@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepare": "husky"
   },
   "repository": {
     "type": "git",
@@ -17,5 +18,10 @@
   "bugs": {
     "url": "https://github.com/wahidyankf/coding-itv-js-flashsale/issues"
   },
-  "homepage": "https://github.com/wahidyankf/coding-itv-js-flashsale#readme"
+  "homepage": "https://github.com/wahidyankf/coding-itv-js-flashsale#readme",
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.4",
+    "@commitlint/config-conventional": "^21.2.4",
+    "husky": "^9.1.7"
+  }
 }
