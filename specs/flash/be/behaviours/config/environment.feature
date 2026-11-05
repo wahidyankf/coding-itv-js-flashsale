@@ -79,3 +79,25 @@ Feature: Configuration of the flash-be API
       | ADMISSION_TICK_MS     | 0     |
       | ADMISSION_TICK_MS     | fast  |
       | ADMISSION_TTL_SECONDS | -5    |
+
+  # Exemption(integration): the rule is a pure function of an environment object and opens no resource; alternative-proof: flash-be:unit / Payment defaults apply outside production
+  @integration-exempt
+  Scenario: Payment defaults apply outside production
+    Given NODE_ENV is not production
+    When the configuration is built from an empty environment
+    Then the payment takes 150 ms
+    And the payment declines 2 percent of charges
+
+  # Exemption(integration): the rule is a pure function of an environment object and opens no resource; alternative-proof: flash-be:unit / Invalid payment settings are refused
+  @integration-exempt
+  Scenario Outline: Invalid payment settings are refused
+    Given <name> is "<value>"
+    When the configuration is built
+    Then building the configuration fails with "<name> <rule>"
+
+    Examples:
+      | name                 | value | rule                                |
+      | PAYMENT_FAILURE_RATE | 2     | must be a number from 0 to 1        |
+      | PAYMENT_FAILURE_RATE | lots  | must be a number from 0 to 1        |
+      | PAYMENT_LATENCY_MS   | -1    | must be zero or a positive integer  |
+      | PAYMENT_LATENCY_MS   | slow  | must be zero or a positive integer  |

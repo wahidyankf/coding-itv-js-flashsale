@@ -8,6 +8,9 @@ export type Config = {
 	// How often the queue admits the next shoppers, and how long an admission stays valid.
 	admissionTickMs: number;
 	admissionTtlSeconds: number;
+	// The mock payment provider: how long a charge takes, and the share of charges it declines (0 to 1).
+	paymentLatencyMs: number;
+	paymentFailureRate: number;
 };
 
 const localDefaults = {
@@ -42,6 +45,22 @@ export function buildConfig(env: NodeJS.ProcessEnv): Config {
 		return value;
 	};
 
+	const rate = (name: string, fallback: number): number => {
+		const value = Number(env[name] ?? fallback);
+		if (!Number.isFinite(value) || value < 0 || value > 1) {
+			throw new Error(`${name} must be a number from 0 to 1`);
+		}
+		return value;
+	};
+
+	const latency = (name: string, fallback: number): number => {
+		const value = Number(env[name] ?? fallback);
+		if (!Number.isInteger(value) || value < 0) {
+			throw new Error(`${name} must be zero or a positive integer`);
+		}
+		return value;
+	};
+
 	return {
 		host: env.FLASH_BE_HOST ?? localDefaults.host,
 		port,
@@ -50,6 +69,8 @@ export function buildConfig(env: NodeJS.ProcessEnv): Config {
 		ticketSecret: withDefault("TICKET_SECRET", localDefaults.ticketSecret),
 		admissionTickMs: positive("ADMISSION_TICK_MS", 1000),
 		admissionTtlSeconds: positive("ADMISSION_TTL_SECONDS", 600),
+		paymentLatencyMs: latency("PAYMENT_LATENCY_MS", 150),
+		paymentFailureRate: rate("PAYMENT_FAILURE_RATE", 0.02),
 	};
 }
 
@@ -59,7 +80,7 @@ export function describeConfig(config: Config): string {
 		const parsed = new URL(url);
 		return `${parsed.hostname}:${parsed.port}`;
 	};
-	return `flash-be config: port=${config.port} database=${endpoint(config.databaseUrl)} redis=${endpoint(config.redisUrl)}`;
+	return `flash-be config: port=${config.port} database=${endpoint(config.databaseUrl)} redis=${endpoint(config.redisUrl)} payment=${config.paymentLatencyMs}ms/${config.paymentFailureRate}`;
 }
 
 export const config = buildConfig(process.env);

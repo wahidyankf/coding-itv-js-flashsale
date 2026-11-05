@@ -14,6 +14,8 @@ const CONFIG_VARS = [
 	"TICKET_SECRET",
 	"ADMISSION_TICK_MS",
 	"ADMISSION_TTL_SECONDS",
+	"PAYMENT_LATENCY_MS",
+	"PAYMENT_FAILURE_RATE",
 ];
 const START_TIMEOUT_MS = 20_000;
 const CONFIG_LINE = "flash-be config:";
@@ -88,7 +90,7 @@ Given(
 );
 
 Given(
-	/^(ADMISSION_TICK_MS|ADMISSION_TTL_SECONDS) is "([^"]*)"$/,
+	/^(ADMISSION_TICK_MS|ADMISSION_TTL_SECONDS|PAYMENT_LATENCY_MS|PAYMENT_FAILURE_RATE) is "([^"]*)"$/,
 	async ({ request: _request }, name: string, value: string) => {
 		env = { ...baseEnv(), [name]: value };
 	},
@@ -131,6 +133,21 @@ Then(
 		expect(exitCode, "flash-be should exit").not.toBeUndefined();
 		expect(exitCode).not.toBe(0);
 		expect(stderr).toContain(message);
+	},
+);
+
+Then(
+	/^the payment takes (\d+) ms$/,
+	async ({ request: _request }, ms: string) => {
+		expect(field("payment")?.[1]?.split("/")[0]).toBe(`${ms}ms`);
+	},
+);
+
+Then(
+	/^the payment declines (\d+) percent of charges$/,
+	async ({ request: _request }, percent: string) => {
+		const rate = Number(field("payment")?.[1]?.split("/")[1]);
+		expect(rate * 100).toBeCloseTo(Number(percent));
 	},
 );
 

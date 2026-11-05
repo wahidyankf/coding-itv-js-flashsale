@@ -196,6 +196,59 @@ describeFeature(
 		);
 
 		Scenario(
+			"Payment defaults apply outside production",
+			({ Given, When, Then, And }) => {
+				let env: NodeJS.ProcessEnv = {};
+				let config: Config;
+
+				Given("NODE_ENV is not production", () => {
+					env = { NODE_ENV: "development" };
+				});
+
+				When("the configuration is built from an empty environment", () => {
+					config = buildConfig(env);
+				});
+
+				Then("the payment takes {int} ms", (_ctx, ms: number) => {
+					expect(config.paymentLatencyMs).toBe(ms);
+				});
+
+				And(
+					"the payment declines {int} percent of charges",
+					(_ctx, percent: number) => {
+						expect(config.paymentFailureRate * 100).toBeCloseTo(percent);
+					},
+				);
+			},
+		);
+
+		ScenarioOutline(
+			"Invalid payment settings are refused",
+			({ Given, When, Then }, examples) => {
+				let env: NodeJS.ProcessEnv = {};
+				let error: unknown;
+
+				Given('<name> is "<value>"', () => {
+					env = { [String(examples.name)]: String(examples.value) };
+				});
+
+				When("the configuration is built", () => {
+					try {
+						buildConfig(env);
+					} catch (caught) {
+						error = caught;
+					}
+				});
+
+				Then('building the configuration fails with "<name> <rule>"', () => {
+					expect((error as Error).message).toBe(
+						`${examples.name} ${examples.rule}`,
+					);
+				});
+			},
+		);
+
+		Scenario(
 			"Configured port is read from the environment",
 			({ Given, When, Then }) => {
 				let env: NodeJS.ProcessEnv = {};
