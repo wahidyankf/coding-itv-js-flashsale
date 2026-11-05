@@ -2,6 +2,7 @@
 // Static check of the Gherkin corpus under specs/ against its bindings.
 // It fails when a scenario is not bound at a layer it must be bound at, or when an exemption is invalid.
 // Bindings are read from source text, so the check is fast and needs no database or browser.
+import { realpathSync } from "node:fs";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -27,13 +28,13 @@ export const OWNERS = [
 		integration: "apps/flash-web/src/bdd",
 		e2e: "apps/flash-web-e2e/steps",
 	},
-	// The checker's own rules. It has no e2e step files, so its scenarios are e2e-exempt.
+	// The checker's own rules. Its e2e steps run the checker as the repository ships it.
 	{
 		name: "tooling",
 		spec: "specs/tooling/bdd-check",
 		unit: "scripts/bdd",
 		integration: "scripts/bdd",
-		e2e: "scripts/bdd",
+		e2e: "scripts/bdd/e2e/steps",
 	},
 ];
 
@@ -558,9 +559,10 @@ async function main() {
 	if (result.failures.length > 0) process.exitCode = 1;
 }
 
+// Compare real paths: on macOS the temp dir is a symlink, and Node reports the resolved module URL.
 if (
 	process.argv[1] &&
-	path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+	realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
 	await main();
 }
