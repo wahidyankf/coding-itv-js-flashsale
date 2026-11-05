@@ -7,7 +7,14 @@
 	},
 	"files": {
 		"ignoreUnknown": false,
-		"includes": ["**", "!.serena", "!package-lock.json"]
+		"includes": [
+			"**",
+			"!.serena",
+			"!package-lock.json",
+			"!**/routeTree.gen.ts",
+			"!**/dist",
+			"!**/.output"
+		]
 	},
 	"formatter": {
 		"enabled": true,
@@ -17,6 +24,9 @@
 		"enabled": true,
 		"rules": {
 			"preset": "recommended"
+		},
+		"domains": {
+			"react": "recommended"
 		}
 	},
 	"javascript": {

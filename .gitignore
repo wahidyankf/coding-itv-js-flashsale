@@ -75,3 +75,15 @@ ehthumbs.db
 
 # Nx
 .nx/
+
+# Frontend and backend build output
+.output/
+.nitro/
+.tanstack/
+dist/
+.vitest/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+*.tsbuildinfo

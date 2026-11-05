@@ -1,0 +1,21 @@
+# Build context is the repo root. Keep it small and free of local state.
+.git
+.github
+.husky
+.nx
+.serena
+.claude
+.agents
+scratch
+node_modules
+**/node_modules
+**/dist
+**/.output
+**/.nitro
+**/.tanstack
+**/test-results
+**/playwright-report
+**/blob-report
+.env
+.env.*
+!.env.example

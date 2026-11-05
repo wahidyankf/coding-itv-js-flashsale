@@ -7,7 +7,11 @@
 		"test": "echo \"Error: no test specified\" && exit 1",
 		"prepare": "husky",
 		"format": "biome format --write .",
-		"check": "biome check ."
+		"check": "biome check .",
+		"docker:dev:up": "docker compose -f compose.dev.yaml up -d --wait",
+		"docker:dev:down": "docker compose -f compose.dev.yaml down",
+		"docker:prod:up": "docker compose -f compose.prod.yaml up -d --build --wait",
+		"docker:prod:down": "docker compose -f compose.prod.yaml down"
 	},
 	"repository": {
 		"type": "git",
@@ -25,9 +29,13 @@
 		"@biomejs/biome": "^2.6.4",
 		"@commitlint/cli": "^21.2.4",
 		"@commitlint/config-conventional": "^21.2.4",
+		"@playwright/test": "^1.64.1",
+		"@types/node": "^26.6.6",
 		"husky": "^9.1.7",
 		"lint-staged": "^17.6.0",
-		"nx": "^24.0.4"
+		"nx": "^24.0.4",
+		"typescript": "^7.0.2",
+		"vitest": "^5.1.0"
 	},
 	"volta": {
 		"node": "26.13.0",
@@ -35,5 +43,11 @@
 	},
 	"lint-staged": {
 		"*.{js,jsx,mjs,cjs,ts,tsx,mts,cts,json,jsonc}": "biome format --write --no-errors-on-unmatched"
-	}
+	},
+	"workspaces": [
+		"apps/flash-be",
+		"apps/flash-be-e2e",
+		"apps/flash-web",
+		"apps/flash-web-e2e"
+	]
 }
