@@ -28,7 +28,7 @@ describeFeature(
 					() => db.destroy(),
 					() => redis.close(),
 				);
-				const app = buildApp(dependenciesFrom(db, redis));
+				const app = buildApp(dependenciesFrom(db, redis, config));
 				cleanups.push(() => app.close());
 				status = (await app.inject({ method: "GET", url: "/nope" })).statusCode;
 			});

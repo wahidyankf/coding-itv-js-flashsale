@@ -2,6 +2,12 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { type Kysely, sql } from "kysely";
 import { type Clock, systemClock } from "./clock.js";
 import type { Database } from "./db.js";
+import {
+	createQueueService,
+	type QueueOptions,
+	type QueueService,
+} from "./queue/queue-service.js";
+import { createRedisQueueStore } from "./queue/redis-queue-store.js";
 import type { RedisClient } from "./redis.js";
 import { registerRoutes } from "./routes.js";
 import { createSaleRepository } from "./sales/sale-repository.js";
@@ -12,13 +18,16 @@ export type Dependencies = {
 	checkDatabase: () => Promise<void>;
 	checkRedis: () => Promise<void>;
 	sales: SaleService;
+	queue: QueueService;
 };
 
 export function dependenciesFrom(
 	db: Kysely<Database>,
 	redis: RedisClient,
+	settings: QueueOptions,
 	clock: Clock = systemClock,
 ): Dependencies {
+	const sales = createSaleService(createSaleRepository(db), clock);
 	return {
 		checkDatabase: async () => {
 			await sql`select 1`.execute(db);
@@ -26,7 +35,13 @@ export function dependenciesFrom(
 		checkRedis: async () => {
 			await redis.ping();
 		},
-		sales: createSaleService(createSaleRepository(db), clock),
+		sales,
+		queue: createQueueService(
+			createRedisQueueStore(redis),
+			sales,
+			clock,
+			settings,
+		),
 	};
 }
 

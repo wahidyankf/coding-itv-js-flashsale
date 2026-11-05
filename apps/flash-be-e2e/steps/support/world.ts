@@ -10,7 +10,7 @@ const DIST = path.resolve(process.cwd(), "../flash-be/dist");
 const SERVER_URL =
 	process.env.DATABASE_URL ?? "postgres://flash:flash@localhost:5432/flash";
 // Redis index reserved for e2e processes started here. Index 15 is for integration tests, 0 for development.
-const E2E_REDIS_URL = (() => {
+export const E2E_REDIS_URL = (() => {
 	const url = new URL(process.env.REDIS_URL ?? "redis://localhost:6379");
 	url.pathname = "/14";
 	return url.toString();
@@ -24,6 +24,8 @@ export const world: {
 	databaseUrl?: string;
 	saleId?: string;
 	failure?: string;
+	// What the shoppers of this scenario hold: their tickets, and who joined first.
+	queue?: { tickets: Map<string, string>; joined: string[] };
 	seed?: { status: number | null; stdout: string; stderr: string };
 	api?: { url: string; process: ChildProcess };
 } = {};

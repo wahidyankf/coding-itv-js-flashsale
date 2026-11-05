@@ -15,3 +15,13 @@ GET {{backend}}/sales/current
 
 ### Backend: one sale by id (replace the id with the one the seed command printed)
 GET {{backend}}/sales/00000000-0000-4000-8000-000000000000
+
+### Backend: join the queue (replace the sale id; the reply holds your ticket)
+POST {{backend}}/sales/00000000-0000-4000-8000-000000000000/queue
+Content-Type: application/json
+
+{ "userId": "ana" }
+
+### Backend: check your place (send the ticket from the join reply)
+GET {{backend}}/sales/00000000-0000-4000-8000-000000000000/queue/ana
+x-queue-ticket: paste-the-ticket-here

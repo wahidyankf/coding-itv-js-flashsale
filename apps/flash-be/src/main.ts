@@ -7,9 +7,21 @@ console.log(describeConfig(config));
 
 const db = createDb(config.databaseUrl);
 const redis = await createRedis(config.redisUrl);
-const app = buildApp(dependenciesFrom(db, redis), { logger: true });
+const deps = dependenciesFrom(db, redis, config);
+const app = buildApp(deps, { logger: true });
+
+// Admits the next shoppers of the current sale. Every instance runs this; the store lets one win each tick.
+const admitter = setInterval(async () => {
+	try {
+		const sale = await deps.sales.current();
+		if (sale) await deps.queue.admitTick(sale.id);
+	} catch (error) {
+		app.log.error({ err: error }, "admission tick failed");
+	}
+}, config.admissionTickMs);
 
 const shutdown = async (): Promise<void> => {
+	clearInterval(admitter);
 	await app.close();
 	await redis.close();
 	await db.destroy();

@@ -52,7 +52,7 @@ describeFeature(
 
 				When("a client sends GET /health", async () => {
 					const { db, redis } = await realClients();
-					const app = buildApp(dependenciesFrom(db, redis));
+					const app = buildApp(dependenciesFrom(db, redis, config));
 					cleanups.push(() => app.close());
 					response = await app.inject({ method: "GET", url: "/health" });
 				});
@@ -79,7 +79,7 @@ describeFeature(
 
 				When("a client sends GET /ready", async () => {
 					const { db, redis } = await realClients();
-					const app = buildApp(dependenciesFrom(db, redis));
+					const app = buildApp(dependenciesFrom(db, redis, config));
 					cleanups.push(() => app.close());
 					response = await app.inject({ method: "GET", url: "/ready" });
 				});
@@ -111,7 +111,7 @@ describeFeature(
 
 				When("a client sends GET /ready", async () => {
 					const { redis } = await realClients();
-					const app = buildApp(dependenciesFrom(db, redis));
+					const app = buildApp(dependenciesFrom(db, redis, config));
 					cleanups.push(() => app.close());
 					response = await app.inject({ method: "GET", url: "/ready" });
 				});
@@ -146,7 +146,7 @@ describeFeature(
 
 				When("a client sends GET /ready", async () => {
 					const { db } = await realClients();
-					const app = buildApp(dependenciesFrom(db, redis));
+					const app = buildApp(dependenciesFrom(db, redis, config));
 					cleanups.push(() => app.close());
 					response = await app.inject({ method: "GET", url: "/ready" });
 				});
@@ -177,7 +177,7 @@ describeFeature(
 				Given("the API is running and Redis answers", async () => {
 					const clients = await realClients();
 					redis = clients.redis;
-					app = buildApp(dependenciesFrom(clients.db, redis));
+					app = buildApp(dependenciesFrom(clients.db, redis, config));
 					cleanups.push(() => app.close());
 					expect(
 						(await app.inject({ method: "GET", url: "/ready" })).statusCode,
