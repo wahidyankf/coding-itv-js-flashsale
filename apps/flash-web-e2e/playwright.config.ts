@@ -1,5 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 import { defineBddConfig } from "playwright-bdd";
+import { FORWARDER_URL } from "./steps/support/forwarder.js";
 
 // Load the root .env so the backend port matches the apps. It is optional.
 try {
@@ -51,6 +52,8 @@ export default defineConfig({
 				"npm --prefix ../flash-web run build && npm --prefix ../flash-web run start",
 			// Wait for the health route, so tests start only when the app is ready.
 			url: `${baseURL}/api/health`,
+			// The web server reaches flash-be through a forwarder that each scenario points where it needs.
+			env: { FLASH_BE_URL: FORWARDER_URL },
 			reuseExistingServer: !process.env.CI,
 			timeout: 240_000,
 		},

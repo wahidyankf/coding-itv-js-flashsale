@@ -1,0 +1,175 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { SaleClient } from "./client";
+import {
+	cleanUser,
+	errorText,
+	holdingText,
+	TEXT,
+	waitingText,
+} from "./messages";
+import type { Place, SaleStatus } from "./types";
+
+// Where the shopper is. `busy` is a request in flight; `message` is a result the shopper reads and moves on from.
+export type Phase =
+	| { kind: "idle" }
+	| { kind: "busy"; text: string }
+	| { kind: "waiting"; place: number }
+	| {
+			kind: "holding";
+			reservationId: string;
+			expiresAt: number;
+			notice?: string;
+	  }
+	| { kind: "purchased" }
+	| { kind: "message"; text: string };
+
+const COUNTDOWN_MS = 250;
+
+export function useShopper(
+	saleId: string,
+	saleStatus: SaleStatus,
+	client: SaleClient,
+	now: () => number = Date.now,
+) {
+	const [phase, setPhase] = useState<Phase>({ kind: "idle" });
+	const [clock, setClock] = useState(now());
+	const user = useRef("");
+	const stopWatching = useRef<() => void>(() => {});
+
+	const stop = useCallback(() => {
+		stopWatching.current();
+		stopWatching.current = () => {};
+	}, []);
+	useEffect(() => stop, [stop]);
+
+	// The countdown ticks only while an item is held.
+	const holding = phase.kind === "holding";
+	useEffect(() => {
+		if (!holding) return;
+		const timer = setInterval(() => setClock(now()), COUNTDOWN_MS);
+		return () => clearInterval(timer);
+	}, [holding, now]);
+
+	const secondsLeft =
+		phase.kind === "holding"
+			? Math.max(0, Math.ceil((phase.expiresAt - clock) / 1000))
+			: 0;
+	useEffect(() => {
+		if (phase.kind === "holding" && phase.expiresAt <= clock) {
+			setPhase({ kind: "message", text: TEXT.holdEnded });
+		}
+	}, [phase, clock]);
+
+	// The line stops moving when the sale ends or sells out, so a waiting shopper is told instead of kept waiting.
+	const waiting = phase.kind === "waiting";
+	useEffect(() => {
+		if (!waiting) return;
+		if (saleStatus === "ended" || saleStatus === "sold_out") {
+			stop();
+			setPhase({
+				kind: "message",
+				text: errorText(saleStatus === "ended" ? "sale_ended" : "sold_out"),
+			});
+		}
+	}, [waiting, saleStatus, stop]);
+
+	const fail = (error: string, retryAfterSeconds?: number) =>
+		setPhase({ kind: "message", text: errorText(error, retryAfterSeconds) });
+
+	const reserve = async (id: string, name: string, ticket: string) => {
+		setPhase({ kind: "busy", text: TEXT.reserving });
+		const result = await client.reserve(id, name, ticket);
+		if (!result.ok) return fail(result.error, result.retryAfterSeconds);
+		const expiresAt = Date.parse(result.body.expiresAt);
+		setClock(now());
+		setPhase({
+			kind: "holding",
+			reservationId: result.body.reservationId,
+			expiresAt,
+		});
+	};
+
+	const buy = async (raw: string) => {
+		const name = cleanUser(raw);
+		if (!name) return setPhase({ kind: "message", text: TEXT.invalidUser });
+		stop();
+		user.current = name;
+		setPhase({ kind: "busy", text: TEXT.joining });
+		const joined = await client.join(saleId, name);
+		if (!joined.ok) return fail(joined.error, joined.retryAfterSeconds);
+
+		const ticket = joined.body.ticket;
+		if (joined.body.state === "admitted") return reserve(saleId, name, ticket);
+
+		const onPlace = (place: Place) => {
+			if (place.state === "waiting") {
+				setPhase({ kind: "waiting", place: place.place });
+			} else if (place.state === "admitted") {
+				stop();
+				void reserve(saleId, name, ticket);
+			} else {
+				stop();
+				setPhase({ kind: "message", text: TEXT.placeLost });
+			}
+		};
+		onPlace(joined.body);
+		stopWatching.current = client.watchPlace(saleId, name, ticket, onPlace);
+	};
+
+	const confirm = async () => {
+		if (phase.kind !== "holding") return;
+		const held = phase;
+		setPhase({ kind: "busy", text: TEXT.paying });
+		const result = await client.confirm(
+			saleId,
+			user.current,
+			held.reservationId,
+		);
+		if (result.ok) return setPhase({ kind: "purchased" });
+		if (result.error === "payment_failed") {
+			return setPhase({ ...held, notice: TEXT.paymentFailed });
+		}
+		fail(result.error, result.retryAfterSeconds);
+	};
+
+	const check = async (raw: string) => {
+		const name = cleanUser(raw);
+		if (!name) return setPhase({ kind: "message", text: TEXT.invalidUser });
+		stop();
+		user.current = name;
+		setPhase({ kind: "busy", text: TEXT.checking });
+		const result = await client.outcome(saleId, name);
+		if (!result.ok) return fail(result.error, result.retryAfterSeconds);
+		const found = result.body;
+		if (found.state === "purchased") return setPhase({ kind: "purchased" });
+		if (found.state === "holding") {
+			setClock(now());
+			return setPhase({
+				kind: "holding",
+				reservationId: found.reservationId,
+				expiresAt: Date.parse(found.expiresAt),
+			});
+		}
+		setPhase({ kind: "message", text: TEXT.nothing });
+	};
+
+	// The sentence under the buttons.
+	const text = (() => {
+		switch (phase.kind) {
+			case "idle":
+				return "";
+			case "busy":
+				return phase.text;
+			case "waiting":
+				return waitingText(phase.place);
+			case "holding":
+				return phase.notice ?? holdingText(secondsLeft);
+			case "purchased":
+				return TEXT.purchased;
+			case "message":
+				return phase.text;
+		}
+	})();
+
+	return { phase, text, buy, confirm, check };
+}

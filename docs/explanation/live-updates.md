@@ -37,5 +37,7 @@ server closes, it drops open streams so it does not wait for them.
 
 ## What the browser sees
 
-The browser never talks to this API. The web app reads the stream on its server and sends it on to the page. Because an
-`EventSource` cannot set the ticket header, the web server adds it.
+The browser never talks to this API. It opens the streams on its own web server, which passes them on (see
+[the web server in front of the API](web-server-proxy.md)). An `EventSource` cannot send the ticket header, so the page
+reads the stream with `fetch` and sets `x-queue-ticket` itself. The reader opens the stream again after a short pause
+if it ends, and stops for good on a `401` or `404`, since asking again will not change the answer.

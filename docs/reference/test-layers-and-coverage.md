@@ -64,6 +64,14 @@ The check's own rules are bound at every layer, with no exemptions:
 - unit and integration: `npm run bdd:check:test` (Vitest, `scripts/bdd/*_tests.mjs`);
 - end-to-end: `npm run bdd:e2e` (playwright-bdd, `scripts/bdd/e2e/steps`), which runs the checker as shipped.
 
+## How the web end-to-end tests control the API
+
+The Playwright config starts one built web server with `FLASH_BE_URL` set to a fixed forwarder address (port 18082). The
+forwarder lives in the test process. Each scenario starts its own `flash-be` on a free port over its own scratch
+database, and the forwarder sends the web server there. A scenario can also cut the forwarder, so the API cannot be
+reached, or make it answer with a canned reply, such as a `500`. Scenarios therefore never share state, and none needs
+an exemption for an API that is down or unwell.
+
 ## Exemption tags
 
 | Tag                   | Meaning                                           |

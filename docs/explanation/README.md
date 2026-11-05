@@ -13,3 +13,4 @@ behaviour, read the specs.
 - [sale-read-cache.md](sale-read-cache.md) - why sale reads may be one second old, and why writes never are.
 - [serving-without-redis.md](serving-without-redis.md) - what each step does when Redis is down, and how Redis catches up when it returns.
 - [live-updates.md](live-updates.md) - why the page hears about changes over Server-Sent Events, and what a stream costs.
+- [web-server-proxy.md](web-server-proxy.md) - why the browser talks to its own web server, and what the page does while a shopper waits.

@@ -212,12 +212,36 @@ The scenarios are in [`specs/flash/be/behaviours/degraded/`](../../specs/flash/b
 
 ## flash-web (port 3000)
 
-| Method | Path          | Response                                                                                                                            |
-| ------ | ------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| GET    | `/`           | HTML home page. It shows `Backend: ok` when `flash-be` answers `GET /health` with `{"status":"ok"}`, and `Backend: down` otherwise. |
-| GET    | `/api/health` | `200` `{"status":"ok"}`                                                                                                             |
+| Method | Path            | Response                                                                                                                              |
+| ------ | --------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/`             | HTML page. It shows the current sale, a form to buy, and `Backend: ok` when `flash-be` answers `GET /health` with `{"status":"ok"}`. |
+| GET    | `/api/health`   | `200` `{"status":"ok"}`                                                                                                               |
+| any    | `/api/sales/*`  | The routes below, passed on to `flash-be`. Anything else under this path answers `404` `{"error":"not_found"}`.                       |
 
-The browser never sees the address of `flash-be`. The home page reads it in a server function.
+### The sale routes
+
+The browser reaches the sale only through `/api/sales`. The web server passes each request to `flash-be` at
+`/sales/...` and sends the answer back, including event streams. The allowed method and path pairs are:
+
+| Method | Path under `/api/sales`                  | Passed to                                     |
+| ------ | ---------------------------------------- | --------------------------------------------- |
+| GET    | `/current`                               | the current sale                              |
+| GET    | `/:saleId`                               | one sale                                      |
+| GET    | `/:saleId/events`                        | the sale event stream                         |
+| POST   | `/:saleId/queue`                         | join the waiting queue                        |
+| GET    | `/:saleId/queue/:userId`                 | a place in the queue                          |
+| GET    | `/:saleId/queue/:userId/events`          | the place event stream                        |
+| POST   | `/:saleId/reservations`                  | hold an item                                  |
+| POST   | `/:saleId/purchases`                     | pay for the held item                         |
+| GET    | `/:saleId/purchases/:userId`             | "did I get it"                                |
+
+Only `content-type`, `accept`, `x-queue-ticket` and `x-forwarded-for` are sent on. Only `content-type`,
+`cache-control` and `retry-after` come back. When `flash-be` cannot be reached the answer is `502`
+`{"error":"backend_unavailable"}`. The address of `flash-be` is read on the server and never reaches the page. See
+[the web server in front of the API](../explanation/web-server-proxy.md).
+
+The scenarios are in [`specs/flash/web/behaviours/proxy/`](../../specs/flash/web/behaviours/proxy/README.md) and
+[`sale/`](../../specs/flash/web/behaviours/sale/README.md).
 
 ## Configuration
 
