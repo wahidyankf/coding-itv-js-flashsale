@@ -5,6 +5,7 @@ import {
 	Scripts,
 } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+import { PAGE_CSS } from "../styles";
 
 export const Route = createRootRoute({
 	head: () => ({
@@ -13,6 +14,9 @@ export const Route = createRootRoute({
 			{ name: "viewport", content: "width=device-width, initial-scale=1" },
 			{ title: "Flash Sale" },
 		],
+		// An empty icon, so the browser does not ask for /favicon.ico.
+		links: [{ rel: "icon", href: "data:," }],
+		styles: [{ children: PAGE_CSS }],
 	}),
 	component: RootComponent,
 });
