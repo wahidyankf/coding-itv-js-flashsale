@@ -1,4 +1,5 @@
-import type { Purchase } from "../domain/purchase.js";
+import { isPurchaseOf, type Purchase } from "../domain/purchase.js";
+import { isLive } from "../domain/reservation.js";
 import { isSaleId } from "../domain/sale.js";
 import { normalizeUser } from "../domain/user.js";
 import type { Clock } from "./ports/clock.js";
@@ -53,7 +54,7 @@ export function createPurchaseService(
 
 			const same = await repository.findByReservation(reservationId);
 			if (same) {
-				return same.user === user && same.saleId === saleId
+				return isPurchaseOf(same, saleId, user)
 					? { ok: true, created: false, purchase: same }
 					: { ok: false, error: "reservation_not_found" };
 			}
@@ -68,8 +69,7 @@ export function createPurchaseService(
 			if (!hold || hold.reservationId !== reservationId) {
 				return { ok: false, error: "reservation_not_found" };
 			}
-			if (hold.expiresAt <= clock())
-				return { ok: false, error: "hold_expired" };
+			if (!isLive(hold, clock())) return { ok: false, error: "hold_expired" };
 
 			// The hold is checked before the charge. If it runs out during the charge, the database decides below.
 			const charge = await payment.charge(reservationId);
@@ -109,7 +109,7 @@ export function createPurchaseService(
 			if (purchase)
 				return { ok: true, user, outcome: { state: "purchased", purchase } };
 			const hold = await repository.findReservation(saleId, user);
-			if (hold && hold.expiresAt > clock()) {
+			if (hold && isLive(hold, clock())) {
 				return {
 					ok: true,
 					user,

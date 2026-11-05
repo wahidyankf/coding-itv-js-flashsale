@@ -1,3 +1,5 @@
+import type { Sale } from "./sale.js";
+
 // The hold one user has on one item of a sale.
 export type Reservation = {
 	saleId: string;
@@ -34,3 +36,25 @@ export type HoldSnapshot = {
 	buyers: string[];
 	holds: Array<{ user: string; reservationId: string; expiresAt: Date }>;
 };
+
+// A hold counts while its end time has not passed. An old one frees the item without any job to clear it.
+export function isLive(reservation: { expiresAt: Date }, now: Date): boolean {
+	return reservation.expiresAt > now;
+}
+
+// What a shopper asks for when they reserve: one item, held for the time the sale sets.
+export function holdRequest(
+	sale: Sale,
+	user: string,
+	reservationId: string,
+	now: Date,
+): ReserveRequest {
+	return {
+		saleId: sale.id,
+		user,
+		reservationId,
+		now,
+		expiresAt: new Date(now.getTime() + sale.reservationTtlSeconds * 1000),
+		stock: sale.stock,
+	};
+}

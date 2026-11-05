@@ -1,15 +1,11 @@
-import {
-	describeSale,
-	isSaleId,
-	type Sale,
-	type SaleView,
-} from "../domain/sale.js";
+import { isSaleId, type Sale } from "../domain/sale.js";
 import type { Clock } from "./ports/clock.js";
 import type { SaleRepository } from "./ports/sale-repository.js";
 import {
 	createCachedSaleRepository,
 	type SaleCacheSettings,
 } from "./sale-cache.js";
+import { describeSale, type SaleView } from "./sale-view.js";
 
 export type SaleService = {
 	// How long public reads may be cached, in milliseconds. Zero means not at all.

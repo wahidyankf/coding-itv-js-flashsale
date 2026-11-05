@@ -1,4 +1,5 @@
 import type { QueuePlace } from "../domain/queue.js";
+import { admissionsPerTick, queueBlock } from "../domain/sale.js";
 import { issueTicket, ticketMatches } from "../domain/ticket.js";
 import { normalizeUser } from "../domain/user.js";
 import type { Clock } from "./ports/clock.js";
@@ -52,8 +53,8 @@ export function createQueueService(
 			const sale = found.view;
 			const user = normalizeUser(rawUser);
 			if (!user) return { ok: false, error: "invalid_user" };
-			if (sale.status === "ended") return { ok: false, error: "sale_ended" };
-			if (sale.status === "sold_out") return { ok: false, error: "sold_out" };
+			const blocked = queueBlock(sale.status);
+			if (blocked) return { ok: false, error: blocked };
 
 			// Without Redis there is no line. The shopper is let through, because the stock and the one item per
 			// user are guarded by Postgres, and a stalled queue would stop the sale.
@@ -92,11 +93,12 @@ export function createQueueService(
 			if (!(await store.tryLead(saleId, options.admissionTickMs - 1))) {
 				return [];
 			}
-			const perTick = Math.max(
-				1,
-				Math.round((sale.admitPerSecond * options.admissionTickMs) / 1000),
+			return store.admit(
+				saleId,
+				admissionsPerTick(sale, options.admissionTickMs),
+				clock(),
+				options.admissionTtlSeconds,
 			);
-			return store.admit(saleId, perTick, clock(), options.admissionTtlSeconds);
 		},
 	};
 }

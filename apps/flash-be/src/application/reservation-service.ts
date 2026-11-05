@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
-import type { GateAnswer, ReserveRequest } from "../domain/reservation.js";
+import {
+	type GateAnswer,
+	holdRequest,
+	type ReserveRequest,
+} from "../domain/reservation.js";
+import { reserveBlock } from "../domain/sale.js";
 import { normalizeUser } from "../domain/user.js";
 import type { GuardedGate } from "./guarded-gate.js";
 import type { Clock } from "./ports/clock.js";
@@ -93,11 +98,8 @@ export function createReservationService(
 
 			// A sale that is not selling answers first, so a shopper learns it without a valid ticket.
 			const { sale, view } = found;
-			if (view.status === "upcoming") {
-				return { ok: false, error: "sale_not_started" };
-			}
-			if (view.status === "ended") return { ok: false, error: "sale_ended" };
-			if (view.status === "sold_out") return { ok: false, error: "sold_out" };
+			const blocked = reserveBlock(view.status);
+			if (blocked) return { ok: false, error: blocked };
 
 			const entry = await queue.check(saleId, rawUser, ticket);
 			if (!entry.ok) {
@@ -116,15 +118,7 @@ export function createReservationService(
 				return { ok: false, error: "not_admitted" };
 			}
 
-			const now = clock();
-			const request = {
-				saleId,
-				user: entry.user,
-				reservationId: randomUUID(),
-				now,
-				expiresAt: new Date(now.getTime() + sale.reservationTtlSeconds * 1000),
-				stock: sale.stock,
-			};
+			const request = holdRequest(sale, entry.user, randomUUID(), clock());
 
 			// Redis decides when it can. When it fails, Postgres decides alone under the sale row lock, which is
 			// slower but keeps the stock and the one-per-user rule. That path writes the hold itself.

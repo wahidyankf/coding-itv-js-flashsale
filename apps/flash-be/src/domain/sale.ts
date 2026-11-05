@@ -19,26 +19,32 @@ export function saleStatus(sale: Sale, now: Date): SaleStatus {
 	return sale.sold >= sale.stock ? "sold_out" : "active";
 }
 
-export type SaleView = {
-	id: string;
-	name: string;
-	status: SaleStatus;
-	startsAt: string;
-	endsAt: string;
-	stock: number;
-	remaining: number;
-};
+// The items nobody holds or bought yet, counting only sales.
+export function remaining(sale: Sale): number {
+	return Math.max(sale.stock - sale.sold, 0);
+}
 
-export function describeSale(sale: Sale, now: Date): SaleView {
-	return {
-		id: sale.id,
-		name: sale.name,
-		status: saleStatus(sale, now),
-		startsAt: sale.startsAt.toISOString(),
-		endsAt: sale.endsAt.toISOString(),
-		stock: sale.stock,
-		remaining: Math.max(sale.stock - sale.sold, 0),
-	};
+export type ReserveBlock = "sale_not_started" | "sale_ended" | "sold_out";
+
+// Why a shopper cannot hold an item now. The sale answers in this order, so a shopper learns it without a ticket.
+export function reserveBlock(status: SaleStatus): ReserveBlock | undefined {
+	if (status === "upcoming") return "sale_not_started";
+	if (status === "ended") return "sale_ended";
+	if (status === "sold_out") return "sold_out";
+	return undefined;
+}
+
+export type QueueBlock = "sale_ended" | "sold_out";
+
+// A shopper may queue before the sale opens, but not once it is over or sold out.
+export function queueBlock(status: SaleStatus): QueueBlock | undefined {
+	if (status === "ended") return "sale_ended";
+	return status === "sold_out" ? status : undefined;
+}
+
+// How many shoppers one admission tick lets in. At least one, so a slow rate never stalls the line.
+export function admissionsPerTick(sale: Sale, tickMs: number): number {
+	return Math.max(1, Math.round((sale.admitPerSecond * tickMs) / 1000));
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
