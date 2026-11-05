@@ -106,18 +106,21 @@ async function startConfigured(): Promise<void> {
 	stdout = "";
 	stderr = "";
 	exitCode = undefined;
-	child = spawn(process.execPath, [ENTRY], {
+	const started = spawn(process.execPath, [ENTRY], {
 		env,
 		stdio: ["ignore", "pipe", "pipe"],
 	});
-	child.stdout?.on("data", (chunk: Buffer) => {
-		stdout += chunk.toString();
+	child = started;
+	// Only the current process may change the state. A late event from the previous scenario's process must not
+	// look like an exit of this one.
+	started.stdout?.on("data", (chunk: Buffer) => {
+		if (child === started) stdout += chunk.toString();
 	});
-	child.stderr?.on("data", (chunk: Buffer) => {
-		stderr += chunk.toString();
+	started.stderr?.on("data", (chunk: Buffer) => {
+		if (child === started) stderr += chunk.toString();
 	});
-	child.on("exit", (code) => {
-		exitCode = code;
+	started.on("exit", (code) => {
+		if (child === started) exitCode = code;
 	});
 	await startAndWait();
 }
