@@ -14,6 +14,13 @@ import {
 	type QueueService,
 } from "./queue/queue-service.js";
 import { createRedisQueueStore } from "./queue/redis-queue-store.js";
+import { createMemoryRateLimitStore } from "./ratelimit/memory-rate-limit-store.js";
+import {
+	createRateLimiter,
+	type RateLimiter,
+	type RateLimits,
+} from "./ratelimit/rate-limiter.js";
+import { createRedisRateLimitStore } from "./ratelimit/redis-rate-limit-store.js";
 import type { RedisClient } from "./redis.js";
 import { createRedisHoldGate } from "./reservations/redis-hold-gate.js";
 import { createReservationRepository } from "./reservations/reservation-repository.js";
@@ -24,6 +31,12 @@ import {
 import { registerRoutes } from "./routes.js";
 import { createSaleRepository } from "./sales/sale-repository.js";
 import { createSaleService, type SaleService } from "./sales/sale-service.js";
+
+export type RateLimitSettings = {
+	rateLimitWindowSeconds: number;
+	rateLimitPerUser: number;
+	rateLimitPerIp: number;
+};
 
 export type PaymentSettings = {
 	paymentLatencyMs: number;
@@ -38,12 +51,13 @@ export type Dependencies = {
 	queue: QueueService;
 	reservations: ReservationService;
 	purchases: PurchaseService;
+	rateLimiter: RateLimiter;
 };
 
 export function dependenciesFrom(
 	db: Kysely<Database>,
 	redis: RedisClient,
-	settings: QueueOptions & PaymentSettings,
+	settings: QueueOptions & PaymentSettings & RateLimitSettings,
 	clock: Clock = systemClock,
 ): Dependencies {
 	const sales = createSaleService(createSaleRepository(db), clock);
@@ -81,14 +95,31 @@ export function dependenciesFrom(
 			sales,
 			clock,
 		),
+		rateLimiter: createRateLimiter(
+			createRedisRateLimitStore(redis),
+			createMemoryRateLimitStore(),
+			clock,
+			rateLimitsFrom(settings),
+		),
+	};
+}
+
+function rateLimitsFrom(settings: RateLimitSettings): RateLimits {
+	return {
+		windowSeconds: settings.rateLimitWindowSeconds,
+		perUser: settings.rateLimitPerUser,
+		perIp: settings.rateLimitPerIp,
 	};
 }
 
 export function buildApp(
 	deps: Dependencies,
-	options: { logger?: boolean } = {},
+	options: { logger?: boolean; trustProxy?: boolean } = {},
 ): FastifyInstance {
-	const app = Fastify({ logger: options.logger ?? false });
+	const app = Fastify({
+		logger: options.logger ?? false,
+		trustProxy: options.trustProxy ?? false,
+	});
 	registerRoutes(app, deps);
 	return app;
 }

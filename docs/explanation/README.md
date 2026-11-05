@@ -9,3 +9,4 @@ behaviour, read the specs.
 - [waiting-queue.md](waiting-queue.md) - why shoppers queue before they reserve, and how the queue admits them.
 - [reservations-and-recovery.md](reservations-and-recovery.md) - how a hold is counted, why Postgres has the last word, and how Redis is rebuilt.
 - [payment-and-refunds.md](payment-and-refunds.md) - how a hold becomes a purchase, why it is safe to repeat, and when a charge is refunded.
+- [rate-limiting.md](rate-limiting.md) - why write requests are limited twice, and what happens when Redis is down.

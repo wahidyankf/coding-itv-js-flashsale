@@ -249,6 +249,61 @@ describeFeature(
 		);
 
 		Scenario(
+			"Rate limit defaults apply outside production",
+			({ Given, When, Then, And }) => {
+				let env: NodeJS.ProcessEnv = {};
+				let config: Config;
+
+				Given("NODE_ENV is not production", () => {
+					env = { NODE_ENV: "development" };
+				});
+
+				When("the configuration is built from an empty environment", () => {
+					config = buildConfig(env);
+				});
+
+				Then(
+					"the limit is {int} requests per user and {int} per address in each {int} seconds",
+					(_ctx, user: number, address: number, seconds: number) => {
+						expect(config.rateLimitPerUser).toBe(user);
+						expect(config.rateLimitPerIp).toBe(address);
+						expect(config.rateLimitWindowSeconds).toBe(seconds);
+					},
+				);
+
+				And("proxy headers are not trusted", () => {
+					expect(config.trustProxy).toBe(false);
+				});
+			},
+		);
+
+		ScenarioOutline(
+			"Invalid rate limit settings are refused",
+			({ Given, When, Then }, examples) => {
+				let env: NodeJS.ProcessEnv = {};
+				let error: unknown;
+
+				Given('<name> is "<value>"', () => {
+					env = { [String(examples.name)]: String(examples.value) };
+				});
+
+				When("the configuration is built", () => {
+					try {
+						buildConfig(env);
+					} catch (caught) {
+						error = caught;
+					}
+				});
+
+				Then('building the configuration fails with "<name> <rule>"', () => {
+					expect((error as Error).message).toBe(
+						`${examples.name} ${examples.rule}`,
+					);
+				});
+			},
+		);
+
+		Scenario(
 			"Configured port is read from the environment",
 			({ Given, When, Then }) => {
 				let env: NodeJS.ProcessEnv = {};

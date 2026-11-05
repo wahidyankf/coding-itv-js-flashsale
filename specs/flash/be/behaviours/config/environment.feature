@@ -101,3 +101,25 @@ Feature: Configuration of the flash-be API
       | PAYMENT_FAILURE_RATE | lots  | must be a number from 0 to 1        |
       | PAYMENT_LATENCY_MS   | -1    | must be zero or a positive integer  |
       | PAYMENT_LATENCY_MS   | slow  | must be zero or a positive integer  |
+
+  # Exemption(integration): the rule is a pure function of an environment object and opens no resource; alternative-proof: flash-be:unit / Rate limit defaults apply outside production
+  @integration-exempt
+  Scenario: Rate limit defaults apply outside production
+    Given NODE_ENV is not production
+    When the configuration is built from an empty environment
+    Then the limit is 30 requests per user and 600 per address in each 10 seconds
+    And proxy headers are not trusted
+
+  # Exemption(integration): the rule is a pure function of an environment object and opens no resource; alternative-proof: flash-be:unit / Invalid rate limit settings are refused
+  @integration-exempt
+  Scenario Outline: Invalid rate limit settings are refused
+    Given <name> is "<value>"
+    When the configuration is built
+    Then building the configuration fails with "<name> <rule>"
+
+    Examples:
+      | name                      | value | rule                         |
+      | RATE_LIMIT_WINDOW_SECONDS | 0     | must be a positive integer   |
+      | RATE_LIMIT_PER_USER       | abc   | must be a positive integer   |
+      | RATE_LIMIT_PER_IP         | -1    | must be a positive integer   |
+      | TRUST_PROXY               | maybe | must be true or false        |

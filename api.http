@@ -16,7 +16,7 @@ GET {{backend}}/sales/current
 ### Backend: one sale by id (replace the id with the one the seed command printed)
 GET {{backend}}/sales/00000000-0000-4000-8000-000000000000
 
-### Backend: join the queue (replace the sale id; the reply holds your ticket)
+### Backend: join the queue (replace the sale id; the reply holds your ticket; write requests can answer 429 with Retry-After)
 POST {{backend}}/sales/00000000-0000-4000-8000-000000000000/queue
 Content-Type: application/json
 

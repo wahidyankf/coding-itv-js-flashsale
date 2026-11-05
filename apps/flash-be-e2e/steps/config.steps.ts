@@ -16,6 +16,10 @@ const CONFIG_VARS = [
 	"ADMISSION_TTL_SECONDS",
 	"PAYMENT_LATENCY_MS",
 	"PAYMENT_FAILURE_RATE",
+	"RATE_LIMIT_WINDOW_SECONDS",
+	"RATE_LIMIT_PER_USER",
+	"RATE_LIMIT_PER_IP",
+	"TRUST_PROXY",
 ];
 const START_TIMEOUT_MS = 20_000;
 const CONFIG_LINE = "flash-be config:";
@@ -90,7 +94,7 @@ Given(
 );
 
 Given(
-	/^(ADMISSION_TICK_MS|ADMISSION_TTL_SECONDS|PAYMENT_LATENCY_MS|PAYMENT_FAILURE_RATE) is "([^"]*)"$/,
+	/^(ADMISSION_TICK_MS|ADMISSION_TTL_SECONDS|PAYMENT_LATENCY_MS|PAYMENT_FAILURE_RATE|RATE_LIMIT_WINDOW_SECONDS|RATE_LIMIT_PER_USER|RATE_LIMIT_PER_IP|TRUST_PROXY) is "([^"]*)"$/,
 	async ({ request: _request }, name: string, value: string) => {
 		env = { ...baseEnv(), [name]: value };
 	},
@@ -150,6 +154,22 @@ Then(
 		expect(rate * 100).toBeCloseTo(Number(percent));
 	},
 );
+
+Then(
+	/^the limit is (\d+) requests per user and (\d+) per address in each (\d+) seconds$/,
+	async (
+		{ request: _request },
+		user: string,
+		address: string,
+		seconds: string,
+	) => {
+		expect(field("limit")?.[1]).toBe(`${user}/${address}/${seconds}s`);
+	},
+);
+
+Then("proxy headers are not trusted", async ({ request: _request }) => {
+	expect(field("proxy")?.[1]).toBe("false");
+});
 
 Then(/^the port is (\d+)$/, async ({ request: _request }, port: string) => {
 	expect(field("port")?.[1]).toBe(String(port));

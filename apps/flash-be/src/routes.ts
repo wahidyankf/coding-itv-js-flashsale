@@ -1,9 +1,27 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { Dependencies } from "./app.js";
 import type { Purchase } from "./purchases/purchase-repository.js";
 
 // All routes live here, with full paths, so the list is easy to scan.
 export function registerRoutes(app: FastifyInstance, deps: Dependencies): void {
+	// Runs before every write route. A client over its limit is told to wait, and the route never runs.
+	const limit = async (request: FastifyRequest, reply: FastifyReply) => {
+		const body = request.body as { userId?: unknown } | null;
+		const verdict = await deps.rateLimiter.check({
+			saleId: (request.params as { saleId: string }).saleId,
+			user: body?.userId,
+			ip: request.ip,
+		});
+		if (!verdict.limited) return;
+		return reply
+			.code(429)
+			.header("retry-after", String(verdict.retryAfterSeconds))
+			.send({
+				error: "rate_limited",
+				retryAfterSeconds: verdict.retryAfterSeconds,
+			});
+	};
+
 	// Liveness: the process is up. It does not check dependencies.
 	app.get("/health", async () => ({ status: "ok" }));
 
@@ -46,6 +64,7 @@ export function registerRoutes(app: FastifyInstance, deps: Dependencies): void {
 	// The waiting queue. A ticket proves the shopper joined; it is sent back in the x-queue-ticket header.
 	app.post<{ Params: { saleId: string }; Body: { userId?: unknown } | null }>(
 		"/sales/:saleId/queue",
+		{ preHandler: limit },
 		async (request, reply) => {
 			const result = await deps.queue.join(
 				request.params.saleId,
@@ -85,6 +104,7 @@ export function registerRoutes(app: FastifyInstance, deps: Dependencies): void {
 	// An admitted shopper holds one item for the sale's hold time. Asking again returns the same hold.
 	app.post<{ Params: { saleId: string }; Body: { userId?: unknown } | null }>(
 		"/sales/:saleId/reservations",
+		{ preHandler: limit },
 		async (request, reply) => {
 			const ticket = request.headers["x-queue-ticket"];
 			const result = await deps.reservations.reserve(
@@ -109,21 +129,25 @@ export function registerRoutes(app: FastifyInstance, deps: Dependencies): void {
 	app.post<{
 		Params: { saleId: string };
 		Body: { userId?: unknown; reservationId?: unknown } | null;
-	}>("/sales/:saleId/purchases", async (request, reply) => {
-		const result = await deps.purchases.confirm(
-			request.params.saleId,
-			request.body?.userId,
-			request.body?.reservationId,
-		);
-		if (!result.ok) {
+	}>(
+		"/sales/:saleId/purchases",
+		{ preHandler: limit },
+		async (request, reply) => {
+			const result = await deps.purchases.confirm(
+				request.params.saleId,
+				request.body?.userId,
+				request.body?.reservationId,
+			);
+			if (!result.ok) {
+				return reply
+					.code(CONFIRM_ERROR_STATUS[result.error])
+					.send({ error: result.error });
+			}
 			return reply
-				.code(CONFIRM_ERROR_STATUS[result.error])
-				.send({ error: result.error });
-		}
-		return reply
-			.code(result.created ? 201 : 200)
-			.send(purchaseBody(result.purchase));
-	});
+				.code(result.created ? 201 : 200)
+				.send(purchaseBody(result.purchase));
+		},
+	);
 
 	// "Did I get it?": a purchase, a live hold, or nothing.
 	app.get<{ Params: { saleId: string; userId: string } }>(

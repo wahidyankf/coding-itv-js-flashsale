@@ -8,7 +8,7 @@ console.log(describeConfig(config));
 const db = createDb(config.databaseUrl);
 const redis = await createRedis(config.redisUrl);
 const deps = dependenciesFrom(db, redis, config);
-const app = buildApp(deps, { logger: true });
+const app = buildApp(deps, { logger: true, trustProxy: config.trustProxy });
 
 // Admits the next shoppers of the current sale. Every instance runs this; the store lets one win each tick.
 const admitter = setInterval(async () => {

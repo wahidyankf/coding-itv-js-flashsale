@@ -39,7 +39,7 @@ describeFeature(
 	),
 	({ Scenario, BeforeEachScenario }) => {
 		BeforeEachScenario(() => {
-			real.resetPayment();
+			real.resetSettings();
 		});
 
 		Scenario(

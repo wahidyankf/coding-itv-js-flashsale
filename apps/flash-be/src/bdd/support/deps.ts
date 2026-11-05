@@ -15,6 +15,7 @@ export const healthyDeps: Dependencies = {
 	reservations: {
 		reserve: async () => ({ ok: false, error: "sale_not_found" }),
 	},
+	rateLimiter: { check: async () => ({ limited: false }) },
 	purchases: {
 		confirm: async () => ({ ok: false, error: "sale_not_found" }),
 		outcome: async () => ({ ok: false, error: "sale_not_found" }),

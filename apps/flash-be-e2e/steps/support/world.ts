@@ -30,7 +30,7 @@ export const world: {
 		joined: string[];
 		holds: Map<string, unknown>;
 		purchases: Map<string, unknown>;
-		replies: Array<{ status: number; error?: string }>;
+		replies: Array<{ status: number; error?: string; retryAfter?: string }>;
 	};
 	seed?: { status: number | null; stdout: string; stderr: string };
 	// Settings for the private API, set by steps before it starts (for example a payment that declines).
@@ -121,6 +121,10 @@ export async function startApi(): Promise<string> {
 			// Instant and never declined, unless a step says otherwise. The default 2 percent would flake scenarios.
 			PAYMENT_LATENCY_MS: "0",
 			PAYMENT_FAILURE_RATE: "0",
+			// Limits out of reach, unless a step sets them.
+			RATE_LIMIT_WINDOW_SECONDS: "60",
+			RATE_LIMIT_PER_USER: "100000",
+			RATE_LIMIT_PER_IP: "100000",
 			...world.apiEnv,
 		}),
 		stdio: ["ignore", "pipe", "pipe"],

@@ -11,6 +11,12 @@ export type Config = {
 	// The mock payment provider: how long a charge takes, and the share of charges it declines (0 to 1).
 	paymentLatencyMs: number;
 	paymentFailureRate: number;
+	// Write requests allowed per user and per address in each window. See ratelimit/.
+	rateLimitWindowSeconds: number;
+	rateLimitPerUser: number;
+	rateLimitPerIp: number;
+	// True only behind a proxy you control, so request.ip comes from X-Forwarded-For.
+	trustProxy: boolean;
 };
 
 const localDefaults = {
@@ -53,6 +59,15 @@ export function buildConfig(env: NodeJS.ProcessEnv): Config {
 		return value;
 	};
 
+	const flag = (name: string, fallback: boolean): boolean => {
+		const value = env[name];
+		if (value === undefined || value === "") return fallback;
+		if (value !== "true" && value !== "false") {
+			throw new Error(`${name} must be true or false`);
+		}
+		return value === "true";
+	};
+
 	const latency = (name: string, fallback: number): number => {
 		const value = Number(env[name] ?? fallback);
 		if (!Number.isInteger(value) || value < 0) {
@@ -71,6 +86,10 @@ export function buildConfig(env: NodeJS.ProcessEnv): Config {
 		admissionTtlSeconds: positive("ADMISSION_TTL_SECONDS", 600),
 		paymentLatencyMs: latency("PAYMENT_LATENCY_MS", 150),
 		paymentFailureRate: rate("PAYMENT_FAILURE_RATE", 0.02),
+		rateLimitWindowSeconds: positive("RATE_LIMIT_WINDOW_SECONDS", 10),
+		rateLimitPerUser: positive("RATE_LIMIT_PER_USER", 30),
+		rateLimitPerIp: positive("RATE_LIMIT_PER_IP", 600),
+		trustProxy: flag("TRUST_PROXY", false),
 	};
 }
 
@@ -80,7 +99,7 @@ export function describeConfig(config: Config): string {
 		const parsed = new URL(url);
 		return `${parsed.hostname}:${parsed.port}`;
 	};
-	return `flash-be config: port=${config.port} database=${endpoint(config.databaseUrl)} redis=${endpoint(config.redisUrl)} payment=${config.paymentLatencyMs}ms/${config.paymentFailureRate}`;
+	return `flash-be config: port=${config.port} database=${endpoint(config.databaseUrl)} redis=${endpoint(config.redisUrl)} payment=${config.paymentLatencyMs}ms/${config.paymentFailureRate} limit=${config.rateLimitPerUser}/${config.rateLimitPerIp}/${config.rateLimitWindowSeconds}s proxy=${config.trustProxy}`;
 }
 
 export const config = buildConfig(process.env);

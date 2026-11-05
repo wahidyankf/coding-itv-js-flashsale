@@ -32,7 +32,7 @@ async function post(
 	);
 }
 
-async function confirm(
+export async function confirm(
 	request: Request,
 	user: string,
 	options: { reservationId?: string; owner?: string } = {},

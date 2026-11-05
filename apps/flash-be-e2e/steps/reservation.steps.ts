@@ -29,7 +29,7 @@ async function post(
 	return reply;
 }
 
-async function reserve(
+export async function reserve(
 	request: Request,
 	user: string,
 	options: { ticket?: string; saleId?: string } = {},

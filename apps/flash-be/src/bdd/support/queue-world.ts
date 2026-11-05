@@ -4,6 +4,8 @@ import type { Clock } from "../../clock.js";
 import { createMockPayment } from "../../payment/mock-payment.js";
 import { createPurchaseService } from "../../purchases/purchase-service.js";
 import { createQueueService } from "../../queue/queue-service.js";
+import { createMemoryRateLimitStore } from "../../ratelimit/memory-rate-limit-store.js";
+import { createRateLimiter } from "../../ratelimit/rate-limiter.js";
 import { createReservationService } from "../../reservations/reservation-service.js";
 import type { Sale } from "../../sales/sale.js";
 import { createSaleService } from "../../sales/sale-service.js";
@@ -72,6 +74,12 @@ export type ShopScenario = QueueScenario & {
 	// Another instance sells the last item to this user, behind the back of the scenario.
 	sellLastItemTo: (user: string) => Promise<void>;
 	wasRefunded: (user: string) => Promise<boolean>;
+	setUserLimit: (requests: number, seconds: number) => Promise<void>;
+	setAddressLimit: (requests: number, seconds: number) => Promise<void>;
+	// Sends the same kind of write request several times, one after the other.
+	repeat: (kind: string, user: string, times: number) => Promise<Response[]>;
+	joinMany: (count: number) => Promise<Response[]>;
+	replies: Response[];
 };
 
 export const QUEUE_OPTIONS = {
@@ -195,6 +203,34 @@ export function purchaseRequests(app: FastifyInstance, scenario: ShopScenario) {
 	};
 }
 
+// Write requests by the name a scenario uses for them, for the rate limit scenarios.
+export function limitRequests(scenario: ShopScenario) {
+	const send = async (kind: string, user: string): Promise<Response> => {
+		if (kind === "join the queue") return scenario.join(user);
+		if (kind === "reserve an item") return scenario.reserve(user);
+		if (kind === "confirm a purchase") {
+			return scenario.confirm(user, { reservationId: "not-an-id" });
+		}
+		throw new Error(`unknown request "${kind}"`);
+	};
+	return {
+		async repeat(kind: string, user: string, times: number) {
+			scenario.replies = [];
+			for (let attempt = 0; attempt < times; attempt++) {
+				scenario.replies.push(await send(kind, user));
+			}
+			return scenario.replies;
+		},
+		async joinMany(count: number) {
+			scenario.replies = [];
+			for (let index = 0; index < count; index++) {
+				scenario.replies.push(await scenario.join(`visitor${index}`));
+			}
+			return scenario.replies;
+		},
+	};
+}
+
 export type UnitQueueScenario = ShopScenario & {
 	app: FastifyInstance;
 	store: MemoryQueueStore;
@@ -249,12 +285,21 @@ export function queueWorld(start: Date): UnitQueueScenario {
 		saleService,
 		clock,
 	);
+	// Limits start far out of reach, so only the rate limit scenarios ever meet them.
+	const limits = { windowSeconds: 60, perUser: 100_000, perIp: 100_000 };
+	const rateLimiter = createRateLimiter(
+		createMemoryRateLimitStore(),
+		createMemoryRateLimitStore(),
+		clock,
+		limits,
+	);
 	const app = buildApp({
 		...healthyDeps,
 		sales: saleService,
 		queue,
 		reservations,
 		purchases,
+		rateLimiter,
 	});
 	const settle = () => new Promise((resolve) => setImmediate(resolve));
 	const scenario: UnitQueueScenario = {
@@ -328,6 +373,17 @@ export function queueWorld(start: Date): UnitQueueScenario {
 		async fixWrites() {
 			repository.broken = false;
 		},
+		replies: [],
+		repeat: notWired,
+		joinMany: notWired,
+		async setUserLimit(requests, seconds) {
+			limits.perUser = requests;
+			limits.windowSeconds = seconds;
+		},
+		async setAddressLimit(requests, seconds) {
+			limits.perIp = requests;
+			limits.windowSeconds = seconds;
+		},
 		confirm: notWired,
 		startConfirm: notWired,
 		finishConfirm: notWired,
@@ -371,12 +427,13 @@ export function queueWorld(start: Date): UnitQueueScenario {
 		}
 		await waiting;
 	};
-	return Object.assign(
+	Object.assign(
 		scenario,
 		queueRequests(app, scenario),
 		reserveRequests(app, scenario),
 		requests,
 	);
+	return Object.assign(scenario, limitRequests(scenario));
 }
 
 function notWired(): never {

@@ -43,12 +43,12 @@ itself: if the item is still free, the commit sells it. If another shopper took 
 
 ## When a step fails
 
-| Failure                             | Result                                                                                   |
-| ----------------------------------- | ---------------------------------------------------------------------------------------- |
-| The provider declines               | `402 payment_failed`. The hold stays, so the shopper can try again until it ends.        |
-| The commit says `sold_out`          | The charge is refunded, `409 sold_out`.                                                  |
-| The commit says `already_purchased` | The charge is refunded, `409 already_purchased`.                                         |
-| Redis fails after the commit        | The purchase stands. The next rebuild from Postgres fixes the gate.                      |
+| Failure                             | Result                                                                            |
+| ----------------------------------- | --------------------------------------------------------------------------------- |
+| The provider declines               | `402 payment_failed`. The hold stays, so the shopper can try again until it ends. |
+| The commit says `sold_out`          | The charge is refunded, `409 sold_out`.                                           |
+| The commit says `already_purchased` | The charge is refunded, `409 already_purchased`.                                  |
+| Redis fails after the commit        | The purchase stands. The next rebuild from Postgres fixes the gate.               |
 
 ## Trade-offs
 

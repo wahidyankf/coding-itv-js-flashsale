@@ -104,17 +104,17 @@ An admitted shopper holds one item for the sale's hold time (`reservation_ttl_se
 Asking again while the hold lasts returns `200` with the same body. A hold that has expired stops counting at once, and
 the item can go to someone else.
 
-| Status | `error`             | When                                                                           |
-| ------ | ------------------- | ------------------------------------------------------------------------------ |
-| `400`  | `invalid_user`      | the user id is missing or invalid                                              |
-| `401`  | `invalid_ticket`    | the ticket is missing or is not the one issued for this sale and user          |
-| `403`  | `not_admitted`      | the user is still waiting, or has no place in the queue                        |
-| `404`  | `sale_not_found`    | the sale id is unknown or malformed                                            |
-| `409`  | `sale_not_started`  | the window has not opened yet                                                  |
-| `409`  | `sale_ended`        | the window has closed                                                          |
-| `409`  | `sold_out`          | no item is free: sold items plus live holds fill the stock                     |
-| `409`  | `already_purchased` | the user already bought an item in this sale                                   |
-| `503`  | `unavailable`       | the reservation state could not be rebuilt in time; try again                  |
+| Status | `error`             | When                                                                  |
+| ------ | ------------------- | --------------------------------------------------------------------- |
+| `400`  | `invalid_user`      | the user id is missing or invalid                                     |
+| `401`  | `invalid_ticket`    | the ticket is missing or is not the one issued for this sale and user |
+| `403`  | `not_admitted`      | the user is still waiting, or has no place in the queue               |
+| `404`  | `sale_not_found`    | the sale id is unknown or malformed                                   |
+| `409`  | `sale_not_started`  | the window has not opened yet                                         |
+| `409`  | `sale_ended`        | the window has closed                                                 |
+| `409`  | `sold_out`          | no item is free: sold items plus live holds fill the stock            |
+| `409`  | `already_purchased` | the user already bought an item in this sale                          |
+| `503`  | `unavailable`       | the reservation state could not be rebuilt in time; try again         |
 
 A sale that is not selling answers before the ticket is checked. The scenarios are in
 [`specs/flash/be/behaviours/reservation/`](../../specs/flash/be/behaviours/reservation/README.md).
@@ -140,27 +140,44 @@ reservation reply:
 The reservation id is the idempotency key. Sending the same request again returns `200` with the same purchase, and the
 shopper is charged once.
 
-| Status | `error`                 | When                                                                                          |
-| ------ | ----------------------- | --------------------------------------------------------------------------------------------- |
-| `400`  | `invalid_user`          | the user id is missing or invalid                                                             |
-| `400`  | `invalid_reservation`   | the reservation id is missing or is not an id                                                 |
-| `402`  | `payment_failed`        | the payment provider declined; the hold stays, so the shopper can try again until it ends     |
-| `404`  | `sale_not_found`        | the sale id is unknown or malformed                                                           |
-| `404`  | `reservation_not_found` | no hold of this user has this id (also for somebody else's reservation id)                    |
-| `409`  | `hold_expired`          | the hold ended before the payment started                                                     |
-| `409`  | `already_purchased`     | the user already bought an item in this sale                                                  |
-| `409`  | `sale_ended`            | the window has closed                                                                         |
+| Status | `error`                 | When                                                                                              |
+| ------ | ----------------------- | ------------------------------------------------------------------------------------------------- |
+| `400`  | `invalid_user`          | the user id is missing or invalid                                                                 |
+| `400`  | `invalid_reservation`   | the reservation id is missing or is not an id                                                     |
+| `402`  | `payment_failed`        | the payment provider declined; the hold stays, so the shopper can try again until it ends         |
+| `404`  | `sale_not_found`        | the sale id is unknown or malformed                                                               |
+| `404`  | `reservation_not_found` | no hold of this user has this id (also for somebody else's reservation id)                        |
+| `409`  | `hold_expired`          | the hold ended before the payment started                                                         |
+| `409`  | `already_purchased`     | the user already bought an item in this sale                                                      |
+| `409`  | `sale_ended`            | the window has closed                                                                             |
 | `409`  | `sold_out`              | the hold ended during the payment and the last item went to someone else; the payment is refunded |
 
 `GET /sales/:saleId/purchases/:userId` answers "did I get it?". `state` is one of:
 
-| `state`     | Body                                                                          |
-| ----------- | ----------------------------------------------------------------------------- |
-| `purchased` | the purchase, as above, plus `"state":"purchased"`                            |
-| `holding`   | `{"userId":"ana","state":"holding","reservationId":"...","expiresAt":"..."}`  |
-| `none`      | `{"userId":"ana","state":"none"}`, also when the hold has expired             |
+| `state`     | Body                                                                         |
+| ----------- | ---------------------------------------------------------------------------- |
+| `purchased` | the purchase, as above, plus `"state":"purchased"`                           |
+| `holding`   | `{"userId":"ana","state":"holding","reservationId":"...","expiresAt":"..."}` |
+| `none`      | `{"userId":"ana","state":"none"}`, also when the hold has expired            |
 
 The scenarios are in [`specs/flash/be/behaviours/purchase/`](../../specs/flash/be/behaviours/purchase/README.md).
+
+## Rate limits
+
+The three write routes (`POST .../queue`, `POST .../reservations` and `POST .../purchases`) count each request against
+the user id in the body and against the client address. Reads are not limited. When either count passes its limit in
+the current window, the answer is:
+
+```json
+{ "error": "rate_limited", "retryAfterSeconds": 7 }
+```
+
+with status `429` and a `Retry-After` header that holds the same number of seconds (at least 1). The window starts at
+the first request, not at a fixed clock tick. The limits are `RATE_LIMIT_PER_USER` (30), `RATE_LIMIT_PER_IP` (600) and
+`RATE_LIMIT_WINDOW_SECONDS` (10). Set `TRUST_PROXY=true` only behind a proxy you control, so that the client address is
+read from `X-Forwarded-For`.
+
+The scenarios are in [`specs/flash/be/behaviours/rate-limit/`](../../specs/flash/be/behaviours/rate-limit/README.md).
 
 ## flash-web (port 3000)
 
@@ -176,7 +193,8 @@ The browser never sees the address of `flash-be`. The home page reads it in a se
 Environment variables are listed in [`.env.example`](../../.env.example), with a comment for each one. The defaults for
 local development are there too. `apps/flash-be/src/config.ts` builds the API configuration from them. In production,
 the API stops at start-up when `DATABASE_URL`, `REDIS_URL` or `TICKET_SECRET` is missing. `PAYMENT_LATENCY_MS` (150) and
-`PAYMENT_FAILURE_RATE` (0.02) tune the mock payment provider.
+`PAYMENT_FAILURE_RATE` (0.02) tune the mock payment provider. The `RATE_LIMIT_*` and `TRUST_PROXY` variables tune the
+rate limits.
 
 ## Manual requests
 

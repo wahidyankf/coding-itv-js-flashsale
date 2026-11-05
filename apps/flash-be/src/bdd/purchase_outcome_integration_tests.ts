@@ -37,7 +37,7 @@ describeFeature(
 	await loadFeature(specFile("flash/be/behaviours/purchase/outcome.feature")),
 	({ Scenario, BeforeEachScenario }) => {
 		BeforeEachScenario(() => {
-			real.resetPayment();
+			real.resetSettings();
 		});
 
 		Scenario("A buyer sees the purchase", ({ Given, And, When, Then }) => {

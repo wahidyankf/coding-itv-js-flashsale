@@ -7,11 +7,15 @@ import { createMockPayment } from "../../payment/mock-payment.js";
 import { createPurchaseRepository } from "../../purchases/purchase-repository.js";
 import { createPurchaseService } from "../../purchases/purchase-service.js";
 import { createRedisQueueStore } from "../../queue/redis-queue-store.js";
+import { createMemoryRateLimitStore } from "../../ratelimit/memory-rate-limit-store.js";
+import { createRateLimiter } from "../../ratelimit/rate-limiter.js";
+import { createRedisRateLimitStore } from "../../ratelimit/redis-rate-limit-store.js";
 import { createRedis } from "../../redis.js";
 import { createRedisHoldGate } from "../../reservations/redis-hold-gate.js";
 import { createReservationRepository } from "../../reservations/reservation-repository.js";
 import { createReservationService } from "../../reservations/reservation-service.js";
 import {
+	limitRequests,
 	purchaseRequests,
 	queueRequests,
 	reserveRequests,
@@ -56,15 +60,26 @@ export async function openQueueIntegration() {
 		base.sales,
 		systemClock,
 	);
-	const app = buildApp({ ...base, reservations, purchases });
+	// Limits start far out of reach; the rate limit scenarios lower them and `resetSettings` raises them again.
+	const limits = { windowSeconds: 60, perUser: 100_000, perIp: 100_000 };
+	const rateLimiter = createRateLimiter(
+		createRedisRateLimitStore(redis),
+		createMemoryRateLimitStore(),
+		systemClock,
+		limits,
+	);
+	const app = buildApp({ ...base, reservations, purchases, rateLimiter });
 	const queueStore = createRedisQueueStore(redis);
 
 	return {
 		db,
-		// Puts the payment back to "instant and never declined" before a scenario.
-		resetPayment() {
+		// Puts the payment back to "instant and never declined", and the limits out of reach, before a scenario.
+		resetSettings() {
 			payment.settings.latencyMs = 0;
 			payment.settings.failureRate = 0;
+			limits.windowSeconds = 60;
+			limits.perUser = 100_000;
+			limits.perIp = 100_000;
 		},
 		scenario(): ShopScenario {
 			const scenario: ShopScenario = {
@@ -130,6 +145,17 @@ export async function openQueueIntegration() {
 					broken = false;
 				},
 				purchases: new Map(),
+				replies: [],
+				repeat: notWired,
+				joinMany: notWired,
+				async setUserLimit(requests, seconds) {
+					limits.perUser = requests;
+					limits.windowSeconds = seconds;
+				},
+				async setAddressLimit(requests, seconds) {
+					limits.perIp = requests;
+					limits.windowSeconds = seconds;
+				},
 				confirm: notWired,
 				startConfirm: notWired,
 				finishConfirm: notWired,
@@ -163,12 +189,13 @@ export async function openQueueIntegration() {
 					return payment.refunded.includes(`mock-${id}`);
 				},
 			};
-			return Object.assign(
+			Object.assign(
 				scenario,
 				queueRequests(app, scenario),
 				reserveRequests(app, scenario),
 				purchaseRequests(app, scenario),
 			);
+			return Object.assign(scenario, limitRequests(scenario));
 		},
 		async close() {
 			await app.close();
