@@ -1,0 +1,59 @@
+{
+	"$schema": "../../node_modules/nx/schemas/project-schema.json",
+	"name": "flash-load",
+	"projectType": "application",
+	"sourceRoot": "apps/flash-load/k6",
+	"implicitDependencies": ["flash-be"],
+	"targets": {
+		"typecheck": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "npm run typecheck",
+				"cwd": "apps/flash-load"
+			}
+		},
+		"lint": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "npm run lint",
+				"cwd": "apps/flash-load"
+			}
+		},
+		"test:quick": {
+			"executor": "nx:run-commands",
+			"options": {
+				"commands": ["npx nx typecheck flash-load", "npx nx lint flash-load"],
+				"cwd": ".",
+				"parallel": false
+			}
+		},
+		"test:quick:watch": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "npx nx watch --projects=flash-load --initialRun -- npx nx run-many -t typecheck lint -p flash-load --output-style=stream",
+				"cwd": "."
+			}
+		},
+		"load:smoke": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "npm run load:smoke",
+				"cwd": "apps/flash-load"
+			}
+		},
+		"load:full": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "npm run load:full",
+				"cwd": "apps/flash-load"
+			}
+		},
+		"load:chaos": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "npm run load:chaos",
+				"cwd": "apps/flash-load"
+			}
+		}
+	}
+}

@@ -1,0 +1,26 @@
+{
+	"compilerOptions": {
+		"target": "ES2022",
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"strict": true,
+		"noEmit": true,
+		"noImplicitAny": true,
+		"noUncheckedIndexedAccess": true,
+		"exactOptionalPropertyTypes": true,
+		"noImplicitOverride": true,
+		"noImplicitReturns": true,
+		"noFallthroughCasesInSwitch": true,
+		"noUnusedLocals": true,
+		"noUnusedParameters": true,
+		"allowUnreachableCode": false,
+		"allowUnusedLabels": false,
+		"forceConsistentCasingInFileNames": true,
+		"verbatimModuleSyntax": true,
+		"allowImportingTsExtensions": true,
+		"skipLibCheck": true,
+		"esModuleInterop": true,
+		"types": ["node", "k6"]
+	},
+	"include": ["k6/**/*.ts", "scripts/**/*.ts"]
+}

@@ -1,0 +1,16 @@
+{
+	"name": "flash-load",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"typecheck": "tsc --noEmit -p tsconfig.json",
+		"lint": "biome lint --error-on-warnings .",
+		"load:smoke": "node scripts/run.ts smoke",
+		"load:full": "node scripts/run.ts full",
+		"load:chaos": "node scripts/run.ts chaos"
+	},
+	"devDependencies": {
+		"@types/k6": "^2.3.1"
+	}
+}

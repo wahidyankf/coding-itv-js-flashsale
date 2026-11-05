@@ -8,6 +8,7 @@ Flash sale monorepo: a Fastify REST API (`flash-be`) and a TanStack Start web cl
 - `apps/flash-be-e2e`: Playwright API tests against `flash-be`.
 - `apps/flash-web`: TanStack Start client. It calls `flash-be` over REST.
 - `apps/flash-web-e2e`: Playwright browser tests against `flash-web`.
+- `apps/flash-load`: k6 load test against three `flash-be` instances behind nginx.
 - `compose.dev.yaml`: Postgres and Redis for local development (project name `flash-dev`).
 - `compose.prod.yaml`: the full stack in containers (project name `flash-prod`).
 - `api.http`: manual requests for the running apps (kulala.nvim format, `,rh` in Neovim sends one).
@@ -55,6 +56,13 @@ npx nx test:quick <app>       # typecheck + lint + unit
 Docs (Markdown links, heading structure, README indexes, and Mermaid diagrams) are checked by a pinned RHINO release. Run `npm run docs:install` once to fetch it into `.tools/`, then `npm run docs:check`. The policy is in `repo-config.yml`.
 
 Behaviour scenarios are checked against their bindings with `npm run bdd:check`. The combined unit and integration coverage gate (99%) is `npx nx test:coverage <app>`, which needs the dev compose stack.
+
+## Load test
+
+`npx nx load:smoke flash-load` (500 shoppers), `load:full` (5,000 shoppers) and `load:chaos` (Redis stops mid-run) run the
+stack in Docker and then check Postgres and Redis. The limits are fixed before any run: reserve p95 under 300 ms,
+purchase p95 under 500 ms, and no server errors. No item may be sold twice or over the stock. See
+[docs/reference/load-test.md](docs/reference/load-test.md).
 
 ## Documentation
 

@@ -6,6 +6,7 @@ COPY apps/flash-be/package.json apps/flash-be/
 COPY apps/flash-be-e2e/package.json apps/flash-be-e2e/
 COPY apps/flash-web/package.json apps/flash-web/
 COPY apps/flash-web-e2e/package.json apps/flash-web-e2e/
+COPY apps/flash-load/package.json apps/flash-load/
 RUN npm ci --ignore-scripts
 COPY apps/flash-be apps/flash-be
 RUN npm run build -w flash-be && npm prune --omit=dev

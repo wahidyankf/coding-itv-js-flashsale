@@ -212,28 +212,28 @@ The scenarios are in [`specs/flash/be/behaviours/degraded/`](../../specs/flash/b
 
 ## flash-web (port 3000)
 
-| Method | Path            | Response                                                                                                                              |
-| ------ | --------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| GET    | `/`             | HTML page. It shows the current sale, a form to buy, and `Backend: ok` when `flash-be` answers `GET /health` with `{"status":"ok"}`. |
-| GET    | `/api/health`   | `200` `{"status":"ok"}`                                                                                                               |
-| any    | `/api/sales/*`  | The routes below, passed on to `flash-be`. Anything else under this path answers `404` `{"error":"not_found"}`.                       |
+| Method | Path           | Response                                                                                                                             |
+| ------ | -------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| GET    | `/`            | HTML page. It shows the current sale, a form to buy, and `Backend: ok` when `flash-be` answers `GET /health` with `{"status":"ok"}`. |
+| GET    | `/api/health`  | `200` `{"status":"ok"}`                                                                                                              |
+| any    | `/api/sales/*` | The routes below, passed on to `flash-be`. Anything else under this path answers `404` `{"error":"not_found"}`.                      |
 
 ### The sale routes
 
 The browser reaches the sale only through `/api/sales`. The web server passes each request to `flash-be` at
 `/sales/...` and sends the answer back, including event streams. The allowed method and path pairs are:
 
-| Method | Path under `/api/sales`                  | Passed to                                     |
-| ------ | ---------------------------------------- | --------------------------------------------- |
-| GET    | `/current`                               | the current sale                              |
-| GET    | `/:saleId`                               | one sale                                      |
-| GET    | `/:saleId/events`                        | the sale event stream                         |
-| POST   | `/:saleId/queue`                         | join the waiting queue                        |
-| GET    | `/:saleId/queue/:userId`                 | a place in the queue                          |
-| GET    | `/:saleId/queue/:userId/events`          | the place event stream                        |
-| POST   | `/:saleId/reservations`                  | hold an item                                  |
-| POST   | `/:saleId/purchases`                     | pay for the held item                         |
-| GET    | `/:saleId/purchases/:userId`             | "did I get it"                                |
+| Method | Path under `/api/sales`         | Passed to              |
+| ------ | ------------------------------- | ---------------------- |
+| GET    | `/current`                      | the current sale       |
+| GET    | `/:saleId`                      | one sale               |
+| GET    | `/:saleId/events`               | the sale event stream  |
+| POST   | `/:saleId/queue`                | join the waiting queue |
+| GET    | `/:saleId/queue/:userId`        | a place in the queue   |
+| GET    | `/:saleId/queue/:userId/events` | the place event stream |
+| POST   | `/:saleId/reservations`         | hold an item           |
+| POST   | `/:saleId/purchases`            | pay for the held item  |
+| GET    | `/:saleId/purchases/:userId`    | "did I get it"         |
 
 Only `content-type`, `accept`, `x-queue-ticket` and `x-forwarded-for` are sent on. Only `content-type`,
 `cache-control` and `retry-after` come back. When `flash-be` cannot be reached the answer is `502`

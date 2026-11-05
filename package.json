@@ -60,6 +60,7 @@
 		"apps/flash-be",
 		"apps/flash-be-e2e",
 		"apps/flash-web",
-		"apps/flash-web-e2e"
+		"apps/flash-web-e2e",
+		"apps/flash-load"
 	]
 }

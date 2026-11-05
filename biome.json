@@ -74,5 +74,13 @@
 				"organizeImports": "on"
 			}
 		}
-	}
+	},
+	"overrides": [
+		{
+			"includes": ["apps/flash-load/k6/**"],
+			"javascript": {
+				"globals": ["__ENV"]
+			}
+		}
+	]
 }

@@ -4,8 +4,8 @@ Guidance for AI coding agents working in this repository. For setup and run comm
 
 ## Project
 
-Flash sale monorepo with four apps in `apps/`: `flash-be` (Fastify REST API), `flash-web` (TanStack Start client),
-`flash-be-e2e` and `flash-web-e2e` (Playwright). Data lives in Postgres (Kysely, no ORM) and Redis.
+Flash sale monorepo with five apps in `apps/`: `flash-be` (Fastify REST API), `flash-web` (TanStack Start client),
+`flash-be-e2e` and `flash-web-e2e` (Playwright), and `flash-load` (k6 load test). Data lives in Postgres (Kysely, no ORM) and Redis.
 
 ## Docs and specs
 
@@ -15,13 +15,15 @@ Flash sale monorepo with four apps in `apps/`: `flash-be` (Fastify REST API), `f
 ## Repository rules
 
 - Default branch is `main`. Do not commit or push unless the user asks.
-- Node and npm are pinned with Volta in `package.json`. Run `npm install` at the root. All four apps are npm
+- Node and npm are pinned with Volta in `package.json`. Run `npm install` at the root. All five apps are npm
   workspaces with one `package-lock.json`.
 - Nx runs commands only. Do not add Nx plugins (`@nx/*`, `nx-*`) or run `nx init`. Define every target in the app's
   `project.json` with `"executor": "nx:run-commands"`.
 - Run targets with `npx nx <target> <app>`. Every app has `typecheck`, `lint`, `test:quick`, and `test:quick:watch`.
   - `flash-be` and `flash-web` also have `test:unit` and `test:integration`.
   - `flash-be-e2e` and `flash-web-e2e` have `test:e2e` instead.
+  - `flash-load` has `load:smoke`, `load:full` and `load:chaos` instead. They need Docker and run the stack. Its limits are in
+    `apps/flash-load/k6/profiles.ts`. A failed run is a finding; do not change a limit to make it pass.
   - `test:quick` runs `typecheck`, `lint`, and `test:unit`, or only `typecheck` and `lint` for the e2e apps. Change a
     check in its own target, not in `test:quick`. Keep `test:quick:watch` in sync with it.
 - Biome formats and lints (tabs, double quotes). Do not add Prettier or ESLint.
