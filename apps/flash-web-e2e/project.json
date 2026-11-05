@@ -1,0 +1,55 @@
+{
+	"$schema": "../../node_modules/nx/schemas/project-schema.json",
+	"name": "flash-web-e2e",
+	"projectType": "application",
+	"sourceRoot": "apps/flash-web-e2e/tests",
+	"implicitDependencies": ["flash-web", "flash-be"],
+	"targets": {
+		"typecheck": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "npm run typecheck",
+				"cwd": "apps/flash-web-e2e"
+			}
+		},
+		"lint": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "npm run lint",
+				"cwd": "apps/flash-web-e2e"
+			}
+		},
+		"test:e2e": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "npm run test:e2e",
+				"cwd": "apps/flash-web-e2e"
+			}
+		},
+		"test:e2e:watch": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "npx playwright test --ui",
+				"cwd": "apps/flash-web-e2e"
+			}
+		},
+		"test:quick": {
+			"executor": "nx:run-commands",
+			"options": {
+				"commands": [
+					"npx nx typecheck flash-web-e2e",
+					"npx nx lint flash-web-e2e"
+				],
+				"cwd": ".",
+				"parallel": false
+			}
+		},
+		"test:quick:watch": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "npx nx watch --projects=flash-web-e2e --initialRun -- npx nx run-many -t typecheck lint -p flash-web-e2e --output-style=stream",
+				"cwd": "."
+			}
+		}
+	}
+}
