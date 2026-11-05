@@ -46,6 +46,9 @@
 		"typescript": "^7.0.2",
 		"vitest": "^5.1.0"
 	},
+	"overrides": {
+		"minimatch": "^11.0.4"
+	},
 	"volta": {
 		"node": "26.13.0",
 		"npm": "12.2.1"
