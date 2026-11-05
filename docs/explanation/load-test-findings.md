@@ -26,6 +26,17 @@ seconds and requires every confirmation to answer in under 500 ms. It failed bef
 
 The same chaos profile then gave a purchase p95 of 155 ms, which is the 150 ms of the mock payment plus the database.
 
+## A buyer asking again during the outage gets a different refusal
+
+In the chaos run, 12 to 15 of about 200 buyers who reserved a second time were refused with `403 not_admitted` and not
+`409 already_purchased`, so k6 reports the check "a second reserve is refused" as failed for them. No second hold was
+made and no invariant broke. The reserve route checks the queue place before it asks the gate, and the queue lives only
+in Redis. The load stack runs Redis without persistence, so a stop and start empties the queue, and a shopper who bought
+a moment ago is no longer admitted. This is likely, not proven. It is left as it is: the refusal is safe, and a lost
+queue is the documented cost of keeping the queue in Redis (see
+[serving without Redis](serving-without-redis.md)). The check stays in the script, so the number is visible in every
+chaos run.
+
 ## How the runs went
 
 | Profile | Stock sold     | Reserve p95 | Purchase p95 | Server errors |
