@@ -165,6 +165,49 @@ describeFeature(
 			},
 		);
 
+		Scenario(
+			"A buyer is told so when the queue was lost",
+			({ Given, And, When, Then }) => {
+				const world = newWorld();
+
+				Given(
+					"a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour",
+					async () => openSale(world),
+				);
+
+				And("{string} has been admitted", async (_ctx, user: string) => {
+					await world.admitted(user);
+				});
+
+				And("{string} has reserved an item", async (_ctx, user: string) => {
+					await world.reserve(user);
+				});
+
+				And(
+					"{string} has confirmed the purchase",
+					async (_ctx, user: string) => {
+						await world.confirm(user);
+					},
+				);
+
+				And("the queue is lost", async () => {
+					await world.loseQueue();
+				});
+
+				When("{string} reserves an item", async (_ctx, user: string) => {
+					await world.reserve(user);
+				});
+
+				Then("the response status is {int}", (_ctx, status: number) => {
+					expect(response(world).statusCode).toBe(status);
+				});
+
+				And("the error is {string}", (_ctx, error: string) => {
+					expect(response(world).json().error).toBe(error);
+				});
+			},
+		);
+
 		ScenarioOutline(
 			"A sale that is not selling does not take reservations",
 			({ Given, When, Then, And }, examples) => {

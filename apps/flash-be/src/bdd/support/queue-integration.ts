@@ -52,6 +52,7 @@ export async function openQueueIntegration() {
 	const reservations = createReservationService(
 		createGuardedGate(createRedisHoldGate(flaky)),
 		{
+			hasPurchase: (saleId, user) => working.hasPurchase(saleId, user),
 			save: (row) => (broken ? failing : working).save(row),
 			rebuild: (saleId, now, restore) => working.rebuild(saleId, now, restore),
 			reserveWithoutRedis: (request, ready) =>

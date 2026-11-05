@@ -35,6 +35,16 @@ Feature: Reserving an item
     Then the response status is 401
     And the error is "invalid_ticket"
 
+  Scenario: A buyer is told so when the queue was lost
+    Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
+    And "ana" has been admitted
+    And "ana" has reserved an item
+    And "ana" has confirmed the purchase
+    And the queue is lost
+    When "ana" reserves an item
+    Then the response status is 409
+    And the error is "already_purchased"
+
   Scenario Outline: A sale that is not selling does not take reservations
     Given a sale with stock 10 and <sold> sold that opens <opens> and closes <closes>
     When "ana" reserves an item

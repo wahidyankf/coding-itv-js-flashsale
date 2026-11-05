@@ -15,6 +15,8 @@ export type ReservationRow = {
 
 // Reservations are written to Postgres next to Redis. Redis decides fast; this copy is what a rebuild reads.
 export type ReservationRepository = {
+	// True when the user already bought in this sale. Asked only when the queue has no place for them.
+	hasPurchase(saleId: string, user: string): Promise<boolean>;
 	// One row per user and sale. A new hold replaces an expired one.
 	save(row: ReservationRow): Promise<void>;
 	// The reservation when Redis is down: Postgres counts the sold items and the live holds under the sale row lock.
@@ -36,6 +38,16 @@ export function createReservationRepository(
 	db: Kysely<Database>,
 ): ReservationRepository {
 	return {
+		async hasPurchase(saleId, user) {
+			const row = await db
+				.selectFrom("purchases")
+				.select("id")
+				.where("sale_id", "=", saleId)
+				.where("user_id", "=", user)
+				.executeTakeFirst();
+			return row !== undefined;
+		},
+
 		async save(row) {
 			await db
 				.insertInto("reservations")

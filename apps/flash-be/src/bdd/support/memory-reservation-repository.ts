@@ -18,6 +18,10 @@ export function memoryReservationRepository(
 		broken: false,
 		rows: new Map(),
 
+		async hasPurchase(saleId, user) {
+			return buyersOf(saleId).includes(user);
+		},
+
 		async save(row) {
 			if (repository.broken) throw new Error("postgres is unreachable");
 			repository.rows.set(`${row.saleId}:${row.user}`, row);

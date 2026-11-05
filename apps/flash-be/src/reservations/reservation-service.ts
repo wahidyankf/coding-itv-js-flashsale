@@ -102,7 +102,13 @@ export function createReservationService(
 			const entry = await queue.check(saleId, rawUser, ticket);
 			if (!entry.ok) {
 				if (entry.error === "not_in_queue") {
-					return { ok: false, error: "not_admitted" };
+					// The queue is only in Redis and can be lost. A shopper who already bought is told so, not sent back.
+					const user = normalizeUser(rawUser);
+					const bought = user && (await repository.hasPurchase(saleId, user));
+					return {
+						ok: false,
+						error: bought ? "already_purchased" : "not_admitted",
+					};
 				}
 				return { ok: false, error: entry.error };
 			}
