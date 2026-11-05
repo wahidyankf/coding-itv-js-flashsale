@@ -11,3 +11,4 @@ behaviour, read the specs.
 - [payment-and-refunds.md](payment-and-refunds.md) - how a hold becomes a purchase, why it is safe to repeat, and when a charge is refunded.
 - [rate-limiting.md](rate-limiting.md) - why write requests are limited twice, and what happens when Redis is down.
 - [sale-read-cache.md](sale-read-cache.md) - why sale reads may be one second old, and why writes never are.
+- [serving-without-redis.md](serving-without-redis.md) - what each step does when Redis is down, and how Redis catches up when it returns.

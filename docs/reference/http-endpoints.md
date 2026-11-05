@@ -188,6 +188,14 @@ read from `X-Forwarded-For`.
 
 The scenarios are in [`specs/flash/be/behaviours/rate-limit/`](../../specs/flash/be/behaviours/rate-limit/README.md).
 
+## While Redis is down
+
+`POST .../queue` answers `200` with a ticket and `"state":"admitted"`, `GET .../queue/:userId` answers `admitted` for a
+valid ticket, and reservations are decided by Postgres alone. `GET /ready` answers `503` with `"redis":"error"`. The rest
+of the API behaves as usual. See [serving without Redis](../explanation/serving-without-redis.md).
+
+The scenarios are in [`specs/flash/be/behaviours/degraded/`](../../specs/flash/be/behaviours/degraded/README.md).
+
 ## flash-web (port 3000)
 
 | Method | Path          | Response                                                                                                                            |

@@ -6,6 +6,7 @@ import { createPurchaseService } from "../../purchases/purchase-service.js";
 import { createQueueService } from "../../queue/queue-service.js";
 import { createMemoryRateLimitStore } from "../../ratelimit/memory-rate-limit-store.js";
 import { createRateLimiter } from "../../ratelimit/rate-limiter.js";
+import { createGuardedGate } from "../../reservations/guarded-gate.js";
 import { createReservationService } from "../../reservations/reservation-service.js";
 import type { Sale } from "../../sales/sale.js";
 import { createSaleService } from "../../sales/sale-service.js";
@@ -24,6 +25,7 @@ import {
 	type MemoryReservationRepository,
 	memoryReservationRepository,
 } from "./memory-reservation-repository.js";
+import { switchable } from "./switchable.js";
 
 export type Response = Awaited<ReturnType<FastifyInstance["inject"]>>;
 
@@ -79,6 +81,10 @@ export type ShopScenario = QueueScenario & {
 	setSold: (sold: number) => Promise<void>;
 	readSale: () => Promise<Response>;
 	readCurrentSale: () => Promise<Response>;
+	// Redis stops answering, and answers again. What it held is untouched; `loseQueue` and
+	// `loseReservationState` take the data away.
+	breakRedis: () => Promise<void>;
+	fixRedis: () => Promise<void>;
 	setUserLimit: (requests: number, seconds: number) => Promise<void>;
 	setAddressLimit: (requests: number, seconds: number) => Promise<void>;
 	// Sends the same kind of write request several times, one after the other.
@@ -273,8 +279,11 @@ export function queueWorld(start: Date): UnitQueueScenario {
 	let now = start;
 	const clock: Clock = () => now;
 	const sales: Sale[] = [];
+	const redisState = { down: false };
+	const isDown = () => redisState.down;
 	const store = memoryQueueStore(clock);
-	const gate = memoryHoldGate(clock);
+	const memoryGate = memoryHoldGate(clock);
+	const gate = createGuardedGate(switchable(memoryGate, isDown));
 	let purchaseRepository: MemoryPurchaseRepository | undefined;
 	const repository = memoryReservationRepository(
 		(saleId) => purchaseRepository?.buyersOf(saleId) ?? [],
@@ -295,7 +304,12 @@ export function queueWorld(start: Date): UnitQueueScenario {
 	});
 	const cache = { ttlMs: 0 };
 	const saleService = createSaleService(fakeRepository(sales), clock, cache);
-	const queue = createQueueService(store, saleService, clock, QUEUE_OPTIONS);
+	const queue = createQueueService(
+		switchable(store, isDown),
+		saleService,
+		clock,
+		QUEUE_OPTIONS,
+	);
 	const reservations = createReservationService(
 		gate,
 		repository,
@@ -314,13 +328,16 @@ export function queueWorld(start: Date): UnitQueueScenario {
 	// Limits start far out of reach, so only the rate limit scenarios ever meet them.
 	const limits = { windowSeconds: 60, perUser: 100_000, perIp: 100_000 };
 	const rateLimiter = createRateLimiter(
-		createMemoryRateLimitStore(),
+		switchable(createMemoryRateLimitStore(), isDown),
 		createMemoryRateLimitStore(),
 		clock,
 		limits,
 	);
 	const app = buildApp({
 		...healthyDeps,
+		checkRedis: async () => {
+			if (redisState.down) throw new Error("redis is down");
+		},
 		sales: saleService,
 		queue,
 		reservations,
@@ -331,7 +348,7 @@ export function queueWorld(start: Date): UnitQueueScenario {
 	const scenario: UnitQueueScenario = {
 		app,
 		store,
-		gate,
+		gate: memoryGate,
 		repository,
 		queue,
 		reservations,
@@ -391,7 +408,7 @@ export function queueWorld(start: Date): UnitQueueScenario {
 			store.clear();
 		},
 		async loseReservationState() {
-			gate.forget(scenario.saleId);
+			memoryGate.forget(scenario.saleId);
 		},
 		async breakWrites() {
 			repository.broken = true;
@@ -409,6 +426,12 @@ export function queueWorld(start: Date): UnitQueueScenario {
 		async setAddressLimit(requests, seconds) {
 			limits.perIp = requests;
 			limits.windowSeconds = seconds;
+		},
+		async breakRedis() {
+			redisState.down = true;
+		},
+		async fixRedis() {
+			redisState.down = false;
 		},
 		async setSaleCache(ms) {
 			cache.ttlMs = ms;

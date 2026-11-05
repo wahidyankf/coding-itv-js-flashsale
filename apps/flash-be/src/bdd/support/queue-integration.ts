@@ -11,6 +11,7 @@ import { createMemoryRateLimitStore } from "../../ratelimit/memory-rate-limit-st
 import { createRateLimiter } from "../../ratelimit/rate-limiter.js";
 import { createRedisRateLimitStore } from "../../ratelimit/redis-rate-limit-store.js";
 import { createRedis } from "../../redis.js";
+import { createGuardedGate } from "../../reservations/guarded-gate.js";
 import { createRedisHoldGate } from "../../reservations/redis-hold-gate.js";
 import { createReservationRepository } from "../../reservations/reservation-repository.js";
 import { createReservationService } from "../../reservations/reservation-service.js";
@@ -23,6 +24,7 @@ import {
 	saleRequests,
 } from "./queue-world.js";
 import { insertSale } from "./seed.js";
+import { switchable } from "./switchable.js";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -31,9 +33,12 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export async function openQueueIntegration() {
 	const db = createDb(config.databaseUrl);
 	const redis = await createRedis(config.redisUrl);
+	// What the app sees. While `redisState.down` is set, every call fails; the data in Redis is untouched.
+	const redisState = { down: false };
+	const flaky = switchable(redis, () => redisState.down);
 	// The cache time starts at zero, so a scenario only meets the cache when it asks for it.
 	const cache = { ttlMs: 0 };
-	const base = dependenciesFrom(db, redis, config, systemClock, cache);
+	const base = dependenciesFrom(db, flaky, config, systemClock, cache);
 
 	// A second database handle that points at a port nobody listens on. Saving through it fails the way an
 	// unreachable Postgres does, while the rest of the app keeps its working connection.
@@ -44,10 +49,12 @@ export async function openQueueIntegration() {
 	const failing = createReservationRepository(closedDb);
 	let broken = false;
 	const reservations = createReservationService(
-		createRedisHoldGate(redis),
+		createGuardedGate(createRedisHoldGate(flaky)),
 		{
 			save: (row) => (broken ? failing : working).save(row),
 			rebuild: (saleId, now, restore) => working.rebuild(saleId, now, restore),
+			reserveWithoutRedis: (request, ready) =>
+				working.reserveWithoutRedis(request, ready),
 		},
 		base.sales,
 		base.queue,
@@ -55,7 +62,7 @@ export async function openQueueIntegration() {
 	);
 	// Latency and declines are zero until a scenario asks for them, so the default 2 percent never decides a result.
 	const payment = createMockPayment({ latencyMs: 0, failureRate: 0 });
-	const gate = createRedisHoldGate(redis);
+	const gate = createGuardedGate(createRedisHoldGate(flaky));
 	const purchases = createPurchaseService(
 		createPurchaseRepository(db),
 		payment,
@@ -66,12 +73,13 @@ export async function openQueueIntegration() {
 	// Limits start far out of reach; the rate limit scenarios lower them and `resetSettings` raises them again.
 	const limits = { windowSeconds: 60, perUser: 100_000, perIp: 100_000 };
 	const rateLimiter = createRateLimiter(
-		createRedisRateLimitStore(redis),
+		createRedisRateLimitStore(flaky),
 		createMemoryRateLimitStore(),
 		systemClock,
 		limits,
 	);
 	const app = buildApp({ ...base, reservations, purchases, rateLimiter });
+	// The test scaffolding admits shoppers straight in Redis, whether or not the app can reach it.
 	const queueStore = createRedisQueueStore(redis);
 
 	return {
@@ -84,6 +92,7 @@ export async function openQueueIntegration() {
 			limits.perUser = 100_000;
 			limits.perIp = 100_000;
 			cache.ttlMs = 0;
+			redisState.down = false;
 		},
 		scenario(): ShopScenario {
 			const scenario: ShopScenario = {
@@ -159,6 +168,12 @@ export async function openQueueIntegration() {
 				async setAddressLimit(requests, seconds) {
 					limits.perIp = requests;
 					limits.windowSeconds = seconds;
+				},
+				async breakRedis() {
+					redisState.down = true;
+				},
+				async fixRedis() {
+					redisState.down = false;
 				},
 				async setSaleCache(ms) {
 					cache.ttlMs = ms;

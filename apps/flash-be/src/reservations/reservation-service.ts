@@ -3,7 +3,8 @@ import type { Clock } from "../clock.js";
 import type { QueueService } from "../queue/queue-service.js";
 import { normalizeUser } from "../queue/user.js";
 import type { SaleService } from "../sales/sale-service.js";
-import type { HoldGate } from "./hold-gate.js";
+import type { GuardedGate } from "./guarded-gate.js";
+import type { GateAnswer, ReserveRequest } from "./hold-gate.js";
 import type { ReservationRepository } from "./reservation-repository.js";
 
 export type ReserveError =
@@ -44,7 +45,7 @@ const POLL_MS = 25;
 export type ReservationService = ReturnType<typeof createReservationService>;
 
 export function createReservationService(
-	gate: HoldGate,
+	gate: GuardedGate,
 	repository: ReservationRepository,
 	sales: SaleService,
 	queue: QueueService,
@@ -69,6 +70,14 @@ export function createReservationService(
 			if (await gate.isReady(saleId)) return true;
 		}
 		return false;
+	}
+
+	// The fast path: ask the gate, and rebuild its state first when it has none.
+	async function viaGate(request: ReserveRequest): Promise<GateAnswer> {
+		const answer = await gate.reserve(request);
+		if (answer.kind !== "not_ready") return answer;
+		if (!(await ensureReady(request.saleId))) return { kind: "not_ready" };
+		return gate.reserve(request);
 	}
 
 	return {
@@ -111,16 +120,30 @@ export function createReservationService(
 				stock: sale.stock,
 			};
 
-			let answer = await gate.reserve(request);
-			if (answer.kind === "not_ready") {
-				if (!(await ensureReady(saleId))) {
-					return { ok: false, error: "unavailable" };
+			// Redis decides when it can. When it fails, Postgres decides alone under the sale row lock, which is
+			// slower but keeps the stock and the one-per-user rule. That path writes the hold itself.
+			let answer: GateAnswer;
+			let written = false;
+			try {
+				answer = await viaGate(request);
+			} catch {
+				gate.markStale(saleId);
+				const fallback = await repository.reserveWithoutRedis(request, () =>
+					gate.isReady(saleId),
+				);
+				if (fallback.kind === "redis_ready") {
+					answer = await viaGate(request);
+				} else {
+					answer = fallback;
+					written = true;
 				}
-				answer = await gate.reserve(request);
 			}
 
 			switch (answer.kind) {
 				case "reserved":
+					if (written) {
+						return { ok: true, created: true, user: entry.user, ...answer };
+					}
 					try {
 						await repository.save({
 							saleId,

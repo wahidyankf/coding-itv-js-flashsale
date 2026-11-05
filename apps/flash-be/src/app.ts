@@ -22,6 +22,7 @@ import {
 } from "./ratelimit/rate-limiter.js";
 import { createRedisRateLimitStore } from "./ratelimit/redis-rate-limit-store.js";
 import type { RedisClient } from "./redis.js";
+import { createGuardedGate } from "./reservations/guarded-gate.js";
 import { createRedisHoldGate } from "./reservations/redis-hold-gate.js";
 import { createReservationRepository } from "./reservations/reservation-repository.js";
 import {
@@ -69,7 +70,7 @@ export function dependenciesFrom(
 	cache: SaleCacheSettings = { ttlMs: settings.saleCacheMs },
 ): Dependencies {
 	const sales = createSaleService(createSaleRepository(db), clock, cache);
-	const gate = createRedisHoldGate(redis);
+	const gate = createGuardedGate(createRedisHoldGate(redis));
 	const queue = createQueueService(
 		createRedisQueueStore(redis),
 		sales,

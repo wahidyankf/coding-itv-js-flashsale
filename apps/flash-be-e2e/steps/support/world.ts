@@ -36,8 +36,62 @@ export const world: {
 	// Settings for the private API, set by steps before it starts (for example a payment that declines).
 	apiEnv?: Record<string, string>;
 	api?: { url: string; process: ChildProcess; log: string };
+	// The private API reaches Redis through this proxy, so a scenario can cut and restore the connection.
+	redisProxy?: RedisProxy;
 	pendingConfirm?: Promise<APIResponse>;
 } = {};
+
+// A TCP relay in front of Redis. `down` drops every connection and refuses new ones, as an unreachable Redis does;
+// `up` accepts again on the same port. The data in Redis is not touched.
+export type RedisProxy = {
+	url: string;
+	down: () => Promise<void>;
+	up: () => Promise<void>;
+	close: () => Promise<void>;
+};
+
+async function startRedisProxy(target: string): Promise<RedisProxy> {
+	const to = new URL(target);
+	const sockets = new Set<net.Socket>();
+	const relay = (client: net.Socket) => {
+		const upstream = net.connect(Number(to.port || 6379), to.hostname);
+		for (const socket of [client, upstream]) {
+			sockets.add(socket);
+			socket.on("error", () => socket.destroy());
+			socket.on("close", () => {
+				sockets.delete(socket);
+				client.destroy();
+				upstream.destroy();
+			});
+		}
+		client.pipe(upstream);
+		upstream.pipe(client);
+	};
+	const listen = (port: number) =>
+		new Promise<net.Server>((resolve, reject) => {
+			const server = net.createServer(relay);
+			server.once("error", reject);
+			server.listen(port, "127.0.0.1", () => resolve(server));
+		});
+	let server = await listen(0);
+	const port = (server.address() as net.AddressInfo).port;
+	const stop = () =>
+		new Promise<void>((resolve) => {
+			for (const socket of sockets) socket.destroy();
+			server.close(() => resolve());
+		});
+	const url = new URL(target);
+	url.hostname = "127.0.0.1";
+	url.port = String(port);
+	return {
+		url: url.toString(),
+		down: stop,
+		up: async () => {
+			server = await listen(port);
+		},
+		close: stop,
+	};
+}
 
 function childEnv(extra: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
 	const env: NodeJS.ProcessEnv = {};
@@ -112,10 +166,11 @@ async function freePort(): Promise<number> {
 export async function startApi(): Promise<string> {
 	if (world.api) return world.api.url;
 	const port = await freePort();
+	world.redisProxy = await startRedisProxy(E2E_REDIS_URL);
 	const child = spawn(process.execPath, [path.join(DIST, "main.js")], {
 		env: childEnv({
 			DATABASE_URL: world.databaseUrl,
-			REDIS_URL: E2E_REDIS_URL,
+			REDIS_URL: world.redisProxy.url,
 			FLASH_BE_PORT: String(port),
 			FLASH_BE_HOST: "127.0.0.1",
 			// Instant and never declined, unless a step says otherwise. The default 2 percent would flake scenarios.
@@ -163,6 +218,7 @@ export async function cleanup(): Promise<void> {
 		api.process.kill("SIGTERM");
 		await exited;
 	}
+	await world.redisProxy?.close();
 	if (world.databaseName) {
 		const admin = new pg.Client({ connectionString: SERVER_URL });
 		await admin.connect();

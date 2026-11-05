@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { queueWorld } from "../bdd/support/queue-world.js";
 import { relativeTime } from "../bdd/support/time.js";
+import { createGuardedGate } from "./guarded-gate.js";
 import type { GateAnswer, HoldGate } from "./hold-gate.js";
 import { createReservationService } from "./reservation-service.js";
 
@@ -26,6 +27,7 @@ function gateWith(answers: GateAnswer[], overrides: Partial<HoldGate> = {}) {
 	const calls = { restore: 0, lock: 0 };
 	const gate: HoldGate = {
 		reserve: async () => queue.shift() ?? { kind: "not_ready" },
+		invalidate: async () => {},
 		release: async () => {},
 		confirm: async () => {},
 		isReady: async () => false,
@@ -43,9 +45,10 @@ function gateWith(answers: GateAnswer[], overrides: Partial<HoldGate> = {}) {
 }
 
 async function reserveWith(gate: HoldGate) {
+	const guarded = createGuardedGate(gate);
 	const { world, saleId, ticket } = await admittedAna();
 	const service = createReservationService(
-		gate,
+		guarded,
 		world.repository,
 		world.saleService,
 		world.queue,
@@ -113,6 +116,19 @@ describe("the reservation service", () => {
 		);
 		expect(await reserveWith(gate)).toEqual({ ok: false, error: "sold_out" });
 		expect(calls.lock).toBe(0);
+	});
+
+	it("asks the gate again when Redis is ready again by the time Postgres has the lock", async () => {
+		let calls = 0;
+		const { gate } = gateWith([], {
+			reserve: async () => {
+				if (++calls === 1) throw new Error("redis is down");
+				return { kind: "sold_out" };
+			},
+			isReady: async () => true,
+		});
+		expect(await reserveWith(gate)).toEqual({ ok: false, error: "sold_out" });
+		expect(calls).toBe(2);
 	});
 
 	it("refuses a user id that cannot be used", async () => {

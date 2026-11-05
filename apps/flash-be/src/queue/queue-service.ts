@@ -34,6 +34,8 @@ export type CheckResult =
 				| "not_in_queue";
 	  };
 
+const ADMITTED: QueuePlace = { state: "admitted" };
+
 export type QueueService = ReturnType<typeof createQueueService>;
 
 export function createQueueService(
@@ -52,7 +54,11 @@ export function createQueueService(
 			if (sale.status === "ended") return { ok: false, error: "sale_ended" };
 			if (sale.status === "sold_out") return { ok: false, error: "sold_out" };
 
-			const { place, created } = await store.join(saleId, user, clock());
+			// Without Redis there is no line. The shopper is let through, because the stock and the one item per
+			// user are guarded by Postgres, and a stalled queue would stop the sale.
+			const { place, created } = await store
+				.join(saleId, user, clock())
+				.catch(() => ({ place: ADMITTED, created: false }));
 			const ticket = issueTicket(options.ticketSecret, saleId, user);
 			return { ok: true, created, user, ticket, place };
 		},
@@ -70,7 +76,9 @@ export function createQueueService(
 			if (!ticketMatches(options.ticketSecret, saleId, user, ticket)) {
 				return { ok: false, error: "invalid_ticket" };
 			}
-			const place = await store.place(saleId, user, clock());
+			const place = await store
+				.place(saleId, user, clock())
+				.catch(() => ADMITTED);
 			if (place.state === "absent") return { ok: false, error: "not_in_queue" };
 			return { ok: true, user, place };
 		},

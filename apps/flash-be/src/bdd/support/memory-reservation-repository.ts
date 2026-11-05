@@ -23,6 +23,41 @@ export function memoryReservationRepository(
 			repository.rows.set(`${row.saleId}:${row.user}`, row);
 		},
 
+		// The same rules as the SQL: sold items and live holds of other users count against the stock.
+		async reserveWithoutRedis(request, redisReady) {
+			if (await redisReady().catch(() => false)) {
+				return { kind: "redis_ready" };
+			}
+			const buyers = buyersOf(request.saleId);
+			if (buyers.includes(request.user)) return { kind: "purchased" };
+			const own = repository.rows.get(`${request.saleId}:${request.user}`);
+			if (own && own.expiresAt > request.now) {
+				return {
+					kind: "held",
+					reservationId: own.reservationId,
+					expiresAt: own.expiresAt,
+				};
+			}
+			const live = [...repository.rows.values()].filter(
+				(row) =>
+					row.saleId === request.saleId &&
+					row.user !== request.user &&
+					row.expiresAt > request.now,
+			).length;
+			if (buyers.length + live >= request.stock) return { kind: "sold_out" };
+			repository.rows.set(`${request.saleId}:${request.user}`, {
+				saleId: request.saleId,
+				user: request.user,
+				reservationId: request.reservationId,
+				expiresAt: request.expiresAt,
+			});
+			return {
+				kind: "reserved",
+				reservationId: request.reservationId,
+				expiresAt: request.expiresAt,
+			};
+		},
+
 		async rebuild(saleId, now, restore) {
 			const snapshot: HoldSnapshot = {
 				buyers: buyersOf(saleId),

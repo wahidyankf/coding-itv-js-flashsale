@@ -71,6 +71,10 @@ export function memoryHoldGate(clock: Clock): MemoryHoldGate {
 			return stateOf(saleId).ready;
 		},
 
+		async invalidate(saleId) {
+			stateOf(saleId).ready = false;
+		},
+
 		async restore(saleId, snapshot) {
 			const state = stateOf(saleId);
 			state.buyers = new Set(snapshot.buyers);

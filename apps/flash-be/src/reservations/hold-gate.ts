@@ -17,6 +17,10 @@ export type GateAnswer =
 	// Redis has no reservation state for this sale (it was lost or never built). Rebuild it from Postgres.
 	| { kind: "not_ready" };
 
+// The answer when Redis is down and Postgres decides alone. `redis_ready` means Redis is ready again, so the
+// caller should use the gate instead.
+export type FallbackAnswer = GateAnswer | { kind: "redis_ready" };
+
 export type HoldSnapshot = {
 	buyers: string[];
 	holds: Array<{ user: string; reservationId: string; expiresAt: Date }>;
@@ -30,6 +34,8 @@ export type HoldGate = {
 	// A purchase is done: the user becomes a buyer and their hold goes away.
 	confirm(saleId: string, user: string): Promise<void>;
 	isReady(saleId: string): Promise<boolean>;
+	// Marks the sale's reservation state as not ready, so the next reservation rebuilds it from Postgres.
+	invalidate(saleId: string): Promise<void>;
 	// Replaces the sale's reservation state with the snapshot, then marks it ready.
 	restore(saleId: string, snapshot: HoldSnapshot): Promise<void>;
 	// One instance rebuilds at a time. True when this caller may rebuild, for `ms`.

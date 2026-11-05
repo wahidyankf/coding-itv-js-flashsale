@@ -76,6 +76,10 @@ export function createRedisHoldGate(redis: RedisClient): HoldGate {
 			return (await redis.exists(key(saleId, "ready"))) === 1;
 		},
 
+		async invalidate(saleId) {
+			await redis.del(key(saleId, "ready"));
+		},
+
 		async restore(saleId, snapshot) {
 			const pipeline = redis
 				.multi()
