@@ -7,6 +7,12 @@
 	"targets": {
 		"typecheck": {
 			"executor": "nx:run-commands",
+			"dependsOn": [
+				{
+					"projects": ["typekit"],
+					"target": "build"
+				}
+			],
 			"options": {
 				"command": "npm run typecheck",
 				"cwd": "apps/flash-web-e2e"
@@ -14,6 +20,12 @@
 		},
 		"lint": {
 			"executor": "nx:run-commands",
+			"dependsOn": [
+				{
+					"projects": ["typekit"],
+					"target": "build"
+				}
+			],
 			"options": {
 				"command": "npm run lint",
 				"cwd": "apps/flash-web-e2e"
@@ -21,6 +33,12 @@
 		},
 		"test:e2e": {
 			"executor": "nx:run-commands",
+			"dependsOn": [
+				{
+					"projects": ["typekit"],
+					"target": "build"
+				}
+			],
 			"options": {
 				"command": "npm run test:e2e",
 				"cwd": "apps/flash-web-e2e"

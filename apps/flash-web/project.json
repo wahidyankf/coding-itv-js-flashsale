@@ -6,6 +6,7 @@
 	"targets": {
 		"dev": {
 			"executor": "nx:run-commands",
+			"dependsOn": ["^build"],
 			"options": {
 				"command": "npm run dev",
 				"cwd": "apps/flash-web"
@@ -13,6 +14,7 @@
 		},
 		"build": {
 			"executor": "nx:run-commands",
+			"dependsOn": ["^build"],
 			"outputs": ["{projectRoot}/.output"],
 			"options": {
 				"command": "npm run build",
@@ -29,6 +31,7 @@
 		},
 		"typecheck": {
 			"executor": "nx:run-commands",
+			"dependsOn": ["^build"],
 			"options": {
 				"command": "npm run typecheck",
 				"cwd": "apps/flash-web"
@@ -36,6 +39,7 @@
 		},
 		"lint": {
 			"executor": "nx:run-commands",
+			"dependsOn": ["^build"],
 			"options": {
 				"command": "npm run lint",
 				"cwd": "apps/flash-web"
@@ -43,6 +47,7 @@
 		},
 		"test:unit": {
 			"executor": "nx:run-commands",
+			"dependsOn": ["^build"],
 			"options": {
 				"command": "npm run test:unit",
 				"cwd": "apps/flash-web"
@@ -50,6 +55,7 @@
 		},
 		"test:unit:watch": {
 			"executor": "nx:run-commands",
+			"dependsOn": ["^build"],
 			"options": {
 				"command": "npm run test:unit:watch",
 				"cwd": "apps/flash-web"
@@ -57,6 +63,7 @@
 		},
 		"test:integration": {
 			"executor": "nx:run-commands",
+			"dependsOn": ["^build"],
 			"options": {
 				"command": "npm run test:integration",
 				"cwd": "apps/flash-web"
@@ -64,6 +71,7 @@
 		},
 		"test:coverage": {
 			"executor": "nx:run-commands",
+			"dependsOn": ["^build"],
 			"options": {
 				"commands": [
 					"npx nx db:up flash-be",
