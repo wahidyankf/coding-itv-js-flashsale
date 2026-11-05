@@ -1,12 +1,12 @@
-import { Kysely, PostgresDialect } from "kysely";
+import { type Generated, Kysely, PostgresDialect } from "kysely";
 import pg from "pg";
 
 export type Database = {
 	products: {
-		id: string;
+		id: Generated<string>;
 		name: string;
-		created_at: Date;
-		updated_at: Date;
+		created_at: Generated<Date>;
+		updated_at: Generated<Date>;
 		deleted_at: Date | null;
 	};
 };
