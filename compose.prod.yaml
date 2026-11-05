@@ -37,6 +37,7 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:?}
       # config.ts requires every URL in production, even though migrations only use Postgres.
       REDIS_URL: redis://redis:6379
+      TICKET_SECRET: ${TICKET_SECRET:?set TICKET_SECRET in .env}
     depends_on:
       postgres:
         condition: service_healthy
@@ -47,6 +48,7 @@ services:
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:?}
       REDIS_URL: redis://redis:6379
+      TICKET_SECRET: ${TICKET_SECRET:?set TICKET_SECRET in .env}
       FLASH_BE_PORT: 8080
     ports:
       - "${FLASH_BE_PORT:-8080}:8080"
