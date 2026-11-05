@@ -1,0 +1,113 @@
+{
+	"$schema": "../../node_modules/nx/schemas/project-schema.json",
+	"name": "flash-be",
+	"projectType": "application",
+	"sourceRoot": "apps/flash-be/src",
+	"targets": {
+		"dev": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "npm run dev",
+				"cwd": "apps/flash-be"
+			}
+		},
+		"build": {
+			"executor": "nx:run-commands",
+			"outputs": ["{projectRoot}/dist"],
+			"options": {
+				"command": "npm run build",
+				"cwd": "apps/flash-be"
+			}
+		},
+		"start": {
+			"executor": "nx:run-commands",
+			"dependsOn": ["build"],
+			"options": {
+				"command": "npm run start",
+				"cwd": "apps/flash-be"
+			}
+		},
+		"typecheck": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "npm run typecheck",
+				"cwd": "apps/flash-be"
+			}
+		},
+		"lint": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "npm run lint",
+				"cwd": "apps/flash-be"
+			}
+		},
+		"test:unit": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "npm run test:unit",
+				"cwd": "apps/flash-be"
+			}
+		},
+		"test:unit:watch": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "npm run test:unit:watch",
+				"cwd": "apps/flash-be"
+			}
+		},
+		"test:integration": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "npm run test:integration",
+				"cwd": "apps/flash-be"
+			}
+		},
+		"test:quick": {
+			"executor": "nx:run-commands",
+			"options": {
+				"commands": [
+					"npx nx typecheck flash-be",
+					"npx nx lint flash-be",
+					"npx nx test:unit flash-be"
+				],
+				"cwd": ".",
+				"parallel": false
+			}
+		},
+		"test:quick:watch": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "npx nx watch --projects=flash-be --initialRun -- npx nx run-many -t typecheck lint test:unit -p flash-be --output-style=stream",
+				"cwd": "."
+			}
+		},
+		"db:up": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "docker compose -f compose.dev.yaml up -d --wait",
+				"cwd": "."
+			}
+		},
+		"db:down": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "docker compose -f compose.dev.yaml down",
+				"cwd": "."
+			}
+		},
+		"db:reset": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "docker compose -f compose.dev.yaml down -v && docker compose -f compose.dev.yaml up -d --wait && npm run migrate",
+				"cwd": "apps/flash-be"
+			}
+		},
+		"db:migrate": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "npm run migrate",
+				"cwd": "apps/flash-be"
+			}
+		}
+	}
+}
