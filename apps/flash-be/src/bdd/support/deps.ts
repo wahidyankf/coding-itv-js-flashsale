@@ -12,4 +12,7 @@ export const healthyDeps: Dependencies = {
 		check: async () => ({ ok: false, error: "sale_not_found" }),
 		admitTick: async () => [],
 	},
+	reservations: {
+		reserve: async () => ({ ok: false, error: "sale_not_found" }),
+	},
 };

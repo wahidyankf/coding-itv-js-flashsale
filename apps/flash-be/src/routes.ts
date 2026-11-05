@@ -80,7 +80,42 @@ export function registerRoutes(app: FastifyInstance, deps: Dependencies): void {
 			return { userId: result.user, ...result.place };
 		},
 	);
+
+	// An admitted shopper holds one item for the sale's hold time. Asking again returns the same hold.
+	app.post<{ Params: { saleId: string }; Body: { userId?: unknown } | null }>(
+		"/sales/:saleId/reservations",
+		async (request, reply) => {
+			const ticket = request.headers["x-queue-ticket"];
+			const result = await deps.reservations.reserve(
+				request.params.saleId,
+				request.body?.userId,
+				typeof ticket === "string" ? ticket : undefined,
+			);
+			if (!result.ok) {
+				return reply
+					.code(RESERVE_ERROR_STATUS[result.error])
+					.send({ error: result.error });
+			}
+			return reply.code(result.created ? 201 : 200).send({
+				userId: result.user,
+				reservationId: result.reservationId,
+				expiresAt: result.expiresAt.toISOString(),
+			});
+		},
+	);
 }
+
+const RESERVE_ERROR_STATUS = {
+	sale_not_found: 404,
+	invalid_user: 400,
+	invalid_ticket: 401,
+	not_admitted: 403,
+	sale_not_started: 409,
+	sale_ended: 409,
+	sold_out: 409,
+	already_purchased: 409,
+	unavailable: 503,
+} as const;
 
 const QUEUE_ERROR_STATUS = {
 	sale_not_found: 404,

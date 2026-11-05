@@ -9,6 +9,12 @@ import {
 } from "./queue/queue-service.js";
 import { createRedisQueueStore } from "./queue/redis-queue-store.js";
 import type { RedisClient } from "./redis.js";
+import { createRedisHoldGate } from "./reservations/redis-hold-gate.js";
+import { createReservationRepository } from "./reservations/reservation-repository.js";
+import {
+	createReservationService,
+	type ReservationService,
+} from "./reservations/reservation-service.js";
 import { registerRoutes } from "./routes.js";
 import { createSaleRepository } from "./sales/sale-repository.js";
 import { createSaleService, type SaleService } from "./sales/sale-service.js";
@@ -19,6 +25,7 @@ export type Dependencies = {
 	checkRedis: () => Promise<void>;
 	sales: SaleService;
 	queue: QueueService;
+	reservations: ReservationService;
 };
 
 export function dependenciesFrom(
@@ -28,6 +35,12 @@ export function dependenciesFrom(
 	clock: Clock = systemClock,
 ): Dependencies {
 	const sales = createSaleService(createSaleRepository(db), clock);
+	const queue = createQueueService(
+		createRedisQueueStore(redis),
+		sales,
+		clock,
+		settings,
+	);
 	return {
 		checkDatabase: async () => {
 			await sql`select 1`.execute(db);
@@ -36,11 +49,13 @@ export function dependenciesFrom(
 			await redis.ping();
 		},
 		sales,
-		queue: createQueueService(
-			createRedisQueueStore(redis),
+		queue,
+		reservations: createReservationService(
+			createRedisHoldGate(redis),
+			createReservationRepository(db),
 			sales,
+			queue,
 			clock,
-			settings,
 		),
 	};
 }

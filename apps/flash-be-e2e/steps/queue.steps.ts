@@ -8,12 +8,21 @@ const { Given, When, Then } = createBdd();
 
 type Request = APIRequestContext;
 
-function shoppers(): NonNullable<typeof world.queue> {
-	world.queue ??= { tickets: new Map(), joined: [] };
+export function shoppers(): NonNullable<typeof world.queue> {
+	world.queue ??= {
+		tickets: new Map(),
+		joined: [],
+		holds: new Map(),
+		replies: [],
+	};
 	return world.queue;
 }
 
-async function join(request: Request, user: string, saleId = world.saleId) {
+export async function join(
+	request: Request,
+	user: string,
+	saleId = world.saleId,
+) {
 	const url = await startApi();
 	const reply = await request.post(`${url}/sales/${saleId}/queue`, {
 		data: { userId: user },
@@ -28,7 +37,7 @@ async function join(request: Request, user: string, saleId = world.saleId) {
 	}
 }
 
-async function check(request: Request, user: string, ticket?: string) {
+export async function check(request: Request, user: string, ticket?: string) {
 	const url = await startApi();
 	setResponse(
 		await request.get(`${url}/sales/${world.saleId}/queue/${user}`, {

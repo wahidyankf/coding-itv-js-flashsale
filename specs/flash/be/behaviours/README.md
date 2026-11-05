@@ -9,4 +9,6 @@ The Gherkin corpus for the API, grouped by business area.
 - [db/](db/README.md) - the database schema and its migrations.
 - [sale/](sale/README.md) - the sale status a shopper reads, and the command that seeds a sale.
 - [queue/](queue/README.md) - the waiting queue: joining, tickets, and admission.
+- [reservation/](reservation/README.md) - holding an item: who may reserve, the hold time, and the stock.
+- [recovery/](recovery/README.md) - rebuilding the reservation state in Redis from Postgres.
 - [routing/](routing/README.md) - paths the API does not serve.

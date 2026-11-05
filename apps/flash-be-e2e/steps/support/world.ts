@@ -25,7 +25,12 @@ export const world: {
 	saleId?: string;
 	failure?: string;
 	// What the shoppers of this scenario hold: their tickets, and who joined first.
-	queue?: { tickets: Map<string, string>; joined: string[] };
+	queue?: {
+		tickets: Map<string, string>;
+		joined: string[];
+		holds: Map<string, unknown>;
+		replies: Array<{ status: number; error?: string }>;
+	};
 	seed?: { status: number | null; stdout: string; stderr: string };
 	api?: { url: string; process: ChildProcess };
 } = {};

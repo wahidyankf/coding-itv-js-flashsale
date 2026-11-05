@@ -87,6 +87,38 @@ and the same ticket.
 
 The scenarios are in [`specs/flash/be/behaviours/queue/`](../../specs/flash/be/behaviours/queue/README.md).
 
+## Reservations
+
+An admitted shopper holds one item for the sale's hold time (`reservation_ttl_seconds`, 120 by default).
+
+`POST /sales/:saleId/reservations` with the body `{"userId":"ana"}` and the header `x-queue-ticket: <ticket>`:
+
+```json
+{
+	"userId": "ana",
+	"reservationId": "1c9566e5-28b4-4968-88c6-605f20dca405",
+	"expiresAt": "2026-11-05T14:07:02.037Z"
+}
+```
+
+Asking again while the hold lasts returns `200` with the same body. A hold that has expired stops counting at once, and
+the item can go to someone else.
+
+| Status | `error`             | When                                                                           |
+| ------ | ------------------- | ------------------------------------------------------------------------------ |
+| `400`  | `invalid_user`      | the user id is missing or invalid                                              |
+| `401`  | `invalid_ticket`    | the ticket is missing or is not the one issued for this sale and user          |
+| `403`  | `not_admitted`      | the user is still waiting, or has no place in the queue                        |
+| `404`  | `sale_not_found`    | the sale id is unknown or malformed                                            |
+| `409`  | `sale_not_started`  | the window has not opened yet                                                  |
+| `409`  | `sale_ended`        | the window has closed                                                          |
+| `409`  | `sold_out`          | no item is free: sold items plus live holds fill the stock                     |
+| `409`  | `already_purchased` | the user already bought an item in this sale                                   |
+| `503`  | `unavailable`       | the reservation state could not be rebuilt in time; try again                  |
+
+A sale that is not selling answers before the ticket is checked. The scenarios are in
+[`specs/flash/be/behaviours/reservation/`](../../specs/flash/be/behaviours/reservation/README.md).
+
 ## flash-web (port 3000)
 
 | Method | Path          | Response                                                                                                                            |

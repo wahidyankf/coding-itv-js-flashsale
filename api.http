@@ -25,3 +25,10 @@ Content-Type: application/json
 ### Backend: check your place (send the ticket from the join reply)
 GET {{backend}}/sales/00000000-0000-4000-8000-000000000000/queue/ana
 x-queue-ticket: paste-the-ticket-here
+
+### Backend: reserve one item (needs the ticket and an admitted user; the reply holds the reservation id and its end)
+POST {{backend}}/sales/00000000-0000-4000-8000-000000000000/reservations
+Content-Type: application/json
+x-queue-ticket: paste-the-ticket-here
+
+{ "userId": "ana" }

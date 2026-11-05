@@ -5,12 +5,11 @@ import { queueWorld } from "./support/queue-world.js";
 import { relativeTime } from "./support/time.js";
 
 const NOW = new Date("2026-06-01T12:00:00Z");
-const clock = () => NOW;
 
 // A scenario body runs once when the tests are collected, and each step then runs as its own test. So the world is
 // built per scenario and never closed between steps; app.inject needs no open port.
 function newWorld() {
-	return queueWorld(clock);
+	return queueWorld(NOW);
 }
 
 function response(world: ReturnType<typeof queueWorld>) {

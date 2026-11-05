@@ -6,10 +6,9 @@ import { normalizeUser } from "./user.js";
 
 // Rules that no single scenario shows alone: the edges of the helpers behind the queue.
 const NOW = new Date("2026-06-01T12:00:00Z");
-const clock = () => NOW;
 
 async function openWorld() {
-	const world = queueWorld(clock);
+	const world = queueWorld(NOW);
 	await world.addSale({
 		startsAt: relativeTime("1 hour ago", NOW),
 		endsAt: relativeTime("in 1 hour", NOW),

@@ -5,11 +5,10 @@ import { queueWorld } from "./support/queue-world.js";
 import { relativeTime } from "./support/time.js";
 
 const NOW = new Date("2026-06-01T12:00:00Z");
-const clock = () => NOW;
 
 // A scenario body runs once when the tests are collected, and each step then runs as its own test.
 function newWorld() {
-	return queueWorld(clock);
+	return queueWorld(NOW);
 }
 
 function response(world: ReturnType<typeof queueWorld>) {
