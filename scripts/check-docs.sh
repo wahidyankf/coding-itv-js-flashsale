@@ -15,7 +15,12 @@ else
 fi
 
 failed=0
-for check in "repo-config validate" "md internal-link validate" "md heading-hierarchy validate"; do
+for check in \
+	"repo-config validate" \
+	"md internal-link validate" \
+	"md heading-hierarchy validate" \
+	"md readme-index validate" \
+	"md mermaid validate"; do
 	# shellcheck disable=SC2086
 	"$RHINO" $check || failed=1
 done

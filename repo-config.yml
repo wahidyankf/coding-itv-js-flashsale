@@ -13,6 +13,8 @@ scan:
     - .serena
     - .tools
     - worktrees
+    - local-tmp
+    - generated-reports
 
 policies:
   markdown:
@@ -23,3 +25,22 @@ policies:
         - glob: "**/*.md"
       single-h1: true
       max-level-jump: 1
+    # Every folder under docs/ and specs/ has a README that links its direct children.
+    readme-index:
+      trees:
+        - path: docs
+          require-direct-children: every-directory
+        - path: specs
+          require-direct-children: every-directory
+    # Diagrams state the accessible title and description, use the palette, and keep labels short.
+    mermaid:
+      authoring-rule: rendered
+      node-label-graphemes: 30
+      edge-label-graphemes: 24
+      fill-colors:
+        ["#0173B2", "#DE8F05", "#029E73", "#CC78BC", "#CA9161", "#808080"]
+      edge-colors: ["#0173B2", "#000000"]
+      text-colors: ["#000000", "#FFFFFF"]
+      require-default-class: true
+      forbid-theme-overrides: true
+      canvas-colors: ["#FFFFFF", "#0D1117"]
