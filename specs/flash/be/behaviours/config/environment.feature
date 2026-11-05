@@ -123,3 +123,23 @@ Feature: Configuration of the flash-be API
       | RATE_LIMIT_PER_USER       | abc   | must be a positive integer   |
       | RATE_LIMIT_PER_IP         | -1    | must be a positive integer   |
       | TRUST_PROXY               | maybe | must be true or false        |
+
+  # Exemption(integration): the rule is a pure function of an environment object and opens no resource; alternative-proof: flash-be:unit / The sale cache time defaults to one second outside production
+  @integration-exempt
+  Scenario: The sale cache time defaults to one second outside production
+    Given NODE_ENV is not production
+    When the configuration is built from an empty environment
+    Then sale reads are cached for 1000 ms
+
+  # Exemption(integration): the rule is a pure function of an environment object and opens no resource; alternative-proof: flash-be:unit / An invalid sale cache time is refused
+  @integration-exempt
+  Scenario Outline: An invalid sale cache time is refused
+    Given <name> is "<value>"
+    When the configuration is built
+    Then building the configuration fails with "<name> <rule>"
+
+    Examples:
+      | name          | value | rule                              |
+      | SALE_CACHE_MS | abc   | must be zero or a positive integer |
+      | SALE_CACHE_MS | -1    | must be zero or a positive integer |
+      | SALE_CACHE_MS | 1.5   | must be zero or a positive integer |

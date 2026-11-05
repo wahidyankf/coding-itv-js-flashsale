@@ -20,6 +20,7 @@ import {
 	queueRequests,
 	reserveRequests,
 	type ShopScenario,
+	saleRequests,
 } from "./queue-world.js";
 import { insertSale } from "./seed.js";
 
@@ -30,7 +31,9 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export async function openQueueIntegration() {
 	const db = createDb(config.databaseUrl);
 	const redis = await createRedis(config.redisUrl);
-	const base = dependenciesFrom(db, redis, config);
+	// The cache time starts at zero, so a scenario only meets the cache when it asks for it.
+	const cache = { ttlMs: 0 };
+	const base = dependenciesFrom(db, redis, config, systemClock, cache);
 
 	// A second database handle that points at a port nobody listens on. Saving through it fails the way an
 	// unreachable Postgres does, while the rest of the app keeps its working connection.
@@ -80,6 +83,7 @@ export async function openQueueIntegration() {
 			limits.windowSeconds = 60;
 			limits.perUser = 100_000;
 			limits.perIp = 100_000;
+			cache.ttlMs = 0;
 		},
 		scenario(): ShopScenario {
 			const scenario: ShopScenario = {
@@ -156,6 +160,18 @@ export async function openQueueIntegration() {
 					limits.perIp = requests;
 					limits.windowSeconds = seconds;
 				},
+				async setSaleCache(ms) {
+					cache.ttlMs = ms;
+				},
+				async setSold(sold) {
+					await db
+						.updateTable("sales")
+						.set({ sold })
+						.where("id", "=", scenario.saleId)
+						.execute();
+				},
+				readSale: notWired,
+				readCurrentSale: notWired,
 				confirm: notWired,
 				startConfirm: notWired,
 				finishConfirm: notWired,
@@ -194,6 +210,7 @@ export async function openQueueIntegration() {
 				queueRequests(app, scenario),
 				reserveRequests(app, scenario),
 				purchaseRequests(app, scenario),
+				saleRequests(app, scenario),
 			);
 			return Object.assign(scenario, limitRequests(scenario));
 		},

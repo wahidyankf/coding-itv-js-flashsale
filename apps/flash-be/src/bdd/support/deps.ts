@@ -6,7 +6,7 @@ const noSale = async () => undefined;
 export const healthyDeps: Dependencies = {
 	checkDatabase: async () => {},
 	checkRedis: async () => {},
-	sales: { current: noSale, byId: noSale, details: noSale },
+	sales: { cacheMs: () => 0, current: noSale, byId: noSale, details: noSale },
 	queue: {
 		join: async () => ({ ok: false, error: "sale_not_found" }),
 		check: async () => ({ ok: false, error: "sale_not_found" }),

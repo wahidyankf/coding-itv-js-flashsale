@@ -11,7 +11,7 @@ it("describeConfig shows host and port without credentials", () => {
 		}),
 	);
 	expect(line).toBe(
-		"flash-be config: port=9000 database=db:5432 redis=cache:6379 payment=150ms/0.02 limit=30/600/10s proxy=false",
+		"flash-be config: port=9000 database=db:5432 redis=cache:6379 payment=150ms/0.02 limit=30/600/10s cache=1000ms proxy=false",
 	);
 	expect(line).not.toContain("secret");
 });

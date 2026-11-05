@@ -10,3 +10,4 @@ behaviour, read the specs.
 - [reservations-and-recovery.md](reservations-and-recovery.md) - how a hold is counted, why Postgres has the last word, and how Redis is rebuilt.
 - [payment-and-refunds.md](payment-and-refunds.md) - how a hold becomes a purchase, why it is safe to repeat, and when a charge is refunded.
 - [rate-limiting.md](rate-limiting.md) - why write requests are limited twice, and what happens when Redis is down.
+- [sale-read-cache.md](sale-read-cache.md) - why sale reads may be one second old, and why writes never are.

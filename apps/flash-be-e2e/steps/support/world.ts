@@ -125,6 +125,8 @@ export async function startApi(): Promise<string> {
 			RATE_LIMIT_WINDOW_SECONDS: "60",
 			RATE_LIMIT_PER_USER: "100000",
 			RATE_LIMIT_PER_IP: "100000",
+			// No sale cache, unless a step turns it on, so a scenario always reads the sale as it is.
+			SALE_CACHE_MS: "0",
 			...world.apiEnv,
 		}),
 		stdio: ["ignore", "pipe", "pipe"],

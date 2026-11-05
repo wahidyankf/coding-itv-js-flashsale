@@ -24,9 +24,17 @@ export function fakeSale(overrides: Partial<Sale>): Sale {
 
 export function fakeRepository(sales: Sale[]): SaleRepository {
 	return {
-		findById: async (id) => sales.find((sale) => sale.id === id),
-		findCurrent: async () =>
-			[...sales].sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime())[0],
+		// Copies, as a database does: a cache must not see later changes to the stored row.
+		findById: async (id) => {
+			const found = sales.find((sale) => sale.id === id);
+			return found && { ...found };
+		},
+		findCurrent: async () => {
+			const found = [...sales].sort(
+				(a, b) => b.startsAt.getTime() - a.startsAt.getTime(),
+			)[0];
+			return found && { ...found };
+		},
 	};
 }
 

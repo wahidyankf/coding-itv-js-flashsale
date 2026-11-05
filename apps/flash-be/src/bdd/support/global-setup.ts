@@ -39,6 +39,8 @@ export default async function setup(): Promise<() => Promise<void>> {
 
 	process.env.DATABASE_URL = databaseUrl.toString();
 	process.env.REDIS_URL = redisUrl.toString();
+	// Sale reads are not cached here, so a scenario that changes a sale sees the change. Cache scenarios turn it on.
+	process.env.SALE_CACHE_MS = "0";
 
 	return async () => {
 		const cleanup = new pg.Client({ connectionString: serverUrl });

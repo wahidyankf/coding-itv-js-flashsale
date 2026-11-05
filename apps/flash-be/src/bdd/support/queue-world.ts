@@ -74,6 +74,11 @@ export type ShopScenario = QueueScenario & {
 	// Another instance sells the last item to this user, behind the back of the scenario.
 	sellLastItemTo: (user: string) => Promise<void>;
 	wasRefunded: (user: string) => Promise<boolean>;
+	// The sale read cache: its time, a change behind its back, and the public reads.
+	setSaleCache: (ms: number) => Promise<void>;
+	setSold: (sold: number) => Promise<void>;
+	readSale: () => Promise<Response>;
+	readCurrentSale: () => Promise<Response>;
 	setUserLimit: (requests: number, seconds: number) => Promise<void>;
 	setAddressLimit: (requests: number, seconds: number) => Promise<void>;
 	// Sends the same kind of write request several times, one after the other.
@@ -203,6 +208,26 @@ export function purchaseRequests(app: FastifyInstance, scenario: ShopScenario) {
 	};
 }
 
+// The public sale reads, the same at every layer.
+export function saleRequests(app: FastifyInstance, scenario: ShopScenario) {
+	return {
+		async readSale() {
+			scenario.response = await app.inject({
+				method: "GET",
+				url: `/sales/${scenario.saleId}`,
+			});
+			return scenario.response;
+		},
+		async readCurrentSale() {
+			scenario.response = await app.inject({
+				method: "GET",
+				url: "/sales/current",
+			});
+			return scenario.response;
+		},
+	};
+}
+
 // Write requests by the name a scenario uses for them, for the rate limit scenarios.
 export function limitRequests(scenario: ShopScenario) {
 	const send = async (kind: string, user: string): Promise<Response> => {
@@ -268,7 +293,8 @@ export function queueWorld(start: Date): UnitQueueScenario {
 						timers.push({ at: now.getTime() + ms, resolve });
 					}),
 	});
-	const saleService = createSaleService(fakeRepository(sales), clock);
+	const cache = { ttlMs: 0 };
+	const saleService = createSaleService(fakeRepository(sales), clock, cache);
 	const queue = createQueueService(store, saleService, clock, QUEUE_OPTIONS);
 	const reservations = createReservationService(
 		gate,
@@ -384,6 +410,14 @@ export function queueWorld(start: Date): UnitQueueScenario {
 			limits.perIp = requests;
 			limits.windowSeconds = seconds;
 		},
+		async setSaleCache(ms) {
+			cache.ttlMs = ms;
+		},
+		async setSold(sold) {
+			for (const sale of sales) sale.sold = sold;
+		},
+		readSale: notWired,
+		readCurrentSale: notWired,
 		confirm: notWired,
 		startConfirm: notWired,
 		finishConfirm: notWired,
@@ -432,6 +466,7 @@ export function queueWorld(start: Date): UnitQueueScenario {
 		queueRequests(app, scenario),
 		reserveRequests(app, scenario),
 		requests,
+		saleRequests(app, scenario),
 	);
 	return Object.assign(scenario, limitRequests(scenario));
 }

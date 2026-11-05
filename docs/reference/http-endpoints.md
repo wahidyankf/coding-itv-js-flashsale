@@ -48,6 +48,15 @@ The current sale is the one that opens last. `remaining` is `stock` minus the it
 
 The scenarios are in [`specs/flash/be/behaviours/sale/status.feature`](../../specs/flash/be/behaviours/sale/status.feature).
 
+### Caching
+
+Both sale reads are answered from a short in-process cache. `SALE_CACHE_MS` sets its time (1000 by default, 0 turns it
+off). A cached `200` carries `Cache-Control: public, max-age=<seconds>`, rounded up, so `remaining` can be that old. The
+`status` is not stale in the same way, because it is worked out from the cached row and the clock on every request. A
+`404` is never cached and has no `Cache-Control` header. The write routes never read the cache.
+
+The scenarios are in [`specs/flash/be/behaviours/sale/caching.feature`](../../specs/flash/be/behaviours/sale/caching.feature).
+
 ## The waiting queue
 
 Shoppers join a queue before they can reserve. The queue admits them in order, at the rate set on the sale
@@ -194,7 +203,7 @@ Environment variables are listed in [`.env.example`](../../.env.example), with a
 local development are there too. `apps/flash-be/src/config.ts` builds the API configuration from them. In production,
 the API stops at start-up when `DATABASE_URL`, `REDIS_URL` or `TICKET_SECRET` is missing. `PAYMENT_LATENCY_MS` (150) and
 `PAYMENT_FAILURE_RATE` (0.02) tune the mock payment provider. The `RATE_LIMIT_*` and `TRUST_PROXY` variables tune the
-rate limits.
+rate limits. `SALE_CACHE_MS` (1000) sets the sale read cache.
 
 ## Manual requests
 

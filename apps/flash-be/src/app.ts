@@ -29,6 +29,7 @@ import {
 	type ReservationService,
 } from "./reservations/reservation-service.js";
 import { registerRoutes } from "./routes.js";
+import type { SaleCacheSettings } from "./sales/sale-cache.js";
 import { createSaleRepository } from "./sales/sale-repository.js";
 import { createSaleService, type SaleService } from "./sales/sale-service.js";
 
@@ -37,6 +38,8 @@ export type RateLimitSettings = {
 	rateLimitPerUser: number;
 	rateLimitPerIp: number;
 };
+
+export type SaleCacheOptions = { saleCacheMs: number };
 
 export type PaymentSettings = {
 	paymentLatencyMs: number;
@@ -57,10 +60,15 @@ export type Dependencies = {
 export function dependenciesFrom(
 	db: Kysely<Database>,
 	redis: RedisClient,
-	settings: QueueOptions & PaymentSettings & RateLimitSettings,
+	settings: QueueOptions &
+		PaymentSettings &
+		RateLimitSettings &
+		SaleCacheOptions,
 	clock: Clock = systemClock,
+	// Tests pass their own, so a scenario can change the cache time while the app runs.
+	cache: SaleCacheSettings = { ttlMs: settings.saleCacheMs },
 ): Dependencies {
-	const sales = createSaleService(createSaleRepository(db), clock);
+	const sales = createSaleService(createSaleRepository(db), clock, cache);
 	const gate = createRedisHoldGate(redis);
 	const queue = createQueueService(
 		createRedisQueueStore(redis),

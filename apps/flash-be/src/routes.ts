@@ -22,6 +22,14 @@ export function registerRoutes(app: FastifyInstance, deps: Dependencies): void {
 			});
 	};
 
+	// Public sale reads may be kept for the cache time, by this server and by the client.
+	const cacheable = (reply: FastifyReply): FastifyReply => {
+		const ms = deps.sales.cacheMs();
+		return ms > 0
+			? reply.header("cache-control", `public, max-age=${Math.ceil(ms / 1000)}`)
+			: reply;
+	};
+
 	// Liveness: the process is up. It does not check dependencies.
 	app.get("/health", async () => ({ status: "ok" }));
 
@@ -50,14 +58,16 @@ export function registerRoutes(app: FastifyInstance, deps: Dependencies): void {
 	// The sale a shopper sees. "current" is the sale that opens last.
 	app.get("/sales/current", async (_request, reply) => {
 		const sale = await deps.sales.current();
-		return sale ? sale : reply.code(404).send({ error: "sale_not_found" });
+		if (!sale) return reply.code(404).send({ error: "sale_not_found" });
+		return cacheable(reply).send(sale);
 	});
 
 	app.get<{ Params: { saleId: string } }>(
 		"/sales/:saleId",
 		async (request, reply) => {
 			const sale = await deps.sales.byId(request.params.saleId);
-			return sale ? sale : reply.code(404).send({ error: "sale_not_found" });
+			if (!sale) return reply.code(404).send({ error: "sale_not_found" });
+			return cacheable(reply).send(sale);
 		},
 	);
 
