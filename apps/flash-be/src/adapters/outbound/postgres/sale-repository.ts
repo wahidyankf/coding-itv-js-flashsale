@@ -1,3 +1,4 @@
+import { fromOptional, option, pipe } from "@flash/typekit";
 import type { Kysely, Selectable } from "kysely";
 import type { SaleRepository } from "../../../application/ports/sale-repository.js";
 import type { Sale } from "../../../domain/sale.js";
@@ -24,7 +25,7 @@ export function createSaleRepository(db: Kysely<Database>): SaleRepository {
 				.selectAll()
 				.where("id", "=", id)
 				.executeTakeFirst();
-			return row ? toSale(row) : undefined;
+			return pipe(fromOptional(row), option.map(toSale));
 		},
 		findCurrent: async () => {
 			const row = await db
@@ -33,7 +34,7 @@ export function createSaleRepository(db: Kysely<Database>): SaleRepository {
 				.orderBy("starts_at", "desc")
 				.limit(1)
 				.executeTakeFirst();
-			return row ? toSale(row) : undefined;
+			return pipe(fromOptional(row), option.map(toSale));
 		},
 	};
 }

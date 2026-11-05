@@ -1,3 +1,13 @@
+import {
+	attemptAsync,
+	Err,
+	Ok,
+	type Option,
+	option,
+	pipe,
+	type Result,
+	result,
+} from "@flash/typekit";
 import { isPurchaseOf, type Purchase } from "../domain/purchase.js";
 import { isLive } from "../domain/reservation.js";
 import { isSaleId } from "../domain/sale.js";
@@ -6,7 +16,7 @@ import type { Clock } from "./ports/clock.js";
 import type { HoldGate } from "./ports/hold-gate.js";
 import type { Payment } from "./ports/payment.js";
 import type { PurchaseRepository } from "./ports/purchase-repository.js";
-import type { SaleService } from "./sale-service.js";
+import type { SaleDetails, SaleService } from "./sale-service.js";
 
 export type ConfirmError =
 	| "sale_not_found"
@@ -19,14 +29,47 @@ export type ConfirmError =
 	| "sold_out"
 	| "payment_failed";
 
-export type ConfirmResult =
-	| { ok: true; created: boolean; purchase: Purchase }
-	| { ok: false; error: ConfirmError };
+export type Confirmed = { created: boolean; purchase: Purchase };
+
+export type ConfirmResult = Result<Confirmed, ConfirmError>;
 
 export type Outcome =
 	| { state: "purchased"; purchase: Purchase }
 	| { state: "holding"; reservationId: string; expiresAt: Date }
 	| { state: "none" };
+
+export type OutcomeError = "sale_not_found" | "invalid_user";
+
+export type OutcomeResult = Result<
+	{ user: string; outcome: Outcome },
+	OutcomeError
+>;
+
+type Request = { details: SaleDetails; user: string; reservationId: string };
+
+// What a confirmation must be before any store is asked: a known sale, a usable name and a well-formed reservation id.
+function wellFormed(
+	found: Option<SaleDetails>,
+	rawUser: unknown,
+	reservationId: unknown,
+): Result<Request, ConfirmError> {
+	return pipe(
+		found,
+		option.okOr<SaleDetails, ConfirmError>("sale_not_found"),
+		result.flatMap((details: SaleDetails) =>
+			pipe(
+				normalizeUser(rawUser),
+				option.okOr<string, ConfirmError>("invalid_user"),
+				result.map((user: string) => ({ details, user })),
+			),
+		),
+		result.flatMap(({ details, user }) =>
+			typeof reservationId === "string" && isSaleId(reservationId)
+				? new Ok({ details, user, reservationId })
+				: new Err<Request, ConfirmError>("invalid_reservation"),
+		),
+	);
+}
 
 export type PurchaseService = ReturnType<typeof createPurchaseService>;
 
@@ -44,83 +87,89 @@ export function createPurchaseService(
 			rawUser: unknown,
 			reservationId: unknown,
 		): Promise<ConfirmResult> {
-			const found = await sales.details(saleId);
-			if (!found) return { ok: false, error: "sale_not_found" };
-			const user = normalizeUser(rawUser);
-			if (!user) return { ok: false, error: "invalid_user" };
-			if (typeof reservationId !== "string" || !isSaleId(reservationId)) {
-				return { ok: false, error: "invalid_reservation" };
-			}
+			const request = wellFormed(
+				await sales.details(saleId),
+				rawUser,
+				reservationId,
+			);
+			if (request.isErr()) return new Err(request.error);
+			const { details, user, reservationId: held } = request.value;
 
-			const same = await repository.findByReservation(reservationId);
+			const same = await repository.findByReservation(held);
 			if (same) {
-				return isPurchaseOf(same, saleId, user)
-					? { ok: true, created: false, purchase: same }
-					: { ok: false, error: "reservation_not_found" };
+				return isPurchaseOf(same.value, saleId, user)
+					? new Ok({ created: false, purchase: same.value })
+					: new Err("reservation_not_found");
 			}
 			if (await repository.findByUser(saleId, user)) {
-				return { ok: false, error: "already_purchased" };
+				return new Err("already_purchased");
 			}
-			if (found.view.status === "ended") {
-				return { ok: false, error: "sale_ended" };
-			}
+			if (details.view.status === "ended") return new Err("sale_ended");
 
 			const hold = await repository.findReservation(saleId, user);
-			if (!hold || hold.reservationId !== reservationId) {
-				return { ok: false, error: "reservation_not_found" };
+			if (!hold || hold.value.reservationId !== held) {
+				return new Err("reservation_not_found");
 			}
-			if (!isLive(hold, clock())) return { ok: false, error: "hold_expired" };
+			if (!isLive(hold.value, clock())) return new Err("hold_expired");
 
 			// The hold is checked before the charge. If it runs out during the charge, the database decides below.
-			const charge = await payment.charge(reservationId);
-			if (!charge.ok) return { ok: false, error: "payment_failed" };
+			const charge = await payment.charge(held);
+			if (charge.isErr()) return new Err("payment_failed");
+			const { ref } = charge.value;
 
-			const result = await repository.commit({
+			const committed = await repository.commit({
 				saleId,
 				user,
-				reservationId,
-				paymentRef: charge.ref,
+				reservationId: held,
+				paymentRef: ref,
 			});
-			if (result.kind !== "purchased") {
-				await payment.refund(charge.ref);
-				return { ok: false, error: result.kind };
+			if (committed.kind !== "purchased") {
+				await payment.refund(ref);
+				return new Err(committed.kind);
 			}
 
 			// Redis learns about the purchase after the commit. If this fails, a rebuild from Postgres fixes it.
-			await gate.confirm(saleId, user).catch(() => {});
-			return { ok: true, created: result.created, purchase: result.purchase };
+			await attemptAsync(() => gate.confirm(saleId, user), Error);
+			return new Ok({
+				created: committed.created,
+				purchase: committed.purchase,
+			});
 		},
 
 		// "Did I get it?": a purchase, a live hold, or nothing.
-		async outcome(
-			saleId: string,
-			rawUser: unknown,
-		): Promise<
-			| { ok: true; user: string; outcome: Outcome }
-			| { ok: false; error: "sale_not_found" | "invalid_user" }
-		> {
-			if (!(await sales.byId(saleId))) {
-				return { ok: false, error: "sale_not_found" };
-			}
-			const user = normalizeUser(rawUser);
-			if (!user) return { ok: false, error: "invalid_user" };
+		async outcome(saleId: string, rawUser: unknown): Promise<OutcomeResult> {
+			const known = pipe(
+				await sales.byId(saleId),
+				option.okOr<unknown, OutcomeError>("sale_not_found"),
+				result.flatMap(() =>
+					pipe(
+						normalizeUser(rawUser),
+						option.okOr<string, OutcomeError>("invalid_user"),
+					),
+				),
+			);
+			if (known.isErr()) return new Err(known.error);
+			const user = known.value;
 
 			const purchase = await repository.findByUser(saleId, user);
-			if (purchase)
-				return { ok: true, user, outcome: { state: "purchased", purchase } };
+			if (purchase) {
+				return new Ok({
+					user,
+					outcome: { state: "purchased", purchase: purchase.value },
+				});
+			}
 			const hold = await repository.findReservation(saleId, user);
-			if (hold && isLive(hold, clock())) {
-				return {
-					ok: true,
+			if (hold && isLive(hold.value, clock())) {
+				return new Ok({
 					user,
 					outcome: {
 						state: "holding",
-						reservationId: hold.reservationId,
-						expiresAt: hold.expiresAt,
+						reservationId: hold.value.reservationId,
+						expiresAt: hold.value.expiresAt,
 					},
-				};
+				});
 			}
-			return { ok: true, user, outcome: { state: "none" } };
+			return new Ok({ user, outcome: { state: "none" } });
 		},
 	};
 }

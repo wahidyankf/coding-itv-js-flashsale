@@ -1,5 +1,12 @@
+import { attemptAsync } from "@flash/typekit";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { Dependencies } from "../../../application/dependencies.js";
+import type { ConfirmError } from "../../../application/purchase-service.js";
+import type {
+	CheckError,
+	JoinError,
+} from "../../../application/queue-service.js";
+import type { ReserveError } from "../../../application/reservation-service.js";
 import type { Purchase } from "../../../domain/purchase.js";
 import { type StreamOptions, serveEvents } from "./event-stream.js";
 
@@ -40,19 +47,12 @@ export function registerRoutes(
 
 	// Readiness: Postgres and Redis both answer.
 	app.get("/ready", async (_request, reply) => {
-		const checks = { database: "ok", redis: "ok" };
-
-		try {
-			await deps.checkDatabase();
-		} catch {
-			checks.database = "error";
-		}
-
-		try {
-			await deps.checkRedis();
-		} catch {
-			checks.redis = "error";
-		}
+		const database = await attemptAsync(() => deps.checkDatabase(), Error);
+		const redis = await attemptAsync(() => deps.checkRedis(), Error);
+		const checks = {
+			database: database.isOk() ? "ok" : "error",
+			redis: redis.isOk() ? "ok" : "error",
+		};
 
 		const ready = Object.values(checks).every((value) => value === "ok");
 		return reply
@@ -64,7 +64,7 @@ export function registerRoutes(
 	app.get("/sales/current", async (_request, reply) => {
 		const sale = await deps.sales.current();
 		if (!sale) return reply.code(404).send({ error: "sale_not_found" });
-		return cacheable(reply).send(sale);
+		return cacheable(reply).send(sale.value);
 	});
 
 	app.get<{ Params: { saleId: string } }>(
@@ -72,7 +72,7 @@ export function registerRoutes(
 		async (request, reply) => {
 			const sale = await deps.sales.byId(request.params.saleId);
 			if (!sale) return reply.code(404).send({ error: "sale_not_found" });
-			return cacheable(reply).send(sale);
+			return cacheable(reply).send(sale.value);
 		},
 	);
 
@@ -91,7 +91,7 @@ export function registerRoutes(
 				async () => {
 					const sale = await deps.sales.byId(saleId);
 					if (!sale) throw new Error("the sale is gone");
-					return { event: "sale", data: sale };
+					return { event: "sale", data: sale.value };
 				},
 				stream,
 				(error) => request.log.warn({ err: error }, "event read failed"),
@@ -107,18 +107,21 @@ export function registerRoutes(
 			const header = request.headers["x-queue-ticket"];
 			const ticket = typeof header === "string" ? header : undefined;
 			const first = await deps.queue.check(saleId, userId, ticket);
-			if (!first.ok) {
+			if (first.isErr()) {
 				return reply
 					.code(QUEUE_ERROR_STATUS[first.error])
 					.send({ error: first.error });
 			}
+			const { user } = first.value;
 			return serveEvents(
 				request,
 				reply,
 				async () => {
-					const result = await deps.queue.check(saleId, userId, ticket);
-					const place = result.ok ? result.place : { state: "absent" };
-					return { event: "place", data: { userId: first.user, ...place } };
+					const latest = await deps.queue.check(saleId, userId, ticket);
+					const place = latest.isOk()
+						? latest.value.place
+						: { state: "absent" };
+					return { event: "place", data: { userId: user, ...place } };
 				},
 				stream,
 				(error) => request.log.warn({ err: error }, "event read failed"),
@@ -131,20 +134,19 @@ export function registerRoutes(
 		"/sales/:saleId/queue",
 		{ preHandler: limit },
 		async (request, reply) => {
-			const result = await deps.queue.join(
+			const joined = await deps.queue.join(
 				request.params.saleId,
 				request.body?.userId,
 			);
-			if (!result.ok) {
+			if (joined.isErr()) {
 				return reply
-					.code(QUEUE_ERROR_STATUS[result.error])
-					.send({ error: result.error });
+					.code(QUEUE_ERROR_STATUS[joined.error])
+					.send({ error: joined.error });
 			}
-			return reply.code(result.created ? 201 : 200).send({
-				userId: result.user,
-				ticket: result.ticket,
-				...result.place,
-			});
+			const { created, user, ticket, place } = joined.value;
+			return reply
+				.code(created ? 201 : 200)
+				.send({ userId: user, ticket, ...place });
 		},
 	);
 
@@ -152,17 +154,17 @@ export function registerRoutes(
 		"/sales/:saleId/queue/:userId",
 		async (request, reply) => {
 			const ticket = request.headers["x-queue-ticket"];
-			const result = await deps.queue.check(
+			const checked = await deps.queue.check(
 				request.params.saleId,
 				request.params.userId,
 				typeof ticket === "string" ? ticket : undefined,
 			);
-			if (!result.ok) {
+			if (checked.isErr()) {
 				return reply
-					.code(QUEUE_ERROR_STATUS[result.error])
-					.send({ error: result.error });
+					.code(QUEUE_ERROR_STATUS[checked.error])
+					.send({ error: checked.error });
 			}
-			return { userId: result.user, ...result.place };
+			return { userId: checked.value.user, ...checked.value.place };
 		},
 	);
 
@@ -172,20 +174,21 @@ export function registerRoutes(
 		{ preHandler: limit },
 		async (request, reply) => {
 			const ticket = request.headers["x-queue-ticket"];
-			const result = await deps.reservations.reserve(
+			const reserved = await deps.reservations.reserve(
 				request.params.saleId,
 				request.body?.userId,
 				typeof ticket === "string" ? ticket : undefined,
 			);
-			if (!result.ok) {
+			if (reserved.isErr()) {
 				return reply
-					.code(RESERVE_ERROR_STATUS[result.error])
-					.send({ error: result.error });
+					.code(RESERVE_ERROR_STATUS[reserved.error])
+					.send({ error: reserved.error });
 			}
-			return reply.code(result.created ? 201 : 200).send({
-				userId: result.user,
-				reservationId: result.reservationId,
-				expiresAt: result.expiresAt.toISOString(),
+			const { created, user, reservationId, expiresAt } = reserved.value;
+			return reply.code(created ? 201 : 200).send({
+				userId: user,
+				reservationId,
+				expiresAt: expiresAt.toISOString(),
 			});
 		},
 	);
@@ -198,19 +201,18 @@ export function registerRoutes(
 		"/sales/:saleId/purchases",
 		{ preHandler: limit },
 		async (request, reply) => {
-			const result = await deps.purchases.confirm(
+			const confirmed = await deps.purchases.confirm(
 				request.params.saleId,
 				request.body?.userId,
 				request.body?.reservationId,
 			);
-			if (!result.ok) {
+			if (confirmed.isErr()) {
 				return reply
-					.code(CONFIRM_ERROR_STATUS[result.error])
-					.send({ error: result.error });
+					.code(CONFIRM_ERROR_STATUS[confirmed.error])
+					.send({ error: confirmed.error });
 			}
-			return reply
-				.code(result.created ? 201 : 200)
-				.send(purchaseBody(result.purchase));
+			const { created, purchase } = confirmed.value;
+			return reply.code(created ? 201 : 200).send(purchaseBody(purchase));
 		},
 	);
 
@@ -218,28 +220,28 @@ export function registerRoutes(
 	app.get<{ Params: { saleId: string; userId: string } }>(
 		"/sales/:saleId/purchases/:userId",
 		async (request, reply) => {
-			const result = await deps.purchases.outcome(
+			const found = await deps.purchases.outcome(
 				request.params.saleId,
 				request.params.userId,
 			);
-			if (!result.ok) {
+			if (found.isErr()) {
 				return reply
-					.code(result.error === "sale_not_found" ? 404 : 400)
-					.send({ error: result.error });
+					.code(found.error === "sale_not_found" ? 404 : 400)
+					.send({ error: found.error });
 			}
-			const { outcome } = result;
+			const { user, outcome } = found.value;
 			if (outcome.state === "purchased") {
 				return { ...purchaseBody(outcome.purchase), state: "purchased" };
 			}
 			if (outcome.state === "holding") {
 				return {
-					userId: result.user,
+					userId: user,
 					state: "holding",
 					reservationId: outcome.reservationId,
 					expiresAt: outcome.expiresAt.toISOString(),
 				};
 			}
-			return { userId: result.user, state: "none" };
+			return { userId: user, state: "none" };
 		},
 	);
 }
@@ -263,7 +265,7 @@ const CONFIRM_ERROR_STATUS = {
 	sale_ended: 409,
 	sold_out: 409,
 	payment_failed: 402,
-} as const;
+} satisfies Record<ConfirmError, number>;
 
 const RESERVE_ERROR_STATUS = {
 	sale_not_found: 404,
@@ -275,7 +277,7 @@ const RESERVE_ERROR_STATUS = {
 	sold_out: 409,
 	already_purchased: 409,
 	unavailable: 503,
-} as const;
+} satisfies Record<ReserveError, number>;
 
 const QUEUE_ERROR_STATUS = {
 	sale_not_found: 404,
@@ -284,4 +286,4 @@ const QUEUE_ERROR_STATUS = {
 	sold_out: 409,
 	invalid_ticket: 401,
 	not_in_queue: 404,
-} as const;
+} satisfies Record<JoinError | CheckError, number>;

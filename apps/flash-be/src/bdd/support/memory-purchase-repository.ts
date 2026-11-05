@@ -1,3 +1,4 @@
+import { fromOptional } from "@flash/typekit";
 import type { PurchaseRepository } from "../../application/ports/purchase-repository.js";
 import type { Purchase } from "../../domain/purchase.js";
 import type { Reservation } from "../../domain/reservation.js";
@@ -36,24 +37,30 @@ export function memoryPurchaseRepository(
 		},
 
 		async findByReservation(reservationId) {
-			return repository.purchases.find(
-				(purchase) => purchase.reservationId === reservationId,
+			return fromOptional(
+				repository.purchases.find(
+					(purchase) => purchase.reservationId === reservationId,
+				),
 			);
 		},
 
 		async findByUser(saleId, user) {
-			return repository.purchases.find(
-				(purchase) => purchase.saleId === saleId && purchase.user === user,
+			return fromOptional(
+				repository.purchases.find(
+					(purchase) => purchase.saleId === saleId && purchase.user === user,
+				),
 			);
 		},
 
 		async findReservation(saleId, user) {
-			return reservations.get(`${saleId}:${user}`);
+			return fromOptional(reservations.get(`${saleId}:${user}`));
 		},
 
 		async commit(input) {
 			const same = await repository.findByReservation(input.reservationId);
-			if (same) return { kind: "purchased", purchase: same, created: false };
+			if (same) {
+				return { kind: "purchased", purchase: same.value, created: false };
+			}
 			if (await repository.findByUser(input.saleId, input.user)) {
 				return { kind: "already_purchased" };
 			}

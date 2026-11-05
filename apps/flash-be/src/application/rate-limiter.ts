@@ -1,3 +1,4 @@
+import { attemptAsync } from "@flash/typekit";
 import { normalizeUser } from "../domain/user.js";
 import type { Clock } from "./ports/clock.js";
 import type { RateLimitStore } from "./ports/rate-limit-store.js";
@@ -23,11 +24,11 @@ export function createRateLimiter(
 	limits: RateLimits,
 ) {
 	async function hit(key: string, windowMs: number) {
-		try {
-			return await shared.hit(key, windowMs, clock());
-		} catch {
-			return local.hit(key, windowMs, clock());
-		}
+		const counted = await attemptAsync(
+			() => shared.hit(key, windowMs, clock()),
+			Error,
+		);
+		return counted.isOk() ? counted.value : local.hit(key, windowMs, clock());
 	}
 
 	return {
@@ -44,7 +45,7 @@ export function createRateLimiter(
 			// A request with no usable user id still counts against its address. The route answers the bad id.
 			const user = normalizeUser(request.user);
 			const person = user
-				? await hit(`user:${request.saleId}:${user}`, windowMs)
+				? await hit(`user:${request.saleId}:${user.value}`, windowMs)
 				: undefined;
 
 			const over: Array<typeof address> = [];

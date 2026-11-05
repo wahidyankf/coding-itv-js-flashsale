@@ -1,3 +1,4 @@
+import { Some } from "@flash/typekit";
 import { expect, it } from "vitest";
 import { fakeSale } from "../bdd/support/fake-sales.js";
 import type { SaleRepository } from "./ports/sale-repository.js";
@@ -12,12 +13,12 @@ function counting(sale = fakeSale({})) {
 		findById: async () => {
 			reads.byId++;
 			await Promise.resolve();
-			return { ...sale };
+			return new Some({ ...sale });
 		},
 		findCurrent: async () => {
 			reads.current++;
 			await Promise.resolve();
-			return { ...sale };
+			return new Some({ ...sale });
 		},
 	};
 	return { inner, reads, sale };
@@ -30,7 +31,7 @@ it("shares one read between callers that arrive while it runs", async () => {
 		Array.from({ length: 20 }, () => cache.findById(sale.id)),
 	);
 	expect(reads.byId).toBe(1);
-	expect(answers.every((answer) => answer?.id === sale.id)).toBe(true);
+	expect(answers.every((answer) => answer?.value.id === sale.id)).toBe(true);
 });
 
 it("reads again once the time is over, for one sale and for the current sale", async () => {

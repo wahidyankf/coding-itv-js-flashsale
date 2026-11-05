@@ -1,3 +1,5 @@
+import { type Option, Some } from "@flash/typekit";
+
 export type Sale = {
 	id: string;
 	name: string;
@@ -27,19 +29,32 @@ export function remaining(sale: Sale): number {
 export type ReserveBlock = "sale_not_started" | "sale_ended" | "sold_out";
 
 // Why a shopper cannot hold an item now. The sale answers in this order, so a shopper learns it without a ticket.
-export function reserveBlock(status: SaleStatus): ReserveBlock | undefined {
-	if (status === "upcoming") return "sale_not_started";
-	if (status === "ended") return "sale_ended";
-	if (status === "sold_out") return "sold_out";
-	return undefined;
+export function reserveBlock(status: SaleStatus): Option<ReserveBlock> {
+	switch (status) {
+		case "upcoming":
+			return new Some("sale_not_started");
+		case "ended":
+			return new Some("sale_ended");
+		case "sold_out":
+			return new Some("sold_out");
+		case "active":
+			return undefined;
+	}
 }
 
 export type QueueBlock = "sale_ended" | "sold_out";
 
 // A shopper may queue before the sale opens, but not once it is over or sold out.
-export function queueBlock(status: SaleStatus): QueueBlock | undefined {
-	if (status === "ended") return "sale_ended";
-	return status === "sold_out" ? status : undefined;
+export function queueBlock(status: SaleStatus): Option<QueueBlock> {
+	switch (status) {
+		case "ended":
+			return new Some("sale_ended");
+		case "sold_out":
+			return new Some("sold_out");
+		case "upcoming":
+		case "active":
+			return undefined;
+	}
 }
 
 // How many shoppers one admission tick lets in. At least one, so a slow rate never stalls the line.

@@ -1,3 +1,4 @@
+import { Err, Ok, Some } from "@flash/typekit";
 import { afterEach, describe, expect, it } from "vitest";
 import { healthyDeps } from "../../../bdd/support/deps.js";
 import { fakeSale } from "../../../bdd/support/fake-sales.js";
@@ -42,7 +43,11 @@ describe("the event stream", () => {
 
 	it("sends a keep-alive comment when nothing changed", async () => {
 		const sale = fakeSale({});
-		const view = { ...sale, status: "active", remaining: 10 } as never;
+		const view = new Some({
+			...sale,
+			status: "active",
+			remaining: 10,
+		} as never);
 		const app = buildApp(
 			{
 				...healthyDeps,
@@ -63,7 +68,7 @@ describe("the event stream", () => {
 
 	it("keeps the stream open when a read fails, and goes on afterwards", async () => {
 		let calls = 0;
-		const view = { id: "s", status: "active", remaining: 4 } as never;
+		const view = new Some({ id: "s", status: "active", remaining: 4 } as never);
 		const app = buildApp(
 			{
 				...healthyDeps,
@@ -100,8 +105,11 @@ describe("the event stream", () => {
 					check: async () => {
 						calls++;
 						return calls <= 2
-							? { ok: true, user: "ana", place: { state: "waiting", place: 1 } }
-							: { ok: false, error: "not_in_queue" };
+							? new Ok({
+									user: "ana",
+									place: { state: "waiting" as const, place: 1 },
+								})
+							: new Err("not_in_queue");
 					},
 				},
 			},
@@ -124,7 +132,7 @@ describe("the event stream", () => {
 				...healthyDeps,
 				queue: {
 					...healthyDeps.queue,
-					check: async () => ({ ok: false, error: "invalid_ticket" }),
+					check: async () => new Err("invalid_ticket"),
 				},
 			},
 			{ events: fast },
@@ -145,7 +153,10 @@ describe("the event stream", () => {
 					check: async () => {
 						calls++;
 						if (calls === 2) throw new Error("redis is down");
-						return { ok: true, user: "ana", place: { state: "admitted" } };
+						return new Ok({
+							user: "ana",
+							place: { state: "admitted" as const },
+						});
 					},
 				},
 			},
@@ -164,7 +175,7 @@ describe("the event stream", () => {
 
 	it("stops reading once the client left in the middle of a read", async () => {
 		let calls = 0;
-		const view = { id: "s", status: "active", remaining: 4 } as never;
+		const view = new Some({ id: "s", status: "active", remaining: 4 } as never);
 		const app = buildApp(
 			{
 				...healthyDeps,

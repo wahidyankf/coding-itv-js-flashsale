@@ -1,16 +1,26 @@
 import { randomUUID } from "node:crypto";
 import {
+	attemptAsync,
+	Err,
+	Ok,
+	type Option,
+	option,
+	pipe,
+	type Result,
+	result,
+} from "@flash/typekit";
+import {
 	type GateAnswer,
 	holdRequest,
 	type ReserveRequest,
 } from "../domain/reservation.js";
-import { reserveBlock } from "../domain/sale.js";
+import { type ReserveBlock, reserveBlock } from "../domain/sale.js";
 import { normalizeUser } from "../domain/user.js";
 import type { GuardedGate } from "./guarded-gate.js";
 import type { Clock } from "./ports/clock.js";
 import type { ReservationRepository } from "./ports/reservation-repository.js";
 import type { QueueService } from "./queue-service.js";
-import type { SaleService } from "./sale-service.js";
+import type { SaleDetails, SaleService } from "./sale-service.js";
 
 export type ReserveError =
 	| "sale_not_found"
@@ -23,15 +33,14 @@ export type ReserveError =
 	| "already_purchased"
 	| "unavailable";
 
-export type ReserveResult =
-	| {
-			ok: true;
-			created: boolean;
-			user: string;
-			reservationId: string;
-			expiresAt: Date;
-	  }
-	| { ok: false; error: ReserveError };
+export type Reserved = {
+	created: boolean;
+	user: string;
+	reservationId: string;
+	expiresAt: Date;
+};
+
+export type ReserveResult = Result<Reserved, ReserveError>;
 
 export type ReservationOptions = {
 	// How long to wait for another instance that is rebuilding the sale's reservation state.
@@ -46,6 +55,33 @@ export const defaultReservationOptions: ReservationOptions = {
 
 const REBUILD_LOCK_MS = 10_000;
 const POLL_MS = 25;
+
+// What must hold before the queue or a store is asked: the sale exists, the name is usable and the sale is selling.
+function selling(
+	found: Option<SaleDetails>,
+	rawUser: unknown,
+): Result<SaleDetails, ReserveError> {
+	return pipe(
+		found,
+		option.okOr<SaleDetails, ReserveError>("sale_not_found"),
+		result.flatMap((details: SaleDetails) =>
+			pipe(
+				normalizeUser(rawUser),
+				option.okOr<string, ReserveError>("invalid_user"),
+				result.flatMap(() =>
+					// A sale that is not selling answers first, so a shopper learns it without a valid ticket.
+					pipe(
+						reserveBlock(details.view.status),
+						option.match<ReserveBlock, Result<SaleDetails, ReserveError>>({
+							some: (block) => new Err(block),
+							none: () => new Ok(details),
+						}),
+					),
+				),
+			),
+		),
+	);
+}
 
 export type ReservationService = ReturnType<typeof createReservationService>;
 
@@ -85,86 +121,94 @@ export function createReservationService(
 		return gate.reserve(request);
 	}
 
+	// Redis decides when it can. When it fails, Postgres decides alone under the sale row lock, which is slower but
+	// keeps the stock and the one item per user. That path writes the hold itself, so `written` is true.
+	async function decide(
+		request: ReserveRequest,
+	): Promise<{ answer: GateAnswer; written: boolean }> {
+		const viaRedis = await attemptAsync(() => viaGate(request), Error);
+		if (viaRedis.isOk()) return { answer: viaRedis.value, written: false };
+
+		gate.markStale(request.saleId);
+		const fallback = await repository.reserveWithoutRedis(request, () =>
+			gate.isReady(request.saleId),
+		);
+		if (fallback.kind === "redis_ready") {
+			return { answer: await viaGate(request), written: false };
+		}
+		return { answer: fallback, written: true };
+	}
+
+	// Without its Postgres row a hold could not be rebuilt, so when the write fails the item goes back.
+	async function remember(
+		saleId: string,
+		user: string,
+		answer: Extract<GateAnswer, { kind: "reserved" }>,
+	): Promise<void> {
+		const saved = await attemptAsync(
+			() =>
+				repository.save({
+					saleId,
+					user,
+					reservationId: answer.reservationId,
+					expiresAt: answer.expiresAt,
+				}),
+			Error,
+		);
+		if (saved.isErr()) {
+			await gate.release(saleId, user);
+			throw saved.error;
+		}
+	}
+
 	return {
 		async reserve(
 			saleId: string,
 			rawUser: unknown,
 			ticket: string | undefined,
 		): Promise<ReserveResult> {
-			const found = await sales.details(saleId);
-			if (!found) return { ok: false, error: "sale_not_found" };
-
-			if (!normalizeUser(rawUser)) return { ok: false, error: "invalid_user" };
-
-			// A sale that is not selling answers first, so a shopper learns it without a valid ticket.
-			const { sale, view } = found;
-			const blocked = reserveBlock(view.status);
-			if (blocked) return { ok: false, error: blocked };
+			const open = selling(await sales.details(saleId), rawUser);
+			if (open.isErr()) return new Err(open.error);
+			const { sale } = open.value;
 
 			const entry = await queue.check(saleId, rawUser, ticket);
-			if (!entry.ok) {
-				if (entry.error === "not_in_queue") {
-					// The queue is only in Redis and can be lost. A shopper who already bought is told so, not sent back.
-					const user = normalizeUser(rawUser);
-					const bought = user && (await repository.hasPurchase(saleId, user));
-					return {
-						ok: false,
-						error: bought ? "already_purchased" : "not_admitted",
-					};
-				}
-				return { ok: false, error: entry.error };
+			if (entry.isErr()) {
+				if (entry.error !== "not_in_queue") return new Err(entry.error);
+				// The queue is only in Redis and can be lost. A shopper who already bought is told so, not sent back.
+				const user = normalizeUser(rawUser);
+				const bought =
+					user !== undefined &&
+					(await repository.hasPurchase(saleId, user.value));
+				return new Err(bought ? "already_purchased" : "not_admitted");
 			}
-			if (entry.place.state !== "admitted") {
-				return { ok: false, error: "not_admitted" };
-			}
+			const { user, place } = entry.value;
+			if (place.state !== "admitted") return new Err("not_admitted");
 
-			const request = holdRequest(sale, entry.user, randomUUID(), clock());
-
-			// Redis decides when it can. When it fails, Postgres decides alone under the sale row lock, which is
-			// slower but keeps the stock and the one-per-user rule. That path writes the hold itself.
-			let answer: GateAnswer;
-			let written = false;
-			try {
-				answer = await viaGate(request);
-			} catch {
-				gate.markStale(saleId);
-				const fallback = await repository.reserveWithoutRedis(request, () =>
-					gate.isReady(saleId),
-				);
-				if (fallback.kind === "redis_ready") {
-					answer = await viaGate(request);
-				} else {
-					answer = fallback;
-					written = true;
-				}
-			}
+			const request = holdRequest(sale, user, randomUUID(), clock());
+			const { answer, written } = await decide(request);
 
 			switch (answer.kind) {
 				case "reserved":
-					if (written) {
-						return { ok: true, created: true, user: entry.user, ...answer };
-					}
-					try {
-						await repository.save({
-							saleId,
-							user: entry.user,
-							reservationId: answer.reservationId,
-							expiresAt: answer.expiresAt,
-						});
-					} catch (error) {
-						// Without its Postgres row a hold could not be rebuilt, so the item goes back.
-						await gate.release(saleId, entry.user);
-						throw error;
-					}
-					return { ok: true, created: true, user: entry.user, ...answer };
+					if (!written) await remember(saleId, user, answer);
+					return new Ok({
+						created: true,
+						user,
+						reservationId: answer.reservationId,
+						expiresAt: answer.expiresAt,
+					});
 				case "held":
-					return { ok: true, created: false, user: entry.user, ...answer };
+					return new Ok({
+						created: false,
+						user,
+						reservationId: answer.reservationId,
+						expiresAt: answer.expiresAt,
+					});
 				case "purchased":
-					return { ok: false, error: "already_purchased" };
+					return new Err("already_purchased");
 				case "sold_out":
-					return { ok: false, error: "sold_out" };
+					return new Err("sold_out");
 				case "not_ready":
-					return { ok: false, error: "unavailable" };
+					return new Err("unavailable");
 			}
 		},
 	};

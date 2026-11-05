@@ -52,6 +52,8 @@ const files = walk(SRC).filter((file) => file.endsWith(".ts"));
 const product = files.filter((file) => layerOf(file) !== "test");
 
 const isNode = (target: string) => target.startsWith("node:");
+// The typekit library has no dependencies of its own and no I/O, so the inner layers may use it.
+const isKernel = (target: string) => target === "@flash/typekit";
 const isDomain = (target: string) => target.startsWith("domain/");
 const isPort = (target: string) => target.startsWith("application/ports/");
 const isWiring = (target: string) =>
@@ -61,10 +63,13 @@ const isWiring = (target: string) =>
 function allowed(layer: Layer, target: string): boolean {
 	switch (layer) {
 		case "domain":
-			return isNode(target) || isDomain(target);
+			return isNode(target) || isKernel(target) || isDomain(target);
 		case "application":
 			return (
-				isNode(target) || isDomain(target) || target.startsWith("application/")
+				isNode(target) ||
+				isKernel(target) ||
+				isDomain(target) ||
+				target.startsWith("application/")
 			);
 		case "inbound":
 			return !target.startsWith("adapters/outbound/") && !isWiring(target);
@@ -124,6 +129,7 @@ describe("hexagonal architecture", () => {
 			allowed("application", "adapters/outbound/redis/redis-client.ts"),
 		).toBe(false);
 		expect(allowed("application", "fastify")).toBe(false);
+		expect(allowed("domain", "@flash/typekit-extras")).toBe(false);
 		expect(allowed("inbound", "adapters/outbound/postgres/database.ts")).toBe(
 			false,
 		);
@@ -133,6 +139,8 @@ describe("hexagonal architecture", () => {
 
 	it("accepts the imports the rules allow", () => {
 		expect(allowed("domain", "node:crypto")).toBe(true);
+		expect(allowed("domain", "@flash/typekit")).toBe(true);
+		expect(allowed("application", "@flash/typekit")).toBe(true);
 		expect(allowed("application", "application/ports/clock.ts")).toBe(true);
 		expect(allowed("outbound", "application/ports/clock.ts")).toBe(true);
 		expect(allowed("outbound", "domain/sale.ts")).toBe(true);

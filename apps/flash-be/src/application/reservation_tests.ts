@@ -1,3 +1,4 @@
+import { Err } from "@flash/typekit";
 import { describe, expect, it } from "vitest";
 import { queueWorld } from "../bdd/support/queue-world.js";
 import { relativeTime } from "../bdd/support/time.js";
@@ -62,10 +63,7 @@ async function reserveWith(gate: HoldGate) {
 describe("the reservation service", () => {
 	it("answers already_purchased when the gate knows the user bought", async () => {
 		const { gate } = gateWith([{ kind: "purchased" }]);
-		expect(await reserveWith(gate)).toEqual({
-			ok: false,
-			error: "already_purchased",
-		});
+		expect(await reserveWith(gate)).toEqual(new Err("already_purchased"));
 	});
 
 	it("rebuilds once and asks the gate again", async () => {
@@ -73,16 +71,13 @@ describe("the reservation service", () => {
 			{ kind: "not_ready" },
 			{ kind: "sold_out" },
 		]);
-		expect(await reserveWith(gate)).toEqual({ ok: false, error: "sold_out" });
+		expect(await reserveWith(gate)).toEqual(new Err("sold_out"));
 		expect(calls).toEqual({ restore: 1, lock: 1 });
 	});
 
 	it("answers unavailable when the state is still not ready after a rebuild", async () => {
 		const { gate } = gateWith([{ kind: "not_ready" }, { kind: "not_ready" }]);
-		expect(await reserveWith(gate)).toEqual({
-			ok: false,
-			error: "unavailable",
-		});
+		expect(await reserveWith(gate)).toEqual(new Err("unavailable"));
 	});
 
 	it("waits for another instance that is rebuilding, then goes on", async () => {
@@ -94,7 +89,7 @@ describe("the reservation service", () => {
 				isReady: async () => ++polls > 3,
 			},
 		);
-		expect(await reserveWith(gate)).toEqual({ ok: false, error: "sold_out" });
+		expect(await reserveWith(gate)).toEqual(new Err("sold_out"));
 		expect(calls.restore).toBe(0);
 	});
 
@@ -102,10 +97,7 @@ describe("the reservation service", () => {
 		const { gate } = gateWith([{ kind: "not_ready" }], {
 			lockRebuild: async () => false,
 		});
-		expect(await reserveWith(gate)).toEqual({
-			ok: false,
-			error: "unavailable",
-		});
+		expect(await reserveWith(gate)).toEqual(new Err("unavailable"));
 	});
 
 	it("goes on when another instance finished the rebuild just before", async () => {
@@ -115,7 +107,7 @@ describe("the reservation service", () => {
 				isReady: async () => true,
 			},
 		);
-		expect(await reserveWith(gate)).toEqual({ ok: false, error: "sold_out" });
+		expect(await reserveWith(gate)).toEqual(new Err("sold_out"));
 		expect(calls.lock).toBe(0);
 	});
 
@@ -128,24 +120,22 @@ describe("the reservation service", () => {
 			},
 			isReady: async () => true,
 		});
-		expect(await reserveWith(gate)).toEqual({ ok: false, error: "sold_out" });
+		expect(await reserveWith(gate)).toEqual(new Err("sold_out"));
 		expect(calls).toBe(2);
 	});
 
 	it("refuses a user id that cannot be used", async () => {
 		const { world, saleId } = await admittedAna();
-		expect(await world.reservations.reserve(saleId, "has space", "t")).toEqual({
-			ok: false,
-			error: "invalid_user",
-		});
+		expect(await world.reservations.reserve(saleId, "has space", "t")).toEqual(
+			new Err("invalid_user"),
+		);
 	});
 
 	it("tells a shopper whose queue place was lost that they are not admitted", async () => {
 		const { world, saleId, ticket } = await admittedAna();
 		world.store.clear();
-		expect(await world.reservations.reserve(saleId, "ana", ticket)).toEqual({
-			ok: false,
-			error: "not_admitted",
-		});
+		expect(await world.reservations.reserve(saleId, "ana", ticket)).toEqual(
+			new Err("not_admitted"),
+		);
 	});
 });

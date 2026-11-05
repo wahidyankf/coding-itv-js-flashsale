@@ -1,3 +1,4 @@
+import { Err, Ok } from "@flash/typekit";
 import type {
 	Payment,
 	PaymentResult,
@@ -44,9 +45,9 @@ export function createMockPayment(options: MockPaymentOptions): MockPayment {
 				await sleep(settings.latencyMs);
 				if (random() < settings.failureRate) {
 					charges.delete(reservationId);
-					return { ok: false };
+					return new Err("declined");
 				}
-				return { ok: true, ref: `mock-${reservationId}` };
+				return new Ok({ ref: `mock-${reservationId}` });
 			})();
 			charges.set(reservationId, attempt);
 			return attempt;

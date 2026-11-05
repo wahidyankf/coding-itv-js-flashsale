@@ -1,3 +1,4 @@
+import { attemptAsync } from "@flash/typekit";
 import { buildApp } from "./adapters/inbound/http/app.js";
 import { createDb } from "./adapters/outbound/postgres/database.js";
 import { createRedis } from "./adapters/outbound/redis/redis-client.js";
@@ -17,11 +18,12 @@ const app = buildApp(deps, {
 
 // Admits the next shoppers of the current sale. Every instance runs this; the store lets one win each tick.
 const admitter = setInterval(async () => {
-	try {
+	const ticked = await attemptAsync(async () => {
 		const sale = await deps.sales.current();
-		if (sale) await deps.queue.admitTick(sale.id);
-	} catch (error) {
-		app.log.error({ err: error }, "admission tick failed");
+		if (sale) await deps.queue.admitTick(sale.value.id);
+	}, Error);
+	if (ticked.isErr()) {
+		app.log.error({ err: ticked.error }, "admission tick failed");
 	}
 }, config.admissionTickMs);
 

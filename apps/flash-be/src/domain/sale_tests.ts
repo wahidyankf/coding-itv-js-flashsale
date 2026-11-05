@@ -1,3 +1,4 @@
+import { Some } from "@flash/typekit";
 import { describe, expect, it } from "vitest";
 import {
 	admissionsPerTick,
@@ -37,17 +38,17 @@ describe("sale rules", () => {
 	});
 
 	it("blocks a reservation unless the sale is active", () => {
-		expect(reserveBlock("upcoming")).toBe("sale_not_started");
-		expect(reserveBlock("ended")).toBe("sale_ended");
-		expect(reserveBlock("sold_out")).toBe("sold_out");
+		expect(reserveBlock("upcoming")).toEqual(new Some("sale_not_started"));
+		expect(reserveBlock("ended")).toEqual(new Some("sale_ended"));
+		expect(reserveBlock("sold_out")).toEqual(new Some("sold_out"));
 		expect(reserveBlock("active")).toBeUndefined();
 	});
 
 	it("lets a shopper queue before the sale opens but not after it is over", () => {
 		expect(queueBlock("upcoming")).toBeUndefined();
 		expect(queueBlock("active")).toBeUndefined();
-		expect(queueBlock("ended")).toBe("sale_ended");
-		expect(queueBlock("sold_out")).toBe("sold_out");
+		expect(queueBlock("ended")).toEqual(new Some("sale_ended"));
+		expect(queueBlock("sold_out")).toEqual(new Some("sold_out"));
 	});
 
 	it("admits at least one shopper per tick", () => {

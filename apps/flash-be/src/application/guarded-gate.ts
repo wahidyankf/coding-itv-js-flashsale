@@ -1,3 +1,4 @@
+import { attemptAsync } from "@flash/typekit";
 import type { HoldGate } from "./ports/hold-gate.js";
 
 // A gate that remembers which sales Redis may have fallen behind on. When a call fails, Postgres may have decided
@@ -13,13 +14,17 @@ export function createGuardedGate(inner: HoldGate): GuardedGate {
 		await inner.invalidate(saleId);
 		stale.delete(saleId);
 	};
-	const marking = async <T>(saleId: string, call: () => Promise<T>) => {
-		try {
-			return await call();
-		} catch (error) {
+	// A failed call leaves Redis behind Postgres, so the sale is marked stale before the failure goes on.
+	const marking = async <T>(
+		saleId: string,
+		call: () => Promise<T>,
+	): Promise<T> => {
+		const outcome = await attemptAsync(call, Error);
+		if (outcome.isErr()) {
 			stale.add(saleId);
-			throw error;
+			throw outcome.error;
 		}
+		return outcome.value;
 	};
 
 	return {

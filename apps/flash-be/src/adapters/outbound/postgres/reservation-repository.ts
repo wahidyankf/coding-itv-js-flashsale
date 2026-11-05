@@ -1,3 +1,4 @@
+import { attemptAsync } from "@flash/typekit";
 import type { Kysely } from "kysely";
 import type { ReservationRepository } from "../../../application/ports/reservation-repository.js";
 import type { FallbackAnswer } from "../../../domain/reservation.js";
@@ -44,9 +45,8 @@ export function createReservationRepository(
 					.forUpdate()
 					.executeTakeFirstOrThrow();
 				// Rebuilding takes the same lock, so after it Redis is ready and holds everything written so far.
-				if (await redisReady().catch(() => false)) {
-					return { kind: "redis_ready" };
-				}
+				const ready = await attemptAsync(redisReady, Error);
+				if (ready.isOk() && ready.value) return { kind: "redis_ready" };
 				const bought = await trx
 					.selectFrom("purchases")
 					.select("id")

@@ -1,3 +1,4 @@
+import { Err } from "@flash/typekit";
 import type { Dependencies } from "../../application/dependencies.js";
 
 const noSale = async () => undefined;
@@ -8,16 +9,16 @@ export const healthyDeps: Dependencies = {
 	checkRedis: async () => {},
 	sales: { cacheMs: () => 0, current: noSale, byId: noSale, details: noSale },
 	queue: {
-		join: async () => ({ ok: false, error: "sale_not_found" }),
-		check: async () => ({ ok: false, error: "sale_not_found" }),
+		join: async () => new Err("sale_not_found"),
+		check: async () => new Err("sale_not_found"),
 		admitTick: async () => [],
 	},
 	reservations: {
-		reserve: async () => ({ ok: false, error: "sale_not_found" }),
+		reserve: async () => new Err("sale_not_found"),
 	},
 	rateLimiter: { check: async () => ({ limited: false }) },
 	purchases: {
-		confirm: async () => ({ ok: false, error: "sale_not_found" }),
-		outcome: async () => ({ ok: false, error: "sale_not_found" }),
+		confirm: async () => new Err("sale_not_found"),
+		outcome: async () => new Err("sale_not_found"),
 	},
 };

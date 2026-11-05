@@ -1,9 +1,11 @@
+import { fromOptional, option, pipe } from "@flash/typekit";
 import { type Kysely, type Selectable, sql } from "kysely";
 import type {
 	CommitResult,
 	PurchaseRepository,
 } from "../../../application/ports/purchase-repository.js";
 import type { Purchase } from "../../../domain/purchase.js";
+import type { Reservation } from "../../../domain/reservation.js";
 import type { Database } from "./database.js";
 
 function toPurchase(row: Selectable<Database["purchases"]>): Purchase {
@@ -17,6 +19,15 @@ function toPurchase(row: Selectable<Database["purchases"]>): Purchase {
 	};
 }
 
+function toReservation(row: Selectable<Database["reservations"]>): Reservation {
+	return {
+		saleId: row.sale_id,
+		user: row.user_id,
+		reservationId: row.id,
+		expiresAt: row.expires_at,
+	};
+}
+
 export function createPurchaseRepository(
 	db: Kysely<Database>,
 ): PurchaseRepository {
@@ -27,7 +38,7 @@ export function createPurchaseRepository(
 				.selectAll()
 				.where("reservation_id", "=", reservationId)
 				.executeTakeFirst();
-			return row ? toPurchase(row) : undefined;
+			return pipe(fromOptional(row), option.map(toPurchase));
 		},
 
 		async findByUser(saleId, user) {
@@ -37,7 +48,7 @@ export function createPurchaseRepository(
 				.where("sale_id", "=", saleId)
 				.where("user_id", "=", user)
 				.executeTakeFirst();
-			return row ? toPurchase(row) : undefined;
+			return pipe(fromOptional(row), option.map(toPurchase));
 		},
 
 		async findReservation(saleId, user) {
@@ -47,14 +58,7 @@ export function createPurchaseRepository(
 				.where("sale_id", "=", saleId)
 				.where("user_id", "=", user)
 				.executeTakeFirst();
-			return row
-				? {
-						saleId: row.sale_id,
-						user: row.user_id,
-						reservationId: row.id,
-						expiresAt: row.expires_at,
-					}
-				: undefined;
+			return pipe(fromOptional(row), option.map(toReservation));
 		},
 
 		async commit(input) {

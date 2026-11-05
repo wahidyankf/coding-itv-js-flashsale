@@ -1,3 +1,4 @@
+import { type Option, Some } from "@flash/typekit";
 import type { Sale } from "../domain/sale.js";
 import type { Clock } from "./ports/clock.js";
 import type { SaleRepository } from "./ports/sale-repository.js";
@@ -17,7 +18,7 @@ export function createCachedSaleRepository(
 ): SaleRepository {
 	const byId = new Map<string, Entry>();
 	let current: Entry | undefined;
-	const running = new Map<string, Promise<Sale | undefined>>();
+	const running = new Map<string, Promise<Option<Sale>>>();
 
 	// Turning the cache off also drops what it kept, so turning it on again never serves an old row.
 	const off = (): boolean => {
@@ -27,17 +28,22 @@ export function createCachedSaleRepository(
 		return true;
 	};
 
-	const fresh = (entry: Entry | undefined): Sale | undefined =>
-		entry && entry.expiresAt > clock().getTime() ? entry.sale : undefined;
+	const fresh = (entry: Entry | undefined): Option<Sale> =>
+		entry && entry.expiresAt > clock().getTime()
+			? new Some(entry.sale)
+			: undefined;
 
-	const remember = (sale: Sale | undefined): Entry | undefined =>
-		sale && { sale, expiresAt: clock().getTime() + settings.ttlMs };
+	const remember = (sale: Option<Sale>): Entry | undefined =>
+		sale && {
+			sale: sale.value,
+			expiresAt: clock().getTime() + settings.ttlMs,
+		};
 
 	// One read at a time per key; later callers wait for it.
 	const once = (
 		key: string,
-		read: () => Promise<Sale | undefined>,
-	): Promise<Sale | undefined> => {
+		read: () => Promise<Option<Sale>>,
+	): Promise<Option<Sale>> => {
 		const known = running.get(key);
 		if (known !== undefined) return known;
 		const started = read().finally(() => running.delete(key));

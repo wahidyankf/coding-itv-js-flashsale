@@ -1,3 +1,4 @@
+import type { Option } from "@flash/typekit";
 import type { Purchase } from "../../domain/purchase.js";
 import type { Reservation } from "../../domain/reservation.js";
 
@@ -14,13 +15,10 @@ export type CommitResult =
 	| { kind: "already_purchased" };
 
 export type PurchaseRepository = {
-	findByReservation(reservationId: string): Promise<Purchase | undefined>;
-	findByUser(saleId: string, user: string): Promise<Purchase | undefined>;
+	findByReservation(reservationId: string): Promise<Option<Purchase>>;
+	findByUser(saleId: string, user: string): Promise<Option<Purchase>>;
 	// The reservation of this user, with any expiry. The service decides what an old one means.
-	findReservation(
-		saleId: string,
-		user: string,
-	): Promise<Reservation | undefined>;
+	findReservation(saleId: string, user: string): Promise<Option<Reservation>>;
 	// Turns a hold into a purchase in one transaction under a lock on the sale row.
 	commit(input: CommitInput): Promise<CommitResult>;
 };

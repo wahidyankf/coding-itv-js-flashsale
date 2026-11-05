@@ -1,3 +1,4 @@
+import { Err, Some } from "@flash/typekit";
 import { describe, expect, it } from "vitest";
 import { queueWorld } from "../bdd/support/queue-world.js";
 import { relativeTime } from "../bdd/support/time.js";
@@ -23,7 +24,9 @@ describe("normalizeUser", () => {
 	});
 
 	it("accepts letters, digits and . _ @ + -", () => {
-		expect(normalizeUser("  Ana.B_1@x+y-z ")).toBe("ana.b_1@x+y-z");
+		expect(normalizeUser("  Ana.B_1@x+y-z ")).toEqual(
+			new Some("ana.b_1@x+y-z"),
+		);
 	});
 });
 
@@ -45,14 +48,12 @@ describe("tickets", () => {
 describe("the queue service", () => {
 	it("refuses a check for an unknown sale and for a bad user id", async () => {
 		const world = await openWorld();
-		expect(await world.queue.check("nope", "ana", "t")).toEqual({
-			ok: false,
-			error: "sale_not_found",
-		});
-		expect(await world.queue.check(world.saleId, " ", "t")).toEqual({
-			ok: false,
-			error: "invalid_user",
-		});
+		expect(await world.queue.check("nope", "ana", "t")).toEqual(
+			new Err("sale_not_found"),
+		);
+		expect(await world.queue.check(world.saleId, " ", "t")).toEqual(
+			new Err("invalid_user"),
+		);
 	});
 
 	it("lets one admission win each tick", async () => {

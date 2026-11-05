@@ -1,3 +1,4 @@
+import { Err, Ok } from "@flash/typekit";
 import { expect, it } from "vitest";
 import { createMockPayment } from "./mock-payment.js";
 
@@ -25,6 +26,6 @@ it("forgets a declined charge so the shopper can try again", async () => {
 		random: () => draws.shift() ?? 1,
 		sleep: async () => {},
 	});
-	expect(await payment.charge("r1")).toEqual({ ok: false });
-	expect(await payment.charge("r1")).toEqual({ ok: true, ref: "mock-r1" });
+	expect(await payment.charge("r1")).toEqual(new Err("declined"));
+	expect(await payment.charge("r1")).toEqual(new Ok({ ref: "mock-r1" }));
 });

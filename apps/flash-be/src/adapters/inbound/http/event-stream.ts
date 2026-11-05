@@ -1,3 +1,4 @@
+import { attemptAsync } from "@flash/typekit";
 import type { FastifyReply, FastifyRequest } from "fastify";
 
 export type StreamOptions = {
@@ -46,7 +47,7 @@ export function serveEvents(
 	let timer: NodeJS.Timeout | undefined;
 
 	const tick = async (): Promise<void> => {
-		try {
+		const sent = await attemptAsync(async () => {
 			const item = await read();
 			const key = JSON.stringify(item);
 			if (key !== last) {
@@ -57,10 +58,9 @@ export function serveEvents(
 				raw.write(": keep-alive\n\n");
 				lastWrite = Date.now();
 			}
-		} catch (error) {
-			// A failed read is skipped. The next interval tries again.
-			log(error);
-		}
+		}, Error);
+		// A failed read is skipped. The next interval tries again.
+		if (sent.isErr()) log(sent.error);
 		if (!closed) timer = setTimeout(tick, options.intervalMs);
 	};
 
