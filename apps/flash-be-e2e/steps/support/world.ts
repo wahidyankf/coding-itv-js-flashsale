@@ -43,6 +43,8 @@ export const world: {
 	// The private API reaches Redis through this proxy, so a scenario can cut and restore the connection.
 	redisProxy?: RedisProxy;
 	pendingConfirm?: Promise<APIResponse>;
+	// How long each confirmation took, in milliseconds.
+	confirmMs?: number[];
 	// Closes the event streams this scenario opened, before its API stops.
 	streams?: Array<() => void>;
 } = {};

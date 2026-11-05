@@ -37,7 +37,9 @@ export async function confirm(
 	user: string,
 	options: { reservationId?: string; owner?: string } = {},
 ) {
+	const started = performance.now();
 	const reply = await post(request, user, options);
+	world.confirmMs = [...(world.confirmMs ?? []), performance.now() - started];
 	setResponse(reply);
 	if (
 		(reply.status() === 201 || reply.status() === 200) &&
@@ -112,6 +114,16 @@ Given(
 When(/^"([^"]+)" confirms the purchase$/, async ({ request }, user: string) => {
 	await confirm(request, user);
 });
+
+Then(
+	/^every confirmation answered in less than (\d+) milliseconds$/,
+	// biome-ignore lint/correctness/noEmptyPattern: playwright-bdd needs an object pattern as the first argument
+	async ({}, limit: string) => {
+		const times = world.confirmMs ?? [];
+		expect(times).toHaveLength(3);
+		expect(Math.max(...times)).toBeLessThan(Number(limit));
+	},
+);
 
 When(
 	/^"([^"]+)" confirms the purchase with the reservation id "([^"]*)"$/,

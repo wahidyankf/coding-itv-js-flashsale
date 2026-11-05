@@ -22,6 +22,23 @@ redis.call('HSET', KEYS[4], ARGV[1], ARGV[5])
 return {1, ARGV[5], ARGV[3]}
 `;
 
+// KEYS: holds, ids. ARGV: user. Frees the hold of a user.
+// Single scripts, not MULTI: while Redis is down node-redis answers a script at once with an error, but holds a MULTI
+// until its own timeout, which slowed every payment during an outage.
+const RELEASE = `
+redis.call('ZREM', KEYS[1], ARGV[1])
+redis.call('HDEL', KEYS[2], ARGV[1])
+return 1
+`;
+
+// KEYS: buyers, holds, ids. ARGV: user. Records the purchase and frees the hold.
+const CONFIRM = `
+redis.call('SADD', KEYS[1], ARGV[1])
+redis.call('ZREM', KEYS[2], ARGV[1])
+redis.call('HDEL', KEYS[3], ARGV[1])
+return 1
+`;
+
 export function createRedisHoldGate(redis: RedisClient): HoldGate {
 	return {
 		async reserve(request) {
@@ -56,20 +73,17 @@ export function createRedisHoldGate(redis: RedisClient): HoldGate {
 		},
 
 		async release(saleId, user) {
-			await redis
-				.multi()
-				.zRem(key(saleId, "holds"), user)
-				.hDel(key(saleId, "ids"), user)
-				.exec();
+			await redis.eval(RELEASE, {
+				keys: [key(saleId, "holds"), key(saleId, "ids")],
+				arguments: [user],
+			});
 		},
 
 		async confirm(saleId, user) {
-			await redis
-				.multi()
-				.sAdd(key(saleId, "buyers"), user)
-				.zRem(key(saleId, "holds"), user)
-				.hDel(key(saleId, "ids"), user)
-				.exec();
+			await redis.eval(CONFIRM, {
+				keys: [key(saleId, "buyers"), key(saleId, "holds"), key(saleId, "ids")],
+				arguments: [user],
+			});
 		},
 
 		async isReady(saleId) {

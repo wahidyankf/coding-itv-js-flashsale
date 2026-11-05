@@ -48,6 +48,21 @@ Feature: Serving while Redis is down
     And a purchase id is issued
     And 9 items remain
 
+  Scenario: Paying while Redis is down is not slowed down
+    Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
+    And "ana" has been admitted
+    And "ben" has been admitted
+    And "cai" has been admitted
+    And "ana" has reserved an item
+    And "ben" has reserved an item
+    And "cai" has reserved an item
+    And Redis is down
+    And 4 seconds pass
+    When "ana" confirms the purchase
+    And "ben" confirms the purchase
+    And "cai" confirms the purchase
+    Then every confirmation answered in less than 500 milliseconds
+
   Scenario: Requests are still limited
     Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
     And the limit is 3 requests per user in each 60 seconds

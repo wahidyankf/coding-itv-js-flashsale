@@ -214,6 +214,69 @@ describeFeature(
 			},
 		);
 
+		Scenario(
+			"Paying while Redis is down is not slowed down",
+			({ Given, And, When, Then }) => {
+				const world = newWorld();
+				const times: number[] = [];
+
+				// Each confirmation is timed, because a dependency that is down must not make a shopper wait.
+				const timed = async (user: string) => {
+					const started = performance.now();
+					await world.confirm(user);
+					times.push(performance.now() - started);
+				};
+
+				Given(SALE_10, async () => openSale(world, 10));
+
+				And('"ana" has been admitted', async () => {
+					await world.admitted("ana");
+				});
+
+				And('"ben" has been admitted', async () => {
+					await world.admitted("ben");
+				});
+
+				And('"cai" has been admitted', async () => {
+					await world.admitted("cai");
+				});
+
+				And('"ana" has reserved an item', async () => {
+					await world.reserve("ana");
+				});
+
+				And('"ben" has reserved an item', async () => {
+					await world.reserve("ben");
+				});
+
+				And('"cai" has reserved an item', async () => {
+					await world.reserve("cai");
+				});
+
+				And("Redis is down", async () => {
+					await world.breakRedis();
+				});
+
+				And("{int} seconds pass", async (_ctx, seconds: number) => {
+					await world.advance(seconds);
+				});
+
+				When('"ana" confirms the purchase', async () => timed("ana"));
+
+				And('"ben" confirms the purchase', async () => timed("ben"));
+
+				And('"cai" confirms the purchase', async () => timed("cai"));
+
+				Then(
+					"every confirmation answered in less than {int} milliseconds",
+					(_ctx, limit: number) => {
+						expect(times).toHaveLength(3);
+						expect(Math.max(...times)).toBeLessThan(limit);
+					},
+				);
+			},
+		);
+
 		Scenario("Requests are still limited", ({ Given, And, When, Then }) => {
 			const world = newWorld();
 
