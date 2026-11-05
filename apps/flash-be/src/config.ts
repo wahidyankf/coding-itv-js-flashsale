@@ -36,4 +36,13 @@ export function buildConfig(env: NodeJS.ProcessEnv): Config {
 	};
 }
 
+// Startup log line: the effective settings, host and port only. Credentials stay out of the log.
+export function describeConfig(config: Config): string {
+	const endpoint = (url: string): string => {
+		const parsed = new URL(url);
+		return `${parsed.hostname}:${parsed.port}`;
+	};
+	return `flash-be config: port=${config.port} database=${endpoint(config.databaseUrl)} redis=${endpoint(config.redisUrl)}`;
+}
+
 export const config = buildConfig(process.env);

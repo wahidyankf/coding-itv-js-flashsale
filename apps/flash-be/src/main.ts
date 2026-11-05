@@ -1,7 +1,9 @@
 import { buildApp, dependenciesFrom } from "./app.js";
-import { config } from "./config.js";
+import { config, describeConfig } from "./config.js";
 import { createDb } from "./db.js";
 import { createRedis } from "./redis.js";
+
+console.log(describeConfig(config));
 
 const db = createDb(config.databaseUrl);
 const redis = await createRedis(config.redisUrl);

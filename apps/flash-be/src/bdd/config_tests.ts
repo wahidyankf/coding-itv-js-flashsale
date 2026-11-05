@@ -24,13 +24,14 @@ describeFeature(
 					expect(config.port).toBe(8080);
 				});
 
-				And("the database URL points at localhost port 5432", () => {
-					expect(new URL(config.databaseUrl).port).toBe("5432");
+				And("the database host is localhost on port 5432", () => {
 					expect(new URL(config.databaseUrl).hostname).toBe("localhost");
+					expect(new URL(config.databaseUrl).port).toBe("5432");
 				});
 
-				And('the Redis URL is "redis://localhost:6379"', () => {
-					expect(config.redisUrl).toBe("redis://localhost:6379");
+				And("the Redis host is localhost on port 6379", () => {
+					expect(new URL(config.redisUrl).hostname).toBe("localhost");
+					expect(new URL(config.redisUrl).port).toBe("6379");
 				});
 			},
 		);
@@ -98,42 +99,6 @@ describeFeature(
 			);
 		});
 
-		Scenario(
-			"Configured values are read from the environment",
-			({ Given, And, When, Then }) => {
-				let env: NodeJS.ProcessEnv = {};
-				let config: Config;
-
-				Given('FLASH_BE_PORT is "9000"', () => {
-					env = { FLASH_BE_PORT: "9000" };
-				});
-
-				And('DATABASE_URL is "postgres://u:p@db:5432/x"', () => {
-					env.DATABASE_URL = "postgres://u:p@db:5432/x";
-				});
-
-				And('REDIS_URL is "redis://cache:6379"', () => {
-					env.REDIS_URL = "redis://cache:6379";
-				});
-
-				When("the configuration is built", () => {
-					config = buildConfig(env);
-				});
-
-				Then("the port is 9000", () => {
-					expect(config.port).toBe(9000);
-				});
-
-				And('the database URL is "postgres://u:p@db:5432/x"', () => {
-					expect(config.databaseUrl).toBe("postgres://u:p@db:5432/x");
-				});
-
-				And('the Redis URL is "redis://cache:6379"', () => {
-					expect(config.redisUrl).toBe("redis://cache:6379");
-				});
-			},
-		);
-
 		// One row per Examples value in the feature. Each row runs as its own set of tests.
 		ScenarioOutline(
 			"Invalid FLASH_BE_PORT is refused",
@@ -161,6 +126,56 @@ describeFeature(
 						);
 					},
 				);
+			},
+		);
+
+		Scenario(
+			"Configured port is read from the environment",
+			({ Given, When, Then }) => {
+				let env: NodeJS.ProcessEnv = {};
+				let config: Config;
+
+				Given('FLASH_BE_PORT is "9000"', () => {
+					env = { FLASH_BE_PORT: "9000" };
+				});
+
+				When("the configuration is built", () => {
+					config = buildConfig(env);
+				});
+
+				Then("the port is 9000", () => {
+					expect(config.port).toBe(9000);
+				});
+			},
+		);
+
+		Scenario(
+			"Configured database and Redis hosts are read from the environment",
+			({ Given, And, When, Then }) => {
+				let env: NodeJS.ProcessEnv = {};
+				let config: Config;
+
+				Given('DATABASE_URL is "postgres://u:p@db:5432/x"', () => {
+					env = { DATABASE_URL: "postgres://u:p@db:5432/x" };
+				});
+
+				And('REDIS_URL is "redis://cache:6379"', () => {
+					env.REDIS_URL = "redis://cache:6379";
+				});
+
+				When("the configuration is built", () => {
+					config = buildConfig(env);
+				});
+
+				Then("the database host is db on port 5432", () => {
+					expect(new URL(config.databaseUrl).hostname).toBe("db");
+					expect(new URL(config.databaseUrl).port).toBe("5432");
+				});
+
+				And("the Redis host is cache on port 6379", () => {
+					expect(new URL(config.redisUrl).hostname).toBe("cache");
+					expect(new URL(config.redisUrl).port).toBe("6379");
+				});
 			},
 		);
 	},
