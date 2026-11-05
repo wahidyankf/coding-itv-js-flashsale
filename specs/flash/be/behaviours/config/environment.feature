@@ -143,3 +143,23 @@ Feature: Configuration of the flash-be API
       | SALE_CACHE_MS | abc   | must be zero or a positive integer |
       | SALE_CACHE_MS | -1    | must be zero or a positive integer |
       | SALE_CACHE_MS | 1.5   | must be zero or a positive integer |
+
+  # Exemption(integration): the rule is a pure function of an environment object and opens no resource; alternative-proof: flash-be:unit / The event interval defaults to one second outside production
+  @integration-exempt
+  Scenario: The event interval defaults to one second outside production
+    Given NODE_ENV is not production
+    When the configuration is built from an empty environment
+    Then event streams read every 1000 ms
+
+  # Exemption(integration): the rule is a pure function of an environment object and opens no resource; alternative-proof: flash-be:unit / An invalid event interval is refused
+  @integration-exempt
+  Scenario Outline: An invalid event interval is refused
+    Given <name> is "<value>"
+    When the configuration is built
+    Then building the configuration fails with "<name> <rule>"
+
+    Examples:
+      | name               | value | rule                       |
+      | EVENTS_INTERVAL_MS | 0     | must be a positive integer |
+      | EVENTS_INTERVAL_MS | abc   | must be a positive integer |
+      | EVENTS_INTERVAL_MS | -5    | must be a positive integer |

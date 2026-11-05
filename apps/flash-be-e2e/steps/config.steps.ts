@@ -21,6 +21,7 @@ const CONFIG_VARS = [
 	"RATE_LIMIT_PER_IP",
 	"TRUST_PROXY",
 	"SALE_CACHE_MS",
+	"EVENTS_INTERVAL_MS",
 ];
 const START_TIMEOUT_MS = 20_000;
 const CONFIG_LINE = "flash-be config:";
@@ -95,7 +96,7 @@ Given(
 );
 
 Given(
-	/^(ADMISSION_TICK_MS|ADMISSION_TTL_SECONDS|PAYMENT_LATENCY_MS|PAYMENT_FAILURE_RATE|RATE_LIMIT_WINDOW_SECONDS|RATE_LIMIT_PER_USER|RATE_LIMIT_PER_IP|TRUST_PROXY|SALE_CACHE_MS) is "([^"]*)"$/,
+	/^(ADMISSION_TICK_MS|ADMISSION_TTL_SECONDS|PAYMENT_LATENCY_MS|PAYMENT_FAILURE_RATE|RATE_LIMIT_WINDOW_SECONDS|RATE_LIMIT_PER_USER|RATE_LIMIT_PER_IP|TRUST_PROXY|SALE_CACHE_MS|EVENTS_INTERVAL_MS) is "([^"]*)"$/,
 	async ({ request: _request }, name: string, value: string) => {
 		env = { ...baseEnv(), [name]: value };
 	},
@@ -172,6 +173,13 @@ Then(
 	/^sale reads are cached for (\d+) ms$/,
 	async ({ request: _request }, ms: string) => {
 		expect(field("cache")?.[1]).toBe(`${ms}ms`);
+	},
+);
+
+Then(
+	/^event streams read every (\d+) ms$/,
+	async ({ request: _request }, ms: string) => {
+		expect(field("events")?.[1]).toBe(`${ms}ms`);
 	},
 );
 

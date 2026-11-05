@@ -12,3 +12,4 @@ behaviour, read the specs.
 - [rate-limiting.md](rate-limiting.md) - why write requests are limited twice, and what happens when Redis is down.
 - [sale-read-cache.md](sale-read-cache.md) - why sale reads may be one second old, and why writes never are.
 - [serving-without-redis.md](serving-without-redis.md) - what each step does when Redis is down, and how Redis catches up when it returns.
+- [live-updates.md](live-updates.md) - why the page hears about changes over Server-Sent Events, and what a stream costs.

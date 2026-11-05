@@ -27,6 +27,15 @@ import {
 } from "./memory-reservation-repository.js";
 import { switchable } from "./switchable.js";
 
+// A Server-Sent Events stream as a scenario reads it: the status of the opening reply, and the events one by one.
+export type EventWatcher = {
+	status: number;
+	// The JSON body of a refusal. Empty for a stream that opened.
+	body: { error?: string };
+	next: () => Promise<{ event: string; data: Record<string, unknown> }>;
+	close: () => void;
+};
+
 export type Response = Awaited<ReturnType<FastifyInstance["inject"]>>;
 
 // What a queue scenario does, whatever the layer. Unit tests answer it in memory; integration tests use
@@ -81,6 +90,11 @@ export type ShopScenario = QueueScenario & {
 	setSold: (sold: number) => Promise<void>;
 	readSale: () => Promise<Response>;
 	readCurrentSale: () => Promise<Response>;
+	// Live updates: a watcher per stream, and the sale opening while a shopper is already waiting.
+	watcher: EventWatcher | undefined;
+	watchSale: (saleId?: string) => Promise<EventWatcher>;
+	watchPlace: (user: string, ticket?: string) => Promise<EventWatcher>;
+	openSale: () => Promise<void>;
 	// Redis stops answering, and answers again. What it held is untouched; `loseQueue` and
 	// `loseReservationState` take the data away.
 	breakRedis: () => Promise<void>;
@@ -234,6 +248,89 @@ export function saleRequests(app: FastifyInstance, scenario: ShopScenario) {
 	};
 }
 
+const origins = new WeakMap<FastifyInstance, string>();
+
+// The event streams, the same at every layer. The app listens on a free port, because a stream needs a real socket.
+export function eventRequests(app: FastifyInstance, scenario: ShopScenario) {
+	const watch = async (
+		path: string,
+		headers: Record<string, string> = {},
+	): Promise<EventWatcher> => {
+		let origin = origins.get(app);
+		if (!origin) {
+			origin = await app.listen({ host: "127.0.0.1", port: 0 });
+			origins.set(app, origin);
+		}
+		const controller = new AbortController();
+		const reply = await fetch(`${origin}${path}`, {
+			headers,
+			signal: controller.signal,
+		});
+		if (!reply.ok || !reply.body) {
+			const refusal: EventWatcher = {
+				status: reply.status,
+				body: await reply.json(),
+				next: () => Promise.reject(new Error("the stream did not open")),
+				close: () => {},
+			};
+			scenario.watcher = refusal;
+			return refusal;
+		}
+		const reader = reply.body.getReader();
+		const decoder = new TextDecoder();
+		let buffer = "";
+		const frames: Array<{ event: string; data: Record<string, unknown> }> = [];
+		const fill = async (): Promise<void> => {
+			const chunk = await reader.read();
+			if (chunk.done) throw new Error("the stream ended");
+			buffer += decoder.decode(chunk.value, { stream: true });
+			for (
+				let end = buffer.indexOf("\n\n");
+				end >= 0;
+				end = buffer.indexOf("\n\n")
+			) {
+				const frame = buffer.slice(0, end);
+				buffer = buffer.slice(end + 2);
+				// A line that starts with a colon is a keep-alive comment.
+				if (frame.startsWith(":")) continue;
+				const event = /^event: (.*)$/m.exec(frame)?.[1] ?? "message";
+				const data = JSON.parse(/^data: (.*)$/m.exec(frame)?.[1] ?? "null");
+				frames.push({ event, data });
+			}
+		};
+		const watcher: EventWatcher = {
+			status: reply.status,
+			body: {},
+			async next() {
+				const deadline = Date.now() + 5000;
+				while (frames.length === 0) {
+					if (Date.now() > deadline) throw new Error("no event in time");
+					await Promise.race([
+						fill(),
+						new Promise<void>((resolve) => setTimeout(resolve, 200)),
+					]);
+				}
+				const frame = frames.shift();
+				if (!frame) throw new Error("no event");
+				return frame;
+			},
+			close: () => controller.abort(),
+		};
+		scenario.watcher = watcher;
+		return watcher;
+	};
+	return {
+		watchSale: (saleId = scenario.saleId) => watch(`/sales/${saleId}/events`),
+		watchPlace: (user: string, ticket?: string) => {
+			const given = ticket ?? scenario.tickets.get(user.trim().toLowerCase());
+			return watch(
+				`/sales/${scenario.saleId}/queue/${encodeURIComponent(user)}/events`,
+				given === undefined ? {} : { "x-queue-ticket": given },
+			);
+		},
+	};
+}
+
 // Write requests by the name a scenario uses for them, for the rate limit scenarios.
 export function limitRequests(scenario: ShopScenario) {
 	const send = async (kind: string, user: string): Promise<Response> => {
@@ -333,17 +430,21 @@ export function queueWorld(start: Date): UnitQueueScenario {
 		clock,
 		limits,
 	);
-	const app = buildApp({
-		...healthyDeps,
-		checkRedis: async () => {
-			if (redisState.down) throw new Error("redis is down");
+	const app = buildApp(
+		{
+			...healthyDeps,
+			checkRedis: async () => {
+				if (redisState.down) throw new Error("redis is down");
+			},
+			sales: saleService,
+			queue,
+			reservations,
+			purchases,
+			rateLimiter,
 		},
-		sales: saleService,
-		queue,
-		reservations,
-		purchases,
-		rateLimiter,
-	});
+		// Streams read often in tests, so a change shows within a few milliseconds.
+		{ events: { intervalMs: 20, heartbeatMs: 15_000 } },
+	);
 	const settle = () => new Promise((resolve) => setImmediate(resolve));
 	const scenario: UnitQueueScenario = {
 		app,
@@ -441,6 +542,15 @@ export function queueWorld(start: Date): UnitQueueScenario {
 		},
 		readSale: notWired,
 		readCurrentSale: notWired,
+		watcher: undefined,
+		watchSale: notWired,
+		watchPlace: notWired,
+		async openSale() {
+			for (const sale of sales) {
+				sale.startsAt = new Date(now.getTime() - 3_600_000);
+			}
+			await queue.admitTick(scenario.saleId);
+		},
 		confirm: notWired,
 		startConfirm: notWired,
 		finishConfirm: notWired,
@@ -490,6 +600,7 @@ export function queueWorld(start: Date): UnitQueueScenario {
 		reserveRequests(app, scenario),
 		requests,
 		saleRequests(app, scenario),
+		eventRequests(app, scenario),
 	);
 	return Object.assign(scenario, limitRequests(scenario));
 }

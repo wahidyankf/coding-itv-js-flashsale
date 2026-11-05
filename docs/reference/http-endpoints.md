@@ -171,6 +171,20 @@ shopper is charged once.
 
 The scenarios are in [`specs/flash/be/behaviours/purchase/`](../../specs/flash/be/behaviours/purchase/README.md).
 
+## Live updates (Server-Sent Events)
+
+| Method | Path                                  | What it streams                                                                            |
+| ------ | ------------------------------------- | ------------------------------------------------------------------------------------------ |
+| GET    | `/sales/:saleId/events`               | `event: sale`, with the same body as `GET /sales/:saleId`                                  |
+| GET    | `/sales/:saleId/queue/:userId/events` | `event: place`, with the body of `GET /sales/:saleId/queue/:userId`; send `x-queue-ticket` |
+
+Both answer `Content-Type: text/event-stream`. The first event comes at once. Later events come only when the data
+changed, checked every `EVENTS_INTERVAL_MS` (1000). When nothing changes for 15 seconds, a `: keep-alive` comment line is
+sent. If the sale or the ticket is wrong, the answer is a normal JSON error (`404 sale_not_found`, `401 invalid_ticket`)
+and no stream opens. If a shopper's place is lost while watching, the stream sends `{"state":"absent"}`.
+
+The scenarios are in [`specs/flash/be/behaviours/events/`](../../specs/flash/be/behaviours/events/README.md).
+
 ## Rate limits
 
 The three write routes (`POST .../queue`, `POST .../reservations` and `POST .../purchases`) count each request against
@@ -211,7 +225,7 @@ Environment variables are listed in [`.env.example`](../../.env.example), with a
 local development are there too. `apps/flash-be/src/config.ts` builds the API configuration from them. In production,
 the API stops at start-up when `DATABASE_URL`, `REDIS_URL` or `TICKET_SECRET` is missing. `PAYMENT_LATENCY_MS` (150) and
 `PAYMENT_FAILURE_RATE` (0.02) tune the mock payment provider. The `RATE_LIMIT_*` and `TRUST_PROXY` variables tune the
-rate limits. `SALE_CACHE_MS` (1000) sets the sale read cache.
+rate limits. `SALE_CACHE_MS` (1000) sets the sale read cache. `EVENTS_INTERVAL_MS` (1000) sets how often an event stream reads.
 
 ## Manual requests
 

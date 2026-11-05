@@ -41,3 +41,10 @@ Content-Type: application/json
 
 ### Backend: did I get it? (purchased, holding or none)
 GET {{backend}}/sales/00000000-0000-4000-8000-000000000000/purchases/ana
+
+### Backend: live sale status (Server-Sent Events; stays open, sends an event when the sale changes)
+GET {{backend}}/sales/00000000-0000-4000-8000-000000000000/events
+
+### Backend: live place in the queue (send the ticket from the join reply; stays open)
+GET {{backend}}/sales/00000000-0000-4000-8000-000000000000/queue/ana/events
+x-queue-ticket: paste-the-ticket-here

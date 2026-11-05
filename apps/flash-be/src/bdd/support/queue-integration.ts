@@ -16,6 +16,7 @@ import { createRedisHoldGate } from "../../reservations/redis-hold-gate.js";
 import { createReservationRepository } from "../../reservations/reservation-repository.js";
 import { createReservationService } from "../../reservations/reservation-service.js";
 import {
+	eventRequests,
 	limitRequests,
 	purchaseRequests,
 	queueRequests,
@@ -78,7 +79,11 @@ export async function openQueueIntegration() {
 		systemClock,
 		limits,
 	);
-	const app = buildApp({ ...base, reservations, purchases, rateLimiter });
+	const app = buildApp(
+		{ ...base, reservations, purchases, rateLimiter },
+		// Streams read often in tests, so a change shows within a few milliseconds.
+		{ events: { intervalMs: 20, heartbeatMs: 15_000 } },
+	);
 	// The test scaffolding admits shoppers straight in Redis, whether or not the app can reach it.
 	const queueStore = createRedisQueueStore(redis);
 
@@ -187,6 +192,17 @@ export async function openQueueIntegration() {
 				},
 				readSale: notWired,
 				readCurrentSale: notWired,
+				watcher: undefined,
+				watchSale: notWired,
+				watchPlace: notWired,
+				async openSale() {
+					await db
+						.updateTable("sales")
+						.set({ starts_at: new Date(Date.now() - 3_600_000) })
+						.where("id", "=", scenario.saleId)
+						.execute();
+					await base.queue.admitTick(scenario.saleId);
+				},
 				confirm: notWired,
 				startConfirm: notWired,
 				finishConfirm: notWired,
@@ -226,6 +242,7 @@ export async function openQueueIntegration() {
 				reserveRequests(app, scenario),
 				purchaseRequests(app, scenario),
 				saleRequests(app, scenario),
+				eventRequests(app, scenario),
 			);
 			return Object.assign(scenario, limitRequests(scenario));
 		},

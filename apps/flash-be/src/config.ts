@@ -17,6 +17,8 @@ export type Config = {
 	rateLimitPerIp: number;
 	// How long a sale read may be served from memory. 0 turns the cache off. See sales/sale-cache.ts.
 	saleCacheMs: number;
+	// How often an open event stream reads the sale or the place, in milliseconds.
+	eventsIntervalMs: number;
 	// True only behind a proxy you control, so request.ip comes from X-Forwarded-For.
 	trustProxy: boolean;
 };
@@ -92,6 +94,7 @@ export function buildConfig(env: NodeJS.ProcessEnv): Config {
 		rateLimitPerUser: positive("RATE_LIMIT_PER_USER", 30),
 		rateLimitPerIp: positive("RATE_LIMIT_PER_IP", 600),
 		saleCacheMs: latency("SALE_CACHE_MS", 1000),
+		eventsIntervalMs: positive("EVENTS_INTERVAL_MS", 1000),
 		trustProxy: flag("TRUST_PROXY", false),
 	};
 }
@@ -102,7 +105,7 @@ export function describeConfig(config: Config): string {
 		const parsed = new URL(url);
 		return `${parsed.hostname}:${parsed.port}`;
 	};
-	return `flash-be config: port=${config.port} database=${endpoint(config.databaseUrl)} redis=${endpoint(config.redisUrl)} payment=${config.paymentLatencyMs}ms/${config.paymentFailureRate} limit=${config.rateLimitPerUser}/${config.rateLimitPerIp}/${config.rateLimitWindowSeconds}s cache=${config.saleCacheMs}ms proxy=${config.trustProxy}`;
+	return `flash-be config: port=${config.port} database=${endpoint(config.databaseUrl)} redis=${endpoint(config.redisUrl)} payment=${config.paymentLatencyMs}ms/${config.paymentFailureRate} limit=${config.rateLimitPerUser}/${config.rateLimitPerIp}/${config.rateLimitWindowSeconds}s cache=${config.saleCacheMs}ms events=${config.eventsIntervalMs}ms proxy=${config.trustProxy}`;
 }
 
 export const config = buildConfig(process.env);

@@ -2,6 +2,10 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { type Kysely, sql } from "kysely";
 import { type Clock, systemClock } from "./clock.js";
 import type { Database } from "./db.js";
+import {
+	DEFAULT_STREAM_OPTIONS,
+	type StreamOptions,
+} from "./events/event-stream.js";
 import { createMockPayment } from "./payment/mock-payment.js";
 import { createPurchaseRepository } from "./purchases/purchase-repository.js";
 import {
@@ -123,12 +127,18 @@ function rateLimitsFrom(settings: RateLimitSettings): RateLimits {
 
 export function buildApp(
 	deps: Dependencies,
-	options: { logger?: boolean; trustProxy?: boolean } = {},
+	options: {
+		logger?: boolean;
+		trustProxy?: boolean;
+		events?: StreamOptions;
+	} = {},
 ): FastifyInstance {
 	const app = Fastify({
 		logger: options.logger ?? false,
 		trustProxy: options.trustProxy ?? false,
+		// Open event streams must not keep the server from closing.
+		forceCloseConnections: true,
 	});
-	registerRoutes(app, deps);
+	registerRoutes(app, deps, options.events ?? DEFAULT_STREAM_OPTIONS);
 	return app;
 }

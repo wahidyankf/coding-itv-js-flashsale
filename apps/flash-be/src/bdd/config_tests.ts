@@ -323,6 +323,52 @@ describeFeature(
 			},
 		);
 
+		Scenario(
+			"The event interval defaults to one second outside production",
+			({ Given, When, Then }) => {
+				let env: NodeJS.ProcessEnv = {};
+				let config: Config;
+
+				Given("NODE_ENV is not production", () => {
+					env = { NODE_ENV: "development" };
+				});
+
+				When("the configuration is built from an empty environment", () => {
+					config = buildConfig(env);
+				});
+
+				Then("event streams read every {int} ms", (_ctx, ms: number) => {
+					expect(config.eventsIntervalMs).toBe(ms);
+				});
+			},
+		);
+
+		ScenarioOutline(
+			"An invalid event interval is refused",
+			({ Given, When, Then }, examples) => {
+				let env: NodeJS.ProcessEnv = {};
+				let error: unknown;
+
+				Given('<name> is "<value>"', () => {
+					env = { [String(examples.name)]: String(examples.value) };
+				});
+
+				When("the configuration is built", () => {
+					try {
+						buildConfig(env);
+					} catch (caught) {
+						error = caught;
+					}
+				});
+
+				Then('building the configuration fails with "<name> <rule>"', () => {
+					expect((error as Error).message).toBe(
+						`${examples.name} ${examples.rule}`,
+					);
+				});
+			},
+		);
+
 		ScenarioOutline(
 			"Invalid rate limit settings are refused",
 			({ Given, When, Then }, examples) => {

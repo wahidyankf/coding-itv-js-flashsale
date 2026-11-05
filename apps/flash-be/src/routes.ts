@@ -1,9 +1,14 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { Dependencies } from "./app.js";
+import { type StreamOptions, serveEvents } from "./events/event-stream.js";
 import type { Purchase } from "./purchases/purchase-repository.js";
 
 // All routes live here, with full paths, so the list is easy to scan.
-export function registerRoutes(app: FastifyInstance, deps: Dependencies): void {
+export function registerRoutes(
+	app: FastifyInstance,
+	deps: Dependencies,
+	stream: StreamOptions,
+): void {
 	// Runs before every write route. A client over its limit is told to wait, and the route never runs.
 	const limit = async (request: FastifyRequest, reply: FastifyReply) => {
 		const body = request.body as { userId?: unknown } | null;
@@ -68,6 +73,56 @@ export function registerRoutes(app: FastifyInstance, deps: Dependencies): void {
 			const sale = await deps.sales.byId(request.params.saleId);
 			if (!sale) return reply.code(404).send({ error: "sale_not_found" });
 			return cacheable(reply).send(sale);
+		},
+	);
+
+	// Live updates. The status is read through the same cache as the plain read, so any number of watchers cost one
+	// database read per cache time.
+	app.get<{ Params: { saleId: string } }>(
+		"/sales/:saleId/events",
+		async (request, reply) => {
+			const { saleId } = request.params;
+			if (!(await deps.sales.byId(saleId))) {
+				return reply.code(404).send({ error: "sale_not_found" });
+			}
+			return serveEvents(
+				request,
+				reply,
+				async () => {
+					const sale = await deps.sales.byId(saleId);
+					if (!sale) throw new Error("the sale is gone");
+					return { event: "sale", data: sale };
+				},
+				stream,
+				(error) => request.log.warn({ err: error }, "event read failed"),
+			);
+		},
+	);
+
+	// A shopper's place, pushed when it changes. The ticket is checked once, when the stream opens.
+	app.get<{ Params: { saleId: string; userId: string } }>(
+		"/sales/:saleId/queue/:userId/events",
+		async (request, reply) => {
+			const { saleId, userId } = request.params;
+			const header = request.headers["x-queue-ticket"];
+			const ticket = typeof header === "string" ? header : undefined;
+			const first = await deps.queue.check(saleId, userId, ticket);
+			if (!first.ok) {
+				return reply
+					.code(QUEUE_ERROR_STATUS[first.error])
+					.send({ error: first.error });
+			}
+			return serveEvents(
+				request,
+				reply,
+				async () => {
+					const result = await deps.queue.check(saleId, userId, ticket);
+					const place = result.ok ? result.place : { state: "absent" };
+					return { event: "place", data: { userId: first.user, ...place } };
+				},
+				stream,
+				(error) => request.log.warn({ err: error }, "event read failed"),
+			);
 		},
 	);
 

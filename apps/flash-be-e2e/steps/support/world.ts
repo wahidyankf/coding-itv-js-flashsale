@@ -43,6 +43,8 @@ export const world: {
 	// The private API reaches Redis through this proxy, so a scenario can cut and restore the connection.
 	redisProxy?: RedisProxy;
 	pendingConfirm?: Promise<APIResponse>;
+	// Closes the event streams this scenario opened, before its API stops.
+	streams?: Array<() => void>;
 } = {};
 
 // A TCP relay in front of Redis. `down` drops every connection and refuses new ones, as an unreachable Redis does;
@@ -186,6 +188,8 @@ export async function startApi(): Promise<string> {
 			RATE_LIMIT_PER_IP: "100000",
 			// No sale cache, unless a step turns it on, so a scenario always reads the sale as it is.
 			SALE_CACHE_MS: "0",
+			// Event streams read often, so a scenario sees a change within a moment.
+			EVENTS_INTERVAL_MS: "100",
 			...world.apiEnv,
 		}),
 		stdio: ["ignore", "pipe", "pipe"],
@@ -216,6 +220,7 @@ export async function startApi(): Promise<string> {
 
 // Stops the private API and drops the scenario's database. Runs after every scenario.
 export async function cleanup(): Promise<void> {
+	for (const close of world.streams ?? []) close();
 	const api = world.api;
 	if (api && api.process.exitCode === null) {
 		const exited = new Promise((resolve) => api.process.once("exit", resolve));
