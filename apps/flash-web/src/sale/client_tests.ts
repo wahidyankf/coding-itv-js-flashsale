@@ -1,3 +1,4 @@
+import { Err, Ok } from "@flash/typekit";
 import { describe, expect, it, vi } from "vitest";
 import { createSaleClient } from "./client";
 import type { Watcher } from "./sse";
@@ -20,10 +21,7 @@ describe("createSaleClient", () => {
 			Response.json({ ticket: "t", state: "admitted" }, { status: 201 }),
 		);
 		const result = await api.join(SALE, "ana");
-		expect(result).toEqual({
-			ok: true,
-			body: { ticket: "t", state: "admitted" },
-		});
+		expect(result).toEqual(new Ok({ ticket: "t", state: "admitted" }));
 		const [url, init] = fetcher.mock.calls[0] ?? [];
 		expect(url).toBe(`http://web.test/api/sales/${SALE}/queue`);
 		expect(init?.body).toBe('{"userId":"ana"}');
@@ -58,11 +56,9 @@ describe("createSaleClient", () => {
 				{ status: 429, headers: { "retry-after": "7" } },
 			),
 		);
-		expect(await api.join(SALE, "ana")).toEqual({
-			ok: false,
-			error: "rate_limited",
-			retryAfterSeconds: 7,
-		});
+		expect(await api.join(SALE, "ana")).toEqual(
+			new Err({ error: "rate_limited", retryAfterSeconds: 7 }),
+		);
 	});
 
 	it("reads the wait from the body when there is no header", async () => {
@@ -72,36 +68,35 @@ describe("createSaleClient", () => {
 				{ status: 429 },
 			),
 		);
-		expect(await api.join(SALE, "ana")).toMatchObject({ retryAfterSeconds: 3 });
+		expect(await api.join(SALE, "ana")).toEqual(
+			new Err({ error: "rate_limited", retryAfterSeconds: 3 }),
+		);
 	});
 
 	it("calls an answer it cannot read unexpected", async () => {
 		const { api } = client(() => new Response("<html>", { status: 500 }));
-		expect(await api.join(SALE, "ana")).toEqual({
-			ok: false,
-			error: "unexpected",
-			retryAfterSeconds: undefined,
-		});
+		expect(await api.join(SALE, "ana")).toEqual(
+			new Err({ error: "unexpected", retryAfterSeconds: undefined }),
+		);
 	});
 
 	it("calls an error without a code unexpected", async () => {
 		const { api } = client(() => Response.json({ error: 5 }, { status: 400 }));
-		expect(await api.join(SALE, "ana")).toMatchObject({ error: "unexpected" });
+		expect(await api.join(SALE, "ana")).toEqual(
+			new Err({ error: "unexpected", retryAfterSeconds: undefined }),
+		);
 	});
 
 	it("reports the network when nothing answers", async () => {
 		const { api } = client(() => {
 			throw new TypeError("fetch failed");
 		});
-		expect(await api.join(SALE, "ana")).toEqual({
-			ok: false,
-			error: "network",
-		});
+		expect(await api.join(SALE, "ana")).toEqual(new Err({ error: "network" }));
 	});
 
 	it("reads a good answer that has no body", async () => {
 		const { api } = client(() => new Response(null, { status: 200 }));
-		expect(await api.outcome(SALE, "ana")).toEqual({ ok: true, body: {} });
+		expect(await api.outcome(SALE, "ana")).toEqual(new Ok({}));
 	});
 
 	it("hands only sale events to the sale callback", () => {

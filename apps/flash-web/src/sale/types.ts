@@ -1,3 +1,4 @@
+import type { Result } from "@flash/typekit";
 export type SaleStatus = "upcoming" | "active" | "sold_out" | "ended";
 
 // What GET /sales/:id sends, and what the sale stream pushes.
@@ -28,6 +29,9 @@ export type Outcome =
 	| { state: "none" };
 
 // An answer from the web server: the body, or the error code the API gave, or "network" when nothing answered.
-export type ApiResult<T> =
-	| { ok: true; body: T }
-	| { ok: false; error: string; retryAfterSeconds?: number | undefined };
+export type ApiError = {
+	error: string;
+	retryAfterSeconds?: number | undefined;
+};
+
+export type ApiResult<T> = Result<T, ApiError>;

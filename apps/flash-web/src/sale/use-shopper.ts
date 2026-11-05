@@ -7,7 +7,7 @@ import {
 	TEXT,
 	waitingText,
 } from "./messages";
-import type { Place, SaleStatus } from "./types";
+import type { ApiError, Place, SaleStatus } from "./types";
 
 // Where the shopper is. `busy` is a request in flight; `message` is a result the shopper reads and moves on from.
 export type Phase =
@@ -73,33 +73,34 @@ export function useShopper(
 		}
 	}, [waiting, saleStatus, stop]);
 
-	const fail = (error: string, retryAfterSeconds?: number) =>
+	const fail = ({ error, retryAfterSeconds }: ApiError) =>
 		setPhase({ kind: "message", text: errorText(error, retryAfterSeconds) });
 
 	const reserve = async (id: string, name: string, ticket: string) => {
 		setPhase({ kind: "busy", text: TEXT.reserving });
-		const result = await client.reserve(id, name, ticket);
-		if (!result.ok) return fail(result.error, result.retryAfterSeconds);
-		const expiresAt = Date.parse(result.body.expiresAt);
+		const reserved = await client.reserve(id, name, ticket);
+		if (reserved.isErr()) return fail(reserved.error);
+		const expiresAt = Date.parse(reserved.value.expiresAt);
 		setClock(now());
 		setPhase({
 			kind: "holding",
-			reservationId: result.body.reservationId,
+			reservationId: reserved.value.reservationId,
 			expiresAt,
 		});
 	};
 
 	const buy = async (raw: string) => {
-		const name = cleanUser(raw);
-		if (!name) return setPhase({ kind: "message", text: TEXT.invalidUser });
+		const cleaned = cleanUser(raw);
+		if (!cleaned) return setPhase({ kind: "message", text: TEXT.invalidUser });
+		const name = cleaned.value;
 		stop();
 		user.current = name;
 		setPhase({ kind: "busy", text: TEXT.joining });
 		const joined = await client.join(saleId, name);
-		if (!joined.ok) return fail(joined.error, joined.retryAfterSeconds);
+		if (joined.isErr()) return fail(joined.error);
 
-		const ticket = joined.body.ticket;
-		if (joined.body.state === "admitted") return reserve(saleId, name, ticket);
+		const { ticket } = joined.value;
+		if (joined.value.state === "admitted") return reserve(saleId, name, ticket);
 
 		const onPlace = (place: Place) => {
 			if (place.state === "waiting") {
@@ -112,7 +113,7 @@ export function useShopper(
 				setPhase({ kind: "message", text: TEXT.placeLost });
 			}
 		};
-		onPlace(joined.body);
+		onPlace(joined.value);
 		stopWatching.current = client.watchPlace(saleId, name, ticket, onPlace);
 	};
 
@@ -120,27 +121,28 @@ export function useShopper(
 		if (phase.kind !== "holding") return;
 		const held = phase;
 		setPhase({ kind: "busy", text: TEXT.paying });
-		const result = await client.confirm(
+		const confirmed = await client.confirm(
 			saleId,
 			user.current,
 			held.reservationId,
 		);
-		if (result.ok) return setPhase({ kind: "purchased" });
-		if (result.error === "payment_failed") {
+		if (confirmed.isOk()) return setPhase({ kind: "purchased" });
+		if (confirmed.error.error === "payment_failed") {
 			return setPhase({ ...held, notice: TEXT.paymentFailed });
 		}
-		fail(result.error, result.retryAfterSeconds);
+		fail(confirmed.error);
 	};
 
 	const check = async (raw: string) => {
-		const name = cleanUser(raw);
-		if (!name) return setPhase({ kind: "message", text: TEXT.invalidUser });
+		const cleaned = cleanUser(raw);
+		if (!cleaned) return setPhase({ kind: "message", text: TEXT.invalidUser });
+		const name = cleaned.value;
 		stop();
 		user.current = name;
 		setPhase({ kind: "busy", text: TEXT.checking });
-		const result = await client.outcome(saleId, name);
-		if (!result.ok) return fail(result.error, result.retryAfterSeconds);
-		const found = result.body;
+		const outcome = await client.outcome(saleId, name);
+		if (outcome.isErr()) return fail(outcome.error);
+		const found = outcome.value;
 		if (found.state === "purchased") return setPhase({ kind: "purchased" });
 		if (found.state === "holding") {
 			setClock(now());

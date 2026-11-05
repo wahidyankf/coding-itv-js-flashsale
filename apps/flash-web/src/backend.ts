@@ -1,3 +1,4 @@
+import { attemptAsync } from "@flash/typekit";
 import { buildConfig } from "./config";
 
 export type BackendStatus = "ok" | "down";
@@ -7,15 +8,14 @@ export async function fetchBackendHealth(
 	backendUrl: string,
 	fetcher: typeof fetch = fetch,
 ): Promise<BackendStatus> {
-	try {
+	const asked = await attemptAsync(async (): Promise<BackendStatus> => {
 		const response = await fetcher(`${backendUrl}/health`);
 		if (!response.ok) return "down";
 
 		const body = (await response.json()) as { status?: string };
 		return body.status === "ok" ? "ok" : "down";
-	} catch {
-		return "down";
-	}
+	}, Error);
+	return asked.isOk() ? asked.value : "down";
 }
 
 // Reads the backend address from the given environment, then asks flash-be for its status.

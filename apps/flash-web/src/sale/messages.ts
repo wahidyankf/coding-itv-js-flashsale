@@ -1,3 +1,4 @@
+import { type Option, Some } from "@flash/typekit";
 import type { SaleStatus } from "./types";
 
 export const STATUS_LABEL: Record<SaleStatus, string> = {
@@ -10,9 +11,9 @@ export const STATUS_LABEL: Record<SaleStatus, string> = {
 // The same pattern the API uses for a user id, so a bad name is refused before anything is sent.
 const USER_PATTERN = /^[a-z0-9][a-z0-9._@+-]{0,63}$/;
 
-export function cleanUser(raw: string): string | undefined {
+export function cleanUser(raw: string): Option<string> {
 	const user = raw.trim().toLowerCase();
-	return USER_PATTERN.test(user) ? user : undefined;
+	return USER_PATTERN.test(user) ? new Some(user) : undefined;
 }
 
 export const TEXT = {

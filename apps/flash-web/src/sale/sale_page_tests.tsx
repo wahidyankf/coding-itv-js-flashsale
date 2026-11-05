@@ -1,3 +1,4 @@
+import { Err, Ok } from "@flash/typekit";
 import {
 	act,
 	cleanup,
@@ -26,25 +27,18 @@ afterEach(cleanup);
 function stubClient(overrides: Partial<SaleClient> = {}) {
 	let push: (place: Place) => void = () => {};
 	const client: SaleClient = {
-		join: vi.fn(async () => ({
-			ok: true as const,
-			body: { ticket: "t", state: "waiting" as const, place: 2 },
-		})),
-		reserve: vi.fn(async () => ({
-			ok: true as const,
-			body: {
-				reservationId: "r1",
-				expiresAt: new Date(Date.now() + 60_000).toISOString(),
-			},
-		})),
-		confirm: vi.fn(async () => ({
-			ok: true as const,
-			body: { purchaseId: "p1" },
-		})),
-		outcome: vi.fn(async () => ({
-			ok: true as const,
-			body: { state: "none" as const },
-		})),
+		join: vi.fn(
+			async () => new Ok({ ticket: "t", state: "waiting" as const, place: 2 }),
+		),
+		reserve: vi.fn(
+			async () =>
+				new Ok({
+					reservationId: "r1",
+					expiresAt: new Date(Date.now() + 60_000).toISOString(),
+				}),
+		),
+		confirm: vi.fn(async () => new Ok({ purchaseId: "p1" })),
+		outcome: vi.fn(async () => new Ok({ state: "none" as const })),
 		watchSale: () => () => {},
 		watchPlace: (_id, _user, _ticket, onPlace) => {
 			push = onPlace;
@@ -93,14 +87,10 @@ describe("SalePage", () => {
 
 	it("shows the API's reason when a confirm is refused for another cause", async () => {
 		const { client } = stubClient({
-			join: vi.fn(async () => ({
-				ok: true as const,
-				body: { ticket: "t", state: "admitted" as const },
-			})),
-			confirm: vi.fn(async () => ({
-				ok: false as const,
-				error: "hold_expired",
-			})),
+			join: vi.fn(
+				async () => new Ok({ ticket: "t", state: "admitted" as const }),
+			),
+			confirm: vi.fn(async () => new Err({ error: "hold_expired" })),
 		});
 		render(<SalePage load={{ state: "ok", sale: SALE }} client={client} />);
 		await buyAs("ana");
@@ -112,10 +102,7 @@ describe("SalePage", () => {
 
 	it("shows the reason when the check is refused", async () => {
 		const { client } = stubClient({
-			outcome: vi.fn(async () => ({
-				ok: false as const,
-				error: "network",
-			})),
+			outcome: vi.fn(async () => new Err({ error: "network" })),
 		});
 		render(<SalePage load={{ state: "ok", sale: SALE }} client={client} />);
 		fireEvent.change(screen.getByLabelText(/Your name/), {

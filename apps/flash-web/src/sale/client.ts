@@ -1,3 +1,4 @@
+import { attemptAsync, Err, Ok } from "@flash/typekit";
 import { createWatcher, type Watcher } from "./sse";
 import type { ApiResult, Outcome, Place, SaleView } from "./types";
 
@@ -46,7 +47,7 @@ export function createSaleClient(
 		body?: unknown,
 		headers: Record<string, string> = {},
 	): Promise<ApiResult<T>> {
-		try {
+		const sent = await attemptAsync(async () => {
 			const reply = await fetcher(url, {
 				method,
 				headers:
@@ -55,22 +56,24 @@ export function createSaleClient(
 						: { "content-type": "application/json", ...headers },
 				body: body === undefined ? null : JSON.stringify(body),
 			});
-			const json = (await reply.json().catch(() => ({}))) as Record<
-				string,
-				unknown
-			>;
-			if (reply.ok) return { ok: true, body: json as T };
-			const waited = Number(
-				reply.headers.get("retry-after") ?? json.retryAfterSeconds,
+			// A body that is not JSON is read as empty, so the status still tells what happened.
+			const parsed = await attemptAsync(
+				() => reply.json() as Promise<Record<string, unknown>>,
+				Error,
 			);
-			return {
-				ok: false,
-				error: typeof json.error === "string" ? json.error : "unexpected",
-				retryAfterSeconds: Number.isFinite(waited) ? waited : undefined,
-			};
-		} catch {
-			return { ok: false, error: "network" };
-		}
+			return { reply, json: parsed.isOk() ? parsed.value : {} };
+		}, Error);
+		if (sent.isErr()) return new Err({ error: "network" });
+
+		const { reply, json } = sent.value;
+		if (reply.ok) return new Ok(json as T);
+		const waited = Number(
+			reply.headers.get("retry-after") ?? json.retryAfterSeconds,
+		);
+		return new Err({
+			error: typeof json.error === "string" ? json.error : "unexpected",
+			retryAfterSeconds: Number.isFinite(waited) ? waited : undefined,
+		});
 	}
 
 	return {

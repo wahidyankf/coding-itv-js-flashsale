@@ -1,3 +1,4 @@
+import { attemptAsync } from "@flash/typekit";
 import { buildConfig } from "./config";
 
 const ID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
@@ -52,7 +53,7 @@ export async function proxyToBackend(
 	const forwarded = request.headers.get("x-forwarded-for");
 	if (forwarded !== null) headers.set("x-forwarded-for", forwarded);
 
-	try {
+	const answered = await attemptAsync(async (): Promise<Response> => {
 		const upstream = await fetcher(
 			`${buildConfig(env).backendUrl}/sales/${path}`,
 			{
@@ -71,7 +72,8 @@ export async function proxyToBackend(
 			status: upstream.status,
 			headers: returned,
 		});
-	} catch {
-		return json(502, { error: "backend_unavailable" });
-	}
+	}, Error);
+	return answered.isOk()
+		? answered.value
+		: json(502, { error: "backend_unavailable" });
 }

@@ -1,3 +1,4 @@
+import { attemptAsync } from "@flash/typekit";
 // A Server-Sent Events reader built on fetch. The browser's EventSource cannot send a header, and the queue ticket
 // travels in one. The same code runs in the browser and in tests.
 export type Watcher = (
@@ -41,29 +42,33 @@ export function createWatcher(options: WatchOptions = {}): Watcher {
 
 		const run = async (): Promise<void> => {
 			while (!controller.signal.aborted) {
-				try {
-					const reply = await fetcher(url, {
-						headers,
-						signal: controller.signal,
-					});
-					// A refusal will not change by asking again.
-					if (reply.status === 401 || reply.status === 404) return;
-					if (reply.ok && reply.body) {
-						const reader = reply.body.getReader();
-						const decoder = new TextDecoder();
-						let buffer = "";
-						for (;;) {
-							const chunk = await reader.read();
-							if (chunk.done) break;
-							buffer += decoder.decode(chunk.value, { stream: true });
-							const { frames, rest } = readFrames(buffer);
-							buffer = rest;
-							for (const frame of frames) onEvent(frame.event, frame.data);
+				// A failure means the connection failed or was closed. The loop opens it again unless the watcher was stopped.
+				const finished = await attemptAsync(
+					async (): Promise<"refused" | "closed"> => {
+						const reply = await fetcher(url, {
+							headers,
+							signal: controller.signal,
+						});
+						// A refusal will not change by asking again.
+						if (reply.status === 401 || reply.status === 404) return "refused";
+						if (reply.ok && reply.body) {
+							const reader = reply.body.getReader();
+							const decoder = new TextDecoder();
+							let buffer = "";
+							for (;;) {
+								const chunk = await reader.read();
+								if (chunk.done) break;
+								buffer += decoder.decode(chunk.value, { stream: true });
+								const { frames, rest } = readFrames(buffer);
+								buffer = rest;
+								for (const frame of frames) onEvent(frame.event, frame.data);
+							}
 						}
-					}
-				} catch {
-					// The connection failed or was closed. The loop opens it again unless the watcher was stopped.
-				}
+						return "closed";
+					},
+					Error,
+				);
+				if (finished.isOk() && finished.value === "refused") return;
 				if (!controller.signal.aborted) await sleep(retryMs);
 			}
 		};
