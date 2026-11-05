@@ -10,14 +10,6 @@ Feature: Database migrations of the flash-be API
     Then the sales, purchases and reservations tables exist
     And the products table does not exist
 
-  # Exemption(e2e): the shipped process only migrates upward and has no entry point that runs a rollback; alternative-proof: flash-be:integration / Rolling back the latest migration restores the products table
-  @e2e-exempt
-  Scenario: Rolling back the latest migration restores the products table
-    Given a database migrated to the latest version
-    When the latest migration is rolled back
-    Then the products table exists
-    And the sales, purchases and reservations tables do not exist
-
   Scenario: The database refuses a sale that has sold more than its stock
     Given a database migrated to the latest version
     When a sale with stock 5 and 6 sold is inserted

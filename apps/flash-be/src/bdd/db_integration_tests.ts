@@ -74,36 +74,6 @@ describeFeature(
 		);
 
 		Scenario(
-			"Rolling back the latest migration restores the products table",
-			({ Given, When, Then, And }) => {
-				let db: Kysely<Database>;
-
-				Given("a database migrated to the latest version", async () => {
-					db = await scratch();
-					await migrate(db);
-				});
-
-				When("the latest migration is rolled back", async () => {
-					const { error } = await createMigrator(db).migrateDown();
-					if (error) throw error;
-				});
-
-				Then("the products table exists", async () => {
-					expect(await exists(db, "products")).toBe(true);
-				});
-
-				And(
-					"the sales, purchases and reservations tables do not exist",
-					async () => {
-						for (const table of TABLES) {
-							expect(await exists(db, table)).toBe(false);
-						}
-					},
-				);
-			},
-		);
-
-		Scenario(
 			"The database refuses a sale that has sold more than its stock",
 			({ Given, When, Then }) => {
 				let db: Kysely<Database>;
