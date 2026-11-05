@@ -20,21 +20,18 @@ Vitest test when it guards how the code does its work. This page gives the reaso
   the unit, integration and end-to-end bindings.
 - A person who does not write code, or you in three months, needs to read it as documentation.
 
-An operator counts as a reader. What the process does with its environment is a scenario when an operator can see it: the
-API refuses to start in production without `TICKET_SECRET`, and an invalid `RATE_LIMIT_PER_USER` is refused. The end-to-end
-layer starts the real process to prove it.
-
 ## Write a plain test when
 
 - It checks a branch or an edge case inside one function or module: the validation of a name, the rounding of a time, the
   order of arguments. As scenarios, these would crowd `specs/` and make it hard to read.
 - It checks a rule of structure, such as `architecture_tests.ts`, which keeps the layers from importing each other. That is
   not behaviour of the system.
-- It checks how one setting is parsed (the `TRUST_PROXY` flag), a type (`expectTypeOf`, `@ts-expect-error`) or an
-  internal helper.
+- It checks how config and environment variables are mapped: the defaults, the values read, and the values refused. It
+  can also check a type (`expectTypeOf`, `@ts-expect-error`) or an internal helper.
 - It was written to reach a branch so that coverage stays at 99%.
-- Nobody but a developer can observe it. The address in `FLASH_BE_URL`, and the rollback of a migration (the shipped
-  process only migrates upward), are examples. A scenario that no end-to-end test can show is a sign that it belongs here.
+- Nobody but a developer can observe it. The address in `FLASH_BE_URL`, the port in `FLASH_BE_PORT`, and the rollback of
+  a migration (the shipped process only migrates upward) are examples. A scenario that no end-to-end test can show is a
+  sign that it belongs here.
 
 ## In practice
 

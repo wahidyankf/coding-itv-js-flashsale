@@ -5,7 +5,6 @@ The Gherkin corpus for the API, grouped by business area.
 ## Directory Map
 
 - [health/](health/README.md) - liveness and readiness.
-- [config/](config/README.md) - how the API reads its settings.
 - [db/](db/README.md) - the database schema and its migrations.
 - [sale/](sale/README.md) - the sale status a shopper reads, how reads are cached, and the command that seeds a sale.
 - [degraded/](degraded/README.md) - serving shoppers while Redis is down, and the rebuild when it returns.

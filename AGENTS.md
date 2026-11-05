@@ -58,10 +58,9 @@ Flash sale monorepo with five apps in `apps/` and one library in `libs/`: `flash
   (`npx nx db:up flash-be`) and are not part of `test:quick`.
 - Vitest globals are off. Call `cleanup` in `afterEach` when rendering components.
 - Choose the kind of test by one question: if this breaks, does a shopper or an operator see the difference? If yes, write
-  a Gherkin scenario in `specs/` (behaviour that is part of the contract: HTTP, queue, hold, payment, `Result` and `Option`;
-  what an operator can see of the process and its environment). If only a developer cares, write a plain Vitest test next to
-  the code (branches and edge cases in one function, rules of structure such as `architecture_tests.ts`, parsing of one
-  setting, types, internal helpers, tests that only reach a branch for coverage). Write new behaviour as a scenario first,
+  a Gherkin scenario in `specs/` (behaviour that is part of the contract: HTTP, queue, hold, payment, `Result` and `Option`). If only a developer cares, write a plain Vitest test next to
+  the code (branches and edge cases in one function, rules of structure such as `architecture_tests.ts`, the mapping of
+  config and environment variables, types, internal helpers, tests that only reach a branch for coverage). Write new behaviour as a scenario first,
   then add plain tests for the branches that do not deserve one. A scenario that needs both `@integration-exempt` and
   `@e2e-exempt` in an app is a sign of a detail: make it a plain test. See `docs/explanation/scenario-or-plain-test.md`.
 - Behaviour scenarios are canonical in `specs/`. Bind each one at unit. Bind integration and e2e too, unless the
