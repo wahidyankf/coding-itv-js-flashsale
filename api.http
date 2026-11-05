@@ -48,3 +48,31 @@ GET {{backend}}/sales/00000000-0000-4000-8000-000000000000/events
 ### Backend: live place in the queue (send the ticket from the join reply; stays open)
 GET {{backend}}/sales/00000000-0000-4000-8000-000000000000/queue/ana/events
 x-queue-ticket: paste-the-ticket-here
+
+### Web: the current sale through the pass-through route (what the page calls; run with `npx nx dev flash-web`)
+GET {{web}}/api/sales/current
+
+### Web: join the queue through the pass-through route (replace the sale id; the reply holds your ticket)
+POST {{web}}/api/sales/00000000-0000-4000-8000-000000000000/queue
+Content-Type: application/json
+
+{ "userId": "ana" }
+
+### Web: reserve one item through the pass-through route (send the ticket from the join reply)
+POST {{web}}/api/sales/00000000-0000-4000-8000-000000000000/reservations
+Content-Type: application/json
+x-queue-ticket: paste-the-ticket-here
+
+{ "userId": "ana" }
+
+### Web: pay for the held item through the pass-through route
+POST {{web}}/api/sales/00000000-0000-4000-8000-000000000000/purchases
+Content-Type: application/json
+
+{ "userId": "ana", "reservationId": "00000000-0000-4000-8000-000000000001" }
+
+### Web: did I get it? through the pass-through route
+GET {{web}}/api/sales/00000000-0000-4000-8000-000000000000/purchases/ana
+
+### Web: a path that is not allowed answers 404 not_found
+GET {{web}}/api/sales/current/secret

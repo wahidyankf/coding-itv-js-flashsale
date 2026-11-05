@@ -1,7 +1,7 @@
 # Run the flash sale locally
 
-This tutorial takes you from a fresh clone to the home page showing `Backend: ok`. Postgres and Redis run in Docker.
-The two apps run on your machine.
+This tutorial takes you from a fresh clone to buying an item in the browser. Postgres and Redis run in Docker. The two
+apps run on your machine.
 
 You need [Volta](https://volta.sh/), Docker, and Git. Volta pins the Node and npm versions for this repository.
 
@@ -61,7 +61,21 @@ curl localhost:8080/ready
 
 The response is `{"status":"ok","checks":{"database":"ok","redis":"ok"}}`.
 
-## 6. Start the web app
+## 6. Seed a sale
+
+```bash
+npx nx db:seed-sale flash-be --stock=3 --starts-in-minutes=0 --duration-minutes=60 --hold-seconds=60
+```
+
+The command prints the id of the new sale, such as `seeded sale ed225112-64e6-40d8-8cf3-30c4fe023bdb`. Read it back:
+
+```bash
+curl -s localhost:8080/sales/current
+```
+
+The body shows `"status":"active"`, `"stock":3` and `"remaining":3`.
+
+## 7. Start the web app
 
 Run this in a third terminal and leave it running:
 
@@ -69,16 +83,28 @@ Run this in a third terminal and leave it running:
 npx nx dev flash-web
 ```
 
-Open <http://localhost:3000>. The page shows **Flash Sale** and **Backend: ok**. You can check the same text from the
-shell:
+Open <http://localhost:3000>. The page shows **Flash Sale**, the status **On sale**, **Items left: 3** and the line
+**Backend: ok**.
 
-```bash
-curl -s localhost:3000/ | grep -o 'Backend: <strong>[a-z]*</strong>'
-```
+## 8. Buy an item
 
-The output is `Backend: <strong>ok</strong>`.
+1. Type `ana` in **Your name** and press **Buy Now**. The shopper is let in at once, because nobody is waiting. The
+   page says **An item is held for you. Confirm within 45 seconds.** and the seconds count down.
+2. Press **Confirm purchase**. The page says **You got it! Your purchase is confirmed.** and **Items left** drops to 2.
+3. Press **Buy Now** again with the same name. The page says **You already bought an item.** One shopper can buy one
+   item.
+4. Type another name and press **Check my status** to ask "did I get it" without buying. A shopper who has nothing
+   sees **You have no purchase and no hold.**
 
-## 7. Stop everything
+When the last item is bought, the status changes to **Sold out** and **Buy Now** is disabled. The page follows the sale
+by itself, so you do not need to reload it.
+
+If more shoppers arrive than the queue lets in each second, the page shows the place in line instead, and moves on when
+the shopper is admitted. See [explanation: the waiting queue](../explanation/waiting-queue.md).
+
+The page follows your system color scheme, light or dark.
+
+## 9. Stop everything
 
 Press Ctrl+C in the two `nx dev` terminals. Then stop the containers:
 

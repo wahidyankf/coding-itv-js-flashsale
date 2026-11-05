@@ -60,6 +60,11 @@ Flash sale monorepo with five apps in `apps/`: `flash-be` (Fastify REST API), `f
 
 ## Backend
 
+- Never oversell and never sell one user twice. Postgres has the last word: the `UPDATE ... WHERE sold < stock`, the
+  `UNIQUE(sale_id, user_id)` and the `CHECK (sold <= stock)` must stay, whatever Redis says. Redis is a fast gate that
+  Postgres can rebuild. A change to the sale path needs a concurrency scenario, and `flash-load` must still pass.
+- Redis keys are `sale:<saleId>:{ready,buyers,holds,ids,rebuild-lock}`. Every command on the sale path must fail at
+  once when Redis is down. Use single scripts, not `MULTI`, which waits for the connection.
 - Routes are in `apps/flash-be/src/routes.ts`, with full paths. Migrations are hand-written in
   `apps/flash-be/src/migrations`. Use Kysely as a query builder. Do not add an ORM.
 - Config is built once from `process.env` in `src/config.ts`. `buildConfig` is exported for tests. Local defaults match
@@ -71,4 +76,5 @@ Flash sale monorepo with five apps in `apps/`: `flash-be` (Fastify REST API), `f
 ## Code style
 
 - Keep comments, commit messages, and notes brief. Explain why, not what.
+- Use neutral domain names in docs and commits: say "shopper", "sale", "hold" and "purchase".
 - Use clear, simple English that is easy for non-native speakers to read.
