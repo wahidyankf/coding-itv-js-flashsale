@@ -90,3 +90,9 @@ playwright-report/
 blob-report/
 playwright/.cache/
 *.tsbuildinfo
+
+# Local scratch and generated output (not committed)
+local-tmp/
+generated-reports/
+# playwright-bdd output (bddgen)
+.features-gen/
