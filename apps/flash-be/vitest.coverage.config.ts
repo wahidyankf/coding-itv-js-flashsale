@@ -14,7 +14,8 @@ export default defineConfig({
 				"src/**/*_tests.ts",
 				"src/**/*_integration_tests.ts",
 				"src/bdd/**",
-				// Process entrypoints only start the process. Their wiring is proven by the e2e suite.
+				// Process entry points. The e2e suite runs main.ts; migrate.ts only wires config,
+				// the migrator and the exit code, and the migrator is covered by integration tests.
 				"src/main.ts",
 				"src/migrate.ts",
 			],

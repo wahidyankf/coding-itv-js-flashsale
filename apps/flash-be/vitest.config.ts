@@ -12,9 +12,12 @@ export default defineConfig({
 			provider: "v8",
 			include: ["src/**/*.ts"],
 			exclude: [
+				// Test code is not product code.
 				"src/**/*_tests.ts",
 				"src/**/*_integration_tests.ts",
 				"src/bdd/**",
+				// Process entry points. The e2e suite runs main.ts; migrate.ts only wires config,
+				// the migrator and the exit code, and the migrator is covered by integration tests.
 				"src/main.ts",
 				"src/migrate.ts",
 			],
