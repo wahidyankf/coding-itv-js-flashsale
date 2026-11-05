@@ -4,8 +4,9 @@ Guidance for AI coding agents working in this repository. For setup and run comm
 
 ## Project
 
-Flash sale monorepo with five apps in `apps/`: `flash-be` (Fastify REST API), `flash-web` (TanStack Start client),
-`flash-be-e2e` and `flash-web-e2e` (Playwright), and `flash-load` (k6 load test). Data lives in Postgres (Kysely, no ORM) and Redis.
+Flash sale monorepo with five apps in `apps/` and one library in `libs/`: `flash-be` (Fastify REST API), `flash-web` (TanStack Start client),
+`flash-be-e2e` and `flash-web-e2e` (Playwright), and `flash-load` (k6 load test). `libs/typekit` (`@flash/typekit`) holds `Result`, `Option`, `attempt`, `pipe` and
+`assertNever`; `flash-be` and `flash-web` use it. Data lives in Postgres (Kysely, no ORM) and Redis.
 
 ## Docs and specs
 
@@ -19,6 +20,8 @@ Flash sale monorepo with five apps in `apps/`: `flash-be` (Fastify REST API), `f
   workspaces with one `package-lock.json`.
 - Nx runs commands only. Do not add Nx plugins (`@nx/*`, `nx-*`) or run `nx init`. Define every target in the app's
   `project.json` with `"executor": "nx:run-commands"`.
+- `libs/typekit` is built to `dist` (`npx nx build typekit`). The Nx targets of the apps that use it build it first, and the
+  Dockerfiles build it too. It has `build`, `typecheck`, `lint`, `test:unit`, `test:coverage` and `test:quick`, and needs no Docker.
 - Run targets with `npx nx <target> <app>`. Every app has `typecheck`, `lint`, `test:quick`, and `test:quick:watch`.
   - `flash-be` and `flash-web` also have `test:unit` and `test:integration`.
   - `flash-be-e2e` and `flash-web-e2e` have `test:e2e` instead.
@@ -27,6 +30,11 @@ Flash sale monorepo with five apps in `apps/`: `flash-be` (Fastify REST API), `f
   - `test:quick` runs `typecheck`, `lint`, and `test:unit`, or only `typecheck` and `lint` for the e2e apps. Change a
     check in its own target, not in `test:quick`. Keep `test:quick:watch` in sync with it.
 - Biome formats and lints (tabs, double quotes). Do not add Prettier or ESLint.
+- Failures are values. Product code (`apps/*/src`, `libs/*/src`, not tests or `src/bdd`) has no `catch` clause and no
+  `.catch(` call: a call that may throw goes through `attempt` or `attemptAsync` from `@flash/typekit`, naming the failure it
+  expects, and a function that can fail returns a `Result`. A lookup that may find nothing returns an `Option`. Close every
+  `switch` over a union with every case or `assertNever`. A Biome plugin (`.biome/no-catch.grit`) and
+  `useExhaustiveSwitchCases` enforce this, and `npm run lint:rules:test` tests the rules. Do not silence them.
 - Typechecking and linting are strict. Every `tsconfig.json` turns on `strict`, `noUncheckedIndexedAccess`,
   `exactOptionalPropertyTypes`, `noImplicitOverride`, `noImplicitReturns`, `noUnusedLocals`, `noUnusedParameters` and
   `verbatimModuleSyntax`. Biome rules for unused code, non-null assertions, type-only imports and floating or misused
@@ -36,7 +44,8 @@ Flash sale monorepo with five apps in `apps/`: `flash-be` (Fastify REST API), `f
 - Commit messages follow Conventional Commits (commitlint hook). Make one coherent change per commit.
 - Docs are checked by RHINO, which reads the policy in `repo-config.yml`. Run `npm run docs:install` once per machine,
   then `npm run docs:check`. The version and digests are pinned in `scripts/install-rhino.sh`; bump them together.
-- The pre-push hook runs `npm run docs:check`, the behaviour coverage check (`bdd:check:test`, `bdd:check`), then
+- The pre-push hook runs `npm run docs:check`, the behaviour coverage check (`bdd:check:test`, `bdd:check`), the lint rule
+  tests (`lint:rules:test`), then
   `nx affected -t test:quick` (typecheck, lint, unit tests) and `nx affected -t test:coverage` (the 99% floor) against
   `origin/main`. `test:coverage` starts the dev stack itself, so Docker must run. Do not skip hooks with `--no-verify`
   unless the user asks.
@@ -66,7 +75,7 @@ Flash sale monorepo with five apps in `apps/`: `flash-be` (Fastify REST API), `f
 - Redis keys are `sale:<saleId>:{ready,buyers,holds,ids,rebuild-lock}`. Every command on the sale path must fail at
   once when Redis is down. Use single scripts, not `MULTI`, which waits for the connection.
 - `flash-be` is a hexagon (see `docs/explanation/hexagonal-architecture.md`). Rules go in `src/domain` (no I/O, only Node
-  built-ins). Use cases go in `src/application`, which reach stores only through `src/application/ports`. Adapters go in
+  built-ins and `@flash/typekit`). Use cases go in `src/application`, which reach stores only through `src/application/ports`. Adapters go in
   `src/adapters/inbound` (HTTP, CLI) and `src/adapters/outbound` (Postgres, Redis, memory, payment, clock). Only
   `composition.ts` and the entry points pick an adapter for a port. `architecture_tests.ts` fails on a wrong import.
   Put a new rule in the domain with a unit test first, not in a service or a route.

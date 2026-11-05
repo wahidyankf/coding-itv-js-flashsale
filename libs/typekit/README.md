@@ -44,7 +44,10 @@ doubled.match({
 - Name the failure you expect. A thrown value that no guard accepts is thrown on, so a bug is not hidden.
 - Close every `switch` over a union with `assertNever`, or use `match`. A missing case fails the type check.
 
-The behaviour is specified in [specs/typekit](../../specs/typekit/README.md).
+The behaviour is specified in [specs/typekit](../../specs/typekit/README.md). Every name is in the
+[reference](../../docs/reference/typekit.md), the steps are in
+[how to handle failures with Result](../../docs/how-to/handle-failures-with-result.md), and the reasons are in
+[failures as values](../../docs/explanation/failures-as-values.md).
 
 ## Commands
 

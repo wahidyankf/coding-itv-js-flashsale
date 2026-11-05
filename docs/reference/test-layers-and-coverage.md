@@ -13,6 +13,10 @@ stack itself. End-to-end tests are never part of the hooks.
 
 ## Nx targets
 
+The library `typekit` (`libs/typekit`) has `build`, `typecheck`, `lint`, `test:unit`, `test:coverage` and `test:quick`. Its
+tests are `libs/typekit/src/**/*_tests.ts` and its scenario bindings are in `libs/typekit/src/bdd`. It needs no Docker. The
+apps' targets build it first.
+
 | Target             | App                             | What it runs                                                 |
 | ------------------ | ------------------------------- | ------------------------------------------------------------ |
 | `typecheck`        | every app                       | `tsc --noEmit` with the strict flags in each `tsconfig.json` |
@@ -93,7 +97,10 @@ Each tag needs the comment described in [how-to: add a behaviour](../how-to/add-
 `git push` runs, in order:
 
 1. `npm run docs:check` (RHINO: links, heading structure, README indexes, Mermaid diagrams)
-2. `npm run bdd:check:test` and `npm run bdd:check` (the behaviour check)
-3. `npx nx affected -t test:quick --base=origin/main`
+2. `npm run bdd:check:test` (the behaviour check's own tests)
+3. `npm run lint:rules:test` (the lint rules for product code, run on sample code)
+4. `npm run bdd:check` (the behaviour check)
+5. `npx nx affected -t test:quick --base=origin/main`
+6. `npx nx affected -t test:coverage --base=origin/main` (unit and integration, the 99% floor)
 
-Integration and end-to-end tests are not in the hook. Run them yourself before you finish a change.
+End-to-end tests are not in the hook. Run them yourself before you finish a change.

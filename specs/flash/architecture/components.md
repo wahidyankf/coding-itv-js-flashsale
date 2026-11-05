@@ -52,8 +52,8 @@ flowchart LR
 
 - Postgres wins every disagreement with Redis. The constraints `sold <= stock` and one purchase per user and sale are
   in the schema, so no part can break them.
-- Dependencies point inward. The domain imports nothing but Node built-ins. The application imports the domain and its
-  own ports. An inbound adapter never imports an outbound adapter, and an outbound adapter imports only ports and the
+- Dependencies point inward. The domain imports nothing but Node built-ins and `@flash/typekit`, which has no dependency and no I/O. The
+  application imports the domain and its own ports. An inbound adapter never imports an outbound adapter, and an outbound adapter imports only ports and the
   domain. `apps/flash-be/src/architecture_tests.ts` fails the unit tests when an import breaks this.
 - The same rules run against memory in unit tests, because the ports (`QueueStore`, `HoldGate`,
   `ReservationRepository`, `PurchaseRepository`, `RateLimitStore`, `Payment`) have memory copies.
