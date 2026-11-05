@@ -6,6 +6,6 @@
 	"scripts": {
 		"typecheck": "tsc --noEmit -p tsconfig.json",
 		"lint": "biome lint .",
-		"test:e2e": "playwright test"
+		"test:e2e": "bddgen && playwright test"
 	}
 }

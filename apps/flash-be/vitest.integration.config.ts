@@ -9,9 +9,12 @@ try {
 
 export default defineConfig({
 	test: {
+		name: "integration",
 		environment: "node",
 		include: ["src/**/*_integration_tests.ts"],
 		exclude: ["node_modules", "dist"],
 		fileParallelism: false,
+		// Creates an empty Postgres database for this run and drops it at the end.
+		globalSetup: ["./src/bdd/support/global-setup.ts"],
 	},
 });

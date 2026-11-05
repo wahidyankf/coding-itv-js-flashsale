@@ -1,0 +1,25 @@
+import { defineConfig } from "vitest/config";
+
+// Combined coverage: unit and integration tests run together, and their executed lines are merged.
+// Thresholds are enforced here, so they apply to the full run, not to one layer alone.
+export default defineConfig({
+	test: {
+		projects: ["./vitest.config.ts", "./vitest.integration.config.ts"],
+		coverage: {
+			enabled: true,
+			provider: "v8",
+			include: ["src/**/*.ts"],
+			exclude: [
+				// Test code is not product code.
+				"src/**/*_tests.ts",
+				"src/**/*_integration_tests.ts",
+				"src/bdd/**",
+				// Process entrypoints only start the process. Their wiring is proven by the e2e suite.
+				"src/main.ts",
+				"src/migrate.ts",
+			],
+			reporter: ["text", "text-summary"],
+			thresholds: { lines: 99, functions: 99, branches: 99, statements: 99 },
+		},
+	},
+});
