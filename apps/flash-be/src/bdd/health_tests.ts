@@ -1,7 +1,8 @@
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import type { FastifyInstance } from "fastify";
 import { afterEach, expect } from "vitest";
-import { buildApp, type Dependencies } from "../app.js";
+import { buildApp } from "../adapters/inbound/http/app.js";
+import type { Dependencies } from "../application/dependencies.js";
 import { healthyDeps } from "./support/deps.js";
 import { specFile } from "./support/paths.js";
 

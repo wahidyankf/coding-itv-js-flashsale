@@ -3,8 +3,11 @@ import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import type { Kysely } from "kysely";
 import { sql } from "kysely";
 import { afterAll, expect } from "vitest";
-import { createDb, type Database } from "../db.js";
-import { createMigrator } from "../migrator.js";
+import {
+	createDb,
+	type Database,
+} from "../adapters/outbound/postgres/database.js";
+import { createMigrator } from "../adapters/outbound/postgres/migrator.js";
 import { specFile } from "./support/paths.js";
 import { createScratchDatabase } from "./support/scratch-db.js";
 import { insertSale } from "./support/seed.js";

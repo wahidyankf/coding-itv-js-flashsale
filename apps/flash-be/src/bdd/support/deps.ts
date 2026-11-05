@@ -1,4 +1,4 @@
-import type { Dependencies } from "../../app.js";
+import type { Dependencies } from "../../application/dependencies.js";
 
 const noSale = async () => undefined;
 

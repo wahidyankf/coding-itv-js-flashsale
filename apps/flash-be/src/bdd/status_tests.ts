@@ -1,7 +1,7 @@
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import type { FastifyInstance } from "fastify";
 import { afterEach, expect } from "vitest";
-import type { Sale } from "../sales/sale.js";
+import type { Sale } from "../domain/sale.js";
 import { appWithSales, fakeSale } from "./support/fake-sales.js";
 import { specFile } from "./support/paths.js";
 import { relativeTime } from "./support/time.js";

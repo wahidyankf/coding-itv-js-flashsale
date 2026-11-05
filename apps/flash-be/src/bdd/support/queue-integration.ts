@@ -1,20 +1,21 @@
 import { sql } from "kysely";
-import { buildApp, dependenciesFrom } from "../../app.js";
-import { systemClock } from "../../clock.js";
+import { buildApp } from "../../adapters/inbound/http/app.js";
+import { createMemoryRateLimitStore } from "../../adapters/outbound/memory/memory-rate-limit-store.js";
+import { createMockPayment } from "../../adapters/outbound/payment/mock-payment.js";
+import { createDb } from "../../adapters/outbound/postgres/database.js";
+import { createPurchaseRepository } from "../../adapters/outbound/postgres/purchase-repository.js";
+import { createReservationRepository } from "../../adapters/outbound/postgres/reservation-repository.js";
+import { createRedis } from "../../adapters/outbound/redis/redis-client.js";
+import { createRedisHoldGate } from "../../adapters/outbound/redis/redis-hold-gate.js";
+import { createRedisQueueStore } from "../../adapters/outbound/redis/redis-queue-store.js";
+import { createRedisRateLimitStore } from "../../adapters/outbound/redis/redis-rate-limit-store.js";
+import { systemClock } from "../../adapters/outbound/system/system-clock.js";
+import { createGuardedGate } from "../../application/guarded-gate.js";
+import { createPurchaseService } from "../../application/purchase-service.js";
+import { createRateLimiter } from "../../application/rate-limiter.js";
+import { createReservationService } from "../../application/reservation-service.js";
+import { dependenciesFrom } from "../../composition.js";
 import { config } from "../../config.js";
-import { createDb } from "../../db.js";
-import { createMockPayment } from "../../payment/mock-payment.js";
-import { createPurchaseRepository } from "../../purchases/purchase-repository.js";
-import { createPurchaseService } from "../../purchases/purchase-service.js";
-import { createRedisQueueStore } from "../../queue/redis-queue-store.js";
-import { createMemoryRateLimitStore } from "../../ratelimit/memory-rate-limit-store.js";
-import { createRateLimiter } from "../../ratelimit/rate-limiter.js";
-import { createRedisRateLimitStore } from "../../ratelimit/redis-rate-limit-store.js";
-import { createRedis } from "../../redis.js";
-import { createGuardedGate } from "../../reservations/guarded-gate.js";
-import { createRedisHoldGate } from "../../reservations/redis-hold-gate.js";
-import { createReservationRepository } from "../../reservations/reservation-repository.js";
-import { createReservationService } from "../../reservations/reservation-service.js";
 import {
 	eventRequests,
 	limitRequests,

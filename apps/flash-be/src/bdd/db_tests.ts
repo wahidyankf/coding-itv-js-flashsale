@@ -1,7 +1,10 @@
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import { expect } from "vitest";
-import { up as upProducts } from "../migrations/0001_create_products.js";
-import { down, up } from "../migrations/0002_create_sales.js";
+import { up as upProducts } from "../adapters/outbound/postgres/migrations/0001_create_products.js";
+import {
+	down,
+	up,
+} from "../adapters/outbound/postgres/migrations/0002_create_sales.js";
 import { specFile } from "./support/paths.js";
 import { recordingDb } from "./support/recording-db.js";
 

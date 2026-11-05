@@ -1,8 +1,9 @@
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import type { Kysely } from "kysely";
 import { expect } from "vitest";
-import type { Database } from "../db.js";
-import { parseSeedArgs, seedSale } from "../sales/seed.js";
+import { parseSeedArgs } from "../adapters/inbound/cli/seed-args.js";
+import type { Database } from "../adapters/outbound/postgres/database.js";
+import { seedSale } from "../adapters/outbound/postgres/sale-seeder.js";
 import { specFile } from "./support/paths.js";
 import { recordingDb } from "./support/recording-db.js";
 

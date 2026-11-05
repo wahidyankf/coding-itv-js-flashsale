@@ -1,6 +1,7 @@
+import { parseSeedArgs } from "./adapters/inbound/cli/seed-args.js";
+import { createDb } from "./adapters/outbound/postgres/database.js";
+import { seedSale } from "./adapters/outbound/postgres/sale-seeder.js";
 import { config } from "./config.js";
-import { createDb } from "./db.js";
-import { parseSeedArgs, seedSale } from "./sales/seed.js";
 
 // Usage: node dist/seed-sale.js --stock 100 [--name ...] [--starts-in-minutes 0] [--duration-minutes 60]
 //        [--hold-seconds 120] [--admit-per-second 50]

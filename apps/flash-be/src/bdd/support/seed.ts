@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Kysely } from "kysely";
-import type { Database } from "../../db.js";
+import type { Database } from "../../adapters/outbound/postgres/database.js";
 
 export type SaleSeed = {
 	name?: string | undefined;

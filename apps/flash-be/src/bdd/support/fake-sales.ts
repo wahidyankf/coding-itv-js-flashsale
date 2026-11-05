@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
-import { buildApp } from "../../app.js";
-import type { Clock } from "../../clock.js";
-import type { Sale } from "../../sales/sale.js";
-import type { SaleRepository } from "../../sales/sale-repository.js";
-import { createSaleService } from "../../sales/sale-service.js";
+import { buildApp } from "../../adapters/inbound/http/app.js";
+import type { Clock } from "../../application/ports/clock.js";
+import type { SaleRepository } from "../../application/ports/sale-repository.js";
+import { createSaleService } from "../../application/sale-service.js";
+import type { Sale } from "../../domain/sale.js";
 import { healthyDeps } from "./deps.js";
 
 // A sale with sensible values; a scenario overrides what it cares about.

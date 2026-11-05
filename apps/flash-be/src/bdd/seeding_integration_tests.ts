@@ -1,9 +1,10 @@
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import { sql } from "kysely";
 import { afterAll, expect } from "vitest";
-import { createDb } from "../db.js";
-import { createMigrator } from "../migrator.js";
-import { parseSeedArgs, seedSale } from "../sales/seed.js";
+import { parseSeedArgs } from "../adapters/inbound/cli/seed-args.js";
+import { createDb } from "../adapters/outbound/postgres/database.js";
+import { createMigrator } from "../adapters/outbound/postgres/migrator.js";
+import { seedSale } from "../adapters/outbound/postgres/sale-seeder.js";
 import { specFile } from "./support/paths.js";
 import { createScratchDatabase } from "./support/scratch-db.js";
 

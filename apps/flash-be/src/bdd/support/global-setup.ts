@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { createClient } from "redis";
-import { createDb } from "../../db.js";
-import { createMigrator } from "../../migrator.js";
+import { createDb } from "../../adapters/outbound/postgres/database.js";
+import { createMigrator } from "../../adapters/outbound/postgres/migrator.js";
 
 // Redis database index reserved for tests. FLUSHDB runs only on this index, never on dev data (index 0).
 const TEST_REDIS_DB = 15;

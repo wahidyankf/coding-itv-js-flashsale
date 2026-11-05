@@ -1,5 +1,6 @@
-import type { Clock } from "../../clock.js";
-import type { GateAnswer, HoldGate } from "../../reservations/hold-gate.js";
+import type { Clock } from "../../application/ports/clock.js";
+import type { HoldGate } from "../../application/ports/hold-gate.js";
+import type { GateAnswer } from "../../domain/reservation.js";
 
 type SaleState = {
 	ready: boolean;

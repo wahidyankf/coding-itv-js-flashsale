@@ -1,7 +1,8 @@
-import { buildApp, dependenciesFrom } from "./app.js";
+import { buildApp } from "./adapters/inbound/http/app.js";
+import { createDb } from "./adapters/outbound/postgres/database.js";
+import { createRedis } from "./adapters/outbound/redis/redis-client.js";
+import { dependenciesFrom } from "./composition.js";
 import { config, describeConfig } from "./config.js";
-import { createDb } from "./db.js";
-import { createRedis } from "./redis.js";
 
 console.log(describeConfig(config));
 

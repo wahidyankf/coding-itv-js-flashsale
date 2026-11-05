@@ -1,6 +1,6 @@
+import { createDb } from "./adapters/outbound/postgres/database.js";
+import { createMigrator } from "./adapters/outbound/postgres/migrator.js";
 import { config } from "./config.js";
-import { createDb } from "./db.js";
-import { createMigrator } from "./migrator.js";
 
 const db = createDb(config.databaseUrl);
 

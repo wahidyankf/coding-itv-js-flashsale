@@ -1,13 +1,10 @@
-import type { HoldSnapshot } from "../../reservations/hold-gate.js";
-import type {
-	ReservationRepository,
-	ReservationRow,
-} from "../../reservations/reservation-repository.js";
+import type { ReservationRepository } from "../../application/ports/reservation-repository.js";
+import type { HoldSnapshot, Reservation } from "../../domain/reservation.js";
 
 export type MemoryReservationRepository = ReservationRepository & {
 	// While broken, saving a reservation fails, as when Postgres is unreachable.
 	broken: boolean;
-	rows: Map<string, ReservationRow>;
+	rows: Map<string, Reservation>;
 };
 
 // The reservation rows in memory, for unit tests.

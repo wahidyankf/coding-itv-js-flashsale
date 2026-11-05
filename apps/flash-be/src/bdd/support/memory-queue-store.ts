@@ -1,5 +1,6 @@
-import type { Clock } from "../../clock.js";
-import type { QueuePlace, QueueStore } from "../../queue/queue-store.js";
+import type { Clock } from "../../application/ports/clock.js";
+import type { QueueStore } from "../../application/ports/queue-store.js";
+import type { QueuePlace } from "../../domain/queue.js";
 
 // The queue state in memory, for unit tests. It follows the same rules as the Redis store.
 export type MemoryQueueStore = QueueStore & { clear: () => void };

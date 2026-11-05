@@ -1,9 +1,7 @@
-import type {
-	Purchase,
-	PurchaseRepository,
-} from "../../purchases/purchase-repository.js";
-import type { ReservationRow } from "../../reservations/reservation-repository.js";
-import type { Sale } from "../../sales/sale.js";
+import type { PurchaseRepository } from "../../application/ports/purchase-repository.js";
+import type { Purchase } from "../../domain/purchase.js";
+import type { Reservation } from "../../domain/reservation.js";
+import type { Sale } from "../../domain/sale.js";
 
 export type MemoryPurchaseRepository = PurchaseRepository & {
 	purchases: Purchase[];
@@ -15,7 +13,7 @@ export type MemoryPurchaseRepository = PurchaseRepository & {
 // Purchases in memory, for unit tests. `commit` follows the transaction in the Postgres repository.
 export function memoryPurchaseRepository(
 	sales: Sale[],
-	reservations: Map<string, ReservationRow>,
+	reservations: Map<string, Reservation>,
 ): MemoryPurchaseRepository {
 	const repository: MemoryPurchaseRepository = {
 		purchases: [],

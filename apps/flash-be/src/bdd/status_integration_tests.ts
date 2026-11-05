@@ -1,10 +1,11 @@
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import type { FastifyInstance } from "fastify";
 import { afterAll, expect } from "vitest";
-import { buildApp, dependenciesFrom } from "../app.js";
+import { buildApp } from "../adapters/inbound/http/app.js";
+import { createDb } from "../adapters/outbound/postgres/database.js";
+import { createRedis } from "../adapters/outbound/redis/redis-client.js";
+import { dependenciesFrom } from "../composition.js";
 import { config } from "../config.js";
-import { createDb } from "../db.js";
-import { createRedis } from "../redis.js";
 import { specFile } from "./support/paths.js";
 import { insertSale, resetSales } from "./support/seed.js";
 import { relativeTime } from "./support/time.js";
