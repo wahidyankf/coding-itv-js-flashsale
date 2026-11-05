@@ -1,0 +1,12 @@
+# Architecture
+
+The as-built architecture of the flash sale product. It describes the system that runs today, not a proposal. A design
+that is not built yet belongs in a plan, not here.
+
+Read the views in order: the system context first, then the containers. Each view is Mermaid, and every relationship it
+draws is also stated in prose in the same file.
+
+## Directory Map
+
+- [context.md](context.md) - C4 level 1: the people and the system around the flash sale product.
+- [containers.md](containers.md) - C4 level 2: the deployable units, their data stores, and the constraints between them.
