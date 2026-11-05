@@ -1,0 +1,11 @@
+@backend = http://localhost:8080
+@web = http://localhost:3000
+
+### Backend: liveness (no dependencies, run with `npx nx dev flash-be`)
+GET {{backend}}/health
+
+### Backend: readiness (checks Postgres and Redis, needs `npx nx db:up flash-be`)
+GET {{backend}}/ready
+
+### Web: health check (Start server route, run with `npx nx dev flash-web`)
+GET {{web}}/api/health
