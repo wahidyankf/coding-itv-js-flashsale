@@ -6,7 +6,7 @@ export type Config = {
 };
 
 const localDefaults = {
-	host: "0.0.0.0",
+	host: "::",
 	port: "8080",
 	databaseUrl: "postgres://flash:flash@localhost:5432/flash",
 	redisUrl: "redis://localhost:6379",

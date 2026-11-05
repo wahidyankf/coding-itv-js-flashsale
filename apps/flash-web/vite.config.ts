@@ -5,6 +5,7 @@ import { defineConfig } from "vite";
 
 // Order matters: tanstackStart() first, then nitro() for the Node server output, then the React plugin.
 export default defineConfig({
-	server: { port: 3000 },
+	// "::" is dual-stack: it accepts IPv4 and IPv6, so localhost works whichever family the client picks.
+	server: { host: "::", port: 3000 },
 	plugins: [tanstackStart(), nitro(), viteReact()],
 });

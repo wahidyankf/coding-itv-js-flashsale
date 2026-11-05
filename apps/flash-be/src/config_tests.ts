@@ -5,7 +5,7 @@ describe("buildConfig", () => {
 	it("uses local defaults outside production", () => {
 		const config = buildConfig({});
 
-		expect(config.host).toBe("0.0.0.0");
+		expect(config.host).toBe("::");
 		expect(config.port).toBe(8080);
 		expect(config.databaseUrl).toContain("localhost:5432");
 		expect(config.redisUrl).toBe("redis://localhost:6379");
