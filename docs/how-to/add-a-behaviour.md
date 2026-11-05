@@ -1,5 +1,8 @@
 # Add a behaviour
 
+First check that it is a behaviour: a shopper or an operator would see the difference if it broke. If only a developer
+cares, write a plain test next to the code instead (see [scenario or plain test](../explanation/scenario-or-plain-test.md)).
+
 Write the scenario first. Then bind it to the tests, so each layer proves what it can. This guide uses `flash-be`.
 The steps are the same for `flash-web`, with its own folders.
 

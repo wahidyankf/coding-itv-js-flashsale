@@ -11,6 +11,11 @@
 The pre-push hook runs the combined coverage gate, so integration tests run there too. `test:coverage` starts the dev
 stack itself. End-to-end tests are never part of the hooks.
 
+Unit tests come in two kinds. A **scenario binding** (`src/bdd/*_tests.ts(x)`) runs a Gherkin scenario from `specs/`. A **plain
+test** (`src/**/*_tests.ts(x)` outside `src/bdd`) guards a branch, a rule of structure or an internal detail. The choice is
+explained in [scenario or plain test](../explanation/scenario-or-plain-test.md). Plain integration tests sit next to the
+code as `*_integration_tests.ts(x)`; they are not scanned by the behaviour check.
+
 ## Nx targets
 
 The library `typekit` (`libs/typekit`) has `build`, `typecheck`, `lint`, `test:unit`, `test:coverage` and `test:quick`. Its

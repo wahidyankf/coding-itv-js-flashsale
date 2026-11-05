@@ -134,7 +134,8 @@ npm run docs:check             # links, structure and diagrams in the docs
 
 The behaviour is written as Gherkin scenarios in [specs/](specs/README.md) first. Each scenario is bound at unit,
 integration and end-to-end level, except where a real boundary makes that impossible; those few exceptions are written
-next to the scenario with the test that proves it instead. Playwright needs Chromium once:
+next to the scenario with the test that proves it instead. A detail that only a developer would notice is a plain test next to the code, not a scenario (see
+[scenario or plain test](docs/explanation/scenario-or-plain-test.md)). Playwright needs Chromium once:
 `npx playwright install chromium`. See [test layers and coverage](docs/reference/test-layers-and-coverage.md).
 
 `git push` runs the docs check, the behaviour coverage check, the lint rule tests, and typecheck, lint, unit tests and the

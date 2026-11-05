@@ -17,3 +17,4 @@ behaviour, read the specs.
 - [web-server-proxy.md](web-server-proxy.md) - why the browser talks to its own web server, and what the page does while a shopper waits.
 - [load-test-findings.md](load-test-findings.md) - what the load runs showed, and what was fixed because of them.
 - [failures-as-values.md](failures-as-values.md) - why failures and absences are values, and how the lint rules keep it so.
+- [scenario-or-plain-test.md](scenario-or-plain-test.md) - when a test is a Gherkin scenario and when it is a plain Vitest test.
