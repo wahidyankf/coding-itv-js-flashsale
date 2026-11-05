@@ -30,7 +30,11 @@ export const world: {
 		joined: string[];
 		holds: Map<string, unknown>;
 		purchases: Map<string, unknown>;
-		replies: Array<{ status: number; error?: string; retryAfter?: string }>;
+		replies: Array<{
+			status: number;
+			error?: string;
+			retryAfter?: string | undefined;
+		}>;
 	};
 	seed?: { status: number | null; stdout: string; stderr: string };
 	// Settings for the private API, set by steps before it starts (for example a payment that declines).

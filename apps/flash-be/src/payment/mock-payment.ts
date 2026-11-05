@@ -36,7 +36,7 @@ export function createMockPayment(options: MockPaymentOptions): MockPayment {
 
 		charge(reservationId) {
 			const known = charges.get(reservationId);
-			if (known) return known;
+			if (known !== undefined) return known;
 			const attempt = (async (): Promise<PaymentResult> => {
 				await sleep(settings.latencyMs);
 				if (random() < settings.failureRate) {

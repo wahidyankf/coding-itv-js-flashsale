@@ -47,7 +47,7 @@ export function createRateLimiter(
 				? await hit(`user:${request.saleId}:${user}`, windowMs)
 				: undefined;
 
-			const over = [];
+			const over: Array<typeof address> = [];
 			if (address.count > limits.perIp) over.push(address);
 			if (person && person.count > limits.perUser) over.push(person);
 			if (over.length === 0) return { limited: false };

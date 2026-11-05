@@ -39,7 +39,7 @@ export function createCachedSaleRepository(
 		read: () => Promise<Sale | undefined>,
 	): Promise<Sale | undefined> => {
 		const known = running.get(key);
-		if (known) return known;
+		if (known !== undefined) return known;
 		const started = read().finally(() => running.delete(key));
 		running.set(key, started);
 		return started;

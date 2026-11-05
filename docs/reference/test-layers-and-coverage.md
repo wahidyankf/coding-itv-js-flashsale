@@ -2,33 +2,35 @@
 
 ## Layers
 
-| Layer       | Where the tests are                                                      | Needs                                   | Runs in                             |
-| ----------- | ------------------------------------------------------------------------ | --------------------------------------- | ----------------------------------- |
-| Unit        | `apps/<app>/src/**/*_tests.ts(x)` and `apps/<app>/src/bdd/*_tests.ts(x)` | nothing                                 | `test:unit`, `test:quick`, pre-push |
-| Integration | `apps/<app>/src/**/*_integration_tests.ts(x)`                            | the dev stack (`npx nx db:up flash-be`) | `test:integration`, `test:coverage` |
-| End-to-end  | `apps/<app>-e2e/steps/*.steps.ts` and the Playwright specs               | the dev stack and the apps              | `test:e2e`                          |
+| Layer       | Where the tests are                                                      | Needs                                   | Runs in                                       |
+| ----------- | ------------------------------------------------------------------------ | --------------------------------------- | --------------------------------------------- |
+| Unit        | `apps/<app>/src/**/*_tests.ts(x)` and `apps/<app>/src/bdd/*_tests.ts(x)` | nothing                                 | `test:unit`, `test:quick`, pre-push           |
+| Integration | `apps/<app>/src/**/*_integration_tests.ts(x)`                            | the dev stack (`npx nx db:up flash-be`) | `test:integration`, `test:coverage`, pre-push |
+| End-to-end  | `apps/<app>-e2e/steps/*.steps.ts` and the Playwright specs               | the dev stack and the apps              | `test:e2e`                                    |
 
-Integration tests are never part of the hooks. The pre-push hook stays fast.
+The pre-push hook runs the combined coverage gate, so integration tests run there too. `test:coverage` starts the dev
+stack itself. End-to-end tests are never part of the hooks.
 
 ## Nx targets
 
-| Target             | App                             | What it runs                                      |
-| ------------------ | ------------------------------- | ------------------------------------------------- |
-| `typecheck`        | every app                       | `tsc --noEmit`                                    |
-| `lint`             | every app                       | Biome                                             |
-| `test:unit`        | `flash-be`, `flash-web`         | unit tests with a coverage report (no floor)      |
-| `test:unit:watch`  | `flash-be`, `flash-web`         | unit tests in watch mode, no coverage             |
-| `test:integration` | `flash-be`, `flash-web`         | integration tests                                 |
-| `test:coverage`    | `flash-be`, `flash-web`         | unit and integration together, with the 99% floor |
-| `test:quick`       | every app                       | `typecheck`, `lint`, and `test:unit`              |
-| `test:e2e`         | `flash-be-e2e`, `flash-web-e2e` | Playwright, built from the feature files          |
+| Target             | App                             | What it runs                                                 |
+| ------------------ | ------------------------------- | ------------------------------------------------------------ |
+| `typecheck`        | every app                       | `tsc --noEmit` with the strict flags in each `tsconfig.json` |
+| `lint`             | every app                       | Biome, and warnings fail the run                             |
+| `test:unit`        | `flash-be`, `flash-web`         | unit tests with a coverage report (no floor)                 |
+| `test:unit:watch`  | `flash-be`, `flash-web`         | unit tests in watch mode, no coverage                        |
+| `test:integration` | `flash-be`, `flash-web`         | integration tests                                            |
+| `test:coverage`    | `flash-be`, `flash-web`         | unit and integration together, with the 99% floor            |
+| `test:quick`       | every app                       | `typecheck`, `lint`, and `test:unit`                         |
+| `test:e2e`         | `flash-be-e2e`, `flash-web-e2e` | Playwright, built from the feature files                     |
 
 Run a target with `npx nx <target> <app>`, for example `npx nx test:coverage flash-be`.
 
 ## Coverage floor
 
 The 99% floor is on the combined run: unit and integration tests together. It covers lines, statements, functions,
-and branches. The gate is `npx nx test:coverage <app>`, which needs the dev stack.
+and branches. The gate is `npx nx test:coverage <app>`. It starts the dev stack, and the pre-push hook runs it for the
+affected apps.
 
 Unit tests alone do not reach 99% for `flash-be`, because the database code is covered by integration tests. So
 `test:unit` reports coverage without a floor.

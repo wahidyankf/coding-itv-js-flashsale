@@ -65,8 +65,12 @@
 		"test:coverage": {
 			"executor": "nx:run-commands",
 			"options": {
-				"command": "npm run test:coverage",
-				"cwd": "apps/flash-web"
+				"commands": [
+					"npx nx db:up flash-be",
+					"npm run test:coverage --workspace flash-web"
+				],
+				"cwd": ".",
+				"parallel": false
 			}
 		},
 		"test:quick": {

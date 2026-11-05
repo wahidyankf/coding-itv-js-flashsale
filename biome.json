@@ -24,8 +24,38 @@
 		"enabled": true,
 		"rules": {
 			"preset": "recommended",
+			"correctness": {
+				"noUnusedVariables": "error",
+				"noUnusedImports": "error",
+				"noUnusedFunctionParameters": "error",
+				"noUnusedPrivateClassMembers": "error",
+				"noUndeclaredVariables": "error"
+			},
+			"style": {
+				"useImportType": "error",
+				"noNonNullAssertion": "error",
+				"useConst": "error",
+				"noParameterAssign": "error",
+				"useTemplate": "error",
+				"noInferrableTypes": "error",
+				"useNodejsImportProtocol": "error",
+				"useShorthandFunctionType": "error",
+				"noUselessElse": "error"
+			},
 			"suspicious": {
-				"noExplicitAny": "error"
+				"noExplicitAny": "error",
+				"noImplicitAnyLet": "error",
+				"noEvolvingTypes": "error",
+				"noConfusingVoidType": "error",
+				"noMisleadingInstantiator": "error"
+			},
+			"complexity": {
+				"noForEach": "error",
+				"useLiteralKeys": "error"
+			},
+			"nursery": {
+				"noFloatingPromises": "error",
+				"noMisusedPromises": "error"
 			}
 		},
 		"domains": {

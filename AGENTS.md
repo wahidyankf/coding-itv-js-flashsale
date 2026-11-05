@@ -25,13 +25,19 @@ Flash sale monorepo with four apps in `apps/`: `flash-be` (Fastify REST API), `f
   - `test:quick` runs `typecheck`, `lint`, and `test:unit`, or only `typecheck` and `lint` for the e2e apps. Change a
     check in its own target, not in `test:quick`. Keep `test:quick:watch` in sync with it.
 - Biome formats and lints (tabs, double quotes). Do not add Prettier or ESLint.
+- Typechecking and linting are strict. Every `tsconfig.json` turns on `strict`, `noUncheckedIndexedAccess`,
+  `exactOptionalPropertyTypes`, `noImplicitOverride`, `noImplicitReturns`, `noUnusedLocals`, `noUnusedParameters` and
+  `verbatimModuleSyntax`. Biome rules for unused code, non-null assertions, type-only imports and floating or misused
+  promises are errors, and `lint` fails on warnings. Fix the code; do not relax a rule to pass.
 - No `any` in TypeScript. Biome's `noExplicitAny` is an error, and `noImplicitAny` is on in every `tsconfig.json`. Use
   `unknown` and narrow it, or write the type. Do not silence the rule with `biome-ignore`.
 - Commit messages follow Conventional Commits (commitlint hook). Make one coherent change per commit.
 - Docs are checked by RHINO, which reads the policy in `repo-config.yml`. Run `npm run docs:install` once per machine,
   then `npm run docs:check`. The version and digests are pinned in `scripts/install-rhino.sh`; bump them together.
-- The pre-push hook runs `npm run docs:check`, then `nx affected -t test:quick --base=origin/main`. Do not skip hooks
-  with `--no-verify` unless the user asks.
+- The pre-push hook runs `npm run docs:check`, the behaviour coverage check (`bdd:check:test`, `bdd:check`), then
+  `nx affected -t test:quick` (typecheck, lint, unit tests) and `nx affected -t test:coverage` (the 99% floor) against
+  `origin/main`. `test:coverage` starts the dev stack itself, so Docker must run. Do not skip hooks with `--no-verify`
+  unless the user asks.
 
 ## Tests
 
@@ -44,7 +50,7 @@ Flash sale monorepo with four apps in `apps/`: `flash-be` (Fastify REST API), `f
   scenario has `@integration-exempt` or `@e2e-exempt`. One scenario may carry both tags. Each tag needs the comment
   format in `docs/how-to/add-a-behaviour.md`, and the unit binding is the alternative proof.
 - Run `npm run bdd:check` after changing a feature file or a binding. It runs in the pre-push hook.
-- Keep combined coverage at 99% (`npx nx test:coverage <app>`). Integration and e2e tests stay out of the hooks.
+- Keep combined coverage at 99% (`npx nx test:coverage <app>`). Integration tests run inside that gate; e2e tests stay out of the hooks.
 - Write docs by Diátaxis mode (`docs/`). Show only commands you ran. Architecture diagrams are Mermaid with an
   `accTitle`, an `accDescr`, and the palette in `repo-config.yml`.
 - E2E tests run against real servers. Keep `/health` (flash-be), `/ready` (flash-be), and `/api/health` (flash-web)

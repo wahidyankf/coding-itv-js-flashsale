@@ -12,7 +12,7 @@
 		"seed-sale": "node --env-file-if-exists=../../.env --import tsx src/seed-sale.ts",
 		"seed-sale:dist": "node --env-file-if-exists=../../.env dist/seed-sale.js",
 		"typecheck": "tsc --noEmit -p tsconfig.json",
-		"lint": "biome lint .",
+		"lint": "biome lint --error-on-warnings .",
 		"test:unit": "vitest run --config vitest.config.ts --coverage.enabled",
 		"test:coverage": "vitest run --config vitest.coverage.config.ts",
 		"test:unit:watch": "vitest --config vitest.config.ts",

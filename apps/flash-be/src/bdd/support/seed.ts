@@ -3,9 +3,9 @@ import type { Kysely } from "kysely";
 import type { Database } from "../../db.js";
 
 export type SaleSeed = {
-	name?: string;
-	stock?: number;
-	sold?: number;
+	name?: string | undefined;
+	stock?: number | undefined;
+	sold?: number | undefined;
 	startsAt: Date;
 	endsAt: Date;
 };
