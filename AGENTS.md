@@ -7,6 +7,11 @@ Guidance for AI coding agents working in this repository. For setup and run comm
 Flash sale monorepo with four apps in `apps/`: `flash-be` (Fastify REST API), `flash-web` (TanStack Start client),
 `flash-be-e2e` and `flash-web-e2e` (Playwright). Data lives in Postgres (Kysely, no ORM) and Redis.
 
+## Docs and specs
+
+- `docs/` is the documentation for users and developers, split into Diátaxis modes. Start at [docs/README.md](docs/README.md).
+- `specs/` holds the behaviour scenarios and the C4 architecture. Start at [specs/README.md](specs/README.md). Specs win when they disagree with `docs/`.
+
 ## Repository rules
 
 - Default branch is `main`. Do not commit or push unless the user asks.
