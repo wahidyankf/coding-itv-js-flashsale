@@ -32,7 +32,11 @@ describeFeature(
 				let response: Response;
 
 				When("a client sends GET /health", async () => {
-					const app = appWith({ checkDatabase: failing, checkRedis: failing });
+					const app = appWith({
+						...healthyDeps,
+						checkDatabase: failing,
+						checkRedis: failing,
+					});
 					response = await app.inject({ method: "GET", url: "/health" });
 				});
 

@@ -9,3 +9,9 @@ GET {{backend}}/ready
 
 ### Web: health check (Start server route, run with `npx nx dev flash-web`)
 GET {{web}}/api/health
+
+### Backend: the current sale (the sale that opens last; seed one with `npx nx db:seed-sale flash-be --stock=100`)
+GET {{backend}}/sales/current
+
+### Backend: one sale by id (replace the id with the one the seed command printed)
+GET {{backend}}/sales/00000000-0000-4000-8000-000000000000

@@ -27,4 +27,18 @@ export function registerRoutes(app: FastifyInstance, deps: Dependencies): void {
 			.code(ready ? 200 : 503)
 			.send({ status: ready ? "ok" : "unavailable", checks });
 	});
+
+	// The sale a shopper sees. "current" is the sale that opens last.
+	app.get("/sales/current", async (_request, reply) => {
+		const sale = await deps.sales.current();
+		return sale ? sale : reply.code(404).send({ error: "sale_not_found" });
+	});
+
+	app.get<{ Params: { saleId: string } }>(
+		"/sales/:saleId",
+		async (request, reply) => {
+			const sale = await deps.sales.byId(request.params.saleId);
+			return sale ? sale : reply.code(404).send({ error: "sale_not_found" });
+		},
+	);
 }
