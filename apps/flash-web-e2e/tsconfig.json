@@ -10,5 +10,5 @@
 		"esModuleInterop": true,
 		"types": ["node"]
 	},
-	"include": ["tests/**/*.ts", "playwright.config.ts"]
+	"include": ["steps/**/*.ts", "playwright.config.ts"]
 }

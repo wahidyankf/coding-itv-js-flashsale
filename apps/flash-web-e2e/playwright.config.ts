@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { defineBddConfig } from "playwright-bdd";
 
 // Load the root .env so the backend port matches the apps. It is optional.
 try {
@@ -11,10 +12,19 @@ const backendPort = Number(process.env.FLASH_BE_PORT ?? 8080);
 const webPort = 3000;
 const baseURL = `http://localhost:${webPort}`;
 
+// The scenarios come from the specs. Scenarios tagged @e2e-exempt are proven by another layer.
+const testDir = defineBddConfig({
+	featuresRoot: "../../specs/flash/web/behaviours",
+	features: "../../specs/flash/web/behaviours/**/*.feature",
+	steps: ["./steps/**/*.steps.ts"],
+	tags: "not @e2e-exempt",
+});
+
 // Tests run against production builds, so they match what ships.
 export default defineConfig({
-	testDir: "./tests",
-	fullyParallel: true,
+	testDir,
+	fullyParallel: false,
+	workers: 1,
 	forbidOnly: !!process.env.CI,
 	retries: process.env.CI ? 2 : 0,
 	reporter: "list",

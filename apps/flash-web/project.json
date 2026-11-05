@@ -62,6 +62,13 @@
 				"cwd": "apps/flash-web"
 			}
 		},
+		"test:coverage": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "npm run test:coverage",
+				"cwd": "apps/flash-web"
+			}
+		},
 		"test:quick": {
 			"executor": "nx:run-commands",
 			"options": {

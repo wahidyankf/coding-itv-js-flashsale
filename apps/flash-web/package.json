@@ -9,7 +9,8 @@
 		"start": "node --env-file-if-exists=../../.env .output/server/index.mjs",
 		"typecheck": "tsc --noEmit -p tsconfig.json",
 		"lint": "biome lint .",
-		"test:unit": "vitest run --config vitest.config.ts",
+		"test:unit": "vitest run --config vitest.config.ts --coverage.enabled",
+		"test:coverage": "vitest run --config vitest.coverage.config.ts",
 		"test:unit:watch": "vitest --config vitest.config.ts",
 		"test:integration": "vitest run --config vitest.integration.config.ts"
 	},

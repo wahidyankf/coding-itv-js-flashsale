@@ -9,6 +9,7 @@ try {
 
 export default defineConfig({
 	test: {
+		name: "integration",
 		environment: "node",
 		include: ["src/**/*_integration_tests.{ts,tsx}"],
 		exclude: ["node_modules", ".output"],
