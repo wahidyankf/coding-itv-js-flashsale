@@ -1,0 +1,73 @@
+name: flash-prod
+
+# Full stack in containers. Secrets come from the root .env and are required (no defaults).
+# Only the web and API ports are published to the host. Postgres and Redis stay on the internal network.
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  redis:
+    image: redis:8-alpine
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  flash-be-migrate:
+    build:
+      context: .
+      dockerfile: apps/flash-be/Dockerfile
+    image: flash-be:prod
+    command: ["node", "dist/migrate.js"]
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:?}
+      # config.ts requires every URL in production, even though migrations only use Postgres.
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  flash-be:
+    image: flash-be:prod
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:?}
+      REDIS_URL: redis://redis:6379
+      FLASH_BE_PORT: 8080
+    ports:
+      - "${FLASH_BE_PORT:-8080}:8080"
+    depends_on:
+      flash-be-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  flash-web:
+    build:
+      context: .
+      dockerfile: apps/flash-web/Dockerfile
+    environment:
+      FLASH_BE_URL: http://flash-be:8080
+    ports:
+      - "${FLASH_WEB_PORT:-3000}:3000"
+    depends_on:
+      flash-be:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  redis-data:
