@@ -29,6 +29,15 @@ Feature: Configuration of the flash-be API
     When the configuration is built
     Then building the configuration fails with "REDIS_URL is required in production"
 
+  # Exemption(integration): the rule is a pure function of an environment object and opens no resource; alternative-proof: flash-be:unit / Production requires TICKET_SECRET
+  @integration-exempt
+  Scenario: Production requires TICKET_SECRET
+    Given NODE_ENV is production
+    And DATABASE_URL is set
+    And REDIS_URL is set
+    When the configuration is built
+    Then building the configuration fails with "TICKET_SECRET is required in production"
+
   # Exemption(integration): the rule is a pure function of an environment object and opens no resource; alternative-proof: flash-be:unit / Invalid FLASH_BE_PORT is refused
   @integration-exempt
   Scenario Outline: Invalid FLASH_BE_PORT is refused
@@ -57,3 +66,16 @@ Feature: Configuration of the flash-be API
     When the configuration is built
     Then the database host is db on port 5432
     And the Redis host is cache on port 6379
+
+  # Exemption(integration): the rule is a pure function of an environment object and opens no resource; alternative-proof: flash-be:unit / Invalid queue timings are refused
+  @integration-exempt
+  Scenario Outline: Invalid queue timings are refused
+    Given <name> is "<value>"
+    When the configuration is built
+    Then building the configuration fails with "<name> must be a positive integer"
+
+    Examples:
+      | name                  | value |
+      | ADMISSION_TICK_MS     | 0     |
+      | ADMISSION_TICK_MS     | fast  |
+      | ADMISSION_TTL_SECONDS | -5    |

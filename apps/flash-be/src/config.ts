@@ -3,6 +3,11 @@ export type Config = {
 	port: number;
 	databaseUrl: string;
 	redisUrl: string;
+	// Signs the queue tickets. Every instance must share it.
+	ticketSecret: string;
+	// How often the queue admits the next shoppers, and how long an admission stays valid.
+	admissionTickMs: number;
+	admissionTtlSeconds: number;
 };
 
 const localDefaults = {
@@ -10,6 +15,7 @@ const localDefaults = {
 	port: "8080",
 	databaseUrl: "postgres://flash:flash@localhost:5432/flash",
 	redisUrl: "redis://localhost:6379",
+	ticketSecret: "local-development-ticket-secret",
 };
 
 // Local defaults match compose.dev.yaml. In production, the URLs must come from the environment.
@@ -28,11 +34,22 @@ export function buildConfig(env: NodeJS.ProcessEnv): Config {
 		throw new Error("FLASH_BE_PORT must be a valid port number");
 	}
 
+	const positive = (name: string, fallback: number): number => {
+		const value = Number(env[name] ?? fallback);
+		if (!Number.isInteger(value) || value < 1) {
+			throw new Error(`${name} must be a positive integer`);
+		}
+		return value;
+	};
+
 	return {
 		host: env.FLASH_BE_HOST ?? localDefaults.host,
 		port,
 		databaseUrl: withDefault("DATABASE_URL", localDefaults.databaseUrl),
 		redisUrl: withDefault("REDIS_URL", localDefaults.redisUrl),
+		ticketSecret: withDefault("TICKET_SECRET", localDefaults.ticketSecret),
+		admissionTickMs: positive("ADMISSION_TICK_MS", 1000),
+		admissionTtlSeconds: positive("ADMISSION_TTL_SECONDS", 600),
 	};
 }
 

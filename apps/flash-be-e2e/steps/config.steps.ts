@@ -11,6 +11,9 @@ const CONFIG_VARS = [
 	"REDIS_URL",
 	"FLASH_BE_PORT",
 	"FLASH_BE_HOST",
+	"TICKET_SECRET",
+	"ADMISSION_TICK_MS",
+	"ADMISSION_TTL_SECONDS",
 ];
 const START_TIMEOUT_MS = 20_000;
 const CONFIG_LINE = "flash-be config:";
@@ -81,6 +84,13 @@ Given(
 	/^FLASH_BE_PORT is "([^"]*)"$/,
 	async ({ request: _request }, value: string) => {
 		env = { ...baseEnv(), FLASH_BE_PORT: value };
+	},
+);
+
+Given(
+	/^(ADMISSION_TICK_MS|ADMISSION_TTL_SECONDS) is "([^"]*)"$/,
+	async ({ request: _request }, name: string, value: string) => {
+		env = { ...baseEnv(), [name]: value };
 	},
 );
 

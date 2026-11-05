@@ -99,6 +99,43 @@ describeFeature(
 			);
 		});
 
+		Scenario(
+			"Production requires TICKET_SECRET",
+			({ Given, And, When, Then }) => {
+				let env: NodeJS.ProcessEnv = {};
+				let error: unknown;
+
+				Given("NODE_ENV is production", () => {
+					env = { NODE_ENV: "production" };
+				});
+
+				And("DATABASE_URL is set", () => {
+					env.DATABASE_URL = "postgres://u:p@db:5432/x";
+				});
+
+				And("REDIS_URL is set", () => {
+					env.REDIS_URL = "redis://cache:6379";
+				});
+
+				When("the configuration is built", () => {
+					try {
+						buildConfig(env);
+					} catch (caught) {
+						error = caught;
+					}
+				});
+
+				Then(
+					'building the configuration fails with "TICKET_SECRET is required in production"',
+					() => {
+						expect((error as Error).message).toBe(
+							"TICKET_SECRET is required in production",
+						);
+					},
+				);
+			},
+		);
+
 		// One row per Examples value in the feature. Each row runs as its own set of tests.
 		ScenarioOutline(
 			"Invalid FLASH_BE_PORT is refused",
@@ -123,6 +160,35 @@ describeFeature(
 					() => {
 						expect((error as Error).message).toBe(
 							"FLASH_BE_PORT must be a valid port number",
+						);
+					},
+				);
+			},
+		);
+
+		ScenarioOutline(
+			"Invalid queue timings are refused",
+			({ Given, When, Then }, examples) => {
+				let env: NodeJS.ProcessEnv = {};
+				let error: unknown;
+
+				Given('<name> is "<value>"', () => {
+					env = { [String(examples.name)]: String(examples.value) };
+				});
+
+				When("the configuration is built", () => {
+					try {
+						buildConfig(env);
+					} catch (caught) {
+						error = caught;
+					}
+				});
+
+				Then(
+					'building the configuration fails with "<name> must be a positive integer"',
+					() => {
+						expect((error as Error).message).toBe(
+							`${examples.name} must be a positive integer`,
 						);
 					},
 				);
