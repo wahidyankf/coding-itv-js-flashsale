@@ -28,6 +28,14 @@ export const OWNERS = [
 		integration: "apps/flash-web/src/bdd",
 		e2e: "apps/flash-web-e2e/steps",
 	},
+	// The typekit library is pure: every scenario is exempt from integration and e2e, with its unit binding as proof.
+	{
+		name: "typekit",
+		spec: "specs/typekit",
+		unit: "libs/typekit/src/bdd",
+		integration: "libs/typekit/src/bdd",
+		e2e: "libs/typekit/src/bdd/e2e",
+	},
 	// The checker's own rules. Its e2e steps run the checker as the repository ships it.
 	{
 		name: "tooling",

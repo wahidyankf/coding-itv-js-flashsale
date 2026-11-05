@@ -57,6 +57,7 @@
 		"*.{js,jsx,mjs,cjs,ts,tsx,mts,cts,json,jsonc}": "biome format --write --no-errors-on-unmatched"
 	},
 	"workspaces": [
+		"libs/typekit",
 		"apps/flash-be",
 		"apps/flash-be-e2e",
 		"apps/flash-web",
