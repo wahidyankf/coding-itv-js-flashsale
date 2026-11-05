@@ -33,6 +33,13 @@ Flash sale monorepo with four apps in `apps/`: `flash-be` (Fastify REST API), `f
   `*_integration_tests.ts(x)` with their own Vitest config. They need the dev compose stack
   (`npx nx db:up flash-be`) and are not part of `test:quick`.
 - Vitest globals are off. Call `cleanup` in `afterEach` when rendering components.
+- Behaviour scenarios are canonical in `specs/`. Bind each one at unit. Bind integration and e2e too, unless the
+  scenario has `@integration-exempt` or `@e2e-exempt`. One scenario may carry both tags. Each tag needs the comment
+  format in `docs/how-to/add-a-behaviour.md`, and the unit binding is the alternative proof.
+- Run `npm run bdd:check` after changing a feature file or a binding. It runs in the pre-push hook.
+- Keep combined coverage at 99% (`npx nx test:coverage <app>`). Integration and e2e tests stay out of the hooks.
+- Write docs by Diátaxis mode (`docs/`). Show only commands you ran. Architecture diagrams are Mermaid with an
+  `accTitle`, an `accDescr`, and the palette in `repo-config.yml`.
 - E2E tests run against real servers. Keep `/health` (flash-be), `/ready` (flash-be), and `/api/health` (flash-web)
   working. The Playwright configs and specs depend on them.
 

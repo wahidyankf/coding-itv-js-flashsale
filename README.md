@@ -52,6 +52,13 @@ npx nx test:e2e <app>         # Playwright (flash-be-e2e, flash-web-e2e)
 npx nx test:quick <app>       # typecheck + lint + unit
 ```
 
-Docs (Markdown links and heading structure) are checked by a pinned RHINO release. Run `npm run docs:install` once to fetch it into `.tools/`, then `npm run docs:check`. The policy is in `repo-config.yml`.
+Docs (Markdown links, heading structure, README indexes, and Mermaid diagrams) are checked by a pinned RHINO release. Run `npm run docs:install` once to fetch it into `.tools/`, then `npm run docs:check`. The policy is in `repo-config.yml`.
+
+Behaviour scenarios are checked against their bindings with `npm run bdd:check`. The combined unit and integration coverage gate (99%) is `npx nx test:coverage <app>`, which needs the dev compose stack.
+
+## Documentation
+
+- [docs/](docs/README.md): tutorials, how-to guides, reference, and explanation.
+- [specs/](specs/README.md): the Gherkin behaviour scenarios and the C4 architecture. Specs win when they disagree with the docs.
 
 Commits are checked with commitlint (Conventional Commits). Staged JS and JSON files are formatted by Biome on commit. `git push` runs `npm run docs:check`, then `nx affected -t test:quick` against `origin/main`.
