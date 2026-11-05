@@ -1,2 +1,4 @@
 npm run --silent docs:check
+npm run --silent bdd:check:test
+npm run --silent bdd:check
 npx --no -- nx affected -t test:quick --base=origin/main
