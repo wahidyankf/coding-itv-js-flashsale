@@ -81,8 +81,6 @@ Feature: Reserving an item
     Then 10 reservations are granted
     And 20 shoppers are told the item is sold out
 
-  # Exemption(e2e): the running process cannot be made to fail one Postgres write while the rest works; alternative-proof: flash-be:integration / A failed write to Postgres gives the item back
-  @e2e-exempt
   Scenario: A failed write to Postgres gives the item back
     Given a sale with stock 1 and 0 sold that opens 1 hour ago and closes in 1 hour
     And "ana" has been admitted

@@ -2,13 +2,16 @@ import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { createClient } from "redis";
 import { currentResponse, setResponse } from "./support/response.js";
+import { world } from "./support/world.js";
 
 // createBdd exposes Given, When and Then only. Matching is by step text, so an And line binds to When or Then.
 const { Given, When, Then } = createBdd();
 
 // Any path, so each feature can name the route it calls.
+// A scenario that started its own API (for example one whose Postgres does not answer) is asked there; the others ask
+// the shared one.
 When(/^a client sends GET (\/\S*)$/, async ({ request }, path: string) => {
-	setResponse(await request.get(path));
+	setResponse(await request.get(`${world.api?.url ?? ""}${path}`));
 });
 
 Given("the API is running and Redis answers", async ({ request }) => {

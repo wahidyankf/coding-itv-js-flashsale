@@ -102,6 +102,30 @@ Given("the reservation state of the sale is lost from Redis", async () => {
 	}
 });
 
+// A trigger in the scenario's own database refuses every reservation write, the way a failing disk or a full table
+// would. Dropping it lets writes through again.
+Given(
+	"Postgres refuses to save reservations",
+	async ({ request: _request }) => {
+		await query(`create function refuse_reservation() returns trigger language plpgsql as $$
+		begin raise exception 'the write is refused'; end $$`);
+		await query(`create trigger refuse_reservation before insert on reservations
+		for each row execute function refuse_reservation()`);
+	},
+);
+
+When("Postgres saves reservations again", async ({ request: _request }) => {
+	await query("drop trigger refuse_reservation on reservations");
+});
+
+When(
+	/^"([^"]+)" reserves an item and the write fails$/,
+	async ({ request }, user: string) => {
+		await reserve(request, user);
+		expect(currentResponse().status()).toBe(500);
+	},
+);
+
 When(/^"([^"]+)" reserves an item$/, async ({ request }, user: string) => {
 	await reserve(request, user);
 });

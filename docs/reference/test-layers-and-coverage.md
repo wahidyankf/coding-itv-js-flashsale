@@ -64,6 +64,13 @@ The check's own rules are bound at every layer, with no exemptions:
 - unit and integration: `npm run bdd:check:test` (Vitest, `scripts/bdd/*_tests.mjs`);
 - end-to-end: `npm run bdd:e2e` (playwright-bdd, `scripts/bdd/e2e/steps`), which runs the checker as shipped.
 
+## How the API end-to-end tests break a dependency
+
+A scenario that needs a failing dependency starts its own `flash-be` process over its own scratch database, so the
+shared stack is never touched. Postgres that does not answer is a connection string with no listener. Redis that does
+not answer is a TCP relay between the API and Redis that the scenario cuts. A Postgres that refuses one kind of write is
+a trigger in the scratch database that raises an error, and dropping it lets writes through again.
+
 ## How the web end-to-end tests control the API
 
 The Playwright config starts one built web server with `FLASH_BE_URL` set to a fixed forwarder address (port 18082). The

@@ -23,6 +23,20 @@ function proxy() {
 	return world.redisProxy;
 }
 
+// The address has no listener, so every connection is refused at once, as with a Postgres that is down.
+const DEAD_POSTGRES = "postgres://flash:flash@127.0.0.1:1/flash";
+
+Given("Postgres does not answer", async ({ request: _request }) => {
+	world.apiEnv = { ...world.apiEnv, DATABASE_URL: DEAD_POSTGRES };
+	await startApi();
+});
+
+Given("Redis does not answer", async ({ request: _request }) => {
+	const url = await startApi();
+	await proxy().down();
+	await waitForReady(url, false);
+});
+
 Given("Redis is down", async ({ request: _request }) => {
 	const url = await startApi();
 	await proxy().down();
