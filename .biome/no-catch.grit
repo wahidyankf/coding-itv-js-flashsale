@@ -1,0 +1,16 @@
+// Product code does not catch. A call that may throw goes through attempt or attemptAsync from @flash/typekit, which
+// turn the failure into a Result the caller must handle. try/finally stays allowed: it cleans up and handles nothing.
+or {
+	`try { $_ } catch ($_) { $_ }` as $c where {
+		register_diagnostic(span=$c, message="Do not catch here. Return a Result with attempt or attemptAsync from @flash/typekit.", severity="error")
+	},
+	`try { $_ } catch { $_ }` as $c where {
+		register_diagnostic(span=$c, message="Do not catch here. Return a Result with attempt or attemptAsync from @flash/typekit.", severity="error")
+	},
+	`try { $_ } catch ($_) { $_ } finally { $_ }` as $c where {
+		register_diagnostic(span=$c, message="Do not catch here. Return a Result with attempt or attemptAsync from @flash/typekit.", severity="error")
+	},
+	`$promise.catch($_)` as $c where {
+		register_diagnostic(span=$c, message="Do not use .catch(). Use attemptAsync from @flash/typekit.", severity="error")
+	}
+}

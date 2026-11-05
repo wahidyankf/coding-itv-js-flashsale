@@ -1,8 +1,8 @@
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import { expect } from "vitest";
-import { Err, Ok, type Result } from "../result.js";
-import { fromOptional, type Option, Some } from "../option.js";
 import * as option from "../option.js";
+import { fromOptional, type Option, Some } from "../option.js";
+import { Err, Ok, type Result } from "../result.js";
 import { specFile } from "./support/paths.js";
 
 describeFeature(

@@ -36,6 +36,14 @@ export const OWNERS = [
 		integration: "libs/typekit/src/bdd",
 		e2e: "libs/typekit/src/bdd/e2e",
 	},
+	// The lint rules for product code. They are checked by running the real linter on sample code.
+	{
+		name: "lint-rules",
+		spec: "specs/tooling/lint-rules",
+		unit: "scripts/lint",
+		integration: "scripts/lint",
+		e2e: "scripts/lint/e2e",
+	},
 	// The checker's own rules. Its e2e steps run the checker as the repository ships it.
 	{
 		name: "tooling",

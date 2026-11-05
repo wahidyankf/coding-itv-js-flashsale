@@ -55,7 +55,8 @@
 			},
 			"nursery": {
 				"noFloatingPromises": "error",
-				"noMisusedPromises": "error"
+				"noMisusedPromises": "error",
+				"useExhaustiveSwitchCases": "error"
 			}
 		},
 		"domains": {
@@ -81,6 +82,19 @@
 			"javascript": {
 				"globals": ["__ENV"]
 			}
+		},
+		{
+			"includes": [
+				"apps/*/src/**",
+				"libs/*/src/**",
+				"!**/*_tests.ts",
+				"!**/*_tests.tsx",
+				"!**/*_integration_tests.ts",
+				"!**/*_integration_tests.tsx",
+				"!**/bdd/**",
+				"!libs/typekit/src/boundary.ts"
+			],
+			"plugins": ["./.biome/no-catch.grit"]
 		}
 	]
 }
