@@ -16,6 +16,10 @@ It is an npm workspace with five apps in `apps/`:
 
 Nx runs the commands only. It has no plugins, and every target is in the app's `project.json`.
 
+`flash-be` is a hexagon: the rules sit in `src/domain`, the use cases in `src/application`, and Postgres, Redis, the
+payment mock and HTTP are adapters behind ports. A unit test fails when a layer imports one it must not know. See
+[hexagonal architecture](docs/explanation/hexagonal-architecture.md).
+
 ## How a purchase works
 
 ```mermaid

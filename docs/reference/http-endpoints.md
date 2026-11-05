@@ -1,6 +1,6 @@
 # HTTP endpoints
 
-The routes of the two services. The API routes are in `apps/flash-be/src/routes.ts`. The web routes are in
+The routes of the two services. The API routes are in `apps/flash-be/src/adapters/inbound/http/routes.ts`. The web routes are in
 `apps/flash-web/src/routes/`.
 
 ## flash-be (API, port 8080)

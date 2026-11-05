@@ -25,7 +25,7 @@ Readiness is for operators and load balancers. The Docker health check does not 
 ## Redis connection drops
 
 A Redis connection that drops after start-up does not stop the API. The Redis client emits an `error` event, and
-`apps/flash-be/src/redis.ts` listens for it, logs the error, and lets the client reconnect. Without that listener, Node
+`apps/flash-be/src/adapters/outbound/redis/redis-client.ts` listens for it, logs the error, and lets the client reconnect. Without that listener, Node
 ends the process on the first dropped socket.
 
 The scenario "Readiness recovers after Redis drops the API's connection" in

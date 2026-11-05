@@ -5,6 +5,7 @@ behaviour, read the specs.
 
 ## Directory Map
 
+- [hexagonal-architecture.md](hexagonal-architecture.md) - how `flash-be` is split into domain, application and adapters, and how the split is enforced.
 - [liveness-and-readiness.md](liveness-and-readiness.md) - why `/health` checks nothing and `/ready` checks the stores.
 - [waiting-queue.md](waiting-queue.md) - why shoppers queue before they reserve, and how the queue admits them.
 - [reservations-and-recovery.md](reservations-and-recovery.md) - how a hold is counted, why Postgres has the last word, and how Redis is rebuilt.

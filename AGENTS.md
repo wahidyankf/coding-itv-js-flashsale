@@ -65,8 +65,13 @@ Flash sale monorepo with five apps in `apps/`: `flash-be` (Fastify REST API), `f
   Postgres can rebuild. A change to the sale path needs a concurrency scenario, and `flash-load` must still pass.
 - Redis keys are `sale:<saleId>:{ready,buyers,holds,ids,rebuild-lock}`. Every command on the sale path must fail at
   once when Redis is down. Use single scripts, not `MULTI`, which waits for the connection.
-- Routes are in `apps/flash-be/src/routes.ts`, with full paths. Migrations are hand-written in
-  `apps/flash-be/src/migrations`. Use Kysely as a query builder. Do not add an ORM.
+- `flash-be` is a hexagon (see `docs/explanation/hexagonal-architecture.md`). Rules go in `src/domain` (no I/O, only Node
+  built-ins). Use cases go in `src/application`, which reach stores only through `src/application/ports`. Adapters go in
+  `src/adapters/inbound` (HTTP, CLI) and `src/adapters/outbound` (Postgres, Redis, memory, payment, clock). Only
+  `composition.ts` and the entry points pick an adapter for a port. `architecture_tests.ts` fails on a wrong import.
+  Put a new rule in the domain with a unit test first, not in a service or a route.
+- Routes are in `apps/flash-be/src/adapters/inbound/http/routes.ts`, with full paths. Migrations are hand-written in
+  `apps/flash-be/src/adapters/outbound/postgres/migrations`. Use Kysely as a query builder. Do not add an ORM.
 - Config is built once from `process.env` in `src/config.ts`. `buildConfig` is exported for tests. Local defaults match
   `compose.dev.yaml`. In production, a missing required URL must fail fast.
 - Env vars are listed in `.env.example`. Never commit `.env`. Do not use the example passwords outside local
