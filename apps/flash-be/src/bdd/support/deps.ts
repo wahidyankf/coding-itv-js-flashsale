@@ -15,4 +15,8 @@ export const healthyDeps: Dependencies = {
 	reservations: {
 		reserve: async () => ({ ok: false, error: "sale_not_found" }),
 	},
+	purchases: {
+		confirm: async () => ({ ok: false, error: "sale_not_found" }),
+		outcome: async () => ({ ok: false, error: "sale_not_found" }),
+	},
 };

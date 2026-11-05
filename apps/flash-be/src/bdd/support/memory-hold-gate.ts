@@ -61,6 +61,12 @@ export function memoryHoldGate(clock: Clock): MemoryHoldGate {
 			stateOf(saleId).holds.delete(user);
 		},
 
+		async confirm(saleId, user) {
+			const state = stateOf(saleId);
+			state.buyers.add(user);
+			state.holds.delete(user);
+		},
+
 		async isReady(saleId) {
 			return stateOf(saleId).ready;
 		},

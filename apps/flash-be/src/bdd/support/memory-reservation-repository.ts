@@ -11,7 +11,9 @@ export type MemoryReservationRepository = ReservationRepository & {
 };
 
 // The reservation rows in memory, for unit tests.
-export function memoryReservationRepository(): MemoryReservationRepository {
+export function memoryReservationRepository(
+	buyersOf: (saleId: string) => string[] = () => [],
+): MemoryReservationRepository {
 	const repository: MemoryReservationRepository = {
 		broken: false,
 		rows: new Map(),
@@ -23,7 +25,7 @@ export function memoryReservationRepository(): MemoryReservationRepository {
 
 		async rebuild(saleId, now, restore) {
 			const snapshot: HoldSnapshot = {
-				buyers: [],
+				buyers: buyersOf(saleId),
 				holds: [...repository.rows.values()]
 					.filter((row) => row.saleId === saleId && row.expiresAt > now)
 					.map((row) => ({

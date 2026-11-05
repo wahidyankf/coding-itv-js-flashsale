@@ -32,3 +32,12 @@ Content-Type: application/json
 x-queue-ticket: paste-the-ticket-here
 
 { "userId": "ana" }
+
+### Backend: pay for the held item (send the reservation id from the reserve reply; sending it again is safe)
+POST {{backend}}/sales/00000000-0000-4000-8000-000000000000/purchases
+Content-Type: application/json
+
+{ "userId": "ana", "reservationId": "00000000-0000-4000-8000-000000000001" }
+
+### Backend: did I get it? (purchased, holding or none)
+GET {{backend}}/sales/00000000-0000-4000-8000-000000000000/purchases/ana

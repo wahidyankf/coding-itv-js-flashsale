@@ -63,6 +63,15 @@ export function createRedisHoldGate(redis: RedisClient): HoldGate {
 				.exec();
 		},
 
+		async confirm(saleId, user) {
+			await redis
+				.multi()
+				.sAdd(key(saleId, "buyers"), user)
+				.zRem(key(saleId, "holds"), user)
+				.hDel(key(saleId, "ids"), user)
+				.exec();
+		},
+
 		async isReady(saleId) {
 			return (await redis.exists(key(saleId, "ready"))) === 1;
 		},

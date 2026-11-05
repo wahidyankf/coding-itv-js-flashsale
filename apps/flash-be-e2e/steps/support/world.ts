@@ -2,7 +2,7 @@ import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import net from "node:net";
 import path from "node:path";
-import { expect } from "@playwright/test";
+import { type APIResponse, expect } from "@playwright/test";
 import pg from "pg";
 
 // The built API and its jobs, started as their own processes, as in production.
@@ -29,10 +29,14 @@ export const world: {
 		tickets: Map<string, string>;
 		joined: string[];
 		holds: Map<string, unknown>;
+		purchases: Map<string, unknown>;
 		replies: Array<{ status: number; error?: string }>;
 	};
 	seed?: { status: number | null; stdout: string; stderr: string };
-	api?: { url: string; process: ChildProcess };
+	// Settings for the private API, set by steps before it starts (for example a payment that declines).
+	apiEnv?: Record<string, string>;
+	api?: { url: string; process: ChildProcess; log: string };
+	pendingConfirm?: Promise<APIResponse>;
 } = {};
 
 function childEnv(extra: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
@@ -114,11 +118,23 @@ export async function startApi(): Promise<string> {
 			REDIS_URL: E2E_REDIS_URL,
 			FLASH_BE_PORT: String(port),
 			FLASH_BE_HOST: "127.0.0.1",
+			// Instant and never declined, unless a step says otherwise. The default 2 percent would flake scenarios.
+			PAYMENT_LATENCY_MS: "0",
+			PAYMENT_FAILURE_RATE: "0",
+			...world.apiEnv,
 		}),
-		stdio: "ignore",
+		stdio: ["ignore", "pipe", "pipe"],
 	});
 	const url = `http://127.0.0.1:${port}`;
-	world.api = { url, process: child };
+	const api = { url, process: child, log: "" };
+	world.api = api;
+	// The log is where the mock payment records a refund. Reading it also keeps the pipe from filling up.
+	child.stdout?.on("data", (chunk: Buffer) => {
+		api.log += chunk.toString();
+	});
+	child.stderr?.on("data", (chunk: Buffer) => {
+		api.log += chunk.toString();
+	});
 
 	const deadline = Date.now() + START_TIMEOUT_MS;
 	while (Date.now() < deadline) {

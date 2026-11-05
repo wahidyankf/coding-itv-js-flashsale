@@ -27,6 +27,7 @@ function gateWith(answers: GateAnswer[], overrides: Partial<HoldGate> = {}) {
 	const gate: HoldGate = {
 		reserve: async () => queue.shift() ?? { kind: "not_ready" },
 		release: async () => {},
+		confirm: async () => {},
 		isReady: async () => false,
 		restore: async () => {
 			calls.restore++;

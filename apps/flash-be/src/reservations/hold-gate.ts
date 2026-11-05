@@ -27,6 +27,8 @@ export type HoldGate = {
 	reserve(request: ReserveRequest): Promise<GateAnswer>;
 	// Gives a hold back, for example when it could not be written to Postgres.
 	release(saleId: string, user: string): Promise<void>;
+	// A purchase is done: the user becomes a buyer and their hold goes away.
+	confirm(saleId: string, user: string): Promise<void>;
 	isReady(saleId: string): Promise<boolean>;
 	// Replaces the sale's reservation state with the snapshot, then marks it ready.
 	restore(saleId: string, snapshot: HoldSnapshot): Promise<void>;

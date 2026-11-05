@@ -13,6 +13,7 @@ export function shoppers(): NonNullable<typeof world.queue> {
 		tickets: new Map(),
 		joined: [],
 		holds: new Map(),
+		purchases: new Map(),
 		replies: [],
 	};
 	return world.queue;

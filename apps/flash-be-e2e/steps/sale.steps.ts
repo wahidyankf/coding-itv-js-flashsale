@@ -1,4 +1,4 @@
-import { expect } from "@playwright/test";
+import { type APIRequestContext, expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { currentResponse, setResponse } from "./support/response.js";
 import { migratedDatabase, query, startApi, world } from "./support/world.js";
@@ -96,19 +96,19 @@ When(
 	},
 );
 
-Then(
-	/^the sale status is "([^"]+)"$/,
-	async ({ request: _request }, status: string) => {
-		expect((await currentResponse().json()).status).toBe(status);
-	},
-);
+// Reads the sale again, so the answer is the state now and not the body of the last response.
+async function saleNow(request: APIRequestContext) {
+	const url = await startApi();
+	return (await request.get(`${url}/sales/${world.saleId}`)).json();
+}
 
-Then(
-	/^(\d+) items remain$/,
-	async ({ request: _request }, remaining: string) => {
-		expect((await currentResponse().json()).remaining).toBe(Number(remaining));
-	},
-);
+Then(/^the sale status is "([^"]+)"$/, async ({ request }, status: string) => {
+	expect((await saleNow(request)).status).toBe(status);
+});
+
+Then(/^(\d+) items remain$/, async ({ request }, remaining: string) => {
+	expect((await saleNow(request)).remaining).toBe(Number(remaining));
+});
 
 Then(
 	/^the sale name is "([^"]+)"$/,

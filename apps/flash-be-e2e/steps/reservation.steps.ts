@@ -163,7 +163,9 @@ Then(
 Then(
 	/^the reservation is the one "([^"]+)" had before$/,
 	async ({ request: _request }, user: string) => {
-		expect(await currentResponse().json()).toEqual(shoppers().holds.get(user));
+		expect((await currentResponse().json()).reservationId).toBe(
+			(shoppers().holds.get(user) as { reservationId: string }).reservationId,
+		);
 	},
 );
 

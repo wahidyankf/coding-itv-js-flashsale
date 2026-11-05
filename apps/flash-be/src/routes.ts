@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { Dependencies } from "./app.js";
+import type { Purchase } from "./purchases/purchase-repository.js";
 
 // All routes live here, with full paths, so the list is easy to scan.
 export function registerRoutes(app: FastifyInstance, deps: Dependencies): void {
@@ -103,7 +104,77 @@ export function registerRoutes(app: FastifyInstance, deps: Dependencies): void {
 			});
 		},
 	);
+
+	// Pays for the held item. The reservation id makes it safe to send twice.
+	app.post<{
+		Params: { saleId: string };
+		Body: { userId?: unknown; reservationId?: unknown } | null;
+	}>("/sales/:saleId/purchases", async (request, reply) => {
+		const result = await deps.purchases.confirm(
+			request.params.saleId,
+			request.body?.userId,
+			request.body?.reservationId,
+		);
+		if (!result.ok) {
+			return reply
+				.code(CONFIRM_ERROR_STATUS[result.error])
+				.send({ error: result.error });
+		}
+		return reply
+			.code(result.created ? 201 : 200)
+			.send(purchaseBody(result.purchase));
+	});
+
+	// "Did I get it?": a purchase, a live hold, or nothing.
+	app.get<{ Params: { saleId: string; userId: string } }>(
+		"/sales/:saleId/purchases/:userId",
+		async (request, reply) => {
+			const result = await deps.purchases.outcome(
+				request.params.saleId,
+				request.params.userId,
+			);
+			if (!result.ok) {
+				return reply
+					.code(result.error === "sale_not_found" ? 404 : 400)
+					.send({ error: result.error });
+			}
+			const { outcome } = result;
+			if (outcome.state === "purchased") {
+				return { ...purchaseBody(outcome.purchase), state: "purchased" };
+			}
+			if (outcome.state === "holding") {
+				return {
+					userId: result.user,
+					state: "holding",
+					reservationId: outcome.reservationId,
+					expiresAt: outcome.expiresAt.toISOString(),
+				};
+			}
+			return { userId: result.user, state: "none" };
+		},
+	);
 }
+
+function purchaseBody(purchase: Purchase) {
+	return {
+		userId: purchase.user,
+		purchaseId: purchase.id,
+		reservationId: purchase.reservationId,
+		purchasedAt: purchase.purchasedAt.toISOString(),
+	};
+}
+
+const CONFIRM_ERROR_STATUS = {
+	sale_not_found: 404,
+	invalid_user: 400,
+	invalid_reservation: 400,
+	reservation_not_found: 404,
+	hold_expired: 409,
+	already_purchased: 409,
+	sale_ended: 409,
+	sold_out: 409,
+	payment_failed: 402,
+} as const;
 
 const RESERVE_ERROR_STATUS = {
 	sale_not_found: 404,

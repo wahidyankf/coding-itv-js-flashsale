@@ -1,13 +1,18 @@
+import { sql } from "kysely";
 import { buildApp, dependenciesFrom } from "../../app.js";
 import { systemClock } from "../../clock.js";
 import { config } from "../../config.js";
 import { createDb } from "../../db.js";
+import { createMockPayment } from "../../payment/mock-payment.js";
+import { createPurchaseRepository } from "../../purchases/purchase-repository.js";
+import { createPurchaseService } from "../../purchases/purchase-service.js";
 import { createRedisQueueStore } from "../../queue/redis-queue-store.js";
 import { createRedis } from "../../redis.js";
 import { createRedisHoldGate } from "../../reservations/redis-hold-gate.js";
 import { createReservationRepository } from "../../reservations/reservation-repository.js";
 import { createReservationService } from "../../reservations/reservation-service.js";
 import {
+	purchaseRequests,
 	queueRequests,
 	reserveRequests,
 	type ShopScenario,
@@ -41,11 +46,26 @@ export async function openQueueIntegration() {
 		base.queue,
 		systemClock,
 	);
-	const app = buildApp({ ...base, reservations });
+	// Latency and declines are zero until a scenario asks for them, so the default 2 percent never decides a result.
+	const payment = createMockPayment({ latencyMs: 0, failureRate: 0 });
+	const gate = createRedisHoldGate(redis);
+	const purchases = createPurchaseService(
+		createPurchaseRepository(db),
+		payment,
+		gate,
+		base.sales,
+		systemClock,
+	);
+	const app = buildApp({ ...base, reservations, purchases });
 	const queueStore = createRedisQueueStore(redis);
 
 	return {
 		db,
+		// Puts the payment back to "instant and never declined" before a scenario.
+		resetPayment() {
+			payment.settings.latencyMs = 0;
+			payment.settings.failureRate = 0;
+		},
 		scenario(): ShopScenario {
 			const scenario: ShopScenario = {
 				saleId: "",
@@ -109,11 +129,45 @@ export async function openQueueIntegration() {
 				async fixWrites() {
 					broken = false;
 				},
+				purchases: new Map(),
+				confirm: notWired,
+				startConfirm: notWired,
+				finishConfirm: notWired,
+				confirmAllHolders: notWired,
+				outcome: notWired,
+				saleView: notWired,
+				async setPaymentDeclines() {
+					payment.settings.failureRate = 1;
+				},
+				async setPaymentDuration(seconds) {
+					payment.settings.latencyMs = seconds * 1000;
+				},
+				async sellLastItemTo(user) {
+					await db
+						.insertInto("purchases")
+						.values({
+							sale_id: scenario.saleId,
+							user_id: user,
+							reservation_id: crypto.randomUUID(),
+							payment_ref: `pay-${user}`,
+						})
+						.execute();
+					await db
+						.updateTable("sales")
+						.set({ sold: sql`stock` })
+						.where("id", "=", scenario.saleId)
+						.execute();
+				},
+				async wasRefunded(user) {
+					const id = scenario.holds.get(user)?.reservationId;
+					return payment.refunded.includes(`mock-${id}`);
+				},
 			};
 			return Object.assign(
 				scenario,
 				queueRequests(app, scenario),
 				reserveRequests(app, scenario),
+				purchaseRequests(app, scenario),
 			);
 		},
 		async close() {

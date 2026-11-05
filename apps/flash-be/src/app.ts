@@ -2,6 +2,12 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { type Kysely, sql } from "kysely";
 import { type Clock, systemClock } from "./clock.js";
 import type { Database } from "./db.js";
+import { createMockPayment } from "./payment/mock-payment.js";
+import { createPurchaseRepository } from "./purchases/purchase-repository.js";
+import {
+	createPurchaseService,
+	type PurchaseService,
+} from "./purchases/purchase-service.js";
 import {
 	createQueueService,
 	type QueueOptions,
@@ -19,6 +25,11 @@ import { registerRoutes } from "./routes.js";
 import { createSaleRepository } from "./sales/sale-repository.js";
 import { createSaleService, type SaleService } from "./sales/sale-service.js";
 
+export type PaymentSettings = {
+	paymentLatencyMs: number;
+	paymentFailureRate: number;
+};
+
 // Everything the routes use is injected, so unit tests can fake it without a real database or Redis.
 export type Dependencies = {
 	checkDatabase: () => Promise<void>;
@@ -26,15 +37,17 @@ export type Dependencies = {
 	sales: SaleService;
 	queue: QueueService;
 	reservations: ReservationService;
+	purchases: PurchaseService;
 };
 
 export function dependenciesFrom(
 	db: Kysely<Database>,
 	redis: RedisClient,
-	settings: QueueOptions,
+	settings: QueueOptions & PaymentSettings,
 	clock: Clock = systemClock,
 ): Dependencies {
 	const sales = createSaleService(createSaleRepository(db), clock);
+	const gate = createRedisHoldGate(redis);
 	const queue = createQueueService(
 		createRedisQueueStore(redis),
 		sales,
@@ -51,10 +64,21 @@ export function dependenciesFrom(
 		sales,
 		queue,
 		reservations: createReservationService(
-			createRedisHoldGate(redis),
+			gate,
 			createReservationRepository(db),
 			sales,
 			queue,
+			clock,
+		),
+		purchases: createPurchaseService(
+			createPurchaseRepository(db),
+			createMockPayment({
+				latencyMs: settings.paymentLatencyMs,
+				failureRate: settings.paymentFailureRate,
+				log: console.log,
+			}),
+			gate,
+			sales,
 			clock,
 		),
 	};
