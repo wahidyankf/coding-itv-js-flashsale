@@ -9,6 +9,8 @@ export type Profile = {
 	// Distinct shoppers, and how fast they arrive. Shoppers divided by the rate is the length of the run.
 	users: number;
 	arrivalsPerSecond: number;
+	// Shoppers who arrive once every hold has lapsed, ten a second. They take the items that abandoned holds gave back.
+	latecomers: number;
 	// Shoppers who flood the queue to prove they are limited and not failed.
 	hammerUsers: number;
 	// Virtual users k6 starts with, and the most it may add.
@@ -30,9 +32,10 @@ export const PROFILES = {
 		admitPerSecond: 100,
 		users: 500,
 		arrivalsPerSecond: 50,
+		latecomers: 50,
 		hammerUsers: 10,
-		preAllocatedVUs: 100,
-		maxVUs: 400,
+		preAllocatedVUs: 150,
+		maxVUs: 500,
 		abandonShare: 0.05,
 		judgeSpeed: true,
 	},
@@ -42,24 +45,26 @@ export const PROFILES = {
 		admitPerSecond: 300,
 		users: 5000,
 		arrivalsPerSecond: 250,
+		latecomers: 100,
 		hammerUsers: 20,
-		preAllocatedVUs: 300,
+		preAllocatedVUs: 600,
 		maxVUs: 1500,
 		abandonShare: 0.05,
 		judgeSpeed: true,
 	},
 	chaos: {
-		stock: 50,
+		stock: 1000,
 		holdSeconds: 10,
-		admitPerSecond: 150,
+		admitPerSecond: 200,
 		users: 2000,
 		arrivalsPerSecond: 100,
+		latecomers: 150,
 		hammerUsers: 10,
-		preAllocatedVUs: 200,
-		maxVUs: 800,
+		preAllocatedVUs: 600,
+		maxVUs: 1200,
 		abandonShare: 0.05,
-		redisStopsAtSeconds: 8,
-		redisStartsAtSeconds: 14,
+		redisStopsAtSeconds: 4,
+		redisStartsAtSeconds: 9,
 		judgeSpeed: false,
 	},
 } as const satisfies Record<string, Profile>;

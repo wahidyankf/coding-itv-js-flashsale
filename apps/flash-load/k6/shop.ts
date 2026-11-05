@@ -20,13 +20,13 @@ const serverErrors = new Counter("server_errors");
 // A refusal such as 409 or 429 is an answer. Only a 5xx or no answer counts as a failed request.
 http.setResponseCallback(http.expectedStatuses({ min: 200, max: 499 }));
 
-const speed = profile.judgeSpeed
-	? {
-			"http_req_duration{name:reserve}": [`p(95)<${LIMITS.reserveP95Ms}`],
-			"http_req_duration{name:purchase}": [`p(95)<${LIMITS.purchaseP95Ms}`],
-			server_errors: [`count<=${LIMITS.serverErrors}`],
-		}
-	: {};
+// The limits are set on every profile so k6 always reports the speed. The runner decides which profiles are judged
+// on it: one that breaks a dependency is judged on its invariants only.
+const speed = {
+	"http_req_duration{name:reserve}": [`p(95)<${LIMITS.reserveP95Ms}`],
+	"http_req_duration{name:purchase}": [`p(95)<${LIMITS.purchaseP95Ms}`],
+	server_errors: [`count<=${LIMITS.serverErrors}`],
+};
 
 export const options: Options = {
 	scenarios: {
@@ -38,6 +38,17 @@ export const options: Options = {
 			duration: `${profile.users / profile.arrivalsPerSecond}s`,
 			preAllocatedVUs: profile.preAllocatedVUs,
 			maxVUs: profile.maxVUs,
+		},
+		latecomers: {
+			executor: "constant-arrival-rate",
+			exec: "latecomer",
+			rate: 10,
+			timeUnit: "1s",
+			duration: `${profile.latecomers / 10}s`,
+			// After the last shopper has arrived and the last hold they could have left has lapsed.
+			startTime: `${profile.users / profile.arrivalsPerSecond + profile.holdSeconds + 2}s`,
+			preAllocatedVUs: 50,
+			maxVUs: 200,
 		},
 		hammer: {
 			executor: "per-vu-iterations",
@@ -85,9 +96,7 @@ const pause = (min: number, spread: number) =>
 	sleep(min + Math.random() * spread);
 
 // One shopper, from the first click to the answer to "did I get it".
-export function shopper(): void {
-	const index = exec.scenario.iterationInTest + 1;
-	const user = `shopper-${index}`;
+function visit(user: string, index: number): void {
 	const headers = {
 		"content-type": "application/json",
 		"x-forwarded-for": address(index),
@@ -111,28 +120,26 @@ export function shopper(): void {
 		const place = call("GET", `/queue/${user}`, "place", authed);
 		if (place.status !== 200) return;
 		state = place.json.state;
+		if (state === "admitted") break;
+		// The queue stops admitting when the sale is over or sold out. The page learns that from the sale stream and
+		// stops waiting, so a shopper here reads the sale alongside the place.
+		const sale = call("GET", "", "sale", headers);
+		if (sale.json.status === "sold_out" || sale.json.status === "ended") return;
 	}
 	if (state !== "admitted") return;
 
-	// Ask for an item. When the gate says sold out, other holds may still lapse, so a shopper tries again a few times.
-	let held: Record<string, unknown> | undefined;
-	for (let attempt = 0; attempt < 5; attempt++) {
-		const hold = call("POST", "/reservations", "reserve", authed, {
-			userId: user,
-		});
-		if (hold.status === 201 || hold.status === 200) {
-			if (hold.status === 201) reserved.add(1);
-			held = hold.json;
-			break;
-		}
-		if (hold.status === 409 && hold.json.error === "sold_out") {
-			soldOutReplies.add(1);
-			pause(3, 2);
-			continue;
-		}
+	// Ask for an item once. A sold out answer is final for this shopper: holds that lapse later are for those who
+	// arrive later, which the latecomers below stand for.
+	const hold = call("POST", "/reservations", "reserve", authed, {
+		userId: user,
+	});
+	if (hold.status === 409 && hold.json.error === "sold_out") {
+		soldOutReplies.add(1);
 		return;
 	}
-	if (!held) return;
+	if (hold.status !== 201 && hold.status !== 200) return;
+	if (hold.status === 201) reserved.add(1);
+	const held = hold.json;
 
 	if (Math.random() < profile.abandonShare) return;
 	pause(0.2, 0.8);
@@ -174,6 +181,17 @@ export function shopper(): void {
 			outcome.status === 200 &&
 			(outcome.json.state === "purchased") === (bought?.status === 201),
 	});
+}
+
+export function shopper(): void {
+	const index = exec.scenario.iterationInTest + 1;
+	visit(`shopper-${index}`, index);
+}
+
+// Shoppers who arrive after every hold has lapsed. They take the items that abandoned holds gave back.
+export function latecomer(): void {
+	const index = exec.scenario.iterationInTest + 1;
+	visit(`late-${index}`, 1_000_000 + index);
 }
 
 // A shopper who sends request after request. Past the limit the API must answer 429, never an error.

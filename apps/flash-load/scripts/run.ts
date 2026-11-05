@@ -17,10 +17,12 @@ const reports = path.resolve(root, "../../generated-reports/load");
 
 const args = process.argv.slice(2);
 const keep = args.includes("--keep");
+// Runs the profile without stopping Redis, as a control for the chaos profile.
+const calm = args.includes("--calm");
 const requested = args.find((arg) => !arg.startsWith("--"));
 if (!requested || !PROFILE_NAMES.includes(requested as ProfileName)) {
 	console.error(
-		`Usage: node scripts/run.ts <${PROFILE_NAMES.join("|")}> [--keep]`,
+		`Usage: node scripts/run.ts <${PROFILE_NAMES.join("|")}> [--keep] [--calm]`,
 	);
 	process.exit(2);
 }
@@ -121,7 +123,7 @@ async function main(): Promise<number> {
 	// Chaos: stop Redis and start it again while shoppers are arriving.
 	const timers: NodeJS.Timeout[] = [];
 	const events: string[] = [];
-	if (profile.redisStopsAtSeconds !== undefined) {
+	if (profile.redisStopsAtSeconds !== undefined && !calm) {
 		timers.push(
 			setTimeout(() => {
 				events.push(`Redis stopped at +${profile.redisStopsAtSeconds}s`);
@@ -129,7 +131,7 @@ async function main(): Promise<number> {
 			}, profile.redisStopsAtSeconds * 1000),
 		);
 	}
-	if (profile.redisStartsAtSeconds !== undefined) {
+	if (profile.redisStartsAtSeconds !== undefined && !calm) {
 		timers.push(
 			setTimeout(() => {
 				events.push(`Redis started at +${profile.redisStartsAtSeconds}s`);
@@ -137,6 +139,50 @@ async function main(): Promise<number> {
 			}, profile.redisStartsAtSeconds * 1000),
 		);
 	}
+
+	// While k6 runs, ask Postgres over and over how many sessions wait for a lock, how many are active and how many sit
+	// inside a transaction. A hot sale row or an exhausted pool shows up here.
+	const samples: Array<{ locked: number; active: number; idle: number }> = [];
+	let sampling = true;
+	const sampler = (async () => {
+		while (sampling) {
+			const probe = spawn(
+				"docker",
+				[
+					"compose",
+					"-f",
+					path.join(root, "compose.yaml"),
+					"exec",
+					"-T",
+					"postgres",
+					"psql",
+					"-U",
+					"flash",
+					"-d",
+					"flash",
+					"-tA",
+					"-c",
+					`select count(*) filter (where wait_event_type = 'Lock'), count(*) filter (where state = 'active'),
+						count(*) filter (where state = 'idle in transaction')
+						from pg_stat_activity where datname = 'flash'`,
+				],
+				{ stdio: ["ignore", "pipe", "ignore"] },
+			);
+			let out = "";
+			probe.stdout.on("data", (chunk: Buffer) => {
+				out += chunk.toString();
+			});
+			await new Promise((resolve) => probe.on("close", resolve));
+			const match = /^(\d+)\|(\d+)\|(\d+)$/m.exec(out);
+			if (match) {
+				samples.push({
+					locked: Number(match[1]),
+					active: Number(match[2]),
+					idle: Number(match[3]),
+				});
+			}
+		}
+	})();
 
 	console.log("load: running k6");
 	const log: string[] = [];
@@ -171,6 +217,8 @@ async function main(): Promise<number> {
 		k6.on("close", resolve),
 	);
 	for (const timer of timers) clearTimeout(timer);
+	sampling = false;
+	await sampler;
 	writeFileSync(path.join(reports, `${name}-k6.log`), log.join(""));
 	// If k6 ended before the timers ran, Redis must still come back before the checks.
 	if (profile.redisStopsAtSeconds !== undefined) docker("start", "redis");
@@ -209,6 +257,14 @@ async function main(): Promise<number> {
 		"p(95)",
 	);
 
+	// A generator that cannot start every planned shopper has not applied the planned load.
+	const dropped = metric(summary, "dropped_iterations", "count") ?? 0;
+	judge(
+		"k6 started every planned shopper",
+		"0 dropped",
+		String(dropped),
+		dropped === 0,
+	);
 	judge(
 		"no oversell: sold is at most the stock",
 		`<= ${stock}`,
@@ -300,7 +356,7 @@ async function main(): Promise<number> {
 	const lines = [
 		`# Load run: ${name}`,
 		"",
-		`Sale ${saleId}. Stock ${stock}, ${profile.users} shoppers at ${profile.arrivalsPerSecond} a second, ` +
+		`Sale ${saleId}. Stock ${stock}, ${profile.users} shoppers at ${profile.arrivalsPerSecond} a second and ${profile.latecomers} latecomers, ` +
 			`hold ${profile.holdSeconds} s, admission ${profile.admitPerSecond} a second.`,
 		...events.map((event) => `- ${event}`),
 		"",
@@ -313,6 +369,8 @@ async function main(): Promise<number> {
 		"",
 		`Informational: reserve p95 ${reserveP95?.toFixed(1)} ms, purchase p95 ${purchaseP95?.toFixed(1)} ms, ` +
 			`server errors ${serverErrors}, requests per instance ${spread.join(" / ")}, k6 exit code ${k6Exit}.`,
+		`Postgres sessions, sampled about three times a second (${samples.length} samples): most waiting for a lock ${Math.max(0, ...samples.map((sample) => sample.locked))}, ` +
+			`most active ${Math.max(0, ...samples.map((sample) => sample.active))}, most idle in a transaction ${Math.max(0, ...samples.map((sample) => sample.idle))}.`,
 		"",
 	];
 	writeFileSync(path.join(reports, `${name}.md`), lines.join("\n"));
