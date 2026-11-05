@@ -21,8 +21,10 @@ Flash sale monorepo with four apps in `apps/`: `flash-be` (Fastify REST API), `f
     check in its own target, not in `test:quick`. Keep `test:quick:watch` in sync with it.
 - Biome formats and lints (tabs, double quotes). Do not add Prettier or ESLint.
 - Commit messages follow Conventional Commits (commitlint hook). Make one coherent change per commit.
-- The pre-push hook runs `nx affected -t test:quick --base=origin/main`. Do not skip hooks with `--no-verify` unless
-  the user asks.
+- Docs are checked by RHINO, which reads the policy in `repo-config.yml`. Run `npm run docs:install` once per machine,
+  then `npm run docs:check`. The version and digests are pinned in `scripts/install-rhino.sh`; bump them together.
+- The pre-push hook runs `npm run docs:check`, then `nx affected -t test:quick --base=origin/main`. Do not skip hooks
+  with `--no-verify` unless the user asks.
 
 ## Tests
 
