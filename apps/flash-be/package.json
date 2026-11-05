@@ -9,6 +9,8 @@
 		"start": "node --env-file-if-exists=../../.env dist/main.js",
 		"migrate": "node --env-file-if-exists=../../.env --import tsx src/migrate.ts",
 		"migrate:dist": "node --env-file-if-exists=../../.env dist/migrate.js",
+		"seed-sale": "node --env-file-if-exists=../../.env --import tsx src/seed-sale.ts",
+		"seed-sale:dist": "node --env-file-if-exists=../../.env dist/seed-sale.js",
 		"typecheck": "tsc --noEmit -p tsconfig.json",
 		"lint": "biome lint .",
 		"test:unit": "vitest run --config vitest.config.ts --coverage.enabled",

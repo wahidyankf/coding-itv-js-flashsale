@@ -1,13 +1,15 @@
 import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { createClient } from "redis";
+import { createDb } from "../../db.js";
+import { createMigrator } from "../../migrator.js";
 
 // Redis database index reserved for tests. FLUSHDB runs only on this index, never on dev data (index 0).
 const TEST_REDIS_DB = 15;
 const DEFAULT_DATABASE_URL = "postgres://flash:flash@localhost:5432/flash";
 const DEFAULT_REDIS_URL = "redis://localhost:6379";
 
-// Runs once per integration run. Creates an empty Postgres database for this run, points the
+// Runs once per integration run. Creates a fresh Postgres database for this run and migrates it, points the
 // tests at it and at the test Redis index, and drops the database when the run ends.
 export default async function setup(): Promise<() => Promise<void>> {
 	const serverUrl = process.env.DATABASE_URL ?? DEFAULT_DATABASE_URL;
@@ -20,6 +22,12 @@ export default async function setup(): Promise<() => Promise<void>> {
 
 	const databaseUrl = new URL(serverUrl);
 	databaseUrl.pathname = `/${databaseName}`;
+
+	// The run database gets the schema once. Scenarios that need no tables use their own scratch database.
+	const db = createDb(databaseUrl.toString());
+	const { error } = await createMigrator(db).migrateToLatest();
+	await db.destroy();
+	if (error) throw error;
 
 	const redisUrl = new URL(process.env.REDIS_URL ?? DEFAULT_REDIS_URL);
 	redisUrl.pathname = `/${TEST_REDIS_DB}`;

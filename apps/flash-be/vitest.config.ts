@@ -20,6 +20,9 @@ export default defineConfig({
 				// the migrator and the exit code, and the migrator is covered by integration tests.
 				"src/main.ts",
 				"src/migrate.ts",
+				// seed-sale.ts only reads the command line, wires config and sets the exit code. The parser and
+				// the insert it calls are covered by unit and integration tests, and the e2e suite runs the command.
+				"src/seed-sale.ts",
 			],
 			reporter: ["text", "text-summary"],
 		},

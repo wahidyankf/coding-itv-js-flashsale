@@ -6,10 +6,17 @@ import {
 	PostgresQueryCompiler,
 } from "kysely";
 
-// A Kysely instance that never opens a connection. It records each SQL statement, so a unit
-// test can prove what a migration would send to Postgres without a database.
-export function recordingDb(): { db: Kysely<unknown>; queries: string[] } {
+export type Statement = { sql: string; parameters: readonly unknown[] };
+
+// A Kysely instance that never opens a connection. It records each SQL statement and its parameters, so a
+// unit test can prove what a migration or a seed would send to Postgres without a database.
+export function recordingDb(): {
+	db: Kysely<unknown>;
+	queries: string[];
+	statements: Statement[];
+} {
 	const queries: string[] = [];
+	const statements: Statement[] = [];
 	const db = new Kysely<unknown>({
 		dialect: {
 			createAdapter: () => new PostgresAdapter(),
@@ -18,8 +25,13 @@ export function recordingDb(): { db: Kysely<unknown>; queries: string[] } {
 			createQueryCompiler: () => new PostgresQueryCompiler(),
 		},
 		log: (event) => {
-			if (event.level === "query") queries.push(event.query.sql);
+			if (event.level !== "query") return;
+			queries.push(event.query.sql);
+			statements.push({
+				sql: event.query.sql,
+				parameters: event.query.parameters,
+			});
 		},
 	});
-	return { db, queries };
+	return { db, queries, statements };
 }

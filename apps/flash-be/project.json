@@ -115,6 +115,13 @@
 				"command": "npm run migrate",
 				"cwd": "apps/flash-be"
 			}
+		},
+		"db:seed-sale": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "npm run seed-sale --",
+				"cwd": "apps/flash-be"
+			}
 		}
 	}
 }

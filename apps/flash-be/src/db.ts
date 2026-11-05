@@ -2,12 +2,31 @@ import { type Generated, Kysely, PostgresDialect } from "kysely";
 import pg from "pg";
 
 export type Database = {
-	products: {
+	sales: {
 		id: Generated<string>;
 		name: string;
+		starts_at: Date;
+		ends_at: Date;
+		stock: number;
+		sold: Generated<number>;
+		reservation_ttl_seconds: Generated<number>;
+		admit_per_second: Generated<number>;
 		created_at: Generated<Date>;
-		updated_at: Generated<Date>;
-		deleted_at: Date | null;
+	};
+	purchases: {
+		id: Generated<string>;
+		sale_id: string;
+		user_id: string;
+		reservation_id: string;
+		payment_ref: string;
+		created_at: Generated<Date>;
+	};
+	reservations: {
+		id: Generated<string>;
+		sale_id: string;
+		user_id: string;
+		expires_at: Date;
+		created_at: Generated<Date>;
 	};
 };
 

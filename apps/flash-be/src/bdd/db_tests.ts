@@ -1,18 +1,30 @@
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
-import type { Kysely } from "kysely";
 import { expect } from "vitest";
-import type { Database } from "../db.js";
-import { down, up } from "../migrations/0001_create_products.js";
+import { up as upProducts } from "../migrations/0001_create_products.js";
+import { down, up } from "../migrations/0002_create_sales.js";
 import { specFile } from "./support/paths.js";
 import { recordingDb } from "./support/recording-db.js";
-import { seedProducts } from "./support/seed.js";
+
+const TABLES = ["sales", "purchases", "reservations"];
+
+// Runs every migration, in order, against a database that only records.
+async function migrated(): Promise<ReturnType<typeof recordingDb>> {
+	const db = recordingDb();
+	await upProducts(db.db);
+	await up(db.db);
+	return db;
+}
+
+function sent(db: ReturnType<typeof recordingDb>, pattern: RegExp): boolean {
+	return db.queries.some((sql) => pattern.test(sql));
+}
 
 describeFeature(
 	await loadFeature(specFile("flash/be/behaviours/db/migrations.feature")),
 	({ Scenario }) => {
 		Scenario(
-			"The first migration creates the products table",
-			({ Given, When, Then }) => {
+			"The migrations create the sales, purchases and reservations tables",
+			({ Given, When, Then, And }) => {
 				let db: ReturnType<typeof recordingDb>;
 
 				Given("a database with no tables", () => {
@@ -20,64 +32,112 @@ describeFeature(
 				});
 
 				When("the migrations run to the latest version", async () => {
+					await upProducts(db.db);
 					await up(db.db);
 				});
 
-				Then("the products table exists", () => {
-					expect(
-						db.queries.some((sql) => /create table "products"/.test(sql)),
-					).toBe(true);
+				Then("the sales, purchases and reservations tables exist", () => {
+					for (const table of TABLES) {
+						expect(sent(db, new RegExp(`create table "${table}"`))).toBe(true);
+					}
+				});
+
+				And("the products table does not exist", () => {
+					expect(sent(db, /drop table "products"/)).toBe(true);
 				});
 			},
 		);
 
 		Scenario(
-			"Rolling back the first migration removes the products table",
-			({ Given, When, Then }) => {
+			"Rolling back the latest migration restores the products table",
+			({ Given, When, Then, And }) => {
 				let db: ReturnType<typeof recordingDb>;
 
 				Given("a database migrated to the latest version", async () => {
-					db = recordingDb();
-					await up(db.db);
+					db = await migrated();
 					db.queries.length = 0;
 				});
 
-				When("the first migration is rolled back", async () => {
+				When("the latest migration is rolled back", async () => {
 					await down(db.db);
 				});
 
-				Then("the products table does not exist", () => {
+				Then("the products table exists", () => {
+					expect(sent(db, /create table "products"/)).toBe(true);
+				});
+
+				And("the sales, purchases and reservations tables do not exist", () => {
+					for (const table of TABLES) {
+						expect(sent(db, new RegExp(`drop table "${table}"`))).toBe(true);
+					}
+				});
+			},
+		);
+
+		Scenario(
+			"The database refuses a sale that has sold more than its stock",
+			({ Given, When, Then }) => {
+				let db: ReturnType<typeof recordingDb>;
+
+				Given("a database migrated to the latest version", async () => {
+					db = await migrated();
+				});
+
+				When("a sale with stock 5 and 6 sold is inserted", async () => {
+					await db.db
+						.insertInto("sales" as never)
+						.values({ stock: 5, sold: 6 } as never)
+						.execute();
+				});
+
+				// Without a database, the unit proof is the constraint the migration creates.
+				Then("the database refuses the row", () => {
 					expect(
-						db.queries.some((sql) => /drop table "products"/.test(sql)),
+						sent(
+							db,
+							/constraint "sales_sold_within_stock" check \(sold <= stock\)/,
+						),
 					).toBe(true);
 				});
 			},
 		);
 
 		Scenario(
-			"A seeded product is stored in the products table",
-			({ Given, When, Then }) => {
+			"The database refuses a second purchase by the same user in one sale",
+			({ Given, And, When, Then }) => {
 				let db: ReturnType<typeof recordingDb>;
 
 				Given("a database migrated to the latest version", async () => {
-					db = recordingDb();
-					await up(db.db);
-					db.queries.length = 0;
+					db = await migrated();
 				});
 
-				When('a product named "Flash mug" is seeded', async () => {
-					// recordingDb is untyped; the seed is typed against the real schema.
-					await seedProducts(db.db as unknown as Kysely<Database>, [
-						{ name: "Flash mug" },
-					]);
+				And("a sale with stock 5 exists", async () => {
+					await db.db
+						.insertInto("sales" as never)
+						.values({ stock: 5 } as never)
+						.execute();
 				});
 
-				// Without a database, the unit proof is the statement sent: one insert into products.
-				Then("the products table holds 1 product", () => {
-					const inserts = db.queries.filter((sql) =>
-						/insert into "products"/.test(sql),
-					);
-					expect(inserts).toHaveLength(1);
+				When(
+					"the user {string} is recorded as a buyer twice in that sale",
+					async (_ctx, user: string) => {
+						for (const reservation of ["r1", "r2"]) {
+							await db.db
+								.insertInto("purchases" as never)
+								.values({ user_id: user, reservation_id: reservation } as never)
+								.execute();
+						}
+					},
+				);
+
+				// Without a database, the unit proof is the constraint the migration creates.
+				Then("the database refuses the second purchase", () => {
+					expect(
+						sent(
+							db,
+							/constraint "purchases_one_per_user" unique \("sale_id", "user_id"\)/,
+						),
+					).toBe(true);
 				});
 			},
 		);

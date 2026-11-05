@@ -1,14 +1,36 @@
+import { randomUUID } from "node:crypto";
 import type { Kysely } from "kysely";
 import type { Database } from "../../db.js";
 
-export type ProductSeed = { name: string };
+export type SaleSeed = {
+	name?: string;
+	stock?: number;
+	sold?: number;
+	startsAt: Date;
+	endsAt: Date;
+};
 
-// Inserts the rows one scenario needs. A scenario seeds its own scratch database, so rows never leak
-// from one scenario to another.
-export async function seedProducts(
+// Inserts the sale one scenario needs and returns its id.
+export async function insertSale(
 	db: Kysely<Database>,
-	rows: ProductSeed[],
-): Promise<void> {
-	if (rows.length === 0) return;
-	await db.insertInto("products").values(rows).execute();
+	seed: SaleSeed,
+): Promise<string> {
+	const id = randomUUID();
+	await db
+		.insertInto("sales")
+		.values({
+			id,
+			name: seed.name ?? "Flash sale",
+			starts_at: seed.startsAt,
+			ends_at: seed.endsAt,
+			stock: seed.stock ?? 10,
+			sold: seed.sold ?? 0,
+		})
+		.execute();
+	return id;
+}
+
+// Removes every sale. Purchases and reservations go with them (ON DELETE CASCADE), so each scenario starts empty.
+export async function resetSales(db: Kysely<Database>): Promise<void> {
+	await db.deleteFrom("sales").execute();
 }
