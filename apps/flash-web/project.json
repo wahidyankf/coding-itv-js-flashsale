@@ -1,0 +1,85 @@
+{
+	"$schema": "../../node_modules/nx/schemas/project-schema.json",
+	"name": "flash-web",
+	"projectType": "application",
+	"sourceRoot": "apps/flash-web/src",
+	"targets": {
+		"dev": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "npm run dev",
+				"cwd": "apps/flash-web"
+			}
+		},
+		"build": {
+			"executor": "nx:run-commands",
+			"outputs": ["{projectRoot}/.output"],
+			"options": {
+				"command": "npm run build",
+				"cwd": "apps/flash-web"
+			}
+		},
+		"start": {
+			"executor": "nx:run-commands",
+			"dependsOn": ["build"],
+			"options": {
+				"command": "npm run start",
+				"cwd": "apps/flash-web"
+			}
+		},
+		"typecheck": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "npm run typecheck",
+				"cwd": "apps/flash-web"
+			}
+		},
+		"lint": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "npm run lint",
+				"cwd": "apps/flash-web"
+			}
+		},
+		"test:unit": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "npm run test:unit",
+				"cwd": "apps/flash-web"
+			}
+		},
+		"test:unit:watch": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "npm run test:unit:watch",
+				"cwd": "apps/flash-web"
+			}
+		},
+		"test:integration": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "npm run test:integration",
+				"cwd": "apps/flash-web"
+			}
+		},
+		"test:quick": {
+			"executor": "nx:run-commands",
+			"options": {
+				"commands": [
+					"npx nx typecheck flash-web",
+					"npx nx lint flash-web",
+					"npx nx test:unit flash-web"
+				],
+				"cwd": ".",
+				"parallel": false
+			}
+		},
+		"test:quick:watch": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "npx nx watch --projects=flash-web --initialRun -- npx nx run-many -t typecheck lint test:unit -p flash-web --output-style=stream",
+				"cwd": "."
+			}
+		}
+	}
+}
