@@ -1,0 +1,25 @@
+# yaml-language-server: $schema=https://github.com/wahidyankf/rhino/releases/download/v0.16.7/rhino-repo-config-v2.schema.json
+# RHINO policy for this repo. Only the Markdown checks are declared; RHINO enforces nothing undeclared.
+
+schema: rhino/repo-config/v2
+
+scan:
+  exclude-directories:
+    - .git
+    - node_modules
+    - .nx
+    - .output
+    - dist
+    - .serena
+    - .tools
+    - worktrees
+
+policies:
+  markdown:
+    internal-link:
+      exclude-sources: []
+    heading-hierarchy:
+      surfaces:
+        - glob: "**/*.md"
+      single-h1: true
+      max-level-jump: 1

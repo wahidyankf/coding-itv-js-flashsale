@@ -8,6 +8,8 @@
 		"prepare": "husky",
 		"format": "biome format --write .",
 		"check": "biome check .",
+		"docs:install": "sh scripts/install-rhino.sh",
+		"docs:check": "sh scripts/check-docs.sh",
 		"docker:dev:up": "docker compose -f compose.dev.yaml up -d --wait",
 		"docker:dev:down": "docker compose -f compose.dev.yaml down",
 		"docker:prod:up": "docker compose -f compose.prod.yaml up -d --build --wait",

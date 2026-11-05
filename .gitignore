@@ -76,6 +76,9 @@ ehthumbs.db
 # Nx
 .nx/
 
+# Pinned RHINO binary (scripts/install-rhino.sh)
+.tools/
+
 # Frontend and backend build output
 .output/
 .nitro/
