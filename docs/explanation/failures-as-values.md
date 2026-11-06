@@ -1,7 +1,7 @@
 # Failures as values
 
-`flash-be` and `flash-web` return failures and absences instead of throwing or returning `undefined` by habit. The
-library is [`@flash/typekit`](../reference/typekit.md), a port of
+`flash-be` and `flash-web` return failures instead of throwing, and they return `undefined` for a value that may be
+missing. The library is [`@flash/typekit`](../reference/typekit.md), a port of
 [py-typekit](https://github.com/wahidyankf/py-typekit).
 
 ## Why not exceptions
@@ -14,11 +14,11 @@ and a new error fails the build until it is mapped.
 Exceptions still exist for what the code does not expect: a bug, or a store that is down. `attempt` catches only what a
 call site names, and anything else goes on. That is why there is no catch-all by default.
 
-## Why Option has no methods
+## Why absence is undefined
 
-TypeScript already tracks `undefined`. `Option<T>` is `Some<T> | undefined`, so a caller must check before it reads, and
-strict mode enforces it. `Some` exists only so `Some(undefined)` can mean "present, and the value is empty". The cost is
-one small object per present value, paid for a lookup that crosses a port, not for a value inside a function.
+A lookup that may find nothing returns `T | undefined`. TypeScript already tracks it, and strict mode makes the caller
+check before it reads the value. An extra wrapper type would add a second way to say the same thing, so the library does
+not have one.
 
 ## Why exhaustive match
 

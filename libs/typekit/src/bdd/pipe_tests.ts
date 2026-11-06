@@ -1,7 +1,5 @@
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import { expect, expectTypeOf } from "vitest";
-import * as option from "../option.js";
-import { type Option, Some } from "../option.js";
 import { pipe } from "../pipeline.js";
 import * as result from "../result.js";
 import { Err, Ok, type Result } from "../result.js";
@@ -13,9 +11,6 @@ const parse = (text: string): Result<number, string> => {
 		? new Err(`not a number: ${text}`)
 		: new Ok(number);
 };
-
-const lookup = (key: string): Option<number> =>
-	key === "a" ? new Some(1) : undefined;
 
 describeFeature(
 	await loadFeature(specFile("typekit/pipe/piping.feature")),
@@ -88,42 +83,6 @@ describeFeature(
 					expect(bad).toEqual(new Err("not a number: x"));
 					expect(calls).toBe(1);
 				});
-			},
-		);
-
-		Scenario(
-			"Pipe chains an Option through the curried combinators",
-			({ Given, When, Then, And }) => {
-				let found: Result<number, string> = new Err("");
-				let missing: Result<number, string> = new Ok(0);
-				let calls = 0;
-
-				Given("an Option read from a lookup", () => {
-					calls = 0;
-				});
-				When("it is piped through option.map and option.okOr", () => {
-					const run = (key: string) =>
-						pipe(
-							lookup(key),
-							option.map((n) => {
-								calls += 1;
-								return n + 1;
-							}),
-							option.okOr<number, string>("missing"),
-						);
-					found = run("a");
-					missing = run("b");
-				});
-				Then("a found key gives an Ok", () => {
-					expect(found).toEqual(new Ok(2));
-				});
-				And(
-					"a missing key gives an Err and the later stages do not run",
-					() => {
-						expect(missing).toEqual(new Err("missing"));
-						expect(calls).toBe(1);
-					},
-				);
 			},
 		);
 

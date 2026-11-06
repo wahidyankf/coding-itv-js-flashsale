@@ -11,14 +11,10 @@ import {
 	attempt,
 	attemptAsync,
 	Err,
-	fromOptional,
 	Ok,
-	option,
 	pipe,
 	result,
 	satisfying,
-	Some,
-	type Option,
 	type Result,
 } from "@flash/typekit";
 ```
@@ -45,22 +41,10 @@ error. Both carry both type parameters, so every method has the same signature o
 `._tag` is `"ok"` or `"err"`, so a `switch` on it narrows. The `result` namespace has the same operations curried, for
 `pipe`: `result.map(f)`, `mapErr`, `flatMap`, `flatMapErr`, `tap`, `tapErr` and `match({ ok, err })`.
 
-## Option
+## Absence
 
-`type Option<T> = Some<T> | undefined`. Absence is the native `undefined`, so an `Option` has no methods. `Some` is
-frozen and has `.value` and `._tag` (`"some"`). `Some(undefined)` is present and `undefined` is absent, which keeps
-nested absence expressible. `null` is a value, not absence.
-
-| Name                           | Result                                                                     |
-| ------------------------------ | -------------------------------------------------------------------------- |
-| `fromOptional(value)`          | `undefined` stays absent; any other value, a falsy one included, is `Some` |
-| `option.map(f)`                | applies `f` to a present value; absence stays absent                       |
-| `option.flatMap(step)`         | continues a present value with `step`, whose own answer is the result      |
-| `option.tap(f)`                | calls `f` with a present value and returns the option unchanged            |
-| `option.okOr(error)`           | `Some` becomes `Ok(value)`; absence becomes `Err(error)`                   |
-| `option.match({ some, none })` | calls `some(value)` or `none()`                                            |
-
-Every `option.*` function returns a function from an `Option`, so it is a stage of `pipe`.
+A value that may be missing is `T | undefined`. There is no wrapper type: a lookup that finds nothing returns
+`undefined`, and strict TypeScript makes the caller check before it reads the value.
 
 ## attempt and attemptAsync
 

@@ -13,7 +13,7 @@ No Zod. The domain of `flash-be` may import this entry.
 
 | Export                                                                                                              | What it is                                                                    |
 | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `USER_ID_PATTERN`, `normalizeUserId`                                                                                | the user id rule; `normalizeUserId` trims, lowercases and returns an `Option` |
+| `USER_ID_PATTERN`, `normalizeUserId`                                                                                | the user id rule; `normalizeUserId` trims, lowercases and returns `undefined` when the id is not usable |
 | `UUID_PATTERN`, `isUuid`                                                                                            | the id rule for sales and reservations                                        |
 | `TICKET_HEADER`, `RETRY_AFTER_HEADER`                                                                               | header names                                                                  |
 | `SALE_STATUSES`, `SaleStatus`, `PLACE_STATES`                                                                       | the states a sale and a place can have                                        |

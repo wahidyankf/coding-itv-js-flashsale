@@ -1,6 +1,6 @@
 # typekit Specifications
 
-The behaviour of `@flash/typekit`, the typed `Result`, `Option`, `attempt`, `pipe` and exhaustive-match helpers in
+The behaviour of `@flash/typekit`, the typed `Result`, `attempt`, `pipe` and exhaustive-match helpers in
 [`libs/typekit`](../../libs/typekit/README.md). It is a TypeScript port of
 [py-typekit](https://github.com/wahidyankf/py-typekit).
 
@@ -11,7 +11,6 @@ scenarios are proved by `@ts-expect-error` lines, which the strict `tsc` run fai
 ## Directory Map
 
 - [result/](result/README.md) - transforming and chaining a `Result`, and its immutability.
-- [option/](option/README.md) - transforming an `Option`, and nested absence.
 - [attempt/](attempt/README.md) - turning a throwing call or a promise into a `Result`.
 - [pipe/](pipe/README.md) - chaining functions left to right.
-- [match/](match/README.md) - exhaustive matching on a `Result`, an `Option` and a union.
+- [match/](match/README.md) - exhaustive matching on a `Result` and a union.

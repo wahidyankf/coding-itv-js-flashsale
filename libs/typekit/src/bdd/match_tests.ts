@@ -1,8 +1,6 @@
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import { expect } from "vitest";
 import { assertNever } from "../match.js";
-import * as option from "../option.js";
-import { type Option, Some } from "../option.js";
 import * as result from "../result.js";
 import { Err, Ok, type Result } from "../result.js";
 import { specFile } from "./support/paths.js";
@@ -42,49 +40,18 @@ describeFeature(
 		);
 
 		Scenario(
-			"Match on an Option runs the handler of its side",
-			({ Given, When, Then, And }) => {
-				let present: Option<number>;
-				let absent: Option<number>;
-				let fromPresent = "";
-				let fromAbsent = "";
-
-				Given("a present 2 and an absent value", () => {
-					present = new Some(2);
-					absent = undefined;
-				});
-				When("each is matched with a handler per side", () => {
-					const run = option.match({
-						some: (n: number) => `some ${n}`,
-						none: () => "none",
-					});
-					fromPresent = run(present);
-					fromAbsent = run(absent);
-				});
-				Then("the present value runs the some handler with 2", () => {
-					expect(fromPresent).toBe("some 2");
-				});
-				And("absence runs the none handler", () => {
-					expect(fromAbsent).toBe("none");
-				});
-			},
-		);
-
-		Scenario(
 			"A match without a handler for a side is a type error",
 			({ Given, When, Then }) => {
 				let good: Result<number, string> = new Ok(2);
 				let run: () => unknown = () => undefined;
 
-				Given("a Result and an Option", () => {
+				Given("a Result", () => {
 					good = new Ok(2);
 				});
 				When("each is matched without one of its handlers", () => {
 					run = () => [
 						// @ts-expect-error the err handler is missing
 						good.match({ ok: (n: number) => n }),
-						// @ts-expect-error the none handler is missing
-						option.match({ some: (n: number) => n }),
 						// @ts-expect-error the curried result match needs both handlers too
 						result.match({ ok: (n: number) => n }),
 					];

@@ -7,5 +7,5 @@ bug to fix.
 ## Directory Map
 
 - [flash/](flash/README.md) - the flash sale product: its architecture, the API (`be`), and the web app (`web`).
-- [typekit/](typekit/README.md) - the typed `Result`, `Option`, `attempt` and `pipe` library in `libs/typekit`.
+- [typekit/](typekit/README.md) - the typed `Result`, `attempt` and `pipe` library in `libs/typekit`.
 - [tooling/](tooling/README.md) - the repository's own tools, such as the behaviour check.

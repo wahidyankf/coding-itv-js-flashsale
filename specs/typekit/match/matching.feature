@@ -13,20 +13,11 @@ Feature: Matching exhaustively
     Then the Ok runs the ok handler with 2
     And the Err runs the err handler with "bad"
 
-  # Exemption(integration): a pure library opens no resource, so there is nothing to integrate with; alternative-proof: typekit:unit / Match on an Option runs the handler of its side
-  # Exemption(e2e): a pure library has no process or page to drive from outside; alternative-proof: typekit:unit / Match on an Option runs the handler of its side
-  @integration-exempt @e2e-exempt
-  Scenario: Match on an Option runs the handler of its side
-    Given a present 2 and an absent value
-    When each is matched with a handler per side
-    Then the present value runs the some handler with 2
-    And absence runs the none handler
-
   # Exemption(integration): a pure library opens no resource, so there is nothing to integrate with; alternative-proof: typekit:unit / A match without a handler for a side is a type error
   # Exemption(e2e): a pure library has no process or page to drive from outside; alternative-proof: typekit:unit / A match without a handler for a side is a type error
   @integration-exempt @e2e-exempt
   Scenario: A match without a handler for a side is a type error
-    Given a Result and an Option
+    Given a Result
     When each is matched without one of its handlers
     Then the type checker refuses both calls
 

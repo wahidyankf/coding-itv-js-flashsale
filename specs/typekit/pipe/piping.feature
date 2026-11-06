@@ -22,15 +22,6 @@ Feature: Chaining with pipe
     Then a good text gives an Ok
     And a bad text gives an Err and the later stages do not run
 
-  # Exemption(integration): a pure library opens no resource, so there is nothing to integrate with; alternative-proof: typekit:unit / Pipe chains an Option through the curried combinators
-  # Exemption(e2e): a pure library has no process or page to drive from outside; alternative-proof: typekit:unit / Pipe chains an Option through the curried combinators
-  @integration-exempt @e2e-exempt
-  Scenario: Pipe chains an Option through the curried combinators
-    Given an Option read from a lookup
-    When it is piped through option.map and option.okOr
-    Then a found key gives an Ok
-    And a missing key gives an Err and the later stages do not run
-
   # Exemption(integration): a pure library opens no resource, so there is nothing to integrate with; alternative-proof: typekit:unit / Pipe stops at the first function that throws
   # Exemption(e2e): a pure library has no process or page to drive from outside; alternative-proof: typekit:unit / Pipe stops at the first function that throws
   @integration-exempt @e2e-exempt

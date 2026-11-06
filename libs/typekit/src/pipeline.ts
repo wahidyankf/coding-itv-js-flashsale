@@ -1,7 +1,7 @@
 // pipe(value, f1, f2) is f2(f1(value)) written in the order it runs. It takes one to nine functions, each typed from
 // the one before, so a mismatched stage is a type error at the stage. A longer chain nests:
-// pipe(pipe(value, f1, ..., f9), f10) loses no type. The curried combinators of result and option are the stages that
-// make pipe chain a Result or an Option.
+// pipe(pipe(value, f1, ..., f9), f10) loses no type. The curried combinators of result are the stages that make pipe
+// chain a Result.
 
 export function pipe<A, B>(value: A, f1: (input: A) => B): B;
 export function pipe<A, B, C>(

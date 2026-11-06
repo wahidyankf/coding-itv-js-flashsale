@@ -1,8 +1,7 @@
 # @flash/typekit
 
-Typed `Result`, `Option`, `attempt`, `pipe` and exhaustive-match helpers for TypeScript. A failure is a value the caller
-must handle, and an absent value is one the type system tracks. It is a TypeScript port of
-[py-typekit](https://github.com/wahidyankf/py-typekit), with no runtime dependencies.
+Typed `Result`, `attempt`, `pipe` and exhaustive-match helpers for TypeScript. A failure is a value the caller must
+handle. It is a TypeScript port of [py-typekit](https://github.com/wahidyankf/py-typekit), with no runtime dependencies.
 
 It is a workspace package used by `flash-be` and `flash-web`. Build it first with `npx nx build typekit`; the apps'
 Nx targets do that for you.
@@ -12,13 +11,11 @@ Nx targets do that for you.
 | Name                      | What it is                                                                                                                |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `Result<T, E>`            | `Ok<T, E> \| Err<T, E>`, frozen and covariant, with `map`, `mapErr`, `flatMap`, `flatMapErr`, `tap`, `tapErr` and `match` |
-| `Option<T>`               | `Some<T> \| undefined`; absence is the native `undefined`, and `Some(undefined)` keeps nested absence expressible         |
-| `fromOptional`            | `undefined` stays absent; any other value, a falsy one or `null` included, becomes `Some`                                 |
 | `attempt`, `attemptAsync` | turn a throwing call or a promise into a `Result` that names exactly the failures you expect                              |
 | `satisfying`              | wraps a type predicate so it can be a guard for a thrown value that is not an error class                                 |
 | `pipe`                    | chains one to nine functions left to right, each typed from the one before                                                |
 | `assertNever`             | closes a `switch` over a union, so a forgotten case is a type error                                                       |
-| `result`, `option`        | namespaces of the curried combinators that are the stages of `pipe`                                                       |
+| `result`                  | namespace of the curried combinators that are the stages of `pipe`                                                        |
 
 ```ts
 import { attempt, pipe, result } from "@flash/typekit";
@@ -43,6 +40,7 @@ doubled.match({
   and a Biome rule enforces it.
 - Name the failure you expect. A thrown value that no guard accepts is thrown on, so a bug is not hidden.
 - Close every `switch` over a union with `assertNever`, or use `match`. A missing case fails the type check.
+- A value that may be missing is `T | undefined`. TypeScript's strict options make the check impossible to forget.
 
 The behaviour is specified in [specs/typekit](../../specs/typekit/README.md). Every name is in the
 [reference](../../docs/reference/typekit.md), the steps are in

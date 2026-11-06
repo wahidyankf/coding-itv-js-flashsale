@@ -5,7 +5,7 @@ Guidance for AI coding agents working in this repository. For setup and run comm
 ## Project
 
 Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `flash-be` (Fastify REST API), `flash-web` (TanStack Start client),
-`flash-be-e2e` and `flash-web-e2e` (Playwright), and `flash-load` (k6 load test). `libs/typekit` (`@flash/typekit`) holds `Result`, `Option`, `attempt`, `pipe` and
+`flash-be-e2e` and `flash-web-e2e` (Playwright), and `flash-load` (k6 load test). `libs/typekit` (`@flash/typekit`) holds `Result`, `attempt`, `pipe` and
 `assertNever`; `flash-be` and `flash-web` use it. `libs/contract` (`@flash/contract`) holds the HTTP contract of the API; every app uses it. Data lives in Postgres (Kysely, no ORM) and Redis.
 
 ## Docs and specs
@@ -39,7 +39,7 @@ Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `fla
 - Biome formats and lints (tabs, double quotes). Do not add Prettier or ESLint.
 - Failures are values. Product code (`apps/*/src`, `libs/*/src`, not tests or `src/bdd`) has no `catch` clause and no
   `.catch(` call: a call that may throw goes through `attempt` or `attemptAsync` from `@flash/typekit`, naming the failure it
-  expects, and a function that can fail returns a `Result`. A lookup that may find nothing returns an `Option`. Close every
+  expects, and a function that can fail returns a `Result`. A lookup that may find nothing returns `undefined`, typed `T | undefined`. Close every
   `switch` over a union with every case or `assertNever`. A Biome plugin (`.biome/no-catch.grit`) and
   `useExhaustiveSwitchCases` enforce this, and `npm run lint:rules:test` tests the rules. Do not silence them.
 - Typechecking and linting are strict. Every `tsconfig.json` turns on `strict`, `noUncheckedIndexedAccess`,
@@ -65,7 +65,7 @@ Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `fla
   (`npx nx db:up flash-be`) and are not part of `test:quick`.
 - Vitest globals are off. Call `cleanup` in `afterEach` when rendering components.
 - Choose the kind of test by one question: if this breaks, does a shopper or an operator see the difference? If yes, write
-  a Gherkin scenario in `specs/` (behaviour that is part of the contract: HTTP, queue, hold, payment, `Result` and `Option`). If only a developer cares, write a plain Vitest test next to
+  a Gherkin scenario in `specs/` (behaviour that is part of the contract: HTTP, queue, hold, payment, `Result`). If only a developer cares, write a plain Vitest test next to
   the code (branches and edge cases in one function, rules of structure such as `architecture_tests.ts`, the mapping of
   config and environment variables, types, internal helpers, tests that only reach a branch for coverage). Write new behaviour as a scenario first,
   then add plain tests for the branches that do not deserve one. A scenario that needs both `@integration-exempt` and

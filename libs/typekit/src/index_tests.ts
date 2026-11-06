@@ -6,20 +6,16 @@ describe("public surface", () => {
 		expect(Object.keys(typekit).sort()).toEqual([
 			"Err",
 			"Ok",
-			"Some",
 			"assertNever",
 			"attempt",
 			"attemptAsync",
-			"fromOptional",
-			"option",
 			"pipe",
 			"result",
 			"satisfying",
 		]);
 	});
 
-	it("reaches the curried combinators through their namespaces", () => {
+	it("reaches the curried combinators through their namespace", () => {
 		expect(Object.keys(typekit.result).sort()).toContain("flatMapErr");
-		expect(Object.keys(typekit.option).sort()).toContain("okOr");
 	});
 });

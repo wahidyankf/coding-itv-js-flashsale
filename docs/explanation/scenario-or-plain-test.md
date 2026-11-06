@@ -14,8 +14,7 @@ Vitest test when it guards how the code does its work. This page gives the reaso
 
 - A reader of the spec can understand it without reading code. For example: "a shopper who already bought cannot buy
   again", "Redis is down, so `/ready` answers 503", "too many requests get `429` with `Retry-After`".
-- The behaviour is part of the contract of the system: the HTTP routes, the queue, the hold, the payment, and `Result` and
-  `Option` in `@flash/typekit`.
+- The behaviour is part of the contract of the system: the HTTP routes, the queue, the hold, the payment, and `Result` in `@flash/typekit`.
 - The same behaviour is worth proving at more than one layer. One `.feature` file is then the shared source of truth for
   the unit, integration and end-to-end bindings.
 - A person who does not write code, or you in three months, needs to read it as documentation.

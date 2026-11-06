@@ -49,29 +49,21 @@ build. Use `.match({ ok, err })` when both sides produce a value of the same typ
 
 ## 4. Chain steps
 
-Use `pipe` with the curried combinators when the steps are pure. A missing sale, a bad name and a closed sale each stop
-the chain, and the first failure is what comes out:
+Use `pipe` with the curried combinators to transform a Result that already exists, such as `result.map(f)`. To check
+several things in a row, return early on each failure. The first failure is what comes out, and the code reads from top
+to bottom:
 
 ```ts
-const open = pipe(
-	found,
-	option.okOr<SaleDetails, ReserveError>("sale_not_found"),
-	result.flatMap((details: SaleDetails) =>
-		pipe(
-			normalizeUser(rawUser),
-			option.okOr<string, ReserveError>("invalid_user"),
-			result.map(() => details),
-		),
-	),
-);
+const found = await sales.details(saleId);
+if (found === undefined) return new Err("sale_not_found");
+const user = normalizeUser(rawUser);
+if (user === undefined) return new Err("invalid_user");
 ```
-
-For steps that await, check the Result and return early, as in step 3.
 
 ## 5. Absent values
 
-Return `Option<T>` from a lookup that may find nothing: `new Some(value)` or `undefined`. Convert a native optional at the
-edge with `fromOptional(row)`. Keep parameters, optional object fields and JSON bodies native.
+Return `undefined` from a lookup that may find nothing, and type the return as `T | undefined`. Check it with `=== undefined`
+before you read the value. Keep parameters, optional object fields and JSON bodies native.
 
 ## 6. Close every switch
 
