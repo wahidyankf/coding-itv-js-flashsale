@@ -1,5 +1,6 @@
 import { routes } from "@flash/contract";
 import { describe, expect, it } from "vitest";
+import { unusedDependencies } from "../../../openapi-deps.js";
 import { buildOpenApi } from "./openapi.js";
 
 type Operation = {
@@ -12,7 +13,7 @@ type Document = {
 	paths: Record<string, Record<string, Operation>>;
 };
 
-const document = (await buildOpenApi()) as Document;
+const document = (await buildOpenApi(unusedDependencies)) as Document;
 const operations = Object.entries(document.paths).flatMap(([path, methods]) =>
 	Object.entries(methods).map(([method, operation]) => ({
 		path,

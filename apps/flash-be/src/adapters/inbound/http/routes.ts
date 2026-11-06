@@ -25,10 +25,14 @@ export function registerRoutes(
 
 	// Runs before the body is checked, so a bad request is counted too. A client over its limit is told to wait, and
 	// the route never runs.
-	const limit = async (request: FastifyRequest, reply: FastifyReply) => {
-		const saleId = fieldOf(request.params, "saleId");
+	const limit = async (
+		request: Pick<FastifyRequest, "body" | "ip"> & {
+			params: { saleId: string };
+		},
+		reply: FastifyReply,
+	) => {
 		const verdict = await deps.rateLimiter.check({
-			saleId: typeof saleId === "string" ? saleId : "",
+			saleId: request.params.saleId,
 			user: fieldOf(request.body, "userId"),
 			ip: request.ip,
 		});

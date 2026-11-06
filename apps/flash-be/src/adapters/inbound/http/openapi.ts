@@ -1,6 +1,5 @@
 import swagger from "@fastify/swagger";
 import { routes } from "@flash/contract";
-import { Err } from "@flash/typekit";
 import Fastify from "fastify";
 import { jsonSchemaTransform } from "fastify-type-provider-zod";
 import type { Dependencies } from "../../../application/dependencies.js";
@@ -8,32 +7,13 @@ import { applyContract } from "./app.js";
 import { DEFAULT_STREAM_OPTIONS } from "./event-stream.js";
 import { registerRoutes } from "./routes.js";
 
-// Nothing is called while the document is built, only the routes are registered.
-const noSale = async () => undefined;
-const unused: Dependencies = {
-	checkDatabase: async () => {},
-	checkRedis: async () => {},
-	sales: { cacheMs: () => 0, current: noSale, byId: noSale, details: noSale },
-	queue: {
-		join: async () => new Err("sale_not_found"),
-		check: async () => new Err("sale_not_found"),
-		admitTick: async () => [],
-	},
-	reservations: { reserve: async () => new Err("sale_not_found") },
-	rateLimiter: { check: async () => ({ limited: false }) },
-	purchases: {
-		confirm: async () => new Err("sale_not_found"),
-		outcome: async () => new Err("sale_not_found"),
-	},
+type Reply = {
+	description?: string | undefined;
+	content: Record<string, unknown>;
 };
-
-type Operation = {
-	responses?: Record<
-		string,
-		{ description?: string; content?: Record<string, unknown> }
-	>;
-};
-type Document = { paths?: Record<string, Record<string, Operation>> };
+// Every route answers 200, and every reply has a JSON body.
+type Operation = { responses: Record<string, Reply> & Record<"200", Reply> };
+type Document = { paths: Record<string, Record<string, Operation>> };
 
 const STATUS_TEXT: Record<string, string> = {
 	"200": "OK",
@@ -51,7 +31,8 @@ const STATUS_TEXT: Record<string, string> = {
 
 // The OpenAPI document of the API, made from the routes the server registers. A stream is described as
 // `text/event-stream`, because that is what its 200 reply is.
-export async function buildOpenApi(): Promise<object> {
+// The dependencies are never called: only the routes are registered.
+export async function buildOpenApi(deps: Dependencies): Promise<object> {
 	const app = Fastify();
 	applyContract(app);
 	await app.register(swagger, {
@@ -66,24 +47,33 @@ export async function buildOpenApi(): Promise<object> {
 		},
 		transform: jsonSchemaTransform,
 	});
-	registerRoutes(app, unused, DEFAULT_STREAM_OPTIONS);
+	registerRoutes(app, deps, DEFAULT_STREAM_OPTIONS);
 	await app.ready();
-	// A copy, so the changes below touch no object of the plugin.
-	const document = structuredClone(app.swagger()) as Document;
-	for (const operations of Object.values(document.paths ?? {})) {
+	// A copy, so the changes below touch no object of the plugin. The plugin types every part as optional; the tests
+	// check the shape that is used here.
+	const document = structuredClone(app.swagger()) as unknown as Document;
+	for (const operations of Object.values(document.paths)) {
 		for (const operation of Object.values(operations)) {
-			for (const [status, reply] of Object.entries(operation.responses ?? {})) {
-				reply.description = STATUS_TEXT[status] ?? "Reply";
+			// A status that has no text here shows up as a missing description, which the tests refuse.
+			for (const [status, reply] of Object.entries(operation.responses)) {
+				reply.description = STATUS_TEXT[status];
 			}
 		}
 	}
-	for (const route of Object.values(routes)) {
-		if (!route.stream) continue;
-		const path = route.path.replace(/:([A-Za-z]+)/g, "{$1}");
-		const ok =
-			document.paths?.[path]?.[route.method.toLowerCase()]?.responses?.["200"];
-		if (ok?.content)
+	const streams = new Set(
+		Object.values(routes)
+			.filter((route) => route.stream)
+			.map(
+				(route) =>
+					`${route.method} ${route.path.replace(/:([A-Za-z]+)/g, "{$1}")}`,
+			),
+	);
+	for (const [path, operations] of Object.entries(document.paths)) {
+		for (const [method, operation] of Object.entries(operations)) {
+			if (!streams.has(`${method.toUpperCase()} ${path}`)) continue;
+			const ok = operation.responses["200"];
 			ok.content = { "text/event-stream": ok.content["application/json"] };
+		}
 	}
 	await app.close();
 	return document;

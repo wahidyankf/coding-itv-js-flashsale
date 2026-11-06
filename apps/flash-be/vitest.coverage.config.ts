@@ -23,6 +23,8 @@ export default defineConfig({
 				"src/seed-sale.ts",
 				// openapi.ts only writes the document that the tested builder makes to a file.
 				"src/openapi.ts",
+				// The stubs it passes; nothing calls them.
+				"src/openapi-deps.ts",
 			],
 			reporter: ["text", "text-summary"],
 			thresholds: { lines: 99, functions: 99, branches: 99, statements: 99 },

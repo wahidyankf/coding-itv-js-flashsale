@@ -1,7 +1,9 @@
+import Fastify from "fastify";
 import { afterEach, describe, expect, it } from "vitest";
+import { z } from "zod";
 import type { Dependencies } from "../../../application/dependencies.js";
 import { healthyDeps } from "../../../bdd/support/deps.js";
-import { buildApp } from "./app.js";
+import { applyContract, buildApp } from "./app.js";
 
 const apps: Array<ReturnType<typeof buildApp>> = [];
 afterEach(async () => {
@@ -47,6 +49,21 @@ describe("the errors of the HTTP edge", () => {
 		});
 		expect(reply.statusCode).toBe(500);
 		expect(reply.json()).toEqual({ error: "internal" });
+	});
+
+	it("refuses a request whose query is wrong as `invalid_request`", async () => {
+		const app = Fastify();
+		applyContract(app);
+		app.route({
+			method: "GET",
+			url: "/probe",
+			schema: { querystring: z.object({ count: z.coerce.number().int() }) },
+			handler: async () => ({}),
+		});
+		const reply = await app.inject({ method: "GET", url: "/probe?count=x" });
+		expect(reply.statusCode).toBe(400);
+		expect(reply.json()).toEqual({ error: "invalid_request" });
+		await app.close();
 	});
 
 	it("refuses a body that is too large as `invalid_request`", async () => {
