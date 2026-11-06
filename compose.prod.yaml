@@ -1,7 +1,25 @@
 name: flash-prod
 
 # Full stack in containers. Secrets come from the root .env and are required (no defaults).
-# Only the web and API ports are published to the host. Postgres and Redis stay on the internal network.
+# Only the web port and the API port (nginx) are published to the host. Postgres and Redis stay on the internal network.
+# Three API instances share one Postgres, one Redis and one TICKET_SECRET. Behind nginx the address of a caller comes
+# from X-Forwarded-For, so TRUST_PROXY is on; the instances are on the internal network only.
+x-api: &api
+  image: flash-be:prod
+  environment:
+    DATABASE_URL: postgres://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:?}
+    REDIS_URL: redis://redis:6379
+    TICKET_SECRET: ${TICKET_SECRET:?set TICKET_SECRET in .env}
+    # Optional. Empty means the admin routes are off.
+    ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+    FLASH_BE_PORT: 8080
+    TRUST_PROXY: "true"
+  depends_on:
+    flash-be-migrate:
+      condition: service_completed_successfully
+    redis:
+      condition: service_healthy
+
 services:
   postgres:
     image: postgres:18-alpine
@@ -43,21 +61,31 @@ services:
         condition: service_healthy
     restart: "no"
 
-  flash-be:
-    image: flash-be:prod
-    environment:
-      DATABASE_URL: postgres://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:?}
-      REDIS_URL: redis://redis:6379
-      TICKET_SECRET: ${TICKET_SECRET:?set TICKET_SECRET in .env}
-      # Optional. Empty means the admin routes are off.
-      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
-      FLASH_BE_PORT: 8080
+  flash-be-1:
+    <<: *api
+  flash-be-2:
+    <<: *api
+  flash-be-3:
+    <<: *api
+
+  # The one door to the API. The API instances are not published; nginx spreads the requests over them.
+  nginx:
+    image: nginx:alpine
+    volumes:
+      - ./nginx.prod.conf:/etc/nginx/nginx.conf:ro
     ports:
-      - "${FLASH_BE_PORT:-8080}:8080"
+      - "${FLASH_BE_PORT:-8080}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
     depends_on:
-      flash-be-migrate:
-        condition: service_completed_successfully
-      redis:
+      flash-be-1:
+        condition: service_healthy
+      flash-be-2:
+        condition: service_healthy
+      flash-be-3:
         condition: service_healthy
 
   flash-web:
@@ -65,11 +93,11 @@ services:
       context: .
       dockerfile: apps/flash-web/Dockerfile
     environment:
-      FLASH_BE_URL: http://flash-be:8080
+      FLASH_BE_URL: http://nginx
     ports:
       - "${FLASH_WEB_PORT:-3000}:3000"
     depends_on:
-      flash-be:
+      nginx:
         condition: service_healthy
 
 volumes:

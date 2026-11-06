@@ -113,14 +113,16 @@ Open <http://localhost:3000>, type a name and press **Buy Now**, then **Confirm 
 
 ```bash
 npm run docker:prod:up         # build the images, migrate, start the stack
-docker compose -f compose.prod.yaml exec flash-be node dist/seed-sale.js --stock=5 --duration-minutes=60
+docker compose -f compose.prod.yaml exec flash-be-1 node dist/seed-sale.js --stock=5 --duration-minutes=60
 curl localhost:8080/ready      # Postgres and Redis ok
 open localhost:3000            # the sale page
 npm run docker:prod:down       # stop the stack (volumes are kept)
 ```
 
 Production compose reads `POSTGRES_*`, `TICKET_SECRET` and the ports from `.env`, and fails when one is missing.
-Postgres and Redis are not published to the host.
+Three `flash-be` instances run behind nginx, which is the API port on the host. Postgres, Redis and the instances are not
+published. `npm run smoke:prod` builds the stack under its own name and walks one shopper through it
+(see [the smoke test](docs/how-to/smoke-test-the-production-stack.md)).
 
 ## Tests
 
