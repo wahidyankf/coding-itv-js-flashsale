@@ -7,6 +7,7 @@ import { ErrorBody } from "./schemas.js";
 import {
 	ERROR_STATUS,
 	type ErrorCode,
+	FIRST_CLIENT_ERROR_STATUS,
 	RETRY_AFTER_HEADER,
 } from "./vocabulary.js";
 
@@ -51,7 +52,8 @@ function retryAfter(raw: RawReply, body: unknown): number | undefined {
 
 function refusal(raw: RawReply, body: unknown): ApiFailure | undefined {
 	const parsed = ErrorBody.safeParse(body);
-	if (!parsed.success || raw.status < 400) return undefined;
+	if (!parsed.success || raw.status < FIRST_CLIENT_ERROR_STATUS)
+		return undefined;
 	if (ERROR_STATUS[parsed.data.error] !== raw.status) return undefined;
 	return {
 		error: parsed.data.error,

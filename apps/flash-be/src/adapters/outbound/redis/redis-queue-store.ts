@@ -1,3 +1,4 @@
+import { MS_PER_SECOND } from "@flash/contract/vocabulary";
 import type { QueueStore } from "../../../application/ports/queue-store.js";
 import type { QueuePlace } from "../../../domain/queue.js";
 import type { RedisClient } from "./redis-client.js";
@@ -38,10 +39,13 @@ end
 return users
 `;
 
+// The codes the scripts above answer with, by name, for the two outcomes that carry no place.
+const PLACE_CODE = { admitted: 2, absent: 3 } as const;
+
 function toPlace(reply: unknown): QueuePlace {
 	const [code, place] = reply as [number, number];
-	if (code === 2) return { state: "admitted" };
-	if (code === 3) return { state: "absent" };
+	if (code === PLACE_CODE.admitted) return { state: "admitted" };
+	if (code === PLACE_CODE.absent) return { state: "absent" };
 	return { state: "waiting", place: place as number };
 }
 
@@ -64,7 +68,7 @@ export function createRedisQueueStore(redis: RedisClient): QueueStore {
 		},
 
 		async admit(saleId, count, now, ttlSeconds) {
-			const expiresAt = now.getTime() + ttlSeconds * 1000;
+			const expiresAt = now.getTime() + ttlSeconds * MS_PER_SECOND;
 			const users = await redis.eval(ADMIT, {
 				keys: [queueKey(saleId), admittedKey(saleId)],
 				arguments: [String(count), String(expiresAt), String(now.getTime())],

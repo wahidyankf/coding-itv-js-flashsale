@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildConfig, describeConfig } from "./config.js";
 
@@ -158,5 +160,29 @@ describe("the admin token", () => {
 		expect(() => buildConfig({ ADMIN_TOKEN: "short" })).toThrow(
 			"ADMIN_TOKEN must be at least 16 characters",
 		);
+	});
+});
+
+// .env.example is what a new developer copies, so it must say what the code does when a setting is absent.
+describe(".env.example", () => {
+	const example = Object.fromEntries(
+		readFileSync(
+			path.resolve(import.meta.dirname, "../../../.env.example"),
+			"utf8",
+		)
+			.split("\n")
+			.filter((line) => /^[A-Z_]+=/.test(line))
+			.map((line) => {
+				const at = line.indexOf("=");
+				return [line.slice(0, at), line.slice(at + 1)];
+			}),
+	);
+
+	it("gives every setting the value the code uses when it is absent", () => {
+		expect(buildConfig(example)).toEqual(buildConfig({}));
+	});
+
+	it("leaves the admin token empty, so no secret is committed", () => {
+		expect(example.ADMIN_TOKEN).toBe("");
 	});
 });

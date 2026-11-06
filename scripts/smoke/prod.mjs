@@ -6,10 +6,23 @@ import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import net from "node:net";
 import path from "node:path";
-import { createClient, routes, TICKET_HEADER } from "@flash/contract";
+import {
+	createClient,
+	ERROR_STATUS,
+	HTTP_STATUS,
+	routes,
+	TICKET_HEADER,
+} from "@flash/contract";
 
 const root = path.resolve(import.meta.dirname, "../..");
 const PROJECT = "flash-smoke";
+// The API instances in compose.prod.yaml. The run waits for all of them to be healthy.
+const API_INSTANCES = ["flash-be-1", "flash-be-2", "flash-be-3"];
+// The shopper checks the queue this often, this many times, before the run gives up.
+const ADMISSION_CHECK_MS = 500;
+const MAX_ADMISSION_CHECKS = 30;
+// A declined payment is tried again this many times in all.
+const MAX_PAYMENT_ATTEMPTS = 5;
 const MINUTE_MS = 60_000;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -82,10 +95,12 @@ async function walk() {
 	const running = JSON.parse(
 		`[${compose("ps", "--format", "json").trim().split("\n").join(",")}]`,
 	)
-		.filter((container) => /flash-be-[123]$/.test(container.Service))
+		.filter((container) => API_INSTANCES.includes(container.Service))
 		.filter((container) => container.Health === "healthy");
-	if (running.length !== 3) {
-		throw new Error(`wanted 3 healthy API instances, found ${running.length}`);
+	if (running.length !== API_INSTANCES.length) {
+		throw new Error(
+			`wanted ${API_INSTANCES.length} healthy API instances, found ${running.length}`,
+		);
 	}
 
 	const api = createClient({ baseUrl: `http://127.0.0.1:${bePort}` });
@@ -93,7 +108,8 @@ async function walk() {
 
 	step("the API is ready");
 	const ready = await fetch(`http://127.0.0.1:${bePort}/ready`);
-	if (ready.status !== 200) throw new Error(`/ready answered ${ready.status}`);
+	if (ready.status !== HTTP_STATUS.ok)
+		throw new Error(`/ready answered ${ready.status}`);
 
 	step("an operator with a wrong token is refused");
 	const body = {
@@ -118,7 +134,7 @@ async function walk() {
 			headers: { authorization: `Bearer ${adminToken}` },
 			body,
 		}),
-		201,
+		HTTP_STATUS.created,
 	);
 
 	step("the web server does not pass the admin route on");
@@ -127,7 +143,7 @@ async function walk() {
 		headers: { "content-type": "application/json" },
 		body: "{}",
 	});
-	if (blocked.status !== 404) {
+	if (blocked.status !== ERROR_STATUS.not_found) {
 		throw new Error(`the web server answered ${blocked.status} to /api/admin`);
 	}
 
@@ -135,7 +151,7 @@ async function walk() {
 	const current = expectOk(
 		"current sale",
 		await web.call(routes.currentSale, {}),
-		200,
+		HTTP_STATUS.ok,
 	);
 	if (current.id !== sale.id)
 		throw new Error("the current sale is not the new one");
@@ -148,15 +164,19 @@ async function walk() {
 	);
 	const headers = { [TICKET_HEADER]: joined.ticket };
 	let state = joined.state;
-	for (let tries = 0; state !== "admitted" && tries < 30; tries++) {
-		await sleep(500);
+	for (
+		let tries = 0;
+		state !== "admitted" && tries < MAX_ADMISSION_CHECKS;
+		tries++
+	) {
+		await sleep(ADMISSION_CHECK_MS);
 		const place = expectOk(
 			"place",
 			await web.call(routes.checkPlace, {
 				params: { ...params, userId: "smoke" },
 				headers,
 			}),
-			200,
+			HTTP_STATUS.ok,
 		);
 		state = place.state;
 	}
@@ -174,7 +194,11 @@ async function walk() {
 
 	step("the shopper pays (a declined charge is tried again)");
 	let purchase;
-	for (let attempt = 0; purchase === undefined && attempt < 5; attempt++) {
+	for (
+		let attempt = 0;
+		purchase === undefined && attempt < MAX_PAYMENT_ATTEMPTS;
+		attempt++
+	) {
 		const paid = await web.call(routes.confirm, {
 			params,
 			body: { userId: "smoke", reservationId: held.reservationId },
@@ -191,7 +215,7 @@ async function walk() {
 	const outcome = expectOk(
 		"outcome",
 		await web.call(routes.outcome, { params: { ...params, userId: "smoke" } }),
-		200,
+		HTTP_STATUS.ok,
 	);
 	if (outcome.state !== "purchased") {
 		throw new Error(`the outcome is ${outcome.state}, wanted purchased`);

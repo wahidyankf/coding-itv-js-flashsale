@@ -4,6 +4,15 @@ import type { RedisClient } from "./redis-client.js";
 
 const key = (saleId: string, name: string) => `sale:${saleId}:${name}`;
 
+// The first number each reply of the script below carries, by name.
+const GATE_CODE = {
+	soldOut: 0,
+	reserved: 1,
+	purchased: 2,
+	held: 3,
+	notReady: 4,
+} as const;
+
 // KEYS: ready, buyers, holds, ids. ARGV: user, now, expiresAt, stock, reservationId.
 // Replies: {0} sold out, {1, id, expiresAt} reserved, {2} bought, {3, id, expiresAt} already holding, {4} not ready.
 // One script means the count and the add cannot be split by another request, so the stock is never exceeded.
@@ -64,11 +73,11 @@ export function createRedisHoldGate(redis: RedisClient): HoldGate {
 				expiresAt: new Date(Number(until)),
 			};
 			const answers: Record<number, GateAnswer> = {
-				0: { kind: "sold_out" },
-				1: { kind: "reserved", ...answer },
-				2: { kind: "purchased" },
-				3: { kind: "held", ...answer },
-				4: { kind: "not_ready" },
+				[GATE_CODE.soldOut]: { kind: "sold_out" },
+				[GATE_CODE.reserved]: { kind: "reserved", ...answer },
+				[GATE_CODE.purchased]: { kind: "purchased" },
+				[GATE_CODE.held]: { kind: "held", ...answer },
+				[GATE_CODE.notReady]: { kind: "not_ready" },
 			};
 			return answers[Number(code)] as GateAnswer;
 		},

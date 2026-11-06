@@ -10,7 +10,7 @@ Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `fla
 ## Docs and specs
 
 - `docs/` is the documentation for users and developers, split into Diátaxis modes. Start at [docs/README.md](docs/README.md).
-- `specs/` holds the apps' behaviour scenarios (`specs/apps/flash/`) and their C4 model. Start at [specs/README.md](specs/README.md). Specs win when they disagree with `docs/`.
+- `specs/` holds the apps' behaviour scenarios (`specs/apps/flash/be` and `web`), their C4 model, and the load test rules (`specs/apps/flash/load/`). Start at [specs/README.md](specs/README.md). Specs win when they disagree with `docs/`.
 
 ## Repository rules
 
@@ -24,8 +24,8 @@ Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `fla
 - Run targets with `npx nx <target> <app>`. Every app has `typecheck`, `lint`, `test:quick`, and `test:quick:watch`.
   - `flash-be` and `flash-web` also have `test:unit` and `test:integration`.
   - `flash-be-e2e` and `flash-web-e2e` have `test:e2e` instead.
-  - `flash-load` has `load:smoke`, `load:full`, `load:chaos`, `load:burst` and `load:contention` instead. They need Docker and run the stack. Its limits are in
-    `apps/flash-load/k6/profiles.ts`. A failed run is a finding; do not change a limit to make it pass.
+  - `flash-load` has `load:smoke`, `load:full`, `load:chaos`, `load:burst` and `load:contention` instead. They need Docker and run the stack. Its numbers are in
+    `apps/flash-load/k6/profiles.ts`, and its rules and limits are in `specs/apps/flash/load/`. A failed run is a finding; do not change a limit to make it pass.
   - `test:quick` runs `typecheck`, `lint`, and `test:unit`, or only `typecheck` and `lint` for the e2e apps. Change a
     check in its own target, not in `test:quick`. Keep `test:quick:watch` in sync with it.
 - The HTTP API is written down once, in `libs/contract`. Do not write a hand-made request type, reply type, API path or
@@ -47,11 +47,16 @@ Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `fla
   promises are errors, and `lint` fails on warnings. Fix the code; do not relax a rule to pass.
 - No `any` in TypeScript. Biome's `noExplicitAny` is an error, and `noImplicitAny` is on in every `tsconfig.json`. Use
   `unknown` and narrow it, or write the type. Do not silence the rule with `biome-ignore`.
+- No magic numbers. Biome's `noMagicNumbers` is an error in product code and in tooling (tests, `src/bdd` and the e2e apps
+  may write literals, because a literal is the expected value there). Give a number a name: a `const`, or a field of a
+  `const` object, with a comment when the reason is not plain. HTTP statuses come from `ERROR_STATUS` and `HTTP_STATUS`, and
+  seconds become milliseconds with `MS_PER_SECOND`, all from `@flash/contract`. Do not silence the rule with `biome-ignore`.
 - Commit messages follow Conventional Commits (commitlint hook). Make one coherent change per commit.
 - Docs are checked by RHINO, which reads the policy in `repo-config.yml`. Run `npm run docs:install` once per machine,
   then `npm run docs:check`. The version and digests are pinned in `scripts/install-rhino.sh`; bump them together.
-- The pre-push hook runs `npm run docs:check`, the behaviour coverage check (`bdd:check:test`, `bdd:check`), the lint rule
-  tests (`lint:rules:test`), the OpenAPI check (`openapi:check`), the contract guard (`contract:guard:test`), then
+- The pre-push hook runs `npm run lint` (Biome check of the whole repo, warnings fail), `npm run docs:check`, the behaviour
+  coverage check (`bdd:check:test`, `bdd:check`), the lint rule tests (`lint:rules:test`), the OpenAPI check (`openapi:check`),
+  the contract guard (`contract:guard:test`), then
   `nx affected -t test:quick` (typecheck, lint, unit tests) and `nx affected -t test:coverage` (the 99% floor) against
   `origin/main`. `test:coverage` starts the dev stack itself, so Docker must run. Do not skip hooks with `--no-verify`
   unless the user asks.

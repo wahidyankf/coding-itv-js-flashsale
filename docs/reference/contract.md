@@ -11,14 +11,16 @@ It has two entry points.
 
 No Zod. The domain of `flash-be` may import this entry.
 
-| Export                                                                                                              | What it is                                                                    |
-| ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `USER_ID_PATTERN`, `normalizeUserId`                                                                                | the user id rule; `normalizeUserId` trims, lowercases and returns `undefined` when the id is not usable |
-| `UUID_PATTERN`, `isUuid`                                                                                            | the id rule for sales and reservations                                        |
-| `TICKET_HEADER`, `RETRY_AFTER_HEADER`                                                                               | header names                                                                  |
-| `SALE_STATUSES`, `SaleStatus`                                                                                       | the states a sale can have                                                    |
-| `ERROR_STATUS`, `ErrorCode`                                                                                         | every error code and the one HTTP status that answers it                      |
-| `JOIN_ERRORS`, `CHECK_ERRORS`, `RESERVE_ERRORS`, `CONFIRM_ERRORS`, `OUTCOME_ERRORS`, `ADMIN_ERRORS`, `FIELD_ERROR`   | the codes each operation may answer with                                      |
+| Export                                                                                                             | What it is                                                                                              |
+| ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `USER_ID_PATTERN`, `normalizeUserId`                                                                               | the user id rule; `normalizeUserId` trims, lowercases and returns `undefined` when the id is not usable |
+| `UUID_PATTERN`, `isUuid`                                                                                           | the id rule for sales and reservations                                                                  |
+| `TICKET_HEADER`, `RETRY_AFTER_HEADER`                                                                              | header names                                                                                            |
+| `SALE_STATUSES`, `SaleStatus`                                                                                      | the states a sale can have                                                                              |
+| `ERROR_STATUS`, `ErrorCode`                                                                                        | every error code and the one HTTP status that answers it                                                |
+| `JOIN_ERRORS`, `CHECK_ERRORS`, `RESERVE_ERRORS`, `CONFIRM_ERRORS`, `OUTCOME_ERRORS`, `ADMIN_ERRORS`, `FIELD_ERROR` | the codes each operation may answer with                                                                |
+| `HTTP_STATUS`, `FIRST_CLIENT_ERROR_STATUS`, `FIRST_SERVER_ERROR_STATUS`                                            | the statuses of a success, and where the client errors and the server errors start                      |
+| `MS_PER_SECOND`                                                                                                    | the one name for the thousand that turns seconds into milliseconds                                      |
 
 ## `@flash/contract`
 

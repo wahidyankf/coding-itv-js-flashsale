@@ -14,10 +14,12 @@ export type WatchOptions = {
 	retryMs?: number;
 };
 
+const DEFAULT_RETRY_MS = 1000;
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export function createWatcher(options: WatchOptions = {}): Watcher {
-	const retryMs = options.retryMs ?? 1000;
+	const retryMs = options.retryMs ?? DEFAULT_RETRY_MS;
 	return (url, onEvent, headers = {}) => {
 		const controller = new AbortController();
 		const fetcher = options.fetcher ?? fetch;

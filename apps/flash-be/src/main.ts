@@ -1,5 +1,6 @@
 import { attemptAsync } from "@flash/typekit";
 import { buildApp } from "./adapters/inbound/http/app.js";
+import { DEFAULT_STREAM_OPTIONS } from "./adapters/inbound/http/event-stream.js";
 import { createDb } from "./adapters/outbound/postgres/database.js";
 import { createRedis } from "./adapters/outbound/redis/redis-client.js";
 import { dependenciesFrom } from "./composition.js";
@@ -13,7 +14,7 @@ const deps = dependenciesFrom(db, redis, config);
 const app = buildApp(deps, {
 	logger: true,
 	trustProxy: config.trustProxy,
-	events: { intervalMs: config.eventsIntervalMs, heartbeatMs: 15_000 },
+	events: { ...DEFAULT_STREAM_OPTIONS, intervalMs: config.eventsIntervalMs },
 });
 
 // Admits the next shoppers of the current sale. Every instance runs this; the store lets one win each tick.

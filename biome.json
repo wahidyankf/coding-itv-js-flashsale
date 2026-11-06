@@ -41,7 +41,8 @@
 				"noInferrableTypes": "error",
 				"useNodejsImportProtocol": "error",
 				"useShorthandFunctionType": "error",
-				"noUselessElse": "error"
+				"noUselessElse": "error",
+				"noMagicNumbers": "error"
 			},
 			"suspicious": {
 				"noExplicitAny": "error",
@@ -78,6 +79,24 @@
 		}
 	},
 	"overrides": [
+		{
+			"includes": [
+				"**/*_tests.ts",
+				"**/*_tests.tsx",
+				"**/*_tests.mjs",
+				"**/*_integration_tests.ts",
+				"**/*_integration_tests.tsx",
+				"**/bdd/**",
+				"apps/*-e2e/**"
+			],
+			"linter": {
+				"rules": {
+					"style": {
+						"noMagicNumbers": "off"
+					}
+				}
+			}
+		},
 		{
 			"includes": ["apps/flash-load/k6/**"],
 			"javascript": {

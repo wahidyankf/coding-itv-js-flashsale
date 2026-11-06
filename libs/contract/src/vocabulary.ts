@@ -59,6 +59,19 @@ export const ERROR_STATUS = {
 
 export type ErrorCode = keyof typeof ERROR_STATUS;
 
+// The statuses of a success. An error is answered with `ERROR_STATUS[code]`, never with a number written by hand.
+export const HTTP_STATUS = {
+	ok: 200,
+	created: 201,
+} as const;
+
+// The first status of each class of failure, to tell a refusal from a fault.
+export const FIRST_CLIENT_ERROR_STATUS = 400;
+export const FIRST_SERVER_ERROR_STATUS = 500;
+
+// One name for the thousand that turns seconds into milliseconds, so no file writes it by hand.
+export const MS_PER_SECOND = 1000;
+
 // The codes each operation may answer with.
 export const JOIN_ERRORS = [
 	"sale_not_found",

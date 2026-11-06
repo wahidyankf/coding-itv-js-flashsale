@@ -1,4 +1,4 @@
-import { formatFrame, KEEP_ALIVE_FRAME } from "@flash/contract";
+import { formatFrame, HTTP_STATUS, KEEP_ALIVE_FRAME } from "@flash/contract";
 import { attemptAsync } from "@flash/typekit";
 import type { FastifyReply, FastifyRequest } from "fastify";
 
@@ -34,7 +34,7 @@ export function serveEvents(
 ): void {
 	reply.hijack();
 	const raw = reply.raw;
-	raw.writeHead(200, {
+	raw.writeHead(HTTP_STATUS.ok, {
 		"content-type": "text/event-stream",
 		"cache-control": "no-cache, no-transform",
 		connection: "keep-alive",

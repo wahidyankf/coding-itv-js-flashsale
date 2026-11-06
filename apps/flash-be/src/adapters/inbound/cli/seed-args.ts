@@ -3,6 +3,7 @@ import type { NewSale } from "../../../application/ports/sale-seeder.js";
 import {
 	DEFAULT_ADMIT_PER_SECOND,
 	DEFAULT_HOLD_SECONDS,
+	DEFAULT_SALE_DURATION_MINUTES,
 	DEFAULT_SALE_NAME,
 } from "../../../domain/sale-window.js";
 
@@ -49,7 +50,7 @@ export function parseSeedArgs(argv: string[], now: Date): NewSale {
 	const duration = integer(
 		"duration-minutes",
 		values["duration-minutes"],
-		60,
+		DEFAULT_SALE_DURATION_MINUTES,
 		1,
 	);
 	const startsAt = new Date(now.getTime() + startsIn * MINUTE_MS);

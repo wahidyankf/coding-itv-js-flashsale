@@ -1,3 +1,4 @@
+import { MS_PER_SECOND } from "@flash/contract";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SaleClient } from "./client";
 import {
@@ -52,7 +53,7 @@ export function useShopper(
 
 	const secondsLeft =
 		phase.kind === "holding"
-			? Math.max(0, Math.ceil((phase.expiresAt - clock) / 1000))
+			? Math.max(0, Math.ceil((phase.expiresAt - clock) / MS_PER_SECOND))
 			: 0;
 	useEffect(() => {
 		if (phase.kind === "holding" && phase.expiresAt <= clock) {

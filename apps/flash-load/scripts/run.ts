@@ -4,6 +4,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { MS_PER_SECOND } from "@flash/contract/vocabulary";
 import {
 	LIMITS,
 	PROFILE_NAMES,
@@ -12,6 +13,17 @@ import {
 	type ProfileName,
 } from "../k6/profiles.ts";
 import { bundleShop } from "./bundle.ts";
+
+// 256 MiB. A long k6 log and the container logs come back through one call, so the buffer is large.
+const MAX_COMPOSE_OUTPUT_BYTES = 268_435_456;
+// The instances cache the current sale for up to a second; the run waits a little longer before it starts k6.
+const SALE_CACHE_SETTLE_MS = 2500;
+// After k6 ends, the stack gets this long to finish what it had in flight before the data is read.
+const STACK_SETTLE_MS = 2000;
+// The seeded sale lasts longer than any profile.
+const SEED_DURATION_MINUTES = 30;
+// The API instances in apps/flash-load/compose.yaml.
+const INSTANCE_COUNT = 3;
 
 const root = path.resolve(import.meta.dirname, "..");
 const reports = path.resolve(root, "../../generated-reports/load");
@@ -40,7 +52,7 @@ function docker(...words: string[]): {
 	const run = spawnSync(
 		"docker",
 		["compose", "-f", path.join(root, "compose.yaml"), ...words],
-		{ encoding: "utf8", maxBuffer: 256 * 1024 * 1024 },
+		{ encoding: "utf8", maxBuffer: MAX_COMPOSE_OUTPUT_BYTES },
 	);
 	return { status: run.status, stdout: run.stdout, stderr: run.stderr };
 }
@@ -110,7 +122,7 @@ async function main(): Promise<number> {
 		"--admit-per-second",
 		String(profile.admitPerSecond),
 		"--duration-minutes",
-		"30",
+		String(SEED_DURATION_MINUTES),
 	);
 	const saleId = /seeded sale (\S+)/.exec(seeded)?.[1];
 	if (!saleId)
@@ -119,7 +131,7 @@ async function main(): Promise<number> {
 		`load: sale ${saleId}, stock ${profile.stock}, ${profile.users} shoppers`,
 	);
 	// The instances read the current sale on a short cache; give them a moment.
-	await sleep(2500);
+	await sleep(SALE_CACHE_SETTLE_MS);
 
 	// Chaos: stop Redis and start it again while shoppers are arriving.
 	const timers: NodeJS.Timeout[] = [];
@@ -129,7 +141,7 @@ async function main(): Promise<number> {
 			setTimeout(() => {
 				events.push(`Redis stopped at +${profile.redisStopsAtSeconds}s`);
 				docker("stop", "redis");
-			}, profile.redisStopsAtSeconds * 1000),
+			}, profile.redisStopsAtSeconds * MS_PER_SECOND),
 		);
 	}
 	if (profile.redisStartsAtSeconds !== undefined && !calm) {
@@ -137,7 +149,7 @@ async function main(): Promise<number> {
 			setTimeout(() => {
 				events.push(`Redis started at +${profile.redisStartsAtSeconds}s`);
 				docker("start", "redis");
-			}, profile.redisStartsAtSeconds * 1000),
+			}, profile.redisStartsAtSeconds * MS_PER_SECOND),
 		);
 	}
 
@@ -225,7 +237,7 @@ async function main(): Promise<number> {
 	writeFileSync(path.join(reports, `${name}-k6.log`), log.join(""));
 	// If k6 ended before the timers ran, Redis must still come back before the checks.
 	if (profile.redisStopsAtSeconds !== undefined) docker("start", "redis");
-	await sleep(2000);
+	await sleep(STACK_SETTLE_MS);
 
 	// k6 writes its summary when it finishes. Without it the load generator failed, which says nothing about the system:
 	// for example it ran out of memory while starting virtual users.
@@ -359,8 +371,11 @@ async function main(): Promise<number> {
 		);
 	}
 
-	// How the three instances shared the work.
-	const spread = [1, 2, 3].map((n) => {
+	// How the instances shared the work.
+	const spread = Array.from(
+		{ length: INSTANCE_COUNT },
+		(_, index) => index + 1,
+	).map((n) => {
 		const logs = docker("logs", "--no-log-prefix", `flash-be-${n}`).stdout;
 		return logs.split('"incoming request"').length - 1;
 	});

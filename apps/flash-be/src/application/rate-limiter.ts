@@ -1,3 +1,4 @@
+import { MS_PER_SECOND } from "@flash/contract/vocabulary";
 import { attemptAsync } from "@flash/typekit";
 import { normalizeUser } from "../domain/user.js";
 import type { Clock } from "./ports/clock.js";
@@ -37,7 +38,7 @@ export function createRateLimiter(
 			user: unknown;
 			ip: string;
 		}): Promise<RateLimitVerdict> {
-			const windowMs = limits.windowSeconds * 1000;
+			const windowMs = limits.windowSeconds * MS_PER_SECOND;
 			const address = await hit(
 				`address:${request.saleId}:${request.ip}`,
 				windowMs,
@@ -56,7 +57,7 @@ export function createRateLimiter(
 			const resetInMs = Math.max(...over.map((entry) => entry.resetInMs));
 			return {
 				limited: true,
-				retryAfterSeconds: Math.max(Math.ceil(resetInMs / 1000), 1),
+				retryAfterSeconds: Math.max(Math.ceil(resetInMs / MS_PER_SECOND), 1),
 			};
 		},
 	};

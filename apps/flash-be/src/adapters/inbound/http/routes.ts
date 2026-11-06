@@ -1,6 +1,8 @@
 import {
 	ADMIN_AUTH_HEADER,
 	ERROR_STATUS,
+	HTTP_STATUS,
+	MS_PER_SECOND,
 	type PlaceView,
 	routes,
 	type SaleView,
@@ -48,7 +50,7 @@ export function registerRoutes(
 	) => {
 		if (!verdict.limited) return;
 		return reply
-			.code(429)
+			.code(ERROR_STATUS.rate_limited)
 			.header("retry-after", String(verdict.retryAfterSeconds))
 			.send({
 				error: "rate_limited",
@@ -88,7 +90,7 @@ export function registerRoutes(
 		return ms > 0
 			? (reply.header(
 					"cache-control",
-					`public, max-age=${Math.ceil(ms / 1000)}`,
+					`public, max-age=${Math.ceil(ms / MS_PER_SECOND)}`,
 				) as R)
 			: reply;
 	};
@@ -108,10 +110,10 @@ export function registerRoutes(
 			const redis = await attemptAsync(() => deps.checkRedis(), Error);
 			if (database.isOk() && redis.isOk()) {
 				return reply
-					.code(200)
+					.code(HTTP_STATUS.ok)
 					.send({ status: "ok", checks: { database: "ok", redis: "ok" } });
 			}
-			return reply.code(503).send({
+			return reply.code(ERROR_STATUS.unavailable).send({
 				status: "unavailable",
 				checks: {
 					database: database.isOk() ? "ok" : "error",
@@ -127,8 +129,11 @@ export function registerRoutes(
 		schema: schemaOf(routes.currentSale),
 		handler: async (_request, reply) => {
 			const sale = await deps.sales.current();
-			if (!sale) return reply.code(404).send({ error: "sale_not_found" });
-			return cacheable(reply).code(200).send(sale);
+			if (!sale)
+				return reply
+					.code(ERROR_STATUS.sale_not_found)
+					.send({ error: "sale_not_found" });
+			return cacheable(reply).code(HTTP_STATUS.ok).send(sale);
 		},
 	});
 
@@ -137,8 +142,11 @@ export function registerRoutes(
 		schema: schemaOf(routes.sale),
 		handler: async (request, reply) => {
 			const sale = await deps.sales.byId(request.params.saleId);
-			if (!sale) return reply.code(404).send({ error: "sale_not_found" });
-			return cacheable(reply).code(200).send(sale);
+			if (!sale)
+				return reply
+					.code(ERROR_STATUS.sale_not_found)
+					.send({ error: "sale_not_found" });
+			return cacheable(reply).code(HTTP_STATUS.ok).send(sale);
 		},
 	});
 
@@ -150,7 +158,9 @@ export function registerRoutes(
 		handler: async (request, reply) => {
 			const { saleId } = request.params;
 			if (!(await deps.sales.byId(saleId))) {
-				return reply.code(404).send({ error: "sale_not_found" });
+				return reply
+					.code(ERROR_STATUS.sale_not_found)
+					.send({ error: "sale_not_found" });
 			}
 			return serveEvents(
 				request,
@@ -219,7 +229,7 @@ export function registerRoutes(
 			}
 			const { created, user, ticket, place } = joined.value;
 			return reply
-				.code(created ? 201 : 200)
+				.code(created ? HTTP_STATUS.created : HTTP_STATUS.ok)
 				.send({ userId: user, ticket, ...place });
 		},
 	});
@@ -239,7 +249,7 @@ export function registerRoutes(
 					.send({ error: checked.error });
 			}
 			return reply
-				.code(200)
+				.code(HTTP_STATUS.ok)
 				.send({ userId: checked.value.user, ...checked.value.place });
 		},
 	});
@@ -261,7 +271,7 @@ export function registerRoutes(
 					.send({ error: reserved.error });
 			}
 			const { created, user, reservationId, expiresAt } = reserved.value;
-			return reply.code(created ? 201 : 200).send({
+			return reply.code(created ? HTTP_STATUS.created : HTTP_STATUS.ok).send({
 				userId: user,
 				reservationId,
 				expiresAt: expiresAt.toISOString(),
@@ -286,7 +296,9 @@ export function registerRoutes(
 					.send({ error: confirmed.error });
 			}
 			const { created, purchase } = confirmed.value;
-			return reply.code(created ? 201 : 200).send(purchaseView(purchase));
+			return reply
+				.code(created ? HTTP_STATUS.created : HTTP_STATUS.ok)
+				.send(purchaseView(purchase));
 		},
 	});
 
@@ -303,7 +315,7 @@ export function registerRoutes(
 					.code(ERROR_STATUS[created.error])
 					.send({ error: created.error });
 			}
-			return reply.code(201).send(created.value);
+			return reply.code(HTTP_STATUS.created).send(created.value);
 		},
 	});
 
@@ -324,18 +336,18 @@ export function registerRoutes(
 			const { user, outcome } = found.value;
 			if (outcome.state === "purchased") {
 				return reply
-					.code(200)
+					.code(HTTP_STATUS.ok)
 					.send({ ...purchaseView(outcome.purchase), state: "purchased" });
 			}
 			if (outcome.state === "holding") {
-				return reply.code(200).send({
+				return reply.code(HTTP_STATUS.ok).send({
 					userId: user,
 					state: "holding",
 					reservationId: outcome.reservationId,
 					expiresAt: outcome.expiresAt.toISOString(),
 				});
 			}
-			return reply.code(200).send({ userId: user, state: "none" });
+			return reply.code(HTTP_STATUS.ok).send({ userId: user, state: "none" });
 		},
 	});
 }

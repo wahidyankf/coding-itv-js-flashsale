@@ -1,3 +1,4 @@
+import { MS_PER_SECOND } from "@flash/contract/vocabulary";
 import type { Sale } from "./sale.js";
 
 // The hold one user has on one item of a sale.
@@ -54,7 +55,9 @@ export function holdRequest(
 		user,
 		reservationId,
 		now,
-		expiresAt: new Date(now.getTime() + sale.reservationTtlSeconds * 1000),
+		expiresAt: new Date(
+			now.getTime() + sale.reservationTtlSeconds * MS_PER_SECOND,
+		),
 		stock: sale.stock,
 	};
 }

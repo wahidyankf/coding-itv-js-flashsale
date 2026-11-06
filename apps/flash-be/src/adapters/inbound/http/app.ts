@@ -2,6 +2,8 @@ import {
 	ERROR_STATUS,
 	type ErrorCode,
 	FIELD_ERROR,
+	FIRST_CLIENT_ERROR_STATUS,
+	FIRST_SERVER_ERROR_STATUS,
 	routes,
 } from "@flash/contract";
 import Fastify, { type FastifyInstance } from "fastify";
@@ -52,7 +54,8 @@ export function applyContract(app: FastifyInstance): void {
 		const { status, body } = refuse(
 			errorCodeOf(error, request.routeOptions.url),
 		);
-		if (status >= 500) request.log.error({ err: error }, "request failed");
+		if (status >= FIRST_SERVER_ERROR_STATUS)
+			request.log.error({ err: error }, "request failed");
 		return reply.code(status).send(body);
 	});
 }
@@ -70,7 +73,9 @@ function errorCodeOf(error: unknown, url: string | undefined): ErrorCode {
 			: FIELD_ERROR.userId;
 	}
 	const status = (error as { statusCode?: unknown }).statusCode;
-	return typeof status === "number" && status >= 400 && status < 500
+	return typeof status === "number" &&
+		status >= FIRST_CLIENT_ERROR_STATUS &&
+		status < FIRST_SERVER_ERROR_STATUS
 		? "invalid_request"
 		: "internal";
 }

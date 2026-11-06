@@ -26,6 +26,7 @@ export type Config = {
 };
 
 const ADMIN_TOKEN_MIN_LENGTH = 16;
+const MAX_PORT = 65535;
 
 const localDefaults = {
 	host: "::",
@@ -34,6 +35,19 @@ const localDefaults = {
 	redisUrl: "redis://localhost:6379",
 	ticketSecret: "local-development-ticket-secret",
 };
+
+// The default of each setting that has one. They are the values in .env.example and in the docs; a test holds them.
+const settingDefaults = {
+	admissionTickMs: 1000,
+	admissionTtlSeconds: 600,
+	paymentLatencyMs: 150,
+	paymentFailureRate: 0.02,
+	rateLimitWindowSeconds: 10,
+	rateLimitPerUser: 30,
+	rateLimitPerIp: 600,
+	saleCacheMs: 1000,
+	eventsIntervalMs: 1000,
+} as const;
 
 // Local defaults match compose.dev.yaml. In production, the URLs must come from the environment.
 export function buildConfig(env: NodeJS.ProcessEnv): Config {
@@ -47,7 +61,7 @@ export function buildConfig(env: NodeJS.ProcessEnv): Config {
 	};
 
 	const port = Number(env.FLASH_BE_PORT ?? localDefaults.port);
-	if (!Number.isInteger(port) || port < 1 || port > 65535) {
+	if (!Number.isInteger(port) || port < 1 || port > MAX_PORT) {
 		throw new Error("FLASH_BE_PORT must be a valid port number");
 	}
 
@@ -101,15 +115,39 @@ export function buildConfig(env: NodeJS.ProcessEnv): Config {
 		databaseUrl: withDefault("DATABASE_URL", localDefaults.databaseUrl),
 		redisUrl: withDefault("REDIS_URL", localDefaults.redisUrl),
 		ticketSecret: withDefault("TICKET_SECRET", localDefaults.ticketSecret),
-		admissionTickMs: positive("ADMISSION_TICK_MS", 1000),
-		admissionTtlSeconds: positive("ADMISSION_TTL_SECONDS", 600),
-		paymentLatencyMs: latency("PAYMENT_LATENCY_MS", 150),
-		paymentFailureRate: rate("PAYMENT_FAILURE_RATE", 0.02),
-		rateLimitWindowSeconds: positive("RATE_LIMIT_WINDOW_SECONDS", 10),
-		rateLimitPerUser: positive("RATE_LIMIT_PER_USER", 30),
-		rateLimitPerIp: positive("RATE_LIMIT_PER_IP", 600),
-		saleCacheMs: latency("SALE_CACHE_MS", 1000),
-		eventsIntervalMs: positive("EVENTS_INTERVAL_MS", 1000),
+		admissionTickMs: positive(
+			"ADMISSION_TICK_MS",
+			settingDefaults.admissionTickMs,
+		),
+		admissionTtlSeconds: positive(
+			"ADMISSION_TTL_SECONDS",
+			settingDefaults.admissionTtlSeconds,
+		),
+		paymentLatencyMs: latency(
+			"PAYMENT_LATENCY_MS",
+			settingDefaults.paymentLatencyMs,
+		),
+		paymentFailureRate: rate(
+			"PAYMENT_FAILURE_RATE",
+			settingDefaults.paymentFailureRate,
+		),
+		rateLimitWindowSeconds: positive(
+			"RATE_LIMIT_WINDOW_SECONDS",
+			settingDefaults.rateLimitWindowSeconds,
+		),
+		rateLimitPerUser: positive(
+			"RATE_LIMIT_PER_USER",
+			settingDefaults.rateLimitPerUser,
+		),
+		rateLimitPerIp: positive(
+			"RATE_LIMIT_PER_IP",
+			settingDefaults.rateLimitPerIp,
+		),
+		saleCacheMs: latency("SALE_CACHE_MS", settingDefaults.saleCacheMs),
+		eventsIntervalMs: positive(
+			"EVENTS_INTERVAL_MS",
+			settingDefaults.eventsIntervalMs,
+		),
 		trustProxy: flag("TRUST_PROXY", false),
 		adminToken,
 	};

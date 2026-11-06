@@ -24,18 +24,18 @@ it to understand the system; it only matters when you change the code.
 
 ### What the brief asks for, and where it is
 
-| The brief asks for                | Where it is                                                                                                                                                                                                                                              |
-| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A configurable start and end time | `sales.starts_at` and `ends_at`. Set them with `POST /admin/sales` (absolute times, needs `ADMIN_TOKEN`) or with the seed command (minutes from now)                                                                                                     |
-| One product, limited stock        | `sales.stock`, with `UPDATE ... WHERE sold < stock` and `CHECK (sold <= stock)` in Postgres                                                                                                                                                              |
-| One item per user                 | `UNIQUE(sale_id, user_id)` on purchases and on reservations; a Redis set of buyers in front of it                                                                                                                                                        |
-| An endpoint for the sale status   | `GET /sales/current` and `GET /sales/:saleId`, plus a live stream at `.../events`                                                                                                                                                                        |
+| The brief asks for                | Where it is                                                                                                                                                                                                                             |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A configurable start and end time | `sales.starts_at` and `ends_at`. Set them with `POST /admin/sales` (absolute times, needs `ADMIN_TOKEN`) or with the seed command (minutes from now)                                                                                    |
+| One product, limited stock        | `sales.stock`, with `UPDATE ... WHERE sold < stock` and `CHECK (sold <= stock)` in Postgres                                                                                                                                             |
+| One item per user                 | `UNIQUE(sale_id, user_id)` on purchases and on reservations; a Redis set of buyers in front of it                                                                                                                                       |
+| An endpoint for the sale status   | `GET /sales/current` and `GET /sales/:saleId`, plus a live stream at `.../events`                                                                                                                                                       |
 | An endpoint to attempt a purchase | Three calls, because a rush needs a queue: `POST /sales/:saleId/queue` (join, get a ticket), `POST .../reservations` (hold one item), `POST .../purchases` (pay). **Buy Now** makes the first two; **Confirm purchase** makes the third |
-| An endpoint to check the outcome  | `GET /sales/:saleId/purchases/:userId`: a purchase, a live hold, or nothing                                                                                                                                                                              |
-| A simple React frontend           | `apps/flash-web`                                                                                                                                                                                                                                         |
-| A system diagram                  | below; the C4 views are in [specs/apps/flash/c4](specs/apps/flash/c4/README.md)                                                                                                                                                                |
-| Unit and integration tests        | next to the code; the apps add Gherkin scenarios bound at unit, integration and end-to-end level (see [Tests](#tests))                                                                                                                                           |
-| Stress tests                      | `apps/flash-load` (see [Load test](#load-test))                                                                                                                                                                                                          |
+| An endpoint to check the outcome  | `GET /sales/:saleId/purchases/:userId`: a purchase, a live hold, or nothing                                                                                                                                                             |
+| A simple React frontend           | `apps/flash-web`                                                                                                                                                                                                                        |
+| A system diagram                  | below; the C4 views are in [specs/apps/flash/c4](specs/apps/flash/c4/README.md)                                                                                                                                                         |
+| Unit and integration tests        | next to the code; the apps add Gherkin scenarios bound at unit, integration and end-to-end level (see [Tests](#tests))                                                                                                                  |
+| Stress tests                      | `apps/flash-load` (see [Load test](#load-test))                                                                                                                                                                                         |
 
 ## What is in the repository
 
@@ -245,6 +245,7 @@ npm run openapi:check          # docs/reference/openapi.json matches the routes
 npm run contract:guard:test    # no API path or ticket header written by hand in product code
 npm run lint:rules:test        # the lint rules: no catch, exhaustive switches
 npm run bdd:check              # every scenario is bound at the layers it needs
+npm run lint                   # Biome check of the whole repo: format, lint, imports
 npm run docs:install           # once: fetch the docs checker
 npm run docs:check             # links, structure and diagrams in the docs
 ```
@@ -307,8 +308,8 @@ generator on its own machine. The limits were not changed. See
 
 The chaos run found that paying while Redis was down took about two seconds, because of how the Redis client queues a
 transaction. That is fixed, with a scenario that holds the outage and requires an answer in under 500 ms. The story is
-in [what the load runs found](docs/explanation/load-test-findings.md). The profiles and checks are in
-[docs/reference/load-test.md](docs/reference/load-test.md), and the steps in
+in [what the load runs found](docs/explanation/load-test-findings.md). The profiles are in [docs/reference/load-test.md](docs/reference/load-test.md), the limits and checks in
+[specs/apps/flash/load](specs/apps/flash/load/README.md), and the steps in
 [how to run the load test](docs/how-to/run-the-load-test.md).
 
 ## Documentation

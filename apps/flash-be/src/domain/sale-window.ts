@@ -13,6 +13,7 @@ export type NewSale = {
 export const DEFAULT_SALE_NAME = "Flash sale";
 export const DEFAULT_HOLD_SECONDS = 120;
 export const DEFAULT_ADMIT_PER_SECOND = 50;
+export const DEFAULT_SALE_DURATION_MINUTES = 60;
 const NAME_MAX_LENGTH = 120;
 
 // What an operator sends, before any rule has looked at it.

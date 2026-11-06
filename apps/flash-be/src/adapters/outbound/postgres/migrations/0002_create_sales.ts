@@ -1,5 +1,10 @@
 import { type Kysely, sql } from "kysely";
 
+// The defaults of the two columns, frozen here: a migration never reads a live default, or an old database would change
+// with the code.
+const HOLD_SECONDS_DEFAULT = 120;
+const ADMIT_PER_SECOND_DEFAULT = 50;
+
 // The sale schema. Postgres is the source of truth: the constraints below are the last wall against
 // overselling and against a user buying twice, whatever Redis said.
 export async function up(db: Kysely<unknown>): Promise<void> {
@@ -17,10 +22,10 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 		.addColumn("stock", "integer", (col) => col.notNull())
 		.addColumn("sold", "integer", (col) => col.notNull().defaultTo(0))
 		.addColumn("reservation_ttl_seconds", "integer", (col) =>
-			col.notNull().defaultTo(120),
+			col.notNull().defaultTo(HOLD_SECONDS_DEFAULT),
 		)
 		.addColumn("admit_per_second", "integer", (col) =>
-			col.notNull().defaultTo(50),
+			col.notNull().defaultTo(ADMIT_PER_SECOND_DEFAULT),
 		)
 		.addColumn("created_at", "timestamptz", (col) =>
 			col.notNull().defaultTo(sql`now()`),

@@ -1,4 +1,4 @@
-import type { SaleStatus } from "@flash/contract/vocabulary";
+import { MS_PER_SECOND, type SaleStatus } from "@flash/contract/vocabulary";
 
 export type Sale = {
 	id: string;
@@ -59,7 +59,10 @@ export function queueBlock(status: SaleStatus): QueueBlock | undefined {
 
 // How many shoppers one admission tick lets in. At least one, so a slow rate never stalls the line.
 export function admissionsPerTick(sale: Sale, tickMs: number): number {
-	return Math.max(1, Math.round((sale.admitPerSecond * tickMs) / 1000));
+	return Math.max(
+		1,
+		Math.round((sale.admitPerSecond * tickMs) / MS_PER_SECOND),
+	);
 }
 
 // A malformed id can never match a row, so the lookup is skipped instead of failing in Postgres. The rule lives in the
