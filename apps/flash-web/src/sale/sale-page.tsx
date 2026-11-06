@@ -134,7 +134,7 @@ function SaleShop({ sale, client }: { sale: SaleView; client: SaleClient }) {
 							className={`h-11 rounded-lg border border-slate-300 bg-white px-3 text-base font-normal text-slate-900 placeholder:text-slate-400 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 ${FOCUS}`}
 						/>
 					</label>
-					<div className="grid gap-3 sm:grid-cols-2">
+					<div className="grid gap-3 sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2">
 						<button
 							type="submit"
 							disabled={!canBuy}

@@ -4,7 +4,7 @@ Guidance for AI coding agents working in this repository. For setup and run comm
 
 ## Project
 
-Flash sale monorepo with five apps in `apps/` and one library in `libs/`: `flash-be` (Fastify REST API), `flash-web` (TanStack Start client),
+Flash sale monorepo with five apps in `apps/` and one library in `libs/`: `flash-be` (Fastify REST API), `flash-web` (TanStack Start client, styled with Tailwind CSS),
 `flash-be-e2e` and `flash-web-e2e` (Playwright), and `flash-load` (k6 load test). `libs/typekit` (`@flash/typekit`) holds `Result` and `attempt`; `flash-be` and `flash-web` use it. Data lives in Postgres (Kysely, no ORM) and Redis.
 
 ## Docs and specs
@@ -34,6 +34,9 @@ Flash sale monorepo with five apps in `apps/` and one library in `libs/`: `flash
   scenario (`docs/how-to/change-an-endpoint.md`). An error reply is `{ errorCode, errorMessage }` (plus `retryAfterSeconds`
   for `429`); the status is not in the body.
 - Biome formats and lints (tabs, double quotes). Do not add Prettier or ESLint.
+- `flash-web` is styled with Tailwind classes in the components (`src/styles.css` only imports Tailwind). Do not add inline
+  style blocks or another CSS library. The page must stay readable from a phone to a desktop and in light and dark mode. Colour
+  is never the only signal: the words stay on screen.
 - Failures are values. Product code (`apps/*/src`, `libs/*/src`, not tests or `src/bdd`) has no `catch` clause and no
   `.catch(` call: a call that may throw goes through `attempt` or `attemptAsync` from `@flash/typekit`, naming the failure it
   expects, and a function that can fail returns a `Result`. A lookup that may find nothing returns `undefined`, typed `T | undefined`. Close every

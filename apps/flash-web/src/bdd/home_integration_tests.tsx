@@ -56,11 +56,11 @@ describeFeature(
 				});
 
 				Then('the page heading is "Flash Sale"', () => {
-					expect(html).toContain("<h1>Flash Sale</h1>");
+					expect(html).toMatch(/<h1[^>]*>Flash Sale<\/h1>/);
 				});
 
 				And('the page says "Backend: ok"', () => {
-					expect(html).toContain("Backend: <strong>ok</strong>");
+					expect(html).toMatch(/Backend: <strong[^>]*>ok<\/strong>/);
 				});
 			},
 		);
@@ -80,7 +80,7 @@ describeFeature(
 				});
 
 				Then('the page says "Backend: down"', () => {
-					expect(html).toContain("Backend: <strong>down</strong>");
+					expect(html).toMatch(/Backend: <strong[^>]*>down<\/strong>/);
 				});
 			},
 		);
@@ -100,7 +100,7 @@ describeFeature(
 				});
 
 				Then('the page says "Backend: down"', () => {
-					expect(html).toContain("Backend: <strong>down</strong>");
+					expect(html).toMatch(/Backend: <strong[^>]*>down<\/strong>/);
 				});
 			},
 		);
@@ -120,7 +120,7 @@ describeFeature(
 				});
 
 				Then('the page says "Backend: down"', () => {
-					expect(html).toContain("Backend: <strong>down</strong>");
+					expect(html).toMatch(/Backend: <strong[^>]*>down<\/strong>/);
 				});
 			},
 		);
