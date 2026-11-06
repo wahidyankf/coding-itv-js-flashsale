@@ -239,4 +239,4 @@ rate limits. `SALE_CACHE_MS` (1000) sets the sale read cache. `EVENTS_INTERVAL_M
 
 ## Manual requests
 
-[`api.http`](../../api.http) holds the requests above in the kulala.nvim format.
+[`api-flash-be.http`](../../api-flash-be.http) and [`api-flash-web.http`](../../api-flash-web.http) hold the requests above in the kulala.nvim format, one file per app.

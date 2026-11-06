@@ -315,5 +315,5 @@ in [what the load runs found](docs/explanation/load-test-findings.md). The profi
 
 - [docs/](docs/README.md): a tutorial, how-to guides, reference and explanations.
 - [specs/](specs/README.md): the apps' Gherkin behaviour scenarios and the C4 architecture. Specs win when they disagree with the docs.
-- [api.http](api.http): manual requests for every endpoint.
+- [api-flash-be.http](api-flash-be.http) and [api-flash-web.http](api-flash-web.http): manual requests for the API and the web server.
 - [AGENTS.md](AGENTS.md): rules for people and tools that change the code.
