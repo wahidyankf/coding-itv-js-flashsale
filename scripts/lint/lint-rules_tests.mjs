@@ -2,14 +2,9 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
-import { afterAll, expect } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../..");
-const FEATURE = path.join(
-	REPO_ROOT,
-	"specs/tooling/lint-rules/behaviours/product-code.feature",
-);
 const BIOME = path.join(REPO_ROOT, "node_modules/.bin/biome");
 
 // The rules come from the repo's own biome.json, so this test follows the real configuration. Only the file scope
@@ -97,108 +92,32 @@ const ALL_THREE = SWITCH(
 			return "go";`,
 );
 
-describeFeature(await loadFeature(FEATURE), ({ Scenario }) => {
-	Scenario(
-		"A catch clause in product code is an error",
-		({ Given, When, Then, And }) => {
-			let outcome;
-			let source = "";
-			Given("product code with a try block and a catch clause", () => {
-				source = CATCH;
-			});
-			When("the linter runs on it", () => {
-				outcome = lint(source);
-			});
-			Then("the run fails", () => {
-				expect(outcome.status).not.toBe(0);
-			});
-			And(
-				"the message tells the author to return a Result with attempt",
-				() => {
-					expect(outcome.output).toContain("Return a Result with attempt");
-				},
-			);
-		},
-	);
+describe("lint rules for product code", () => {
+	it("A catch clause in product code is an error", () => {
+		const outcome = lint(CATCH);
+		expect(outcome.status).not.toBe(0);
+		expect(outcome.output).toContain("Return a Result with attempt");
+	});
 
-	Scenario(
-		"A promise catch call in product code is an error",
-		({ Given, When, Then, And }) => {
-			let outcome;
-			let source = "";
-			Given("product code that calls .catch on a promise", () => {
-				source = PROMISE_CATCH;
-			});
-			When("the linter runs on it", () => {
-				outcome = lint(source);
-			});
-			Then("the run fails", () => {
-				expect(outcome.status).not.toBe(0);
-			});
-			And("the message tells the author to use attemptAsync", () => {
-				expect(outcome.output).toContain("Use attemptAsync");
-			});
-		},
-	);
+	it("A promise catch call in product code is an error", () => {
+		const outcome = lint(PROMISE_CATCH);
+		expect(outcome.status).not.toBe(0);
+		expect(outcome.output).toContain("Use attemptAsync");
+	});
 
-	Scenario(
-		"A try block with finally and no catch is allowed",
-		({ Given, When, Then }) => {
-			let outcome;
-			let source = "";
-			Given("product code with a try block and a finally clause only", () => {
-				source = FINALLY_ONLY;
-			});
-			When("the linter runs on it", () => {
-				outcome = lint(source);
-			});
-			Then("the run passes", () => {
-				expect(outcome.output).not.toContain("Do not catch");
-				expect(outcome.status).toBe(0);
-			});
-		},
-	);
+	it("A try block with finally and no catch is allowed", () => {
+		const outcome = lint(FINALLY_ONLY);
+		expect(outcome.output).not.toContain("Do not catch");
+		expect(outcome.status).toBe(0);
+	});
 
-	Scenario(
-		"A switch that forgets a case of a union is an error",
-		({ Given, When, Then, And }) => {
-			let outcome;
-			let source = "";
-			Given(
-				"product code with a switch over a union that handles two of three cases",
-				() => {
-					source = TWO_OF_THREE;
-				},
-			);
-			When("the linter runs on it", () => {
-				outcome = lint(source);
-			});
-			Then("the run fails", () => {
-				expect(outcome.status).not.toBe(0);
-			});
-			And("the message says the switch is not exhaustive", () => {
-				expect(outcome.output).toContain("not exhaustive");
-			});
-		},
-	);
+	it("A switch that forgets a case of a union is an error", () => {
+		const outcome = lint(TWO_OF_THREE);
+		expect(outcome.status).not.toBe(0);
+		expect(outcome.output).toContain("not exhaustive");
+	});
 
-	Scenario(
-		"A switch that handles every case of a union is allowed",
-		({ Given, When, Then }) => {
-			let outcome;
-			let source = "";
-			Given(
-				"product code with a switch over a union that handles all three cases",
-				() => {
-					source = ALL_THREE;
-				},
-			);
-			When("the linter runs on it", () => {
-				outcome = lint(source);
-			});
-			Then("the run passes", () => {
-				expect(outcome.status).toBe(0);
-			});
-		},
-	);
+	it("A switch that handles every case of a union is allowed", () => {
+		expect(lint(ALL_THREE).status).toBe(0);
+	});
 });

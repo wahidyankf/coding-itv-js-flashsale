@@ -7,5 +7,5 @@ bug to fix.
 ## Directory Map
 
 - [flash/](flash/README.md) - the flash sale product: its architecture, the API (`be`), and the web app (`web`).
-- [typekit/](typekit/README.md) - the typed `Result` and `attempt` library in `libs/typekit`.
-- [tooling/](tooling/README.md) - the repository's own tools, such as the behaviour check.
+
+Only the apps use Gherkin. The libraries and the repository's tools are tested with plain Vitest tests next to their code.

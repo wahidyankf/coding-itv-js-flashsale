@@ -3,7 +3,7 @@
 	"version": "0.1.0",
 	"private": true,
 	"type": "module",
-	"description": "Typed Result, attempt and exhaustive-match helpers. A TypeScript port of py-typekit.",
+	"description": "Typed Result and attempt helpers. A TypeScript port of py-typekit.",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"exports": {

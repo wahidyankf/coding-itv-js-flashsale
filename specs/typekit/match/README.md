@@ -1,7 +1,0 @@
-# Match
-
-Scenarios for exhaustive matching.
-
-## Directory Map
-
-- [matching.feature](matching.feature) - `match` on a `Result`.

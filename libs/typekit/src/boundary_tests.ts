@@ -38,6 +38,30 @@ describe("attempt with several guards", () => {
 		expectTypeOf(outcome).toEqualTypeOf<Result<number, Error>>();
 		expect(outcome).toEqual(new Ok(1));
 	});
+
+	it("returns an Err holding the same exception", () => {
+		const thrown = new NotFound("gone");
+		const outcome = attempt(() => {
+			throw thrown;
+		}, NotFound);
+		expect(outcome.isErr() && outcome.error).toBe(thrown);
+	});
+
+	it("lets an exception of another type through unchanged", () => {
+		const thrown = new TypeError("wrong type");
+		expect(() =>
+			attempt(() => {
+				throw thrown;
+			}, NotFound),
+		).toThrow(thrown);
+	});
+
+	it("refuses a call with no guard, at run time as well as in the types", () => {
+		expect(() => {
+			// @ts-expect-error at least one guard must be named
+			attempt(() => 1);
+		}).toThrow(TypeError);
+	});
 });
 
 describe("attemptAsync with guards", () => {
@@ -54,5 +78,33 @@ describe("attemptAsync with guards", () => {
 			NotFound,
 		);
 		expect(outcome.isErr()).toBe(true);
+	});
+
+	it("returns Ok with the value a promise resolves to", async () => {
+		expect(await attemptAsync(async () => 7, Error)).toEqual(new Ok(7));
+	});
+
+	it("returns an Err holding the same rejection", async () => {
+		const thrown = new RangeError("out of range");
+		const outcome = await attemptAsync(
+			() => Promise.reject(thrown),
+			RangeError,
+		);
+		expect(outcome.isErr() && outcome.error).toBe(thrown);
+	});
+
+	it("lets a rejection of another type through", async () => {
+		const thrown = new TypeError("wrong type");
+		await expect(
+			attemptAsync(() => Promise.reject(thrown), RangeError),
+		).rejects.toBe(thrown);
+	});
+
+	it("catches a call that throws before it returns a promise", async () => {
+		const thrown = new RangeError("at once");
+		const outcome = await attemptAsync(() => {
+			throw thrown;
+		}, RangeError);
+		expect(outcome.isErr() && outcome.error).toBe(thrown);
 	});
 });

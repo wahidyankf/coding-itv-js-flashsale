@@ -32,7 +32,7 @@ parse("21").match({
 - Name the failure you expect. A thrown value that no guard accepts is thrown on, so a bug is not hidden.
 - A value that may be missing is `T | undefined`. TypeScript's strict options make the check impossible to forget.
 
-The behaviour is specified in [specs/typekit](../../specs/typekit/README.md). Every name is in the
+Its tests are plain Vitest tests next to the source, with no Gherkin. Every name is in the
 [reference](../../docs/reference/typekit.md), the steps are in
 [how to handle failures with Result](../../docs/how-to/handle-failures-with-result.md), and the reasons are in
 [failures as values](../../docs/explanation/failures-as-values.md).
