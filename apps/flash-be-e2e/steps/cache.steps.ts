@@ -1,7 +1,9 @@
+import { routes } from "@flash/contract";
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
+import { send } from "./support/api.js";
 import { currentResponse, setResponse } from "./support/response.js";
-import { query, startApi, world } from "./support/world.js";
+import { query, world } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
 
@@ -20,14 +22,16 @@ Given("the sale reads are not cached", async ({ request: _request }) => {
 });
 
 Given("a client has asked for that sale", async ({ request }) => {
-	const url = await startApi();
-	setResponse(await request.get(`${url}/sales/${world.saleId}`));
+	setResponse(
+		await send(request, routes.sale, {
+			params: { saleId: world.saleId ?? "" },
+		}),
+	);
 });
 
 // Nothing exists yet, so this read is the "not found" the cache must not keep.
 Given("a client has asked for the current sale", async ({ request }) => {
-	const url = await startApi();
-	const reply = await request.get(`${url}/sales/current`);
+	const reply = await send(request, routes.currentSale, {});
 	expect(reply.status()).toBe(404);
 	setResponse(reply);
 });
@@ -44,8 +48,11 @@ When(
 );
 
 When("a client asks for that sale again", async ({ request }) => {
-	const url = await startApi();
-	setResponse(await request.get(`${url}/sales/${world.saleId}`));
+	setResponse(
+		await send(request, routes.sale, {
+			params: { saleId: world.saleId ?? "" },
+		}),
+	);
 });
 
 Then(

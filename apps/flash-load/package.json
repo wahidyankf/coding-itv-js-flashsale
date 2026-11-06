@@ -8,9 +8,15 @@
 		"lint": "biome lint --error-on-warnings .",
 		"load:smoke": "node scripts/run.ts smoke",
 		"load:full": "node scripts/run.ts full",
-		"load:chaos": "node scripts/run.ts chaos"
+		"load:chaos": "node scripts/run.ts chaos",
+		"bundle": "node scripts/bundle.ts"
 	},
 	"devDependencies": {
-		"@types/k6": "^2.3.1"
+		"@types/k6": "^2.3.1",
+		"esbuild": "^0.28.2"
+	},
+	"dependencies": {
+		"@flash/contract": "*",
+		"@flash/typekit": "*"
 	}
 }

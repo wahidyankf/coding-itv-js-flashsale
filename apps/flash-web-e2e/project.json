@@ -9,7 +9,7 @@
 			"executor": "nx:run-commands",
 			"dependsOn": [
 				{
-					"projects": ["typekit"],
+					"projects": ["typekit", "contract"],
 					"target": "build"
 				}
 			],
@@ -22,7 +22,7 @@
 			"executor": "nx:run-commands",
 			"dependsOn": [
 				{
-					"projects": ["typekit"],
+					"projects": ["typekit", "contract"],
 					"target": "build"
 				}
 			],
@@ -35,7 +35,7 @@
 			"executor": "nx:run-commands",
 			"dependsOn": [
 				{
-					"projects": ["typekit"],
+					"projects": ["typekit", "contract"],
 					"target": "build"
 				}
 			],

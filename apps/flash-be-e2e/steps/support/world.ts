@@ -2,6 +2,7 @@ import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import net from "node:net";
 import path from "node:path";
+import type { PurchaseView, ReservedView } from "@flash/contract";
 import { type APIResponse, expect } from "@playwright/test";
 import pg from "pg";
 
@@ -28,11 +29,11 @@ export const world: {
 	queue?: {
 		tickets: Map<string, string>;
 		joined: string[];
-		holds: Map<string, unknown>;
-		purchases: Map<string, unknown>;
+		holds: Map<string, ReservedView>;
+		purchases: Map<string, PurchaseView>;
 		replies: Array<{
 			status: number;
-			error?: string;
+			error?: string | undefined;
 			retryAfter?: string | undefined;
 		}>;
 	};

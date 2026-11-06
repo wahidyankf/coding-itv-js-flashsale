@@ -1,7 +1,9 @@
+import { routes } from "@flash/contract";
 import { type APIRequestContext, expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
+import { bodyOf, send } from "./support/api.js";
 import { currentResponse, setResponse } from "./support/response.js";
-import { migratedDatabase, query, startApi, world } from "./support/world.js";
+import { migratedDatabase, query, world } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
 
@@ -79,35 +81,40 @@ Given("no sale exists", async () => {
 });
 
 When("a client asks for that sale", async ({ request }) => {
-	const url = await startApi();
-	setResponse(await request.get(`${url}/sales/${world.saleId}`));
+	setResponse(
+		await send(request, routes.sale, {
+			params: { saleId: world.saleId ?? "" },
+		}),
+	);
 });
 
 When("a client asks for the current sale", async ({ request }) => {
-	const url = await startApi();
-	setResponse(await request.get(`${url}/sales/current`));
+	setResponse(await send(request, routes.currentSale, {}));
 });
 
 When(
 	/^a client asks for the sale with id "([^"]+)"$/,
 	async ({ request }, id: string) => {
-		const url = await startApi();
-		setResponse(await request.get(`${url}/sales/${id}`));
+		setResponse(await send(request, routes.sale, { params: { saleId: id } }));
 	},
 );
 
 // Reads the sale again, so the answer is the state now and not the body of the last response.
 async function saleNow(request: APIRequestContext) {
-	const url = await startApi();
-	return (await request.get(`${url}/sales/${world.saleId}`)).json();
+	return bodyOf(
+		routes.sale,
+		await send(request, routes.sale, {
+			params: { saleId: world.saleId ?? "" },
+		}),
+	);
 }
 
 Then(/^the sale status is "([^"]+)"$/, async ({ request }, status: string) => {
-	expect((await saleNow(request)).status).toBe(status);
+	expect((await saleNow(request))?.status).toBe(status);
 });
 
 Then(/^(\d+) items remain$/, async ({ request }, remaining: string) => {
-	expect((await saleNow(request)).remaining).toBe(Number(remaining));
+	expect((await saleNow(request))?.remaining).toBe(Number(remaining));
 });
 
 Then(

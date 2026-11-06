@@ -1,3 +1,14 @@
+import type { ApiFailure } from "@flash/contract";
+import {
+	buildRequest,
+	parseReply,
+	type Reply,
+	type RequestInput,
+	type Route,
+	routes,
+	TICKET_HEADER,
+} from "@flash/contract";
+import type { Result } from "@flash/typekit";
 import { check, sleep } from "k6";
 import exec from "k6/execution";
 import http from "k6/http";
@@ -61,32 +72,50 @@ export const options: Options = {
 	summaryTrendStats: ["avg", "med", "p(90)", "p(95)", "p(99)", "max"],
 };
 
-type Answer = { status: number; json: Record<string, unknown> };
+type Answer<R extends Route> = {
+	status: number;
+	result: Result<Reply<R>, ApiFailure>;
+};
 
-// One request. The user's address goes in X-Forwarded-For, which the API trusts behind the proxy, so each shopper is
-// limited on their own and not as one address.
-function call(
-	method: "GET" | "POST",
-	path: string,
+// The reply when the route did not refuse it, and the name of the refusal when it did.
+function bodyOf<R extends Route>(
+	answer: Answer<R>,
+): Reply<R>["body"] | undefined {
+	return answer.result.isOk() ? answer.result.value.body : undefined;
+}
+
+function errorOf<R extends Route>(
+	answer: Answer<R>,
+): ApiFailure["error"] | undefined {
+	return answer.result.isErr() ? answer.result.error.error : undefined;
+}
+
+// One request, built and read through the contract. The user's address goes in X-Forwarded-For, which the API trusts
+// behind the proxy, so each shopper is limited on their own and not as one address.
+function call<R extends Route>(
+	route: R,
+	input: RequestInput<R>,
 	name: string,
-	headers: Record<string, string>,
-	body?: unknown,
-): Answer {
-	const url = `${BASE}/sales/${SALE}${path}`;
-	const params = { headers, tags: { name } };
+	address: string,
+): Answer<R> {
+	const built = buildRequest(route, input, BASE);
+	const params = {
+		headers: { ...built.headers, "x-forwarded-for": address },
+		tags: { name },
+	};
 	const response =
-		method === "GET"
-			? http.get(url, params)
-			: http.post(url, JSON.stringify(body ?? {}), params);
+		built.method === "GET"
+			? http.get(built.url, params)
+			: http.post(built.url, built.body ?? null, params);
 	if (response.status === 0 || response.status >= 500) serverErrors.add(1);
 	if (response.status === 429) rateLimited.add(1);
-	let json: Record<string, unknown> = {};
-	try {
-		json = response.json() as Record<string, unknown>;
-	} catch {
-		// Not JSON: a gateway error page, for instance. The status says enough.
-	}
-	return { status: response.status, json };
+	// A gateway error page is not JSON; the status says enough, and the reply is read as a failure.
+	const result = parseReply(route, {
+		status: response.status,
+		headers: response.headers,
+		text: typeof response.body === "string" ? response.body : "",
+	});
+	return { status: response.status, result };
 }
 
 const address = (index: number) =>
@@ -97,89 +126,109 @@ const pause = (min: number, spread: number) =>
 
 // One shopper, from the first click to the answer to "did I get it".
 function visit(user: string, index: number): void {
-	const headers = {
-		"content-type": "application/json",
-		"x-forwarded-for": address(index),
-	};
+	const where = address(index);
+	const params = { saleId: SALE };
+	const join = () =>
+		call(routes.joinQueue, { params, body: { userId: user } }, "join", where);
 
-	let joined = call("POST", "/queue", "join", headers, { userId: user });
-	for (let tries = 0; joined.status === 429 && tries < 3; tries++) {
+	let joined = join();
+	for (
+		let tries = 0;
+		errorOf(joined) === "rate_limited" && tries < 3;
+		tries++
+	) {
 		pause(1, 1);
-		joined = call("POST", "/queue", "join", headers, { userId: user });
+		joined = join();
 	}
 	// 409 means the sale is over or sold out. That is a fair answer, not a failure.
-	if (joined.status !== 200 && joined.status !== 201) return;
+	const entry = bodyOf(joined);
+	if (!entry) return;
 
-	const ticket = String(joined.json.ticket);
-	const authed = { ...headers, "x-queue-ticket": ticket };
+	const headers = { [TICKET_HEADER]: entry.ticket };
 
 	// Wait to be let in. The page does the same by following the place stream.
-	let state = joined.json.state;
+	let state: string = entry.state;
 	for (let polls = 0; state !== "admitted" && polls < 90; polls++) {
 		pause(1, 1);
-		const place = call("GET", `/queue/${user}`, "place", authed);
-		if (place.status !== 200) return;
-		state = place.json.state;
+		const place = bodyOf(
+			call(
+				routes.checkPlace,
+				{ params: { saleId: SALE, userId: user }, headers },
+				"place",
+				where,
+			),
+		);
+		if (!place) return;
+		state = place.state;
 		if (state === "admitted") break;
 		// The queue stops admitting when the sale is over or sold out. The page learns that from the sale stream and
 		// stops waiting, so a shopper here reads the sale alongside the place.
-		const sale = call("GET", "", "sale", headers);
-		if (sale.json.status === "sold_out" || sale.json.status === "ended") return;
+		const sale = bodyOf(call(routes.sale, { params }, "sale", where));
+		if (sale?.status === "sold_out" || sale?.status === "ended") return;
 	}
 	if (state !== "admitted") return;
 
 	// Ask for an item once. A sold out answer is final for this shopper: holds that lapse later are for those who
 	// arrive later, which the latecomers below stand for.
-	const hold = call("POST", "/reservations", "reserve", authed, {
-		userId: user,
-	});
-	if (hold.status === 409 && hold.json.error === "sold_out") {
+	const reserve = () =>
+		call(
+			routes.reserve,
+			{ params, headers, body: { userId: user } },
+			"reserve",
+			where,
+		);
+	const hold = reserve();
+	if (errorOf(hold) === "sold_out") {
 		soldOutReplies.add(1);
 		return;
 	}
-	if (hold.status !== 201 && hold.status !== 200) return;
+	const held = bodyOf(hold);
+	if (!held) return;
 	if (hold.status === 201) reserved.add(1);
-	const held = hold.json;
 
 	if (Math.random() < profile.abandonShare) return;
 	pause(0.2, 0.8);
 
-	let bought: Answer | undefined;
-	for (let attempt = 0; attempt < 3; attempt++) {
-		bought = call("POST", "/purchases", "purchase", authed, {
-			userId: user,
-			reservationId: held.reservationId,
-		});
-		if (bought.status !== 402) break;
+	const confirm = (name: string) =>
+		call(
+			routes.confirm,
+			{ params, body: { userId: user, reservationId: held.reservationId } },
+			name,
+			where,
+		);
+	let bought = confirm("purchase");
+	for (let attempt = 1; attempt < 3 && bought.status === 402; attempt++) {
 		pause(0.3, 0.4);
+		bought = confirm("purchase");
 	}
-	if (bought?.status === 201) purchased.add(1);
+	const purchase = bodyOf(bought);
+	if (bought.status === 201) purchased.add(1);
 
 	// One shopper in five presses the button again. The second answer must repeat the first, and a second item must
 	// not be given.
-	if (bought?.status === 201 && Math.random() < 0.2) {
-		const again = call("POST", "/purchases", "purchase_again", authed, {
-			userId: user,
-			reservationId: held.reservationId,
-		});
-		const second = call("POST", "/reservations", "reserve_again", authed, {
-			userId: user,
-		});
+	if (bought.status === 201 && Math.random() < 0.2) {
+		const again = confirm("purchase_again");
+		const second = reserve();
 		check(null, {
 			"a repeated confirm gives the same purchase": () =>
 				again.status === 200 &&
-				again.json.purchaseId === bought?.json.purchaseId,
+				bodyOf(again)?.purchaseId === purchase?.purchaseId,
 			"a second reserve is refused": () =>
-				second.status === 409 && second.json.error === "already_purchased",
+				second.status === 409 && errorOf(second) === "already_purchased",
 		});
 	}
 
 	// "Did I get it" must agree with what happened.
-	const outcome = call("GET", `/purchases/${user}`, "outcome", authed);
+	const outcome = call(
+		routes.outcome,
+		{ params: { saleId: SALE, userId: user } },
+		"outcome",
+		where,
+	);
 	check(null, {
 		"the outcome agrees with the purchase": () =>
 			outcome.status === 200 &&
-			(outcome.json.state === "purchased") === (bought?.status === 201),
+			(bodyOf(outcome)?.state === "purchased") === (bought.status === 201),
 	});
 }
 
@@ -198,11 +247,12 @@ export function latecomer(): void {
 export function hammer(): void {
 	const id = exec.vu.idInTest;
 	const user = `hammer-${id}`;
-	const headers = {
-		"content-type": "application/json",
-		"x-forwarded-for": `192.0.2.${id}`,
-	};
 	for (let sent = 0; sent < 60; sent++) {
-		call("POST", "/queue", "hammer", headers, { userId: user });
+		call(
+			routes.joinQueue,
+			{ params: { saleId: SALE }, body: { userId: user } },
+			"hammer",
+			`192.0.2.${id}`,
+		);
 	}
 }

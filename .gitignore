@@ -96,3 +96,6 @@ local-tmp/
 generated-reports/
 # playwright-bdd output (bddgen)
 .features-gen/
+
+# Built load-test script (see apps/flash-load/scripts/bundle.ts)
+apps/flash-load/k6/.bundle/

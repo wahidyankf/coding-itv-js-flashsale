@@ -1,9 +1,11 @@
+import { routes, TICKET_HEADER } from "@flash/contract";
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { createClient } from "redis";
 import { check, join, shoppers } from "./queue.steps.js";
+import { bodyOf, read, send } from "./support/api.js";
 import { currentResponse, setResponse } from "./support/response.js";
-import { E2E_REDIS_URL, query, startApi, world } from "./support/world.js";
+import { E2E_REDIS_URL, query, world } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
 
@@ -16,17 +18,13 @@ async function post(
 	user: string,
 	options: { ticket?: string; saleId?: string } = {},
 ) {
-	const url = await startApi();
 	const key = user.trim().toLowerCase();
 	const ticket = options.ticket ?? shoppers().tickets.get(key);
-	const reply = await request.post(
-		`${url}/sales/${options.saleId ?? world.saleId}/reservations`,
-		{
-			data: { userId: user },
-			headers: ticket === undefined ? {} : { "x-queue-ticket": ticket },
-		},
-	);
-	return reply;
+	return send(request, routes.reserve, {
+		params: { saleId: options.saleId ?? world.saleId ?? "" },
+		headers: { [TICKET_HEADER]: ticket },
+		body: { userId: user },
+	});
 }
 
 export async function reserve(
@@ -37,12 +35,8 @@ export async function reserve(
 	const reply = await post(request, user, options);
 	setResponse(reply);
 	const key = user.trim().toLowerCase();
-	if (
-		(reply.status() === 201 || reply.status() === 200) &&
-		!shoppers().holds.has(key)
-	) {
-		shoppers().holds.set(key, await reply.json());
-	}
+	const held = await bodyOf(routes.reserve, reply);
+	if (held && !shoppers().holds.has(key)) shoppers().holds.set(key, held);
 }
 
 // The private API admits on its own timer, so a shopper who just joined is admitted within a tick or two.
@@ -52,7 +46,7 @@ async function waitUntilAdmitted(request: Request, users: string[]) {
 		const key = user.trim().toLowerCase();
 		for (;;) {
 			const body = await check(request, key, shoppers().tickets.get(key));
-			if (body.state === "admitted") break;
+			if (body?.state === "admitted") break;
 			if (Date.now() > deadline)
 				throw new Error(`${user} was not admitted in time`);
 			await sleep(50);
@@ -162,11 +156,16 @@ When(
 		shoppers().replies = await Promise.all(
 			replies.map(async (reply) => ({
 				status: reply.status(),
-				error: reply.status() === 409 ? (await reply.json()).error : undefined,
+				error: await errorOf(reply),
 			})),
 		);
 	},
 );
+
+async function errorOf(reply: Awaited<ReturnType<typeof post>>) {
+	const result = await read(routes.reserve, reply);
+	return result.isErr() ? result.error.error : undefined;
+}
 
 Then("a reservation id is issued", async ({ request: _request }) => {
 	expect((await currentResponse().json()).reservationId).toMatch(
@@ -188,7 +187,7 @@ Then(
 	/^the reservation is the one "([^"]+)" had before$/,
 	async ({ request: _request }, user: string) => {
 		expect((await currentResponse().json()).reservationId).toBe(
-			(shoppers().holds.get(user) as { reservationId: string }).reservationId,
+			shoppers().holds.get(user)?.reservationId,
 		);
 	},
 );

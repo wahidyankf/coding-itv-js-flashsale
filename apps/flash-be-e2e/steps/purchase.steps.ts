@@ -1,8 +1,10 @@
+import { routes, TICKET_HEADER } from "@flash/contract";
 import { type APIRequestContext, expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { shoppers } from "./queue.steps.js";
+import { bodyOf, send } from "./support/api.js";
 import { currentResponse, setResponse } from "./support/response.js";
-import { query, startApi, world } from "./support/world.js";
+import { query, world } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
 
@@ -10,10 +12,8 @@ type Request = APIRequestContext;
 
 const key = (user: string) => user.trim().toLowerCase();
 
-function holdOf(user: string): { reservationId: string } | undefined {
-	return shoppers().holds.get(key(user)) as
-		| { reservationId: string }
-		| undefined;
+function holdOf(user: string) {
+	return shoppers().holds.get(key(user));
 }
 
 async function post(
@@ -21,15 +21,13 @@ async function post(
 	user: string,
 	options: { reservationId?: string; owner?: string; saleId?: string } = {},
 ) {
-	const url = await startApi();
 	const reservationId =
 		options.reservationId ?? holdOf(options.owner ?? user)?.reservationId;
-	return request.post(
-		`${url}/sales/${options.saleId ?? world.saleId}/purchases`,
-		{
-			data: { userId: user, reservationId },
-		},
-	);
+	return send(request, routes.confirm, {
+		params: { saleId: options.saleId ?? world.saleId ?? "" },
+		// A shopper with no hold sends no reservation id, which the API refuses.
+		body: { userId: user, reservationId: reservationId ?? "" },
+	});
 }
 
 export async function confirm(
@@ -41,26 +39,20 @@ export async function confirm(
 	const reply = await post(request, user, options);
 	world.confirmMs = [...(world.confirmMs ?? []), performance.now() - started];
 	setResponse(reply);
-	if (
-		(reply.status() === 201 || reply.status() === 200) &&
-		!purchases().has(key(user))
-	) {
-		purchases().set(key(user), await reply.json());
-	}
+	const bought = await bodyOf(routes.confirm, reply);
+	if (bought && !purchases().has(key(user))) purchases().set(key(user), bought);
 }
 
-function purchases(): Map<string, unknown> {
+function purchases() {
 	return shoppers().purchases;
 }
 
 async function outcome(request: Request, user: string, saleId = world.saleId) {
-	const url = await startApi();
-	setResponse(
-		await request.get(
-			`${url}/sales/${saleId}/purchases/${encodeURIComponent(user)}`,
-		),
-	);
-	return currentResponse().json();
+	const reply = await send(request, routes.outcome, {
+		params: { saleId: saleId ?? "", userId: user },
+	});
+	setResponse(reply);
+	return bodyOf(routes.outcome, reply);
 }
 
 Given(
@@ -90,7 +82,6 @@ Given(
 Given(
 	/^all (\d+) shoppers have tried to reserve an item$/,
 	async ({ request }, count: string) => {
-		const url = await startApi();
 		const users = Array.from(
 			{ length: Number(count) },
 			(_, i) => `shopper${i}`,
@@ -98,15 +89,16 @@ Given(
 		const replies = await Promise.all(
 			users.map(async (user) => ({
 				user,
-				reply: await request.post(`${url}/sales/${world.saleId}/reservations`, {
-					data: { userId: user },
-					headers: { "x-queue-ticket": shoppers().tickets.get(user) ?? "" },
+				reply: await send(request, routes.reserve, {
+					params: { saleId: world.saleId ?? "" },
+					headers: { [TICKET_HEADER]: shoppers().tickets.get(user) ?? "" },
+					body: { userId: user },
 				}),
 			})),
 		);
 		for (const { user, reply } of replies) {
-			if (reply.status() === 201)
-				shoppers().holds.set(user, await reply.json());
+			const held = await bodyOf(routes.reserve, reply);
+			if (reply.status() === 201 && held) shoppers().holds.set(user, held);
 		}
 	},
 );
@@ -198,7 +190,7 @@ Then(
 	/^the purchase is the one "([^"]+)" had before$/,
 	async ({ request: _request }, user: string) => {
 		expect((await currentResponse().json()).purchaseId).toBe(
-			(purchases().get(key(user)) as { purchaseId: string }).purchaseId,
+			purchases().get(key(user))?.purchaseId,
 		);
 	},
 );
@@ -211,11 +203,11 @@ Then(
 );
 
 Then(/^"([^"]+)" still holds the item$/, async ({ request }, user: string) => {
-	expect((await outcome(request, user)).state).toBe("holding");
+	expect((await outcome(request, user))?.state).toBe("holding");
 });
 
 Then(/^"([^"]+)" has no purchase$/, async ({ request }, user: string) => {
-	expect((await outcome(request, user)).state).toBe("none");
+	expect((await outcome(request, user))?.state).toBe("none");
 });
 
 Then(

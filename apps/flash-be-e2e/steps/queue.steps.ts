@@ -1,8 +1,10 @@
+import { routes, TICKET_HEADER } from "@flash/contract";
 import { type APIRequestContext, expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { createClient } from "redis";
+import { bodyOf, send } from "./support/api.js";
 import { currentResponse, setResponse } from "./support/response.js";
-import { E2E_REDIS_URL, query, startApi, world } from "./support/world.js";
+import { E2E_REDIS_URL, query, world } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
 
@@ -24,28 +26,28 @@ export async function join(
 	user: string,
 	saleId = world.saleId,
 ) {
-	const url = await startApi();
-	const reply = await request.post(`${url}/sales/${saleId}/queue`, {
-		data: { userId: user },
+	const reply = await send(request, routes.joinQueue, {
+		params: { saleId: saleId ?? "" },
+		body: { userId: user },
 	});
 	setResponse(reply);
-	const body = await reply.json();
+	const joined = await bodyOf(routes.joinQueue, reply);
 	const held = shoppers();
 	const key = user.trim().toLowerCase();
-	if (body.ticket && !held.tickets.has(key)) {
-		held.tickets.set(key, body.ticket);
+	if (joined && !held.tickets.has(key)) {
+		held.tickets.set(key, joined.ticket);
 		held.joined.push(key);
 	}
 }
 
+// Asks for a place. Returns it when the API gave one, and nothing when it refused.
 export async function check(request: Request, user: string, ticket?: string) {
-	const url = await startApi();
-	setResponse(
-		await request.get(`${url}/sales/${world.saleId}/queue/${user}`, {
-			headers: ticket === undefined ? {} : { "x-queue-ticket": ticket },
-		}),
-	);
-	return currentResponse().json();
+	const reply = await send(request, routes.checkPlace, {
+		params: { saleId: world.saleId ?? "", userId: user },
+		headers: { [TICKET_HEADER]: ticket },
+	});
+	setResponse(reply);
+	return bodyOf(routes.checkPlace, reply);
 }
 
 Given(
@@ -104,17 +106,21 @@ Given("the queue is lost", async () => {
 // The private API admits on its own timer. A sale that is open admits its first shopper within one tick, so wait
 // for that. A sale that is not open admits nobody, so wait out a tick and a half instead.
 When("admission runs once", async ({ request }) => {
-	const url = await startApi();
-	const sale = await (await request.get(`${url}/sales/${world.saleId}`)).json();
+	const sale = await bodyOf(
+		routes.sale,
+		await send(request, routes.sale, {
+			params: { saleId: world.saleId ?? "" },
+		}),
+	);
 	const first = shoppers().joined[0];
-	if (sale.status !== "active" || !first) {
+	if (sale?.status !== "active" || !first) {
 		await new Promise((resolve) => setTimeout(resolve, 1500));
 		return;
 	}
 	const deadline = Date.now() + 5000;
 	while (Date.now() < deadline) {
 		const body = await check(request, first, shoppers().tickets.get(first));
-		if (body.state === "admitted") return;
+		if (body?.state === "admitted") return;
 		await new Promise((resolve) => setTimeout(resolve, 25));
 	}
 	throw new Error("the queue admitted nobody in time");
@@ -153,7 +159,9 @@ Then(
 	/^the place in line of "([^"]+)" is (\d+)$/,
 	async ({ request }, user: string, place: string) => {
 		const body = await check(request, user, shoppers().tickets.get(user));
-		expect(body.place).toBe(Number(place));
+		expect(body?.state === "waiting" ? body.place : undefined).toBe(
+			Number(place),
+		);
 	},
 );
 
@@ -168,7 +176,7 @@ Then(
 
 Then(/^"([^"]+)" is admitted$/, async ({ request }, user: string) => {
 	const body = await check(request, user, shoppers().tickets.get(user));
-	expect(body.state).toBe("admitted");
+	expect(body?.state).toBe("admitted");
 });
 
 Then(

@@ -11,6 +11,7 @@ import {
 	type Profile,
 	type ProfileName,
 } from "../k6/profiles.ts";
+import { bundleShop } from "./bundle.ts";
 
 const root = path.resolve(import.meta.dirname, "..");
 const reports = path.resolve(root, "../../generated-reports/load");
@@ -184,6 +185,8 @@ async function main(): Promise<number> {
 		}
 	})();
 
+	// k6 runs one file, so the script and the contract it reads replies with are bundled first.
+	await bundleShop();
 	console.log("load: running k6");
 	const log: string[] = [];
 	const k6 = spawn(
@@ -203,7 +206,7 @@ async function main(): Promise<number> {
 			`PROFILE=${name}`,
 			"-e",
 			`SALE_ID=${saleId}`,
-			"/scripts/shop.ts",
+			"/scripts/.bundle/shop.js",
 		],
 		{ stdio: ["ignore", "pipe", "pipe"] },
 	);

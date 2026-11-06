@@ -1,6 +1,8 @@
+import { buildRequest, routes, TICKET_HEADER } from "@flash/contract";
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { shoppers } from "./queue.steps.js";
+import { send } from "./support/api.js";
 import { setResponse } from "./support/response.js";
 import { openStream, type Stream } from "./support/stream.js";
 import { query, startApi, world } from "./support/world.js";
@@ -15,42 +17,57 @@ function current(): Stream {
 	return stream;
 }
 
-async function watch(path: string, headers: Record<string, string> = {}) {
-	const url = await startApi();
-	stream = await openStream(`${url}${path}`, headers);
+async function watchSale(saleId: string) {
+	const built = buildRequest(
+		routes.saleEvents,
+		{ params: { saleId } },
+		await startApi(),
+	);
+	await watch(built.url, built.headers);
+}
+
+async function watchPlace(user: string) {
+	const built = buildRequest(
+		routes.placeEvents,
+		{
+			params: { saleId: world.saleId ?? "", userId: user },
+			headers: {
+				[TICKET_HEADER]: shoppers().tickets.get(user.trim().toLowerCase()),
+			},
+		},
+		await startApi(),
+	);
+	await watch(built.url, built.headers);
+}
+
+async function watch(url: string, headers: Record<string, string>) {
+	stream = await openStream(url, headers);
 	world.streams = [...(world.streams ?? []), stream.close];
 }
 
-function ticketOf(user: string): Record<string, string> {
-	const ticket = shoppers().tickets.get(user.trim().toLowerCase());
-	return ticket === undefined ? {} : { "x-queue-ticket": ticket };
-}
-
 Given("a client is watching the sale", async ({ request: _request }) => {
-	await watch(`/sales/${world.saleId}/events`);
+	await watchSale(world.saleId ?? "");
 	await current().next();
 });
 
 When("a client watches the sale", async ({ request: _request }) => {
-	await watch(`/sales/${world.saleId}/events`);
+	await watchSale(world.saleId ?? "");
 });
 
 // A refusal is a plain JSON reply, so the shared status and error steps read it.
 When(
 	/^a client watches the sale with id "([^"]+)"$/,
 	async ({ request }, id: string) => {
-		const url = await startApi();
-		setResponse(await request.get(`${url}/sales/${id}/events`));
+		setResponse(
+			await send(request, routes.saleEvents, { params: { saleId: id } }),
+		);
 	},
 );
 
 Given(
 	/^"([^"]+)" is watching her place$/,
 	async ({ request: _request }, user: string) => {
-		await watch(
-			`/sales/${world.saleId}/queue/${encodeURIComponent(user)}/events`,
-			ticketOf(user),
-		);
+		await watchPlace(user);
 		await current().next();
 	},
 );
@@ -58,22 +75,18 @@ Given(
 When(
 	/^"([^"]+)" watches her place$/,
 	async ({ request: _request }, user: string) => {
-		await watch(
-			`/sales/${world.saleId}/queue/${encodeURIComponent(user)}/events`,
-			ticketOf(user),
-		);
+		await watchPlace(user);
 	},
 );
 
 When(
 	/^"([^"]+)" watches her place with a wrong ticket$/,
 	async ({ request }, user: string) => {
-		const url = await startApi();
 		setResponse(
-			await request.get(
-				`${url}/sales/${world.saleId}/queue/${encodeURIComponent(user)}/events`,
-				{ headers: { "x-queue-ticket": "not-the-ticket" } },
-			),
+			await send(request, routes.placeEvents, {
+				params: { saleId: world.saleId ?? "", userId: user },
+				headers: { [TICKET_HEADER]: "not-the-ticket" },
+			}),
 		);
 	},
 );
@@ -96,8 +109,9 @@ Then(
 	) => {
 		const next = await current().next();
 		expect(next.event).toBe(event);
-		expect(next.data.status).toBe(status);
-		expect(next.data.remaining).toBe(Number(left));
+		const sale = next.event === "sale" ? next.data : undefined;
+		expect(sale?.status).toBe(status);
+		expect(sale?.remaining).toBe(Number(left));
 	},
 );
 
@@ -106,7 +120,7 @@ Then(
 	async ({ request: _request }, event: string, state: string) => {
 		const next = await current().next();
 		expect(next.event).toBe(event);
-		expect(next.data.state).toBe(state);
+		expect(next.event === "place" ? next.data.state : undefined).toBe(state);
 	},
 );
 
@@ -120,7 +134,10 @@ Then(
 	) => {
 		const first = await current().next();
 		expect(first.event).toBe(event);
-		expect(first.data.state).toBe(state);
-		expect(first.data.place).toBe(Number(place));
+		const view = first.event === "place" ? first.data : undefined;
+		expect(view?.state).toBe(state);
+		expect(view?.state === "waiting" ? view.place : undefined).toBe(
+			Number(place),
+		);
 	},
 );

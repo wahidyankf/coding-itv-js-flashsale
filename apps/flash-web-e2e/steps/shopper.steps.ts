@@ -1,6 +1,8 @@
+import { routes, TICKET_HEADER } from "@flash/contract";
 import type { APIRequestContext } from "@playwright/test";
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
+import { bodyOf, send } from "./support/api.js";
 import { privateApi, world } from "./support/shop.js";
 
 const { Given, When, Then } = createBdd();
@@ -11,18 +13,25 @@ async function joinAndWait(
 	user: string,
 ): Promise<{ api: string; ticket: string }> {
 	const api = await privateApi();
-	const joined = await request.post(`${api}/sales/${world.saleId}/queue`, {
-		data: { userId: user },
-	});
-	const { ticket } = (await joined.json()) as { ticket: string };
+	const joined = await bodyOf(
+		routes.joinQueue,
+		await send(request, api, routes.joinQueue, {
+			params: { saleId: world.saleId ?? "" },
+			body: { userId: user },
+		}),
+	);
+	const ticket = joined?.ticket ?? "";
 	await expect
 		.poll(
 			async () => {
-				const reply = await request.get(
-					`${api}/sales/${world.saleId}/queue/${user}`,
-					{ headers: { "x-queue-ticket": ticket } },
+				const place = await bodyOf(
+					routes.checkPlace,
+					await send(request, api, routes.checkPlace, {
+						params: { saleId: world.saleId ?? "", userId: user },
+						headers: { [TICKET_HEADER]: ticket },
+					}),
 				);
-				return ((await reply.json()) as { state: string }).state;
+				return place?.state;
 			},
 			{ timeout: 20_000 },
 		)
@@ -35,18 +44,14 @@ async function hold(
 	user: string,
 ): Promise<{ api: string; reservationId: string }> {
 	const { api, ticket } = await joinAndWait(request, user);
-	const reserved = await request.post(
-		`${api}/sales/${world.saleId}/reservations`,
-		{
-			data: { userId: user },
-			headers: { "x-queue-ticket": ticket },
-		},
-	);
+	const reserved = await send(request, api, routes.reserve, {
+		params: { saleId: world.saleId ?? "" },
+		headers: { [TICKET_HEADER]: ticket },
+		body: { userId: user },
+	});
 	expect(reserved.status()).toBe(201);
-	const { reservationId } = (await reserved.json()) as {
-		reservationId: string;
-	};
-	return { api, reservationId };
+	const held = await bodyOf(routes.reserve, reserved);
+	return { api, reservationId: held?.reservationId ?? "" };
 }
 
 Given(/^"([^"]+)" holds the last item$/, async ({ request }, user: string) => {
@@ -59,8 +64,9 @@ Given(/^"([^"]+)" holds an item$/, async ({ request }, user: string) => {
 
 Given(/^"([^"]+)" has bought an item$/, async ({ request }, user: string) => {
 	const { api, reservationId } = await hold(request, user);
-	const bought = await request.post(`${api}/sales/${world.saleId}/purchases`, {
-		data: { userId: user, reservationId },
+	const bought = await send(request, api, routes.confirm, {
+		params: { saleId: world.saleId ?? "" },
+		body: { userId: user, reservationId },
 	});
 	expect(bought.status()).toBe(201);
 });
@@ -76,8 +82,9 @@ Given(
 	async ({ request }, count: string) => {
 		const api = await privateApi();
 		for (let index = 0; index < Number(count); index++) {
-			const joined = await request.post(`${api}/sales/${world.saleId}/queue`, {
-				data: { userId: `shopper${index}` },
+			const joined = await send(request, api, routes.joinQueue, {
+				params: { saleId: world.saleId ?? "" },
+				body: { userId: `shopper${index}` },
 			});
 			expect(joined.status()).toBe(201);
 		}
