@@ -3,6 +3,9 @@
 A test is written as a Gherkin scenario when it describes behaviour that somebody outside the code can see. It is a plain
 Vitest test when it guards how the code does its work. This page gives the reasons and a question to ask.
 
+Only the apps use Gherkin. The libraries in `libs/` and the repository's tools in `scripts/` always use plain tests, so
+the question below applies to the apps only.
+
 ## The question
 
 > If this breaks, does a shopper or an operator see the difference?
@@ -14,7 +17,7 @@ Vitest test when it guards how the code does its work. This page gives the reaso
 
 - A reader of the spec can understand it without reading code. For example: "a shopper who already bought cannot buy
   again", "Redis is down, so `/ready` answers 503", "too many requests get `429` with `Retry-After`".
-- The behaviour is part of the contract of the system: the HTTP routes, the queue, the hold, the payment, and `Result` in `@flash/typekit`.
+- The behaviour is part of the contract of the system: the HTTP routes, the queue, the hold and the payment.
 - The same behaviour is worth proving at more than one layer. One `.feature` file is then the shared source of truth for
   the unit, integration and end-to-end bindings.
 - A person who does not write code, or you in three months, needs to read it as documentation.
@@ -40,8 +43,8 @@ Vitest test when it guards how the code does its work. This page gives the reaso
    forbid plain tests.
 4. A scenario that needs both `@integration-exempt` and `@e2e-exempt` is proved at the unit layer only. Ask whether it
    is behaviour or a detail. In `flash-be` and `flash-web` it was a detail every time, and those scenarios are plain tests
-   now. The library `typekit` and the lint rules keep theirs, because their callers are developers and their behaviour is
-   the product.
+   now. The library `typekit` and the lint rules had such scenarios too. They are plain tests now, because only the apps
+   use Gherkin.
 
 Both kinds of test run in `test:unit` and count towards the 99% floor in the same way. See
 [test layers and coverage](../reference/test-layers-and-coverage.md).

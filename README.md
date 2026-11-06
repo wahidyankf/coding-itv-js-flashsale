@@ -34,7 +34,7 @@ it to understand the system; it only matters when you change the code.
 | An endpoint to check the outcome  | `GET /sales/:saleId/purchases/:userId`: a purchase, a live hold, or nothing                                                                                                                                                                              |
 | A simple React frontend           | `apps/flash-web`                                                                                                                                                                                                                                         |
 | A system diagram                  | below; the C4 views are in [specs/flash/architecture](specs/flash/architecture/README.md)                                                                                                                                                                |
-| Unit and integration tests        | next to the code, plus Gherkin scenarios bound at unit, integration and end-to-end level (see [Tests](#tests))                                                                                                                                           |
+| Unit and integration tests        | next to the code; the apps add Gherkin scenarios bound at unit, integration and end-to-end level (see [Tests](#tests))                                                                                                                                           |
 | Stress tests                      | `apps/flash-load` (see [Load test](#load-test))                                                                                                                                                                                                          |
 
 ## What is in the repository
@@ -249,7 +249,7 @@ npm run docs:install           # once: fetch the docs checker
 npm run docs:check             # links, structure and diagrams in the docs
 ```
 
-The behaviour is written as Gherkin scenarios in [specs/](specs/README.md) first. Each scenario is bound at unit,
+The apps' behaviour is written as Gherkin scenarios in [specs/flash/](specs/flash/README.md) first. Each scenario is bound at unit,
 integration and end-to-end level, except where a real boundary makes that impossible. Those few exceptions sit next to
 the scenario, with the test that proves it. A detail that only a developer would notice is a plain test next to the code,
 not a scenario (see [scenario or plain test](docs/explanation/scenario-or-plain-test.md)). Playwright needs Chromium once:
@@ -314,6 +314,6 @@ in [what the load runs found](docs/explanation/load-test-findings.md). The profi
 ## Documentation
 
 - [docs/](docs/README.md): a tutorial, how-to guides, reference and explanations.
-- [specs/](specs/README.md): the Gherkin behaviour scenarios and the C4 architecture. Specs win when they disagree with the docs.
+- [specs/](specs/README.md): the apps' Gherkin behaviour scenarios and the C4 architecture. Specs win when they disagree with the docs.
 - [api.http](api.http): manual requests for every endpoint.
 - [AGENTS.md](AGENTS.md): rules for people and tools that change the code.

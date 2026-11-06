@@ -10,7 +10,7 @@ Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `fla
 ## Docs and specs
 
 - `docs/` is the documentation for users and developers, split into Diátaxis modes. Start at [docs/README.md](docs/README.md).
-- `specs/` holds the behaviour scenarios and the C4 architecture. Start at [specs/README.md](specs/README.md). Specs win when they disagree with `docs/`.
+- `specs/` holds the apps' behaviour scenarios and the C4 architecture. Start at [specs/README.md](specs/README.md). Specs win when they disagree with `docs/`.
 
 ## Repository rules
 
@@ -64,12 +64,13 @@ Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `fla
   (`npx nx db:up flash-be`) and are not part of `test:quick`.
 - Vitest globals are off. Call `cleanup` in `afterEach` when rendering components.
 - Choose the kind of test by one question: if this breaks, does a shopper or an operator see the difference? If yes, write
-  a Gherkin scenario in `specs/` (behaviour that is part of the contract: HTTP, queue, hold, payment, `Result`). If only a developer cares, write a plain Vitest test next to
+  a Gherkin scenario in `specs/` (behaviour that is part of the contract: HTTP, queue, hold, payment). If only a developer cares, write a plain Vitest test next to
   the code (branches and edge cases in one function, rules of structure such as `architecture_tests.ts`, the mapping of
   config and environment variables, types, internal helpers, tests that only reach a branch for coverage). Write new behaviour as a scenario first,
   then add plain tests for the branches that do not deserve one. A scenario that needs both `@integration-exempt` and
   `@e2e-exempt` in an app is a sign of a detail: make it a plain test. See `docs/explanation/scenario-or-plain-test.md`.
-- Behaviour scenarios are canonical in `specs/`. Bind each one at unit. Bind integration and e2e too, unless the
+- Only the apps use Gherkin. `libs/` and `scripts/` have plain Vitest tests and no `specs/` scenarios. Behaviour scenarios
+  are canonical in `specs/flash/`. Bind each one at unit. Bind integration and e2e too, unless the
   scenario has `@integration-exempt` or `@e2e-exempt`. One scenario may carry both tags. Each tag needs the comment
   format in `docs/how-to/add-a-behaviour.md`, and the unit binding is the alternative proof.
 - Run `npm run bdd:check` after changing a feature file or a binding. It runs in the pre-push hook.

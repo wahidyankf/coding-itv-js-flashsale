@@ -11,16 +11,16 @@
 The pre-push hook runs the combined coverage gate, so integration tests run there too. `test:coverage` starts the dev
 stack itself. End-to-end tests are never part of the hooks.
 
-Unit tests come in two kinds. A **scenario binding** (`src/bdd/*_tests.ts(x)`) runs a Gherkin scenario from `specs/`. A **plain
-test** (`src/**/*_tests.ts(x)` outside `src/bdd`) guards a branch, a rule of structure or an internal detail. The choice is
+Only the apps use Gherkin. In an app, a **scenario binding** (`src/bdd/*_tests.ts(x)`) runs a scenario from `specs/flash/`.
+Everything else is a **plain test** next to the code (`*_tests.ts(x)`): it guards a branch, a rule of structure or an
+internal detail. The libraries (`libs/`) and the repository's scripts (`scripts/`) have no Gherkin at all. The choice is
 explained in [scenario or plain test](../explanation/scenario-or-plain-test.md). Plain integration tests sit next to the
 code as `*_integration_tests.ts(x)`; they are not scanned by the behaviour check.
 
 ## Nx targets
 
 The library `typekit` (`libs/typekit`) has `build`, `typecheck`, `lint`, `test:unit`, `test:coverage` and `test:quick`. Its
-tests are `libs/typekit/src/**/*_tests.ts` and its scenario bindings are in `libs/typekit/src/bdd`. It needs no Docker. The
-apps' targets build it first.
+tests are plain Vitest files, `libs/typekit/src/**/*_tests.ts`. It needs no Docker. The apps' targets build it first.
 
 The library `contract` (`libs/contract`) has the same targets, and needs no Docker either. Its tests are plain unit tests
 next to the source. `npm run openapi:check` and `npm run contract:guard:test` run in the pre-push hook beside the docs
@@ -59,7 +59,7 @@ Excluded from the coverage denominator:
 
 ## Behaviour coverage
 
-Every scenario in `specs/` must be bound at the unit layer. It must also be bound at the integration and end-to-end
+Every scenario in `specs/flash/` must be bound at the unit layer. It must also be bound at the integration and end-to-end
 layers, unless it carries an exemption tag. `npm run bdd:check` checks this without running any tests. It fails when:
 
 - a scenario has no unit binding, or a binding names no scenario;
@@ -69,13 +69,11 @@ layers, unless it carries an exemption tag. `npm run bdd:check` checks this with
 - a feature file is not linked from the `README.md` in its folder;
 - a scenario title is built at run time, so the check cannot read it.
 
-The check writes `generated-reports/behaviour-status.md`. Run it with `npm run bdd:check`. The rules above are specified
-in [`specs/tooling/bdd-check`](../../specs/tooling/bdd-check/README.md).
+The check writes `generated-reports/behaviour-status.md`. Run it with `npm run bdd:check`.
 
-The check's own rules are bound at every layer, with no exemptions:
-
-- unit and integration: `npm run bdd:check:test` (Vitest, `scripts/bdd/*_tests.mjs`);
-- end-to-end: `npm run bdd:e2e` (playwright-bdd, `scripts/bdd/e2e/steps`), which runs the checker as shipped.
+The check's own tests are plain Vitest files in `scripts/bdd` (`npm run bdd:check:test`). They cover the same defects at
+three levels: in process, as a separate command on a temporary corpus, and as a copy of the checker run the way the
+repository ships it. The defects are listed once, in `scripts/bdd/support/problems.mjs`.
 
 ## How the API end-to-end tests break a dependency
 
