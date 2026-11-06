@@ -1,8 +1,8 @@
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import { cleanup, render, screen } from "@testing-library/react";
 import { expect, vi } from "vitest";
-import type { BackendStatus } from "../backend";
-import { backendStatusHandler, HomePage } from "../routes/index";
+import { type BackendStatus, loadBackendStatus } from "../backend";
+import { HomePage } from "../routes/index";
 import { specFile } from "./support/paths";
 
 // Answers the home page's request to flash-be with the given reply.
@@ -12,7 +12,7 @@ function backendAnswers(reply: () => Response | Promise<Response>): void {
 }
 
 async function openHomePage(): Promise<void> {
-	const status: BackendStatus = await backendStatusHandler();
+	const status: BackendStatus = await loadBackendStatus(process.env);
 	render(<HomePage status={status} />);
 }
 

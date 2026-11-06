@@ -17,11 +17,6 @@ export async function homeDataHandler(): Promise<HomeData> {
 	return { status, sale };
 }
 
-// Kept for the scenarios that only need the backend status.
-export async function backendStatusHandler(): Promise<BackendStatus> {
-	return loadBackendStatus(process.env);
-}
-
 const getHomeData = createServerFn({ method: "GET" }).handler(homeDataHandler);
 
 export function HomePage({
