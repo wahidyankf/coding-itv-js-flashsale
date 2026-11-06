@@ -1,7 +1,6 @@
-import { routes } from "@flash/contract";
 import { type APIRequestContext, expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
-import { bodyOf, send } from "./support/api.js";
+import { bodyOf, routes, send } from "./support/api.js";
 import { currentResponse, setResponse } from "./support/response.js";
 import { migratedDatabase, query, world } from "./support/world.js";
 

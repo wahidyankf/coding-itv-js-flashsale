@@ -1,31 +1,83 @@
+import { attemptAsync } from "@flash/typekit";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import type { Dependencies } from "../../../application/dependencies.js";
+import type { SaleView } from "../../../application/sale-view.js";
+import type { Purchase } from "../../../domain/purchase.js";
+import type { QueuePlace } from "../../../domain/queue.js";
+import type { SaleDraft } from "../../../domain/sale-window.js";
+import { MS_PER_SECOND } from "../../../domain/time.js";
 import {
 	ADMIN_AUTH_HEADER,
 	ERROR_STATUS,
 	errorPayload,
 	HTTP_STATUS,
-	MS_PER_SECOND,
-	type PlaceView,
-	routes,
-	type SaleView,
-	type StreamEvent,
 	TICKET_HEADER,
-} from "@flash/contract";
-import { attemptAsync } from "@flash/typekit";
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import type { ZodTypeProvider } from "fastify-type-provider-zod";
-import type { Dependencies } from "../../../application/dependencies.js";
-import type { Purchase } from "../../../domain/purchase.js";
+} from "./errors.js";
 import { type StreamOptions, serveEvents } from "./event-stream.js";
-import { endpoint, fieldOf, schemaOf } from "./schema.js";
 
-// All routes are registered here, from the route table of @flash/contract. The table says the path, the shape of the
-// request and every reply; this file only says what each route does.
+type SaleParams = { saleId: string };
+type PlaceParams = { saleId: string; userId: string };
+
+// The ticket is one header; anything else is the same as no ticket.
+const ticketOf = (request: Pick<FastifyRequest, "headers">) => {
+	const ticket = request.headers[TICKET_HEADER];
+	return typeof ticket === "string" ? ticket : undefined;
+};
+
+// A field of a value that has not been checked yet, such as a body.
+const fieldOf = (source: unknown, name: string): unknown =>
+	typeof source === "object" && source !== null && name in source
+		? Reflect.get(source, name)
+		: undefined;
+
+// A body field that is missing or not a string is refused with the code of that field, before anything else is looked at.
+const FIELD_ERROR = {
+	userId: "invalid_user",
+	reservationId: "invalid_reservation",
+} as const;
+const missingField = (
+	body: unknown,
+	fields: ReadonlyArray<keyof typeof FIELD_ERROR>,
+) => fields.find((name) => typeof fieldOf(body, name) !== "string");
+
+// A sale to create, if the body has the right types. Whether the values make a usable sale is the rule of the domain.
+function saleDraftOf(body: unknown): SaleDraft | undefined {
+	const field = (name: string) => fieldOf(body, name);
+	const optional = (name: string, type: "string" | "number") =>
+		field(name) === undefined || typeof field(name) === type;
+	const name = field("name");
+	const stock = field("stock");
+	const startsAt = field("startsAt");
+	const endsAt = field("endsAt");
+	const holdSeconds = field("holdSeconds");
+	const admitPerSecond = field("admitPerSecond");
+	if (
+		typeof stock !== "number" ||
+		typeof startsAt !== "string" ||
+		typeof endsAt !== "string" ||
+		!optional("name", "string") ||
+		!optional("holdSeconds", "number") ||
+		!optional("admitPerSecond", "number")
+	) {
+		return undefined;
+	}
+	return {
+		name: name as string | undefined,
+		stock,
+		startsAt,
+		endsAt,
+		holdSeconds: holdSeconds as number | undefined,
+		admitPerSecond: admitPerSecond as number | undefined,
+	};
+}
+
+// All routes are registered here. The paths, what each route takes and the replies are in docs/reference/http-endpoints.md.
 export function registerRoutes(
 	root: FastifyInstance,
 	deps: Dependencies,
 	stream: StreamOptions,
 ): void {
-	const app = root.withTypeProvider<ZodTypeProvider>();
+	const app = root;
 
 	// Runs before the body is checked, so a bad request is counted too. A client over its limit is told to wait, and
 	// the route never runs.
@@ -97,15 +149,15 @@ export function registerRoutes(
 	};
 
 	app.route({
-		...endpoint(routes.health),
-		schema: schemaOf(routes.health),
+		method: "GET",
+		url: "/health",
 		handler: async () => ({ status: "ok" as const }),
 	});
 
 	// Readiness: Postgres and Redis both answer.
 	app.route({
-		...endpoint(routes.ready),
-		schema: schemaOf(routes.ready),
+		method: "GET",
+		url: "/ready",
 		handler: async (_request, reply) => {
 			const database = await attemptAsync(() => deps.checkDatabase(), Error);
 			const redis = await attemptAsync(() => deps.checkRedis(), Error);
@@ -126,8 +178,8 @@ export function registerRoutes(
 
 	// The sale a shopper sees. "current" is the sale that opens last.
 	app.route({
-		...endpoint(routes.currentSale),
-		schema: schemaOf(routes.currentSale),
+		method: "GET",
+		url: "/sales/current",
 		handler: async (_request, reply) => {
 			const sale = await deps.sales.current();
 			if (!sale)
@@ -138,9 +190,9 @@ export function registerRoutes(
 		},
 	});
 
-	app.route({
-		...endpoint(routes.sale),
-		schema: schemaOf(routes.sale),
+	app.route<{ Params: SaleParams }>({
+		method: "GET",
+		url: "/sales/:saleId",
 		handler: async (request, reply) => {
 			const sale = await deps.sales.byId(request.params.saleId);
 			if (!sale)
@@ -153,9 +205,9 @@ export function registerRoutes(
 
 	// Live updates. The status is read through the same cache as the plain read, so any number of watchers cost one
 	// database read per cache time.
-	app.route({
-		...endpoint(routes.saleEvents),
-		schema: schemaOf(routes.saleEvents),
+	app.route<{ Params: SaleParams }>({
+		method: "GET",
+		url: "/sales/:saleId/events",
 		handler: async (request, reply) => {
 			const { saleId } = request.params;
 			if (!(await deps.sales.byId(saleId))) {
@@ -181,12 +233,12 @@ export function registerRoutes(
 	});
 
 	// A shopper's place, pushed when it changes. The ticket is checked once, when the stream opens.
-	app.route({
-		...endpoint(routes.placeEvents),
-		schema: schemaOf(routes.placeEvents),
+	app.route<{ Params: PlaceParams }>({
+		method: "GET",
+		url: "/sales/:saleId/queue/:userId/events",
 		handler: async (request, reply) => {
 			const { saleId, userId } = request.params;
-			const ticket = request.headers[TICKET_HEADER];
+			const ticket = ticketOf(request);
 			const first = await deps.queue.check(saleId, userId, ticket);
 			if (first.isErr()) {
 				return reply
@@ -214,14 +266,19 @@ export function registerRoutes(
 	});
 
 	// The waiting queue. A ticket proves the shopper joined; it is sent back in the reply body.
-	app.route({
-		...endpoint(routes.joinQueue),
-		schema: schemaOf(routes.joinQueue),
+	app.route<{ Params: SaleParams }>({
+		method: "POST",
+		url: "/sales/:saleId/queue",
 		preValidation: limit,
 		handler: async (request, reply) => {
+			if (missingField(request.body, ["userId"])) {
+				return reply
+					.code(ERROR_STATUS.invalid_user)
+					.send(errorPayload("invalid_user"));
+			}
 			const joined = await deps.queue.join(
 				request.params.saleId,
-				request.body.userId,
+				fieldOf(request.body, "userId"),
 			);
 			if (joined.isErr()) {
 				return reply
@@ -235,14 +292,14 @@ export function registerRoutes(
 		},
 	});
 
-	app.route({
-		...endpoint(routes.checkPlace),
-		schema: schemaOf(routes.checkPlace),
+	app.route<{ Params: PlaceParams }>({
+		method: "GET",
+		url: "/sales/:saleId/queue/:userId",
 		handler: async (request, reply) => {
 			const checked = await deps.queue.check(
 				request.params.saleId,
 				request.params.userId,
-				request.headers[TICKET_HEADER],
+				ticketOf(request),
 			);
 			if (checked.isErr()) {
 				return reply
@@ -256,15 +313,20 @@ export function registerRoutes(
 	});
 
 	// An admitted shopper holds one item for the sale's hold time. Asking again returns the same hold.
-	app.route({
-		...endpoint(routes.reserve),
-		schema: schemaOf(routes.reserve),
+	app.route<{ Params: SaleParams }>({
+		method: "POST",
+		url: "/sales/:saleId/reservations",
 		preValidation: limit,
 		handler: async (request, reply) => {
+			if (missingField(request.body, ["userId"])) {
+				return reply
+					.code(ERROR_STATUS.invalid_user)
+					.send(errorPayload("invalid_user"));
+			}
 			const reserved = await deps.reservations.reserve(
 				request.params.saleId,
-				request.body.userId,
-				request.headers[TICKET_HEADER],
+				fieldOf(request.body, "userId"),
+				ticketOf(request),
 			);
 			if (reserved.isErr()) {
 				return reply
@@ -281,15 +343,21 @@ export function registerRoutes(
 	});
 
 	// Pays for the held item. The reservation id makes it safe to send twice.
-	app.route({
-		...endpoint(routes.confirm),
-		schema: schemaOf(routes.confirm),
+	app.route<{ Params: SaleParams }>({
+		method: "POST",
+		url: "/sales/:saleId/purchases",
 		preValidation: limit,
 		handler: async (request, reply) => {
+			const bad = missingField(request.body, ["userId", "reservationId"]);
+			if (bad) {
+				return reply
+					.code(ERROR_STATUS[FIELD_ERROR[bad]])
+					.send(errorPayload(FIELD_ERROR[bad]));
+			}
 			const confirmed = await deps.purchases.confirm(
 				request.params.saleId,
-				request.body.userId,
-				request.body.reservationId,
+				fieldOf(request.body, "userId"),
+				fieldOf(request.body, "reservationId"),
 			);
 			if (confirmed.isErr()) {
 				return reply
@@ -305,12 +373,18 @@ export function registerRoutes(
 
 	// An operator creates a sale. The window must not overlap another sale.
 	app.route({
-		...endpoint(routes.createSale),
-		schema: schemaOf(routes.createSale),
+		method: "POST",
+		url: "/admin/sales",
 		// onRequest runs before the body is read, so a client without the token learns nothing from a broken body.
 		onRequest: [limitAdmin, authorizeAdmin],
 		handler: async (request, reply) => {
-			const created = await deps.admin.create(request.body);
+			const draft = saleDraftOf(request.body);
+			if (draft === undefined) {
+				return reply
+					.code(ERROR_STATUS.invalid_sale)
+					.send(errorPayload("invalid_sale"));
+			}
+			const created = await deps.admin.create(draft);
 			if (created.isErr()) {
 				return reply
 					.code(ERROR_STATUS[created.error])
@@ -321,9 +395,9 @@ export function registerRoutes(
 	});
 
 	// "Did I get it?": a purchase, a live hold, or nothing.
-	app.route({
-		...endpoint(routes.outcome),
-		schema: schemaOf(routes.outcome),
+	app.route<{ Params: PlaceParams }>({
+		method: "GET",
+		url: "/sales/:saleId/purchases/:userId",
 		handler: async (request, reply) => {
 			const found = await deps.purchases.outcome(
 				request.params.saleId,
@@ -353,10 +427,8 @@ export function registerRoutes(
 	});
 }
 
-type SaleEvent = Extract<StreamEvent, { event: "sale" }> & { data: SaleView };
-type PlaceEvent = Extract<StreamEvent, { event: "place" }> & {
-	data: PlaceView;
-};
+type SaleEvent = { event: "sale"; data: SaleView };
+type PlaceEvent = { event: "place"; data: { userId: string } & QueuePlace };
 
 function purchaseView(purchase: Purchase) {
 	return {

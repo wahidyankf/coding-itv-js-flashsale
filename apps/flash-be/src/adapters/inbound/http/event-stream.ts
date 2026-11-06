@@ -1,6 +1,9 @@
-import { formatFrame, HTTP_STATUS, KEEP_ALIVE_FRAME } from "@flash/contract";
 import { attemptAsync } from "@flash/typekit";
 import type { FastifyReply, FastifyRequest } from "fastify";
+import { HTTP_STATUS } from "./errors.js";
+
+// A comment line, which a client skips.
+const KEEP_ALIVE_FRAME = ": keep-alive\n\n";
 
 export type StreamOptions = {
 	// How often the source is read.
@@ -19,7 +22,7 @@ export const DEFAULT_STREAM_OPTIONS: StreamOptions = {
 };
 
 export function formatEvent(item: StreamItem): string {
-	return formatFrame(item.event, item.data);
+	return `event: ${item.event}\ndata: ${JSON.stringify(item.data)}\n\n`;
 }
 
 // Turns the request into a Server-Sent Events stream. `read` is called every interval; the client hears about it

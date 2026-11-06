@@ -13,13 +13,12 @@ If you have five minutes, read these files in this order:
 | `apps/flash-be/src/domain/sale.ts`                                    | the sale rules: upcoming, active, sold out or ended, from window and stock       |
 | `apps/flash-be/src/adapters/outbound/redis/redis-hold-gate.ts`        | the Redis script that takes one item for one shopper, atomically                 |
 | `apps/flash-be/src/adapters/outbound/postgres/purchase-repository.ts` | the transaction that has the last word: `sold < stock`, one purchase per shopper |
-| `libs/contract/src/routes.ts`                                         | every endpoint, written once                                                     |
-| `apps/flash-be/src/adapters/inbound/http/routes.ts`                   | what each endpoint does                                                          |
+| `apps/flash-be/src/adapters/inbound/http/routes.ts`                   | every endpoint, and what it does                                                 |
 | `apps/flash-web/src/sale/sale-page.tsx`                               | the page: status, name, Buy Now, feedback                                        |
 | `apps/flash-load/k6/profiles.ts`, `apps/flash-load/scripts/run.ts`    | the stress profiles, and the verdict that is read from the data                  |
 
-That is the core. The rest is support that keeps the code checked as it grows: Nx targets, the `typekit` and `contract`
-libraries, the hexagon layers, the behaviour-coverage check, the docs check and the lint rules. You can ignore all of
+That is the core. The rest is support that keeps the code checked as it grows: Nx targets, the `typekit`
+library, the hexagon layers, the behaviour-coverage check, the docs check and the lint rules. You can ignore all of
 it to understand the system; it only matters when you change the code.
 
 ### What the brief asks for, and where it is
@@ -53,11 +52,9 @@ It is an npm workspace with five apps in `apps/` and two libraries in `libs/`:
 `Result` and `attempt`. `flash-be` and `flash-web` use it, so a failure is a value and product code has no `catch`. The
 linter enforces that; see [failures as values](docs/explanation/failures-as-values.md).
 
-`libs/contract` (`@flash/contract`) is the HTTP contract of the API, written once with Zod: the route table, the schemas, the
-error codes, a small client and the Server-Sent Events codec. `flash-be` registers its routes from it, and `flash-web`, the
-e2e tests and the k6 script build their requests and read the replies through it, so no app writes a path or a reply type
-by hand. [docs/reference/openapi.json](docs/reference/openapi.json) is generated from it. See
-[the API contract](docs/explanation/api-contract.md).
+The HTTP API is plain code: `flash-be` registers its routes in one file, and every route, request and reply is listed in
+[docs/reference/http-endpoints.md](docs/reference/http-endpoints.md). The callers (`flash-web`, the e2e tests and the k6
+script) write the paths they use.
 
 Nx runs the commands only. It has no plugins, and every target is in the project's `project.json`. The apps' targets build
 the library first.
@@ -240,9 +237,6 @@ npx nx test:integration <app>  # needs the dev stack (flash-be, flash-web)
 npx nx test:e2e <app>          # Playwright (flash-be-e2e, flash-web-e2e)
 npx nx test:coverage <app>     # unit + integration, 99% floor; starts the dev stack
 npx nx test:quick typekit      # a library: typecheck + lint + unit tests (no Docker)
-npx nx test:quick contract     # the same for the contract
-npm run openapi:check          # docs/reference/openapi.json matches the routes
-npm run contract:guard:test    # no API path or ticket header written by hand in product code
 npm run lint:rules:test        # the lint rules: no catch, exhaustive switches
 npm run bdd:check              # every scenario is bound at the layers it needs
 npm run lint                   # Biome check of the whole repo: format, lint, imports
@@ -256,7 +250,7 @@ the scenario, with the test that proves it. A detail that only a developer would
 not a scenario (see [scenario or plain test](docs/explanation/scenario-or-plain-test.md)). Playwright needs Chromium once:
 `npx playwright install chromium`. See [test layers and coverage](docs/reference/test-layers-and-coverage.md).
 
-`git push` runs the docs check, the behaviour coverage check, the lint rule tests, the OpenAPI check and the contract guard.
+`git push` runs the Biome check, the docs check, the behaviour coverage check and the lint rule tests.
 It also runs typecheck, lint, unit tests and the coverage floor for the projects the change touches. Commits are checked
 with commitlint (Conventional Commits).
 

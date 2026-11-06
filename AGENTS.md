@@ -4,8 +4,8 @@ Guidance for AI coding agents working in this repository. For setup and run comm
 
 ## Project
 
-Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `flash-be` (Fastify REST API), `flash-web` (TanStack Start client),
-`flash-be-e2e` and `flash-web-e2e` (Playwright), and `flash-load` (k6 load test). `libs/typekit` (`@flash/typekit`) holds `Result` and `attempt`; `flash-be` and `flash-web` use it. `libs/contract` (`@flash/contract`) holds the HTTP contract of the API; every app uses it. Data lives in Postgres (Kysely, no ORM) and Redis.
+Flash sale monorepo with five apps in `apps/` and one library in `libs/`: `flash-be` (Fastify REST API), `flash-web` (TanStack Start client),
+`flash-be-e2e` and `flash-web-e2e` (Playwright), and `flash-load` (k6 load test). `libs/typekit` (`@flash/typekit`) holds `Result` and `attempt`; `flash-be` and `flash-web` use it. Data lives in Postgres (Kysely, no ORM) and Redis.
 
 ## Docs and specs
 
@@ -28,13 +28,11 @@ Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `fla
     `apps/flash-load/k6/profiles.ts`, and its rules and limits are in `specs/apps/flash/load/`. A failed run is a finding; do not change a limit to make it pass.
   - `test:quick` runs `typecheck`, `lint`, and `test:unit`, or only `typecheck` and `lint` for the e2e apps. Change a
     check in its own target, not in `test:quick`. Keep `test:quick:watch` in sync with it.
-- The HTTP API is written down once, in `libs/contract`. Do not write a hand-made request type, reply type, API path or
-  error-code literal, or the name of the ticket header, in an app. Change the contract first (`docs/how-to/change-an-endpoint.md`),
-  then the handler and the consumers. Build requests with `buildRequest` and read replies with `parseReply` or the client. An error reply is `{ errorCode, errorMessage }` (plus `retryAfterSeconds` for `429`), built with `errorPayload`; the status is not in the body.
-  `npm run contract:guard:test` fails on a path or the header written by hand. `docs/reference/openapi.json` is generated:
-  run `npm run openapi:generate` after a change; `npm run openapi:check` runs in the pre-push hook.
-- `libs/contract` is built to `dist` like typekit (`npx nx build contract`), and the Nx targets of the apps that use it build it
-  first. It has `build`, `typecheck`, `lint`, `test:unit`, `test:coverage` and `test:quick`, and needs no Docker.
+- The HTTP API is plain code. The routes are in `apps/flash-be/src/adapters/inbound/http/routes.ts`, and the error codes with
+  their statuses and sentences are in `errors.ts` next to it. `flash-web` and the e2e and load apps write the paths they call
+  themselves. A change to a route or a reply updates the handler, every caller, `docs/reference/http-endpoints.md` and the
+  scenario (`docs/how-to/change-an-endpoint.md`). An error reply is `{ errorCode, errorMessage }` (plus `retryAfterSeconds`
+  for `429`); the status is not in the body.
 - Biome formats and lints (tabs, double quotes). Do not add Prettier or ESLint.
 - Failures are values. Product code (`apps/*/src`, `libs/*/src`, not tests or `src/bdd`) has no `catch` clause and no
   `.catch(` call: a call that may throw goes through `attempt` or `attemptAsync` from `@flash/typekit`, naming the failure it
@@ -49,14 +47,13 @@ Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `fla
   `unknown` and narrow it, or write the type. Do not silence the rule with `biome-ignore`.
 - No magic numbers. Biome's `noMagicNumbers` is an error in product code and in tooling (tests, `src/bdd` and the e2e apps
   may write literals, because a literal is the expected value there). Give a number a name: a `const`, or a field of a
-  `const` object, with a comment when the reason is not plain. HTTP statuses come from `ERROR_STATUS` and `HTTP_STATUS`, and
-  seconds become milliseconds with `MS_PER_SECOND`, all from `@flash/contract`. Do not silence the rule with `biome-ignore`.
+  `const` object, with a comment when the reason is not plain. HTTP statuses come from `ERROR_STATUS` and `HTTP_STATUS` (`errors.ts` in `flash-be`), and
+  seconds become milliseconds with `MS_PER_SECOND` (`domain/time.ts` in `flash-be`, the app's own constants file elsewhere). Do not silence the rule with `biome-ignore`.
 - Commit messages follow Conventional Commits (commitlint hook). Make one coherent change per commit.
 - Docs are checked by RHINO, which reads the policy in `repo-config.yml`. Run `npm run docs:install` once per machine,
   then `npm run docs:check`. The version and digests are pinned in `scripts/install-rhino.sh`; bump them together.
 - The pre-push hook runs `npm run lint` (Biome check of the whole repo, warnings fail), `npm run docs:check`, the behaviour
-  coverage check (`bdd:check:test`, `bdd:check`), the lint rule tests (`lint:rules:test`), the OpenAPI check (`openapi:check`),
-  the contract guard (`contract:guard:test`), then
+  coverage check (`bdd:check:test`, `bdd:check`), the lint rule tests (`lint:rules:test`), then
   `nx affected -t test:quick` (typecheck, lint, unit tests) and `nx affected -t test:coverage` (the 99% floor) against
   `origin/main`. `test:coverage` starts the dev stack itself, so Docker must run. Do not skip hooks with `--no-verify`
   unless the user asks.
@@ -95,7 +92,7 @@ Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `fla
   `{queue,queue-seq,admitted,admit-lead}` for the queue. Every command on the sale path must fail at
   once when Redis is down. Use single scripts, not `MULTI`, which waits for the connection.
 - `flash-be` is a hexagon (see `docs/explanation/hexagonal-architecture.md`). Rules go in `src/domain` (no I/O, only Node
-  built-ins, `@flash/typekit` and `@flash/contract/vocabulary`). Use cases go in `src/application`, which reach stores only through `src/application/ports`. Adapters go in
+  built-ins and `@flash/typekit`). Use cases go in `src/application`, which reach stores only through `src/application/ports`. Adapters go in
   `src/adapters/inbound` (HTTP, CLI) and `src/adapters/outbound` (Postgres, Redis, memory, payment, clock). Only
   `composition.ts` and the entry points pick an adapter for a port. `architecture_tests.ts` fails on a wrong import.
   Put a new rule in the domain with a unit test first, not in a service or a route.
@@ -106,7 +103,7 @@ Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `fla
 - Env vars are listed in `.env.example`. Never commit `.env`. Do not use the example passwords outside local
   development.
 - `POST /admin/sales` creates a sale and is the only operator route. It needs `ADMIN_TOKEN` and is never passed on by `flash-web`. Keep it
-  off the `passThrough` routes of the contract; a contract test fails if it is on. Overlap is refused there only, not in the seed command.
+  off the allow-list of the `flash-web` proxy; a test there fails if it is on it. Overlap is refused there only, not in the seed command.
 - `api-flash-be.http` and `api-flash-web.http` hold manual requests, one file per app. Update them when an endpoint changes. It does not replace tests.
 
 ## Code style

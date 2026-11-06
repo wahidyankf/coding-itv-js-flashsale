@@ -1,4 +1,3 @@
-import { matchRoute, routes, TICKET_HEADER } from "@flash/contract";
 import {
 	act,
 	cleanup,
@@ -8,6 +7,7 @@ import {
 } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, vi } from "vitest";
+import { TICKET_HEADER } from "../../api";
 import { proxyToBackend } from "../../proxy";
 import { HomePage } from "../../routes/index";
 import { createSaleClient } from "../../sale/client";
@@ -15,7 +15,12 @@ import { loadSale } from "../../sale/load";
 import { SalePage } from "../../sale/sale-page";
 import type { Watcher } from "../../sale/sse";
 import type { SaleLoad } from "../../sale/types";
-import { createFakeBackend, type FakeBackend, SALE_ID } from "./fake-backend";
+import {
+	createFakeBackend,
+	type FakeBackend,
+	matchRoute,
+	SALE_ID,
+} from "./fake-backend";
 import type { WebWorld } from "./web-world";
 
 const BACKEND = "http://flash-be.test";
@@ -64,7 +69,7 @@ export function unitWorld(): WebWorld {
 			last = key;
 			onEvent(event, data);
 		};
-		if (match?.route === routes.saleEvents) {
+		if (match?.name === "saleEvents") {
 			const push = () => backend.hasSale() && send("sale", backend.view());
 			push();
 			return backend.onChange(push);

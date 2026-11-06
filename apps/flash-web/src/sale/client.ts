@@ -1,17 +1,15 @@
-import {
-	createClient,
-	type JoinedView,
-	type OutcomeView,
-	type PurchaseView,
-	pathOf,
-	type ReservedView,
-	readStreamEvent,
-	routes,
-	type SaleView,
-	TICKET_HEADER,
-} from "@flash/contract";
+import { callApi, TICKET_HEADER } from "../api";
 import { createWatcher, type Watcher } from "./sse";
-import type { ApiResult, Place } from "./types";
+import type {
+	ApiResult,
+	JoinedView,
+	OutcomeView,
+	Place,
+	PlaceView,
+	PurchaseView,
+	ReservedView,
+	SaleView,
+} from "./types";
 
 // Everything the page asks of the sale, in one place. The page gets a client, so tests can give it a fake.
 export type SaleClient = {
@@ -43,50 +41,44 @@ export function createSaleClient(
 	fetcher: typeof fetch = fetch,
 	watch: Watcher = createWatcher({ fetcher }),
 ): SaleClient {
-	const baseUrl = `${base}/api`;
-	const api = createClient({ baseUrl, fetch: fetcher });
+	const api = `${base}/api`;
+	const sale = (saleId: string) => `${api}/sales/${encodeURIComponent(saleId)}`;
+	const post = (body: object, headers: Record<string, string> = {}) => ({
+		method: "POST",
+		headers: { "content-type": "application/json", ...headers },
+		body: JSON.stringify(body),
+	});
 
 	return {
-		join: async (saleId, userId) =>
-			(
-				await api.call(routes.joinQueue, {
-					params: { saleId },
-					body: { userId },
-				})
-			).map((reply) => reply.body),
-		reserve: async (saleId, userId, ticket) =>
-			(
-				await api.call(routes.reserve, {
-					params: { saleId },
-					headers: { [TICKET_HEADER]: ticket },
-					body: { userId },
-				})
-			).map((reply) => reply.body),
-		confirm: async (saleId, userId, reservationId) =>
-			(
-				await api.call(routes.confirm, {
-					params: { saleId },
-					body: { userId, reservationId },
-				})
-			).map((reply) => reply.body),
-		outcome: async (saleId, userId) =>
-			(await api.call(routes.outcome, { params: { saleId, userId } })).map(
-				(reply) => reply.body,
+		join: (saleId, userId) =>
+			callApi<JoinedView>(fetcher, `${sale(saleId)}/queue`, post({ userId })),
+		reserve: (saleId, userId, ticket) =>
+			callApi<ReservedView>(
+				fetcher,
+				`${sale(saleId)}/reservations`,
+				post({ userId }, { [TICKET_HEADER]: ticket }),
 			),
+		confirm: (saleId, userId, reservationId) =>
+			callApi<PurchaseView>(
+				fetcher,
+				`${sale(saleId)}/purchases`,
+				post({ userId, reservationId }),
+			),
+		outcome: (saleId, userId) =>
+			callApi<OutcomeView>(
+				fetcher,
+				`${sale(saleId)}/purchases/${encodeURIComponent(userId)}`,
+			),
+		// The events are trusted to be what the API sends, like the replies above.
 		watchSale: (saleId, onSale) =>
-			watch(
-				`${baseUrl}${pathOf(routes.saleEvents, { saleId })}`,
-				(event, data) => {
-					const read = readStreamEvent({ event, data });
-					if (read?.event === "sale") onSale(read.data);
-				},
-			),
+			watch(`${sale(saleId)}/events`, (event, data) => {
+				if (event === "sale") onSale(data as SaleView);
+			}),
 		watchPlace: (saleId, userId, ticket, onPlace) =>
 			watch(
-				`${baseUrl}${pathOf(routes.placeEvents, { saleId, userId })}`,
+				`${sale(saleId)}/queue/${encodeURIComponent(userId)}/events`,
 				(event, data) => {
-					const read = readStreamEvent({ event, data });
-					if (read?.event === "place") onPlace(read.data);
+					if (event === "place") onPlace(data as PlaceView);
 				},
 				{ [TICKET_HEADER]: ticket },
 			),

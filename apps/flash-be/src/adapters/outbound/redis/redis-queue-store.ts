@@ -1,6 +1,6 @@
-import { MS_PER_SECOND } from "@flash/contract/vocabulary";
 import type { QueueStore } from "../../../application/ports/queue-store.js";
 import type { QueuePlace } from "../../../domain/queue.js";
+import { MS_PER_SECOND } from "../../../domain/time.js";
 import type { RedisClient } from "./redis-client.js";
 
 const queueKey = (saleId: string) => `sale:${saleId}:queue`;

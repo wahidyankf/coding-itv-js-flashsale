@@ -1,47 +1,95 @@
-import {
-	type ApiFailure,
-	buildRequest,
-	parseReply,
-	type Reply,
-	type RequestInput,
-	type Route,
-} from "@flash/contract";
-import type { Result } from "@flash/typekit";
 import type { APIRequestContext, APIResponse } from "@playwright/test";
+import type {
+	JoinedView,
+	OutcomeView,
+	PlaceView,
+	PurchaseView,
+	ReservedView,
+	SaleView,
+} from "./views.js";
 import { startApi } from "./world.js";
 
-// Sends a request of the contract to the private API of the scenario. The route says the method and the path; the
-// input says the rest.
-export async function send<R extends Route>(
-	request: APIRequestContext,
-	route: R,
-	input: RequestInput<R>,
-): Promise<APIResponse> {
-	const built = buildRequest(route, input, await startApi());
-	return request.fetch(built.url, {
-		method: built.method,
-		headers: built.headers,
-		data: built.body ?? null,
-	});
+export const TICKET_HEADER = "x-queue-ticket";
+export const ADMIN_AUTH_HEADER = "authorization";
+
+const FIRST_ERROR_STATUS = 400;
+
+// A route is a method and a path. `B` is the body of its success reply; it is only there for the types.
+export type Route<B = unknown> = {
+	method: "GET" | "POST";
+	path: string;
+	reply?: B;
+};
+
+const route = <B>(method: Route["method"], path: string): Route<B> => ({
+	method,
+	path,
+});
+
+export const routes = {
+	currentSale: route<SaleView>("GET", "/sales/current"),
+	sale: route<SaleView>("GET", "/sales/:saleId"),
+	saleEvents: route("GET", "/sales/:saleId/events"),
+	placeEvents: route("GET", "/sales/:saleId/queue/:userId/events"),
+	joinQueue: route<JoinedView>("POST", "/sales/:saleId/queue"),
+	checkPlace: route<PlaceView>("GET", "/sales/:saleId/queue/:userId"),
+	reserve: route<ReservedView>("POST", "/sales/:saleId/reservations"),
+	confirm: route<PurchaseView>("POST", "/sales/:saleId/purchases"),
+	outcome: route<OutcomeView>("GET", "/sales/:saleId/purchases/:userId"),
+	createSale: route<SaleView>("POST", "/admin/sales"),
+};
+
+export type Input = {
+	params?: Record<string, string>;
+	headers?: Record<string, string | undefined>;
+	body?: unknown;
+};
+
+// The URL, headers and body text of a request to the private API of the scenario.
+export async function build(route: Route, input: Input = {}) {
+	const path = route.path.replace(/:(\w+)/g, (_match, name: string) =>
+		encodeURIComponent(input.params?.[name] ?? ""),
+	);
+	const headers: Record<string, string> = {};
+	for (const [name, value] of Object.entries(input.headers ?? {})) {
+		if (value !== undefined) headers[name.toLowerCase()] = value;
+	}
+	if (input.body !== undefined) headers["content-type"] = "application/json";
+	return {
+		url: `${await startApi()}${path}`,
+		headers,
+		body: input.body === undefined ? null : JSON.stringify(input.body),
+	};
 }
 
-// Reads a response against the route it answered: a reply the route declares, or a named failure.
-export async function read<R extends Route>(
-	route: R,
-	response: APIResponse,
-): Promise<Result<Reply<R>, ApiFailure>> {
-	return parseReply(route, {
-		status: response.status(),
-		headers: response.headers(),
-		text: await response.text(),
+export async function send(
+	request: APIRequestContext,
+	route: Route,
+	input: Input = {},
+): Promise<APIResponse> {
+	const built = await build(route, input);
+	return request.fetch(built.url, {
+		method: route.method,
+		headers: built.headers,
+		data: built.body,
 	});
 }
 
 // The body of a reply that is not a refusal, or undefined.
-export async function bodyOf<R extends Route>(
-	route: R,
+export async function bodyOf<B>(
+	_route: Route<B>,
 	response: APIResponse,
-): Promise<Reply<R>["body"] | undefined> {
-	const reply = await read(route, response);
-	return reply.isOk() ? reply.value.body : undefined;
+): Promise<B | undefined> {
+	return response.status() < FIRST_ERROR_STATUS
+		? ((await response.json()) as B)
+		: undefined;
+}
+
+// The `errorCode` of a refusal, or undefined.
+export async function errorOf(
+	response: APIResponse,
+): Promise<string | undefined> {
+	return response.status() >= FIRST_ERROR_STATUS
+		? (await response.json()).errorCode
+		: undefined;
 }

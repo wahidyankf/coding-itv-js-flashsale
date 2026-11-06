@@ -1,4 +1,4 @@
-# Requests to the flash-be API. They follow the contract in libs/contract; docs/reference/openapi.json is generated from it.
+# Requests to the flash-be API. The routes and their replies are in docs/reference/http-endpoints.md.
 @backend = http://localhost:8080
 # The operator token is read from ADMIN_TOKEN in the .env file next to this file (see .env.example). kulala.nvim and the
 # REST Client extension read it with $dotenv; in another client, paste the token in the Authorization header.

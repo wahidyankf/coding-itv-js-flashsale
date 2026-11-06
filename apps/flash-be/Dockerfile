@@ -3,7 +3,6 @@ FROM node:26.13.0-alpine AS build
 WORKDIR /repo
 COPY package.json package-lock.json ./
 COPY libs/typekit/package.json libs/typekit/
-COPY libs/contract/package.json libs/contract/
 COPY apps/flash-be/package.json apps/flash-be/
 COPY apps/flash-be-e2e/package.json apps/flash-be-e2e/
 COPY apps/flash-web/package.json apps/flash-web/
@@ -12,8 +11,6 @@ COPY apps/flash-load/package.json apps/flash-load/
 RUN npm ci --ignore-scripts
 COPY libs/typekit libs/typekit
 RUN npm run build -w @flash/typekit
-COPY libs/contract libs/contract
-RUN npm run build -w @flash/contract
 COPY apps/flash-be apps/flash-be
 RUN npm run build -w flash-be && npm prune --omit=dev
 
@@ -23,12 +20,9 @@ ENV NODE_ENV=production \
 	FLASH_BE_PORT=8080
 WORKDIR /app
 COPY --from=build --chown=node:node /repo/node_modules ./node_modules
-# node_modules/@flash/typekit and node_modules/@flash/contract are links to ../../libs/<name>, so the libraries ship at
-# those paths.
+# node_modules/@flash/typekit is a link to ../../libs/typekit, so the library ships at that path.
 COPY --from=build --chown=node:node /repo/libs/typekit/package.json ./libs/typekit/package.json
 COPY --from=build --chown=node:node /repo/libs/typekit/dist ./libs/typekit/dist
-COPY --from=build --chown=node:node /repo/libs/contract/package.json ./libs/contract/package.json
-COPY --from=build --chown=node:node /repo/libs/contract/dist ./libs/contract/dist
 COPY --from=build --chown=node:node /repo/apps/flash-be/package.json ./package.json
 COPY --from=build --chown=node:node /repo/apps/flash-be/dist ./dist
 USER node

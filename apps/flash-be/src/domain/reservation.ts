@@ -1,5 +1,5 @@
-import { MS_PER_SECOND } from "@flash/contract/vocabulary";
 import type { Sale } from "./sale.js";
+import { MS_PER_SECOND } from "./time.js";
 
 // The hold one user has on one item of a sale.
 export type Reservation = {

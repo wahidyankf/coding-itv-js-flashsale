@@ -1,4 +1,3 @@
-import { errorPayload } from "@flash/contract";
 import { describe, expect, it, vi } from "vitest";
 import { isAllowed, proxyToBackend } from "./proxy";
 
@@ -30,6 +29,7 @@ describe("isAllowed", () => {
 		["GET", "/health"],
 		["GET", `/sales/${ID}/purchases/a/b`],
 		["GET", "/sales/not-a-sale-id"],
+		["GET", "/sales/%E0%A4%A"],
 		["GET", `/sales/${ID}/queue/has space`],
 	])("refuses %s %s", (method, path) => {
 		expect(isAllowed(method, path)).toBe(false);
@@ -101,7 +101,10 @@ describe("proxyToBackend", () => {
 			fetcher,
 		);
 		expect(reply.status).toBe(404);
-		expect(await reply.json()).toEqual(errorPayload("not_found"));
+		expect(await reply.json()).toEqual({
+			errorCode: "not_found",
+			errorMessage: "Nothing was found at this address.",
+		});
 		expect(fetcher).not.toHaveBeenCalled();
 	});
 
@@ -117,7 +120,10 @@ describe("proxyToBackend", () => {
 			fetcher,
 		);
 		expect(reply.status).toBe(404);
-		expect(await reply.json()).toEqual(errorPayload("not_found"));
+		expect(await reply.json()).toEqual({
+			errorCode: "not_found",
+			errorMessage: "Nothing was found at this address.",
+		});
 		expect(fetcher).not.toHaveBeenCalled();
 	});
 
@@ -130,7 +136,10 @@ describe("proxyToBackend", () => {
 			},
 		);
 		expect(reply.status).toBe(502);
-		expect(await reply.json()).toEqual(errorPayload("backend_unavailable"));
+		expect(await reply.json()).toEqual({
+			errorCode: "backend_unavailable",
+			errorMessage: "The API could not be reached.",
+		});
 	});
 
 	it("uses the global fetch and the default address", async () => {

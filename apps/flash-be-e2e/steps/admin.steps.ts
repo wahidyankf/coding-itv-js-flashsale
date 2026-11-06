@@ -1,7 +1,6 @@
-import { ADMIN_AUTH_HEADER, routes } from "@flash/contract";
 import { type APIResponse, expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
-import { bodyOf, send } from "./support/api.js";
+import { ADMIN_AUTH_HEADER, bodyOf, routes, send } from "./support/api.js";
 import { currentResponse, setResponse } from "./support/response.js";
 import { migratedDatabase, query, world } from "./support/world.js";
 

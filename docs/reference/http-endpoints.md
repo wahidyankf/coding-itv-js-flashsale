@@ -1,9 +1,8 @@
 # HTTP endpoints
 
-The routes of the two services, and the rules that a schema cannot say. The shape of every request and reply, and every
-status a route answers with, is in the contract ([the library](contract.md)) and in the generated
-[openapi.json](openapi.json); this page does not repeat them. The API routes are registered in
-`apps/flash-be/src/adapters/inbound/http/routes.ts`. The web routes are in `apps/flash-web/src/routes/`.
+The routes of the two services, the shape of their replies, and the rules that a shape cannot say. The API routes are
+registered in `apps/flash-be/src/adapters/inbound/http/routes.ts`, and the error codes with their statuses and sentences
+are in `errors.ts` next to it. The web routes are in `apps/flash-web/src/routes/`.
 
 Every error is `{"errorCode": "<code>", "errorMessage": "<sentence>"}`, whether the route refused the request, the route
 does not exist (`404` `not_found`), the body is not JSON (`400` `invalid_request`) or the server failed (`500` `internal`).
@@ -25,6 +24,26 @@ code, for a developer. A `500` never says what failed; the cause goes to the log
 | POST   | `/sales/:saleId/queue`         | Postgres, Redis    | `201` on a new place, `200` when the user already has one |
 | GET    | `/sales/:saleId/queue/:userId` | Postgres, Redis    | needs the `x-queue-ticket` header                         |
 | POST   | `/admin/sales`                 | Postgres           | operator only; needs `Authorization: Bearer <token>`      |
+
+### Reply bodies
+
+All bodies are JSON. Dates are ISO strings.
+
+| Route                                      | Success body                                                                                                                                 |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /health`                              | `{ "status": "ok" }`                                                                                                                         |
+| `GET /ready`                               | `{ "status": "ok" \| "unavailable", "checks": { "database": "ok" \| "error", "redis": "ok" \| "error" } }`                                   |
+| `GET /sales/current`, `GET /sales/:saleId` | `{ "id", "name", "status", "startsAt", "endsAt", "stock", "remaining" }` (a `SaleView`)                                                      |
+| `POST /sales/:saleId/queue`                | `{ "userId", "ticket", "state": "waiting", "place" }` or `{ "userId", "ticket", "state": "admitted" }`                                       |
+| `GET /sales/:saleId/queue/:userId`         | `{ "userId", "state": "waiting", "place" }`, `{ "userId", "state": "admitted" }` or `{ "userId", "state": "absent" }`                        |
+| `POST /sales/:saleId/reservations`         | `{ "userId", "reservationId", "expiresAt" }`                                                                                                 |
+| `POST /sales/:saleId/purchases`            | `{ "userId", "purchaseId", "reservationId", "purchasedAt" }`                                                                                 |
+| `GET /sales/:saleId/purchases/:userId`     | `{ ...purchase, "state": "purchased" }`, `{ "userId", "state": "holding", "reservationId", "expiresAt" }` or `{ "userId", "state": "none" }` |
+| `POST /admin/sales`                        | a `SaleView`                                                                                                                                 |
+
+Request bodies: the queue, reservation and purchase routes take `{ "userId": "<name>" }`; a purchase also takes
+`"reservationId"`. A body field that is missing or not a string is refused with `400` and the code of that field
+(`invalid_user` or `invalid_reservation`) before anything else is looked at. The ticket goes in the `x-queue-ticket` header.
 
 `/ready` returns `503` when a check fails. Each failing check is `"error"`, and `status` is `"unavailable"`. For
 example, with Postgres stopped:
@@ -172,7 +191,7 @@ The scenarios are in [`specs/apps/flash/be/behaviours/purchase/`](../../specs/ap
 | GET    | `/sales/:saleId/events`               | `event: sale`, with the same body as `GET /sales/:saleId`                                  |
 | GET    | `/sales/:saleId/queue/:userId/events` | `event: place`, with the body of `GET /sales/:saleId/queue/:userId`; send `x-queue-ticket` |
 
-The frames are written and read by the codec of the contract (`formatFrame`, `parseFrames`).
+A frame is `event: <name>`, `data: <JSON>` and a blank line.
 
 Both answer `Content-Type: text/event-stream`. The first event comes at once. Later events come only when the data
 changed, checked every `EVENTS_INTERVAL_MS` (1000). When nothing changes for 15 seconds, a `: keep-alive` comment line is
@@ -245,4 +264,4 @@ rate limits. `SALE_CACHE_MS` (1000) sets the sale read cache. `EVENTS_INTERVAL_M
 
 ## Manual requests
 
-[`api-flash-be.http`](../../api-flash-be.http) and [`api-flash-web.http`](../../api-flash-web.http) hold the requests above in the kulala.nvim format, one file per app. Every route of the contract is in the first file, and every route the web server passes on is in the second. The create-sale request reads `ADMIN_TOKEN` from `.env` with `$dotenv`, so set it there first (see [`.env.example`](../../.env.example)).
+[`api-flash-be.http`](../../api-flash-be.http) and [`api-flash-web.http`](../../api-flash-web.http) hold the requests above in the kulala.nvim format, one file per app. Every route of the API is in the first file, and every route the web server passes on is in the second. The create-sale request reads `ADMIN_TOKEN` from `.env` with `$dotenv`, so set it there first (see [`.env.example`](../../.env.example)).

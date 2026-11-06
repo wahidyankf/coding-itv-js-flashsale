@@ -61,33 +61,20 @@ const product = files.filter((file) => layerOf(file) !== "test");
 const isNode = (target: string) => target.startsWith("node:");
 // The typekit library has no dependencies of its own and no I/O, so the inner layers may use it.
 const isKernel = (target: string) => target === "@flash/typekit";
-// The vocabulary of the contract (format rules, error codes) has no dependency and no I/O, so the inner layers may use
-// it. The rest of the contract holds Zod, so they may only name its types.
-const isVocabulary = (target: string) =>
-	target === "@flash/contract/vocabulary";
-const isContractType = (target: string, typeOnly: boolean) =>
-	typeOnly && target === "@flash/contract";
 const isDomain = (target: string) => target.startsWith("domain/");
 const isPort = (target: string) => target.startsWith("application/ports/");
 const isWiring = (target: string) =>
 	target.startsWith("composition") || target.startsWith("config");
 
 // What a layer may import. A package name or a path outside the list is a violation.
-function allowed(layer: Layer, target: string, typeOnly = false): boolean {
+function allowed(layer: Layer, target: string): boolean {
 	switch (layer) {
 		case "domain":
-			return (
-				isNode(target) ||
-				isKernel(target) ||
-				isVocabulary(target) ||
-				isDomain(target)
-			);
+			return isNode(target) || isKernel(target) || isDomain(target);
 		case "application":
 			return (
 				isNode(target) ||
 				isKernel(target) ||
-				isVocabulary(target) ||
-				isContractType(target, typeOnly) ||
 				isDomain(target) ||
 				target.startsWith("application/")
 			);
@@ -108,7 +95,7 @@ function violations(layer: Layer): string[] {
 	return product
 		.filter((file) => layerOf(file) === layer)
 		.flatMap(importsOf)
-		.filter((imp) => !allowed(layer, imp.target, imp.typeOnly))
+		.filter((imp) => !allowed(layer, imp.target))
 		.map((imp) => `${path.relative(SRC, imp.from)} -> ${imp.target}`);
 }
 
@@ -150,9 +137,8 @@ describe("hexagonal architecture", () => {
 		).toBe(false);
 		expect(allowed("application", "fastify")).toBe(false);
 		expect(allowed("domain", "@flash/typekit-extras")).toBe(false);
-		expect(allowed("domain", "@flash/contract")).toBe(false);
-		expect(allowed("domain", "@flash/contract", true)).toBe(false);
-		expect(allowed("application", "@flash/contract")).toBe(false);
+		expect(allowed("domain", "zod")).toBe(false);
+		expect(allowed("application", "zod")).toBe(false);
 		expect(allowed("inbound", "adapters/outbound/postgres/database.ts")).toBe(
 			false,
 		);
@@ -164,10 +150,7 @@ describe("hexagonal architecture", () => {
 		expect(allowed("domain", "node:crypto")).toBe(true);
 		expect(allowed("domain", "@flash/typekit")).toBe(true);
 		expect(allowed("application", "@flash/typekit")).toBe(true);
-		expect(allowed("domain", "@flash/contract/vocabulary")).toBe(true);
-		expect(allowed("application", "@flash/contract/vocabulary")).toBe(true);
-		expect(allowed("application", "@flash/contract", true)).toBe(true);
-		expect(allowed("inbound", "@flash/contract")).toBe(true);
+		expect(allowed("inbound", "fastify")).toBe(true);
 		expect(allowed("application", "application/ports/clock.ts")).toBe(true);
 		expect(allowed("outbound", "application/ports/clock.ts")).toBe(true);
 		expect(allowed("outbound", "domain/sale.ts")).toBe(true);

@@ -1,14 +1,5 @@
-import {
-	ERROR_STATUS,
-	type ErrorCode,
-	errorPayload,
-	matchRoute,
-	normalizeUserId,
-	RETRY_AFTER_HEADER,
-	type Route,
-	routes,
-	TICKET_HEADER,
-} from "@flash/contract";
+import { TICKET_HEADER } from "../../api";
+import { cleanUser } from "../../sale/messages";
 import type { Place, SaleStatus, SaleView } from "../../sale/types";
 
 export const SALE_ID = "11111111-1111-4111-8111-111111111111";
@@ -27,22 +18,83 @@ export type Reply = {
 	body: unknown;
 };
 
-// An answer. It must be one the route declares for that status, so the fake cannot drift from the contract.
+// The error codes the fake answers with, and the one status of each, as flash-be does.
+const ERROR_STATUS = {
+	invalid_user: 400,
+	invalid_ticket: 401,
+	payment_failed: 402,
+	not_admitted: 403,
+	sale_not_found: 404,
+	reservation_not_found: 404,
+	not_found: 404,
+	sale_not_started: 409,
+	sale_ended: 409,
+	sold_out: 409,
+	hold_expired: 409,
+	already_purchased: 409,
+	rate_limited: 429,
+} as const;
+type ErrorCode = keyof typeof ERROR_STATUS;
+
+const errorPayload = (code: ErrorCode) => ({
+	errorCode: code,
+	errorMessage: code.replaceAll("_", " "),
+});
+
 const reply = (
-	route: Route,
 	status: number,
 	body: unknown,
 	headers: Record<string, string> = {},
-): Reply => {
-	if (!route.replies[status]?.safeParse(body).success) {
-		throw new Error(
-			`the fake backend broke the contract: ${route.name} ${status}`,
-		);
+): Reply => ({ status, headers, body });
+const refuse = (error: ErrorCode) =>
+	reply(ERROR_STATUS[error], errorPayload(error));
+
+// The routes of flash-be that the page can reach, each with its method and path.
+export type RouteName =
+	| "currentSale"
+	| "sale"
+	| "saleEvents"
+	| "placeEvents"
+	| "joinQueue"
+	| "checkPlace"
+	| "reserve"
+	| "confirm"
+	| "outcome";
+const ROUTES: Array<[RouteName, string, RegExp]> = [
+	["currentSale", "GET", /^\/sales\/current$/],
+	["sale", "GET", /^\/sales\/(?<saleId>[^/]+)$/],
+	["saleEvents", "GET", /^\/sales\/(?<saleId>[^/]+)\/events$/],
+	["joinQueue", "POST", /^\/sales\/(?<saleId>[^/]+)\/queue$/],
+	["checkPlace", "GET", /^\/sales\/(?<saleId>[^/]+)\/queue\/(?<userId>[^/]+)$/],
+	[
+		"placeEvents",
+		"GET",
+		/^\/sales\/(?<saleId>[^/]+)\/queue\/(?<userId>[^/]+)\/events$/,
+	],
+	["reserve", "POST", /^\/sales\/(?<saleId>[^/]+)\/reservations$/],
+	["confirm", "POST", /^\/sales\/(?<saleId>[^/]+)\/purchases$/],
+	[
+		"outcome",
+		"GET",
+		/^\/sales\/(?<saleId>[^/]+)\/purchases\/(?<userId>[^/]+)$/,
+	],
+];
+
+export type Match = { name: RouteName; params: Record<string, string> };
+
+export function matchRoute(method: string, path: string): Match | undefined {
+	for (const [name, allowed, pattern] of ROUTES) {
+		if (allowed !== method) continue;
+		const found = pattern.exec(path);
+		if (!found) continue;
+		const params: Record<string, string> = {};
+		for (const [key, value] of Object.entries(found.groups ?? {})) {
+			params[key] = decodeURIComponent(value);
+		}
+		return { name, params };
 	}
-	return { status, headers, body };
-};
-const refuse = (route: Route, error: ErrorCode) =>
-	reply(route, ERROR_STATUS[error], errorPayload(error));
+	return undefined;
+}
 
 // A small stand-in for flash-be that follows its rules for status codes, errors and what a shopper sees, but keeps
 // everything in memory. The unit scenarios call it directly. The integration scenarios put an HTTP server in front of
@@ -107,38 +159,36 @@ export function createFakeBackend(now: () => number) {
 	const ticketOf = (user: string) => `ticket-${user}`;
 
 	// Counts a write request. Returns the 429 reply when the user is over the limit.
-	function limited(route: Route, user: string): Reply | undefined {
+	function limited(user: string): Reply | undefined {
 		if (settings.writesPerUser === 0) return undefined;
 		const count = (writes.get(user) ?? 0) + 1;
 		writes.set(user, count);
 		return count > settings.writesPerUser
 			? reply(
-					route,
 					ERROR_STATUS.rate_limited,
 					{ ...errorPayload("rate_limited"), retryAfterSeconds: 30 },
-					{ [RETRY_AFTER_HEADER]: "30" },
+					{ "retry-after": "30" },
 				)
 			: undefined;
 	}
 
-	const usable = (user: string) => normalizeUserId(user) !== undefined;
+	const usable = (user: string) => cleanUser(user) !== undefined;
 
 	function join(user: string): Reply {
-		const route = routes.joinQueue;
-		const wait = limited(route, user);
+		const wait = limited(user);
 		if (wait) return wait;
-		if (!sale) return refuse(route, "sale_not_found");
-		if (!usable(user)) return refuse(route, "invalid_user");
+		if (!sale) return refuse("sale_not_found");
+		if (!usable(user)) return refuse("invalid_user");
 		const state = status();
-		if (state === "ended") return refuse(route, "sale_ended");
-		if (state === "sold_out") return refuse(route, "sold_out");
+		if (state === "ended") return refuse("sale_ended");
+		if (state === "sold_out") return refuse("sold_out");
 		const known = placeOf(user).state !== "absent";
 		if (!known) {
 			if (settings.slowAdmission) waiting.push(user);
 			else admitted.add(user);
 			changed();
 		}
-		return reply(route, known ? 200 : 201, {
+		return reply(known ? 200 : 201, {
 			userId: user,
 			ticket: ticketOf(user),
 			...placeOf(user),
@@ -146,35 +196,34 @@ export function createFakeBackend(now: () => number) {
 	}
 
 	function reserve(user: string, ticket: string | undefined): Reply {
-		const route = routes.reserve;
-		const wait = limited(route, user);
+		const wait = limited(user);
 		if (wait) return wait;
-		if (!sale) return refuse(route, "sale_not_found");
-		if (!usable(user)) return refuse(route, "invalid_user");
+		if (!sale) return refuse("sale_not_found");
+		if (!usable(user)) return refuse("invalid_user");
 		const state = status();
-		if (state === "upcoming") return refuse(route, "sale_not_started");
-		if (state === "ended") return refuse(route, "sale_ended");
-		if (state === "sold_out") return refuse(route, "sold_out");
-		if (ticket !== ticketOf(user)) return refuse(route, "invalid_ticket");
-		if (!admitted.has(user)) return refuse(route, "not_admitted");
-		if (bought.has(user)) return refuse(route, "already_purchased");
+		if (state === "upcoming") return refuse("sale_not_started");
+		if (state === "ended") return refuse("sale_ended");
+		if (state === "sold_out") return refuse("sold_out");
+		if (ticket !== ticketOf(user)) return refuse("invalid_ticket");
+		if (!admitted.has(user)) return refuse("not_admitted");
+		if (bought.has(user)) return refuse("already_purchased");
 		const own = holds.get(user);
 		if (own && own.expiresAt > now()) {
-			return reply(route, 200, {
+			return reply(200, {
 				userId: user,
 				reservationId: own.reservationId,
 				expiresAt: new Date(own.expiresAt).toISOString(),
 			});
 		}
 		if (bought.size + liveHolds() >= (sale?.stock ?? 0)) {
-			return refuse(route, "sold_out");
+			return refuse("sold_out");
 		}
 		const hold = {
 			reservationId: crypto.randomUUID(),
 			expiresAt: now() + settings.holdSeconds * 1000,
 		};
 		holds.set(user, hold);
-		return reply(route, 201, {
+		return reply(201, {
 			userId: user,
 			reservationId: hold.reservationId,
 			expiresAt: new Date(hold.expiresAt).toISOString(),
@@ -182,23 +231,22 @@ export function createFakeBackend(now: () => number) {
 	}
 
 	function confirm(user: string, reservationId: string): Reply {
-		const route = routes.confirm;
-		const wait = limited(route, user);
+		const wait = limited(user);
 		if (wait) return wait;
-		if (!sale) return refuse(route, "sale_not_found");
+		if (!sale) return refuse("sale_not_found");
 		const earlier = bought.get(user);
 		if (earlier) {
 			// Sending the same payment again is safe; anything else is a second purchase.
 			return earlier.reservationId === reservationId
-				? reply(route, 200, { userId: user, ...earlier })
-				: refuse(route, "already_purchased");
+				? reply(200, { userId: user, ...earlier })
+				: refuse("already_purchased");
 		}
 		const hold = holds.get(user);
 		if (!hold || hold.reservationId !== reservationId) {
-			return refuse(route, "reservation_not_found");
+			return refuse("reservation_not_found");
 		}
-		if (hold.expiresAt <= now()) return refuse(route, "hold_expired");
-		if (settings.paymentDeclines) return refuse(route, "payment_failed");
+		if (hold.expiresAt <= now()) return refuse("hold_expired");
+		if (settings.paymentDeclines) return refuse("payment_failed");
 		const purchase = {
 			purchaseId: crypto.randomUUID(),
 			reservationId,
@@ -208,15 +256,14 @@ export function createFakeBackend(now: () => number) {
 		holds.delete(user);
 		sale.sold += 1;
 		changed();
-		return reply(route, 201, { userId: user, ...purchase });
+		return reply(201, { userId: user, ...purchase });
 	}
 
 	function outcome(user: string): Reply {
-		const route = routes.outcome;
-		if (!sale) return refuse(route, "sale_not_found");
+		if (!sale) return refuse("sale_not_found");
 		const purchase = bought.get(user);
 		if (purchase) {
-			return reply(route, 200, {
+			return reply(200, {
 				userId: user,
 				...purchase,
 				state: "purchased",
@@ -224,14 +271,14 @@ export function createFakeBackend(now: () => number) {
 		}
 		const hold = holds.get(user);
 		if (hold && hold.expiresAt > now()) {
-			return reply(route, 200, {
+			return reply(200, {
 				userId: user,
 				state: "holding",
 				reservationId: hold.reservationId,
 				expiresAt: new Date(hold.expiresAt).toISOString(),
 			});
 		}
-		return reply(route, 200, { userId: user, state: "none" });
+		return reply(200, { userId: user, state: "none" });
 	}
 
 	return {
@@ -293,36 +340,28 @@ export function createFakeBackend(now: () => number) {
 		): Reply {
 			if (unreachable) throw new TypeError("fetch failed");
 			const match = matchRoute(method, path);
-			if (!match)
-				return { status: 404, headers: {}, body: errorPayload("not_found") };
-			const { route, params } = match;
-			if (route === routes.currentSale) {
-				return sale
-					? reply(route, 200, view())
-					: refuse(route, "sale_not_found");
+			if (!match) return refuse("not_found");
+			const { name: route, params } = match;
+			if (route === "currentSale") {
+				return sale ? reply(200, view()) : refuse("sale_not_found");
 			}
-			if (params.saleId !== SALE_ID || !sale) {
-				return route.replies[404]?.safeParse(errorPayload("sale_not_found"))
-					.success
-					? refuse(route, "sale_not_found")
-					: { status: 404, headers: {}, body: errorPayload("not_found") };
-			}
+			if (params.saleId !== SALE_ID || !sale) return refuse("sale_not_found");
 			const name = String(body.userId ?? params.userId ?? "")
 				.trim()
 				.toLowerCase();
 			switch (route) {
-				case routes.sale:
-					return reply(route, 200, view());
-				case routes.joinQueue:
+				case "sale":
+					return reply(200, view());
+				case "joinQueue":
 					return join(name);
-				case routes.reserve:
+				case "reserve":
 					return reserve(name, headers[TICKET_HEADER]);
-				case routes.confirm:
+				case "confirm":
 					return confirm(name, String(body.reservationId ?? ""));
-				case routes.outcome:
+				case "outcome":
 					return outcome(name);
 				default:
-					return { status: 404, headers: {}, body: errorPayload("not_found") };
+					return refuse("not_found");
 			}
 		},
 	};

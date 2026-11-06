@@ -10,26 +10,14 @@
 			"options": {
 				"command": "npm run typecheck",
 				"cwd": "apps/flash-load"
-			},
-			"dependsOn": [
-				{
-					"projects": ["typekit", "contract"],
-					"target": "build"
-				}
-			]
+			}
 		},
 		"lint": {
 			"executor": "nx:run-commands",
 			"options": {
 				"command": "npm run lint",
 				"cwd": "apps/flash-load"
-			},
-			"dependsOn": [
-				{
-					"projects": ["typekit", "contract"],
-					"target": "build"
-				}
-			]
+			}
 		},
 		"test:quick": {
 			"executor": "nx:run-commands",
@@ -51,65 +39,35 @@
 			"options": {
 				"command": "npm run load:smoke",
 				"cwd": "apps/flash-load"
-			},
-			"dependsOn": [
-				{
-					"projects": ["typekit", "contract"],
-					"target": "build"
-				}
-			]
+			}
 		},
 		"load:full": {
 			"executor": "nx:run-commands",
 			"options": {
 				"command": "npm run load:full",
 				"cwd": "apps/flash-load"
-			},
-			"dependsOn": [
-				{
-					"projects": ["typekit", "contract"],
-					"target": "build"
-				}
-			]
+			}
 		},
 		"load:chaos": {
 			"executor": "nx:run-commands",
 			"options": {
 				"command": "npm run load:chaos",
 				"cwd": "apps/flash-load"
-			},
-			"dependsOn": [
-				{
-					"projects": ["typekit", "contract"],
-					"target": "build"
-				}
-			]
+			}
 		},
 		"load:burst": {
 			"executor": "nx:run-commands",
 			"options": {
 				"command": "npm run load:burst",
 				"cwd": "apps/flash-load"
-			},
-			"dependsOn": [
-				{
-					"projects": ["typekit", "contract"],
-					"target": "build"
-				}
-			]
+			}
 		},
 		"load:contention": {
 			"executor": "nx:run-commands",
 			"options": {
 				"command": "npm run load:contention",
 				"cwd": "apps/flash-load"
-			},
-			"dependsOn": [
-				{
-					"projects": ["typekit", "contract"],
-					"target": "build"
-				}
-			]
+			}
 		}
 	}
 }

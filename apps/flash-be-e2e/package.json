@@ -7,9 +7,5 @@
 		"typecheck": "tsc --noEmit -p tsconfig.json",
 		"lint": "biome lint --error-on-warnings .",
 		"test:e2e": "bddgen && playwright test"
-	},
-	"dependencies": {
-		"@flash/contract": "*",
-		"@flash/typekit": "*"
 	}
 }

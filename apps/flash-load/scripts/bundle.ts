@@ -1,5 +1,4 @@
-// k6 cannot read packages from node_modules, so the script and the libraries it imports (the contract and typekit) are
-// bundled into one file. The k6 runtime itself ("k6", "k6/http") stays outside the bundle.
+// k6 cannot read packages from node_modules, so the script and what it imports are bundled into one file. The k6 runtime itself ("k6", "k6/http") stays outside the bundle.
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";

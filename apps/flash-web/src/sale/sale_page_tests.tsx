@@ -1,8 +1,3 @@
-import {
-	CLIENT_FAILURE_MESSAGE,
-	ERROR_MESSAGE,
-	type ErrorCode,
-} from "@flash/contract";
 import { Err, Ok } from "@flash/typekit";
 import {
 	act,
@@ -28,13 +23,7 @@ const SALE: SaleView = {
 
 afterEach(cleanup);
 
-const failure = (errorCode: ErrorCode | "network") => ({
-	errorCode,
-	errorMessage:
-		errorCode === "network"
-			? CLIENT_FAILURE_MESSAGE.network
-			: ERROR_MESSAGE[errorCode],
-});
+const failure = (errorCode: string) => ({ errorCode, errorMessage: errorCode });
 
 // A client that answers with what the test gives it and lets the test push place changes.
 function stubClient(overrides: Partial<SaleClient> = {}) {

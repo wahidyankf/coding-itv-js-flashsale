@@ -17,7 +17,7 @@ Two profiles, `burst` and `contention`, were added to send everyone inside one s
 are in `profiles.ts` and were written before they ran. The limits are the same as for every other run.
 
 **The first try never began.** With 2,000 shoppers k6 stopped starting virtual users at 1,186 of 2,070 on a Docker VM with
-7.7 GiB, about 6 MiB for each user with the contract (and Zod) bundled into the script. That is a limit of the machine
+7.7 GiB, about 6 MiB for each user with a schema library bundled into the script (the script has since been made plain code). That is a limit of the machine
 that runs the load generator, not a result about the system. The herd was cut to 700, close to the 670 users that `full`
 starts. The runner now reports a missing k6 summary as a load-generator failure and removes the stack.
 

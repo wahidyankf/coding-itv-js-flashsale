@@ -1,7 +1,6 @@
-import { routes } from "@flash/contract";
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
-import { send } from "./support/api.js";
+import { routes, send } from "./support/api.js";
 import { currentResponse, setResponse } from "./support/response.js";
 import { query, world } from "./support/world.js";
 

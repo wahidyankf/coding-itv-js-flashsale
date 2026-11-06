@@ -1,5 +1,6 @@
-import { ERROR_STATUS, parseFrames } from "@flash/contract";
-import { attemptAsync } from "@flash/typekit";
+import { attempt, attemptAsync } from "@flash/typekit";
+import { STATUS } from "../api";
+
 // A Server-Sent Events reader built on fetch. The browser's EventSource cannot send a header, and the queue ticket
 // travels in one. The same code runs in the browser and in tests.
 export type Watcher = (
@@ -15,6 +16,26 @@ export type WatchOptions = {
 };
 
 const DEFAULT_RETRY_MS = 1000;
+
+type Frame = { event: string; data: unknown };
+
+// Splits the text that arrived so far into complete frames. Returns the frames and the rest. A keep-alive comment and a
+// frame whose data is not JSON are skipped.
+export function parseFrames(buffer: string): { frames: Frame[]; rest: string } {
+	const frames: Frame[] = [];
+	let rest = buffer;
+	for (let end = rest.indexOf("\n\n"); end >= 0; end = rest.indexOf("\n\n")) {
+		const text = rest.slice(0, end);
+		rest = rest.slice(end + 2);
+		if (text.startsWith(":")) continue;
+		const event = /^event: (.*)$/m.exec(text)?.[1] ?? "message";
+		const line = /^data: (.*)$/m.exec(text)?.[1];
+		if (line === undefined) continue;
+		const data = attempt(() => JSON.parse(line) as unknown, SyntaxError);
+		if (data.isOk()) frames.push({ event, data: data.value });
+	}
+	return { frames, rest };
+}
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -35,8 +56,8 @@ export function createWatcher(options: WatchOptions = {}): Watcher {
 						});
 						// A refusal will not change by asking again.
 						if (
-							reply.status === ERROR_STATUS.invalid_ticket ||
-							reply.status === ERROR_STATUS.sale_not_found
+							reply.status === STATUS.unauthorized ||
+							reply.status === STATUS.notFound
 						) {
 							return "refused";
 						}

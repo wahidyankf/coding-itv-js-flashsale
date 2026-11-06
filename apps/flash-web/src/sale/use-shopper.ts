@@ -1,5 +1,5 @@
-import { MS_PER_SECOND } from "@flash/contract";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { MS_PER_SECOND } from "../api";
 import type { SaleClient } from "./client";
 import {
 	cleanUser,

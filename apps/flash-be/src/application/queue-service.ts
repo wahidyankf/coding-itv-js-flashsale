@@ -1,4 +1,3 @@
-import type { CHECK_ERRORS, JOIN_ERRORS } from "@flash/contract/vocabulary";
 import { attemptAsync, Err, Ok, type Result } from "@flash/typekit";
 import type { QueuePlace } from "../domain/queue.js";
 import { admissionsPerTick, queueBlock } from "../domain/sale.js";
@@ -14,7 +13,11 @@ export type QueueOptions = {
 	admissionTtlSeconds: number;
 };
 
-export type JoinError = (typeof JOIN_ERRORS)[number];
+export type JoinError =
+	| "sale_not_found"
+	| "invalid_user"
+	| "sale_ended"
+	| "sold_out";
 
 export type Joined = {
 	created: boolean;
@@ -25,7 +28,11 @@ export type Joined = {
 
 export type JoinResult = Result<Joined, JoinError>;
 
-export type CheckError = (typeof CHECK_ERRORS)[number];
+export type CheckError =
+	| "sale_not_found"
+	| "invalid_user"
+	| "invalid_ticket"
+	| "not_in_queue";
 
 export type CheckResult = Result<
 	{ user: string; place: QueuePlace },

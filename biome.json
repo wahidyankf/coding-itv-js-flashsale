@@ -12,7 +12,6 @@
 			"!.serena",
 			"!package-lock.json",
 			"!**/routeTree.gen.ts",
-			"!docs/reference/openapi.json",
 			"!**/dist",
 			"!**/.output"
 		]

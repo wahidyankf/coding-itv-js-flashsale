@@ -6,13 +6,6 @@ import {
 } from "node:http";
 import type { AddressInfo } from "node:net";
 import {
-	formatFrame,
-	type Match,
-	matchRoute,
-	routes,
-	TICKET_HEADER,
-} from "@flash/contract";
-import {
 	cleanup,
 	fireEvent,
 	render,
@@ -20,6 +13,7 @@ import {
 	waitFor,
 } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { TICKET_HEADER } from "../../api";
 import { proxyToBackend } from "../../proxy";
 import { HomePage } from "../../routes/index";
 import { createSaleClient } from "../../sale/client";
@@ -27,7 +21,13 @@ import { loadSale } from "../../sale/load";
 import { SalePage } from "../../sale/sale-page";
 import { createWatcher } from "../../sale/sse";
 import type { SaleLoad } from "../../sale/types";
-import { createFakeBackend, type FakeBackend, SALE_ID } from "./fake-backend";
+import {
+	createFakeBackend,
+	type FakeBackend,
+	type Match,
+	matchRoute,
+	SALE_ID,
+} from "./fake-backend";
 import type { WebWorld } from "./web-world";
 
 const WAIT = { timeout: 8000, interval: 50 };
@@ -61,7 +61,7 @@ function backendServer(current: () => FakeBackend): Server {
 		const ticket = typeof header === "string" ? header : undefined;
 		try {
 			const match = matchRoute(request.method ?? "GET", path);
-			if (match?.route.stream) {
+			if (match?.name === "saleEvents" || match?.name === "placeEvents") {
 				return stream(backend, match, ticket, request, response);
 			}
 			const text = await readBody(request);
@@ -91,7 +91,7 @@ function stream(
 	response: ServerResponse,
 ): void {
 	const user = match.params.userId ?? "";
-	const isPlace = match.route === routes.placeEvents;
+	const isPlace = match.name === "placeEvents";
 	if (backend.isCutOff()) throw new Error("unreachable");
 	if (isPlace && ticket !== `ticket-${user}`) {
 		response.writeHead(401).end();
@@ -104,7 +104,7 @@ function stream(
 		const [event, data] = isPlace
 			? ["place", { userId: user, ...backend.placeOf(user) }]
 			: ["sale", backend.view()];
-		const frame = formatFrame(event, data);
+		const frame = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 		if (frame === last) return;
 		last = frame;
 		response.write(frame);

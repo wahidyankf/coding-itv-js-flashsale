@@ -9,7 +9,6 @@
 		"test:e2e": "bddgen && playwright test"
 	},
 	"dependencies": {
-		"@flash/contract": "*",
 		"@flash/typekit": "*"
 	}
 }

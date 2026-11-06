@@ -1,5 +1,5 @@
-import { MS_PER_SECOND } from "@flash/contract/vocabulary";
 import { attemptAsync } from "@flash/typekit";
+import { MS_PER_SECOND } from "../domain/time.js";
 import { normalizeUser } from "../domain/user.js";
 import type { Clock } from "./ports/clock.js";
 import type { RateLimitStore } from "./ports/rate-limit-store.js";

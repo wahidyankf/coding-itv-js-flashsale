@@ -1,6 +1,6 @@
-import { buildRequest, routes } from "@flash/contract";
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
+import { salePath } from "./support/api.js";
 import { FORWARDER_URL } from "./support/forwarder.js";
 import { connectWebServer, world } from "./support/shop.js";
 import { current, setResponse } from "./web.steps.js";
@@ -10,15 +10,9 @@ const { When, Then } = createBdd();
 When("a client joins the queue through the web server", async ({ request }) => {
 	await connectWebServer();
 	// The browser reaches the API through the web server, under /api.
-	const built = buildRequest(
-		routes.joinQueue,
-		{ params: { saleId: world.saleId ?? "" }, body: { userId: "ana" } },
-		"/api",
-	);
 	setResponse(
-		await request.post(built.url, {
-			headers: built.headers,
-			data: built.body ?? null,
+		await request.post(`/api${salePath(world.saleId)}/queue`, {
+			data: { userId: "ana" },
 		}),
 	);
 });

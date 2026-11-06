@@ -1,4 +1,4 @@
-import { MS_PER_SECOND, type SaleStatus } from "@flash/contract/vocabulary";
+import { MS_PER_SECOND } from "./time.js";
 
 export type Sale = {
 	id: string;
@@ -11,7 +11,7 @@ export type Sale = {
 	admitPerSecond: number;
 };
 
-export type { SaleStatus };
+export type SaleStatus = "upcoming" | "active" | "sold_out" | "ended";
 
 // The window decides first: after it closes the sale is ended, even if it sold out. Sold out only
 // matters while the window is open.
@@ -65,6 +65,10 @@ export function admissionsPerTick(sale: Sale, tickMs: number): number {
 	);
 }
 
-// A malformed id can never match a row, so the lookup is skipped instead of failing in Postgres. The rule lives in the
-// contract.
-export { isUuid as isSaleId } from "@flash/contract/vocabulary";
+const UUID_PATTERN =
+	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// A malformed id can never match a row, so the lookup is skipped instead of failing in Postgres.
+export function isSaleId(value: string): boolean {
+	return UUID_PATTERN.test(value);
+}

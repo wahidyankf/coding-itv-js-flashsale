@@ -1,8 +1,7 @@
-import { routes, TICKET_HEADER } from "@flash/contract";
 import { type APIRequestContext, expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { createClient } from "redis";
-import { bodyOf, send } from "./support/api.js";
+import { bodyOf, routes, send, TICKET_HEADER } from "./support/api.js";
 import { currentResponse, setResponse } from "./support/response.js";
 import { E2E_REDIS_URL, query, world } from "./support/world.js";
 

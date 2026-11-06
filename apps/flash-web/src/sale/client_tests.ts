@@ -1,13 +1,16 @@
-import { CLIENT_FAILURE_MESSAGE, errorPayload } from "@flash/contract";
 import { Err, Ok } from "@flash/typekit";
 import { describe, expect, it, vi } from "vitest";
 import { createSaleClient } from "./client";
 import type { Watcher } from "./sse";
 
-const unexpected = {
+const unexpected = new Err({
 	errorCode: "unexpected",
-	errorMessage: CLIENT_FAILURE_MESSAGE.unexpected,
-} as const;
+	errorMessage: "The server sent a reply that this app cannot read.",
+});
+const rateLimited = {
+	errorCode: "rate_limited",
+	errorMessage: "Too many requests. Try again later.",
+};
 
 const SALE = "11111111-1111-4111-8111-111111111111";
 const WHEN = "2026-06-01T12:00:00.000Z";
@@ -83,49 +86,34 @@ describe("createSaleClient", () => {
 	it("reads the error code and the wait from a refusal", async () => {
 		const { api } = client(() =>
 			Response.json(
-				{ ...errorPayload("rate_limited"), retryAfterSeconds: 9 },
+				{ ...rateLimited, retryAfterSeconds: 9 },
 				{ status: 429, headers: { "retry-after": "7" } },
 			),
 		);
 		expect(await api.join(SALE, "ana")).toEqual(
-			new Err({
-				...errorPayload("rate_limited"),
-				status: 429,
-				retryAfterSeconds: 7,
-			}),
+			new Err({ ...rateLimited, retryAfterSeconds: 7 }),
 		);
 	});
 
 	it("reads the wait from the body when there is no header", async () => {
 		const { api } = client(() =>
-			Response.json(
-				{ ...errorPayload("rate_limited"), retryAfterSeconds: 3 },
-				{ status: 429 },
-			),
+			Response.json({ ...rateLimited, retryAfterSeconds: 3 }, { status: 429 }),
 		);
 		expect(await api.join(SALE, "ana")).toEqual(
-			new Err({
-				...errorPayload("rate_limited"),
-				status: 429,
-				retryAfterSeconds: 3,
-			}),
+			new Err({ ...rateLimited, retryAfterSeconds: 3 }),
 		);
 	});
 
 	it("calls an answer it cannot read unexpected", async () => {
 		const { api } = client(() => new Response("<html>", { status: 500 }));
-		expect(await api.join(SALE, "ana")).toEqual(
-			new Err({ ...unexpected, status: 500 }),
-		);
+		expect(await api.join(SALE, "ana")).toEqual(unexpected);
 	});
 
 	it("calls an error without a code unexpected", async () => {
 		const { api } = client(() =>
 			Response.json({ errorCode: 5 }, { status: 400 }),
 		);
-		expect(await api.join(SALE, "ana")).toEqual(
-			new Err({ ...unexpected, status: 400 }),
-		);
+		expect(await api.join(SALE, "ana")).toEqual(unexpected);
 	});
 
 	it("reports the network when nothing answers", async () => {
@@ -135,16 +123,14 @@ describe("createSaleClient", () => {
 		expect(await api.join(SALE, "ana")).toEqual(
 			new Err({
 				errorCode: "network",
-				errorMessage: CLIENT_FAILURE_MESSAGE.network,
+				errorMessage: "The server could not be reached.",
 			}),
 		);
 	});
 
 	it("calls a good answer that has no body unexpected", async () => {
 		const { api } = client(() => new Response(null, { status: 200 }));
-		expect(await api.outcome(SALE, "ana")).toEqual(
-			new Err({ ...unexpected, status: 200 }),
-		);
+		expect(await api.outcome(SALE, "ana")).toEqual(unexpected);
 	});
 
 	it("hands only sale events to the sale callback", () => {
@@ -156,7 +142,6 @@ describe("createSaleClient", () => {
 			`http://web.test/api/sales/${SALE}/events`,
 		);
 		onEvent?.("place", { userId: "ana", state: "admitted" });
-		onEvent?.("sale", { remaining: 2 });
 		onEvent?.("sale", SALE_VIEW);
 		expect(seen).toEqual([SALE_VIEW]);
 	});
@@ -169,7 +154,6 @@ describe("createSaleClient", () => {
 		expect(url).toBe(`http://web.test/api/sales/${SALE}/queue/a%20b/events`);
 		expect(headers).toEqual({ "x-queue-ticket": "t1" });
 		onEvent?.("sale", SALE_VIEW);
-		onEvent?.("place", { state: "admitted" });
 		onEvent?.("place", { userId: "a b", state: "admitted" });
 		expect(seen).toEqual([{ userId: "a b", state: "admitted" }]);
 	});

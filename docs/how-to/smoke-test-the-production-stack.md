@@ -7,7 +7,7 @@ You need Docker. The first run builds the images and takes a few minutes.
 npm run smoke:prod
 ```
 
-The command builds the contract library, then starts `compose.prod.yaml` under its own project name (`flash-smoke`) with
+The command builds the typekit library, then starts `compose.prod.yaml` under its own project name (`flash-smoke`) with
 random secrets and free ports, so it does not touch a stack you started with `npm run docker:prod:up`. It then:
 
 1. checks that three `flash-be` instances are healthy and `/ready` answers;
@@ -20,4 +20,4 @@ random secrets and free ports, so it does not touch a stack you started with `np
 
 It prints one line for each step and ends with `smoke:prod passed`, or stops at the first step that fails and exits
 with a non-zero code. It is not part of the pre-push hook because it builds images. Run it before you ship a change to
-a Dockerfile, to `compose.prod.yaml`, to `nginx.prod.conf` or to the contract.
+a Dockerfile, to `compose.prod.yaml` or to `nginx.prod.conf`.

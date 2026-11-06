@@ -17,6 +17,5 @@ behaviour, read the specs.
 - [admin-and-sale-windows.md](admin-and-sale-windows.md) - why the admin route only creates a sale, how its token is guarded, and why windows may not overlap.
 - [web-server-proxy.md](web-server-proxy.md) - why the browser talks to its own web server, and what the page does while a shopper waits.
 - [load-test-findings.md](load-test-findings.md) - what the load runs showed, and what was fixed because of them.
-- [api-contract.md](api-contract.md) - why the API is written down once in `libs/contract`, and how every app reads it.
 - [failures-as-values.md](failures-as-values.md) - why failures and absences are values, and how the lint rules keep it so.
 - [scenario-or-plain-test.md](scenario-or-plain-test.md) - when a test is a Gherkin scenario and when it is a plain Vitest test.

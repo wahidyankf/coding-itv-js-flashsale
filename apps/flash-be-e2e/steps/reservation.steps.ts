@@ -1,9 +1,8 @@
-import { routes, TICKET_HEADER } from "@flash/contract";
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { createClient } from "redis";
 import { check, join, shoppers } from "./queue.steps.js";
-import { bodyOf, read, send } from "./support/api.js";
+import { bodyOf, errorOf, routes, send, TICKET_HEADER } from "./support/api.js";
 import { currentResponse, setResponse } from "./support/response.js";
 import { E2E_REDIS_URL, query, world } from "./support/world.js";
 
@@ -161,11 +160,6 @@ When(
 		);
 	},
 );
-
-async function errorOf(reply: Awaited<ReturnType<typeof post>>) {
-	const result = await read(routes.reserve, reply);
-	return result.isErr() ? result.error.errorCode : undefined;
-}
 
 Then("a reservation id is issued", async ({ request: _request }) => {
 	expect((await currentResponse().json()).reservationId).toMatch(

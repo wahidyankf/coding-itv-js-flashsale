@@ -74,7 +74,7 @@ export const PROFILES = {
 	// once: the virtual users needed equal the shoppers, and k6 starts all of them before the clock begins. The
 	// machine sets the ceiling, not the system under test. A first try with 2,000 never began: k6 stopped starting
 	// virtual users at 1,186 of 2,070 on a Docker VM with 7.7 GiB, which is about 6 MiB for each user with the
-	// contract bundled in. `full` starts 670 users and runs, so 700 shoppers are used here, about the largest herd
+	// schema library bundled in (it has since been removed). `full` starts 670 users and runs, so 700 shoppers are used here, about the largest herd
 	// this machine is known to start. The speed limits below are the same as for every other run and are not loosened
 	// for a herd.
 	//

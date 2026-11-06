@@ -1,7 +1,20 @@
-import type { SaleView } from "@flash/contract";
-import { remaining, type Sale, saleStatus } from "../domain/sale.js";
+import {
+	remaining,
+	type Sale,
+	type SaleStatus,
+	saleStatus,
+} from "../domain/sale.js";
 
-export type { SaleView };
+// A sale as the API shows it. Dates are ISO strings, as JSON carries them.
+export type SaleView = {
+	id: string;
+	name: string;
+	status: SaleStatus;
+	startsAt: string;
+	endsAt: string;
+	stock: number;
+	remaining: number;
+};
 
 export function describeSale(sale: Sale, now: Date): SaleView {
 	return {

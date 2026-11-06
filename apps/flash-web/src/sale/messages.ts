@@ -1,6 +1,4 @@
-import type { ApiFailure } from "@flash/contract";
-import { normalizeUserId } from "@flash/contract/vocabulary";
-import type { SaleStatus } from "./types";
+import type { ApiFailure, SaleStatus } from "./types";
 
 export const STATUS_LABEL: Record<SaleStatus, string> = {
 	upcoming: "Not open yet",
@@ -9,9 +7,12 @@ export const STATUS_LABEL: Record<SaleStatus, string> = {
 	ended: "Ended",
 };
 
-// The same rule the API uses for a user id, so a bad name is refused before anything is sent.
+// The same rule the API uses for a user id (trimmed, lowercased), so a bad name is refused before anything is sent.
+const USER_ID = /^[a-z0-9][a-z0-9._@+-]{0,63}$/;
+
 export function cleanUser(raw: string): string | undefined {
-	return normalizeUserId(raw);
+	const user = raw.trim().toLowerCase();
+	return USER_ID.test(user) ? user : undefined;
 }
 
 export const TEXT = {

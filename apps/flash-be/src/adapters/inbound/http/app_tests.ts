@@ -1,11 +1,9 @@
-import { errorPayload } from "@flash/contract";
 import { Err, Ok } from "@flash/typekit";
-import Fastify from "fastify";
 import { afterEach, describe, expect, it } from "vitest";
-import { z } from "zod";
 import type { Dependencies } from "../../../application/dependencies.js";
 import { healthyDeps } from "../../../bdd/support/deps.js";
-import { applyContract, buildApp } from "./app.js";
+import { buildApp } from "./app.js";
+import { errorPayload } from "./errors.js";
 
 const apps: Array<ReturnType<typeof buildApp>> = [];
 afterEach(async () => {
@@ -35,37 +33,6 @@ describe("the errors of the HTTP edge", () => {
 		const reply = await app.inject({ method: "GET", url: "/sales/current" });
 		expect(reply.statusCode).toBe(500);
 		expect(reply.json()).toEqual(errorPayload("internal"));
-	});
-
-	it("answers a reply that breaks the contract with `internal`", async () => {
-		const app = appWith({
-			...healthyDeps,
-			sales: {
-				...healthyDeps.sales,
-				byId: async () => ({ value: { id: "s1" } }) as never,
-			},
-		});
-		const reply = await app.inject({
-			method: "GET",
-			url: "/sales/00000000-0000-4000-8000-000000000000",
-		});
-		expect(reply.statusCode).toBe(500);
-		expect(reply.json()).toEqual(errorPayload("internal"));
-	});
-
-	it("refuses a request whose query is wrong as `invalid_request`", async () => {
-		const app = Fastify();
-		applyContract(app);
-		app.route({
-			method: "GET",
-			url: "/probe",
-			schema: { querystring: z.object({ count: z.coerce.number().int() }) },
-			handler: async () => ({}),
-		});
-		const reply = await app.inject({ method: "GET", url: "/probe?count=x" });
-		expect(reply.statusCode).toBe(400);
-		expect(reply.json()).toEqual(errorPayload("invalid_request"));
-		await app.close();
 	});
 
 	it("refuses a body that is too large as `invalid_request`", async () => {

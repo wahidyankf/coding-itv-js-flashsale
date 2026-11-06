@@ -1,17 +1,3 @@
-import type { ApiFailure } from "@flash/contract";
-import {
-	buildRequest,
-	ERROR_STATUS,
-	FIRST_SERVER_ERROR_STATUS,
-	HTTP_STATUS,
-	parseReply,
-	type Reply,
-	type RequestInput,
-	type Route,
-	routes,
-	TICKET_HEADER,
-} from "@flash/contract";
-import type { Result } from "@flash/typekit";
 import { check, sleep } from "k6";
 import exec from "k6/execution";
 import http from "k6/http";
@@ -23,6 +9,20 @@ const profileName = (__ENV.PROFILE ?? "smoke") as ProfileName;
 const profile = PROFILES[profileName];
 const BASE = __ENV.BASE_URL ?? "http://nginx";
 const SALE = __ENV.SALE_ID ?? "";
+
+// The API, as the shopper meets it. A refusal is `{ errorCode, errorMessage }` with the status that goes with it.
+const TICKET_HEADER = "x-queue-ticket";
+const STATUS = {
+	ok: 200,
+	created: 201,
+	paymentFailed: 402,
+	alreadyPurchased: 409,
+	rateLimited: 429,
+	firstServerError: 500,
+} as const;
+const FIRST_ERROR_STATUS = 400;
+const BYTE = 255;
+const BYTE_BITS = 8;
 
 // How a shopper behaves. Each number is a choice about the load, not a limit of the system.
 // A join answered 429 is tried again this many times, then the shopper gives up.
@@ -58,8 +58,8 @@ const serverErrors = new Counter("server_errors");
 // A refusal such as 409 or 429 is an answer. Only a 5xx or no answer counts as a failed request.
 http.setResponseCallback(
 	http.expectedStatuses({
-		min: HTTP_STATUS.ok,
-		max: FIRST_SERVER_ERROR_STATUS - 1,
+		min: STATUS.ok,
+		max: STATUS.firstServerError - 1,
 	}),
 );
 
@@ -104,64 +104,76 @@ export const options: Options = {
 	summaryTrendStats: ["avg", "med", "p(90)", "p(95)", "p(99)", "max"],
 };
 
-type Answer<R extends Route> = {
-	status: number;
-	result: Result<Reply<R>, ApiFailure>;
+// The fields of a reply that the shopper reads. Which ones are there depends on the request.
+type Body = {
+	ticket?: string;
+	state?: string;
+	status?: string;
+	reservationId?: string;
+	purchaseId?: string;
+	errorCode?: string;
 };
+type Answer = { status: number; body: Body };
 
-// The reply when the route did not refuse it, and the name of the refusal when it did.
-function bodyOf<R extends Route>(
-	answer: Answer<R>,
-): Reply<R>["body"] | undefined {
-	return answer.result.isOk() ? answer.result.value.body : undefined;
+// The reply when the API did not refuse it.
+function bodyOf(answer: Answer): Body | undefined {
+	return answer.status < FIRST_ERROR_STATUS ? answer.body : undefined;
 }
 
-function errorOf<R extends Route>(
-	answer: Answer<R>,
-): ApiFailure["errorCode"] | undefined {
-	return answer.result.isErr() ? answer.result.error.errorCode : undefined;
+// The `errorCode` of a refusal.
+function errorOf(answer: Answer): string | undefined {
+	return answer.status >= FIRST_ERROR_STATUS
+		? answer.body.errorCode
+		: undefined;
 }
 
-// One request, built and read through the contract. The user's address goes in X-Forwarded-For, which the API trusts
-// behind the proxy, so each shopper is limited on their own and not as one address.
-function call<R extends Route>(
-	route: R,
-	input: RequestInput<R>,
+type Send = { headers?: Record<string, string>; body?: object };
+
+// One request. The user's address goes in X-Forwarded-For, which the API trusts behind the proxy, so each shopper is
+// limited on their own and not as one address.
+function call(
+	method: "GET" | "POST",
+	path: string,
 	name: string,
 	address: string,
-): Answer<R> {
-	const built = buildRequest(route, input, BASE);
+	{ headers = {}, body }: Send = {},
+): Answer {
 	const params = {
-		headers: { ...built.headers, "x-forwarded-for": address },
+		headers: {
+			...headers,
+			...(body && { "content-type": "application/json" }),
+			"x-forwarded-for": address,
+		},
 		tags: { name },
 	};
+	const url = `${BASE}${path}`;
 	const response =
-		built.method === "GET"
-			? http.get(built.url, params)
-			: http.post(built.url, built.body ?? null, params);
-	if (response.status === 0 || response.status >= FIRST_SERVER_ERROR_STATUS)
+		method === "GET"
+			? http.get(url, params)
+			: http.post(url, body ? JSON.stringify(body) : null, params);
+	if (response.status === 0 || response.status >= STATUS.firstServerError)
 		serverErrors.add(1);
-	if (response.status === ERROR_STATUS.rate_limited) rateLimited.add(1);
-	// A gateway error page is not JSON; the status says enough, and the reply is read as a failure.
-	const result = parseReply(route, {
+	if (response.status === STATUS.rateLimited) rateLimited.add(1);
+	// A gateway error page is not JSON; the status says enough.
+	const isJson = String(response.headers["Content-Type"]).includes("json");
+	return {
 		status: response.status,
-		headers: response.headers,
-		text: typeof response.body === "string" ? response.body : "",
-	});
-	return { status: response.status, result };
+		body: isJson ? (response.json() as Body) : {},
+	};
 }
 
 const address = (index: number) =>
-	`10.${(index >> 16) & 255}.${(index >> 8) & 255}.${index & 255}`;
+	`10.${(index >> (BYTE_BITS * 2)) & BYTE}.${(index >> BYTE_BITS) & BYTE}.${index & BYTE}`;
 
 const pause = ({ min, spread }: Pause) => sleep(min + Math.random() * spread);
 
 // One shopper, from the first click to the answer to "did I get it".
 function visit(user: string, index: number): void {
 	const where = address(index);
-	const params = { saleId: SALE };
 	const join = () =>
-		call(routes.joinQueue, { params, body: { userId: user } }, "join", where);
+		call("POST", `/sales/${SALE}/queue`, "join", where, {
+			body: { userId: user },
+		});
 
 	let joined = join();
 	for (
@@ -176,26 +188,21 @@ function visit(user: string, index: number): void {
 	const entry = bodyOf(joined);
 	if (!entry) return;
 
-	const headers = { [TICKET_HEADER]: entry.ticket };
+	const headers = { [TICKET_HEADER]: entry.ticket ?? "" };
 
 	// Wait to be let in. The page does the same by following the place stream.
-	let state: string = entry.state;
+	let state = entry.state ?? "";
 	for (let polls = 0; state !== "admitted" && polls < MAX_POLLS; polls++) {
 		pause(POLL_PAUSE);
 		const place = bodyOf(
-			call(
-				routes.checkPlace,
-				{ params: { saleId: SALE, userId: user }, headers },
-				"place",
-				where,
-			),
+			call("GET", `/sales/${SALE}/queue/${user}`, "place", where, { headers }),
 		);
 		if (!place) return;
-		state = place.state;
+		state = place.state ?? "";
 		if (state === "admitted") break;
 		// The queue stops admitting when the sale is over or sold out. The page learns that from the sale stream and
 		// stops waiting, so a shopper here reads the sale alongside the place.
-		const sale = bodyOf(call(routes.sale, { params }, "sale", where));
+		const sale = bodyOf(call("GET", `/sales/${SALE}`, "sale", where));
 		if (sale?.status === "sold_out" || sale?.status === "ended") return;
 	}
 	if (state !== "admitted") return;
@@ -203,12 +210,10 @@ function visit(user: string, index: number): void {
 	// Ask for an item once. A sold out answer is final for this shopper: holds that lapse later are for those who
 	// arrive later, which the latecomers below stand for.
 	const reserve = () =>
-		call(
-			routes.reserve,
-			{ params, headers, body: { userId: user } },
-			"reserve",
-			where,
-		);
+		call("POST", `/sales/${SALE}/reservations`, "reserve", where, {
+			headers,
+			body: { userId: user },
+		});
 	const hold = reserve();
 	if (errorOf(hold) === "sold_out") {
 		soldOutReplies.add(1);
@@ -216,61 +221,57 @@ function visit(user: string, index: number): void {
 	}
 	const held = bodyOf(hold);
 	if (!held) return;
-	if (hold.status === HTTP_STATUS.created) reserved.add(1);
+	if (hold.status === STATUS.created) reserved.add(1);
 
 	if (Math.random() < profile.abandonShare) return;
 	pause(THINK_BEFORE_PAYING);
 
 	const confirm = (name: string) =>
-		call(
-			routes.confirm,
-			{ params, body: { userId: user, reservationId: held.reservationId } },
-			name,
-			where,
-		);
+		call("POST", `/sales/${SALE}/purchases`, name, where, {
+			body: { userId: user, reservationId: held.reservationId },
+		});
 	let bought = confirm("purchase");
 	for (
 		let attempt = 1;
-		attempt < MAX_PAYMENT_ATTEMPTS &&
-		bought.status === ERROR_STATUS.payment_failed;
+		attempt < MAX_PAYMENT_ATTEMPTS && bought.status === STATUS.paymentFailed;
 		attempt++
 	) {
 		pause(BEFORE_PAYMENT_RETRY);
 		bought = confirm("purchase");
 	}
 	const purchase = bodyOf(bought);
-	if (bought.status === HTTP_STATUS.created) purchased.add(1);
+	if (bought.status === STATUS.created) purchased.add(1);
 
 	// One shopper in five presses the button again. The second answer must repeat the first, and a second item must
 	// not be given.
 	if (
-		bought.status === HTTP_STATUS.created &&
+		bought.status === STATUS.created &&
 		Math.random() < REPEAT_CONFIRM_SHARE
 	) {
 		const again = confirm("purchase_again");
 		const second = reserve();
 		check(null, {
 			"a repeated confirm gives the same purchase": () =>
-				again.status === HTTP_STATUS.ok &&
+				again.status === STATUS.ok &&
 				bodyOf(again)?.purchaseId === purchase?.purchaseId,
 			"a second reserve is refused": () =>
-				second.status === ERROR_STATUS.already_purchased &&
+				second.status === STATUS.alreadyPurchased &&
 				errorOf(second) === "already_purchased",
 		});
 	}
 
 	// "Did I get it" must agree with what happened.
 	const outcome = call(
-		routes.outcome,
-		{ params: { saleId: SALE, userId: user } },
+		"GET",
+		`/sales/${SALE}/purchases/${user}`,
 		"outcome",
 		where,
 	);
 	check(null, {
 		"the outcome agrees with the purchase": () =>
-			outcome.status === HTTP_STATUS.ok &&
+			outcome.status === STATUS.ok &&
 			(bodyOf(outcome)?.state === "purchased") ===
-				(bought.status === HTTP_STATUS.created),
+				(bought.status === STATUS.created),
 	});
 }
 
@@ -290,11 +291,8 @@ export function hammer(): void {
 	const id = exec.vu.idInTest;
 	const user = `hammer-${id}`;
 	for (let sent = 0; sent < HAMMER_REQUESTS; sent++) {
-		call(
-			routes.joinQueue,
-			{ params: { saleId: SALE }, body: { userId: user } },
-			"hammer",
-			`192.0.2.${id}`,
-		);
+		call("POST", `/sales/${SALE}/queue`, "hammer", `192.0.2.${id}`, {
+			body: { userId: user },
+		});
 	}
 }

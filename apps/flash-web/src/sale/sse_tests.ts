@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createWatcher } from "./sse";
+import { createWatcher, parseFrames } from "./sse";
 
 const encoder = new TextEncoder();
 
@@ -87,5 +87,22 @@ describe("createWatcher", () => {
 		} finally {
 			vi.unstubAllGlobals();
 		}
+	});
+});
+
+describe("parseFrames", () => {
+	it("splits whole frames, keeps the rest, and skips comments and broken data", () => {
+		const { frames, rest } = parseFrames(
+			': keep-alive\n\nevent: sale\ndata: {"n":1}\n\nevent: sale\ndata: nope\n\ndata: {"n":2}\n\nevent: place\ndata: {"n"',
+		);
+		expect(frames).toEqual([
+			{ event: "sale", data: { n: 1 } },
+			{ event: "message", data: { n: 2 } },
+		]);
+		expect(rest).toBe('event: place\ndata: {"n"');
+	});
+
+	it("skips a frame that has no data", () => {
+		expect(parseFrames("event: sale\n\n").frames).toEqual([]);
 	});
 });

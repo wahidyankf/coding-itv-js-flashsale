@@ -22,10 +22,6 @@ code as `*_integration_tests.ts(x)`; they are not scanned by the behaviour check
 The library `typekit` (`libs/typekit`) has `build`, `typecheck`, `lint`, `test:unit`, `test:coverage` and `test:quick`. Its
 tests are plain Vitest files, `libs/typekit/src/**/*_tests.ts`. It needs no Docker. The apps' targets build it first.
 
-The library `contract` (`libs/contract`) has the same targets, and needs no Docker either. Its tests are plain unit tests
-next to the source. `npm run openapi:check` and `npm run contract:guard:test` run in the pre-push hook beside the docs
-check and the behaviour check.
-
 | Target             | App                             | What it runs                                                 |
 | ------------------ | ------------------------------- | ------------------------------------------------------------ |
 | `typecheck`        | every app                       | `tsc --noEmit` with the strict flags in each `tsconfig.json` |

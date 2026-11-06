@@ -1,4 +1,3 @@
-import type { ApiFailure } from "@flash/contract";
 import { describe, expect, it } from "vitest";
 import {
 	cleanUser,
@@ -8,6 +7,7 @@ import {
 	TEXT,
 	waitingText,
 } from "./messages";
+import type { ApiFailure } from "./types";
 
 describe("cleanUser", () => {
 	it("trims and lowercases a good name", () => {

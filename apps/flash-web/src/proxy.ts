@@ -1,20 +1,22 @@
-import {
-	ERROR_STATUS,
-	type ErrorCode,
-	errorPayload,
-	isUuid,
-	matchRoute,
-	RETRY_AFTER_HEADER,
-	routes,
-	TICKET_HEADER,
-} from "@flash/contract";
-import { attemptAsync } from "@flash/typekit";
+import { attempt, attemptAsync } from "@flash/typekit";
+import { RETRY_AFTER_HEADER, STATUS, TICKET_HEADER } from "./api";
 import { buildConfig } from "./config";
 
-// The routes the browser may reach are the ones the contract marks `passThrough`, each with its one method. Anything
-// else is not the browser's.
-const PASS_THROUGH = Object.values(routes).filter((route) => route.passThrough);
+// The routes the browser may reach, each with its one method. Anything else is not the browser's. In particular the
+// operator route (`POST /admin/sales`) is not here, and `/sales/current` comes first so it is not taken for a sale.
+const ALLOWED: Array<[method: string, path: RegExp]> = [
+	["GET", /^\/sales\/current$/],
+	["GET", /^\/sales\/(?<saleId>[^/]+)$/],
+	["GET", /^\/sales\/(?<saleId>[^/]+)\/events$/],
+	["POST", /^\/sales\/(?<saleId>[^/]+)\/queue$/],
+	["GET", /^\/sales\/(?<saleId>[^/]+)\/queue\/(?<userId>[^/]+)$/],
+	["GET", /^\/sales\/(?<saleId>[^/]+)\/queue\/(?<userId>[^/]+)\/events$/],
+	["POST", /^\/sales\/(?<saleId>[^/]+)\/reservations$/],
+	["POST", /^\/sales\/(?<saleId>[^/]+)\/purchases$/],
+	["GET", /^\/sales\/(?<saleId>[^/]+)\/purchases\/(?<userId>[^/]+)$/],
+];
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // A name in a path may still be percent-encoded and in any case; the API normalises it.
 const USER_IN_PATH = /^[A-Za-z0-9._@+-]{1,200}$/;
 
@@ -22,21 +24,46 @@ const USER_IN_PATH = /^[A-Za-z0-9._@+-]{1,200}$/;
 const SENT = ["content-type", TICKET_HEADER, "accept"];
 const RETURNED = ["content-type", "cache-control", RETRY_AFTER_HEADER];
 
+// The answers this server gives on its own, in the shape of the API's errors.
+const REFUSALS = {
+	not_found: {
+		status: STATUS.notFound,
+		message: "Nothing was found at this address.",
+	},
+	backend_unavailable: {
+		status: STATUS.badGateway,
+		message: "The API could not be reached.",
+	},
+};
+
+// A value that cannot be decoded becomes "", which no pattern below accepts.
+const decode = (value: string | undefined) =>
+	value === undefined
+		? undefined
+		: attempt(() => decodeURIComponent(value), URIError).match({
+				ok: (decoded) => decoded,
+				err: () => "",
+			});
+
 // `path` is what follows `/api`, such as `/sales/current`.
 export function isAllowed(method: string, path: string): boolean {
-	const match = matchRoute(method, path, PASS_THROUGH);
-	if (!match) return false;
-	const { saleId, userId } = match.params;
-	return (
-		(saleId === undefined ||
-			isUuid(saleId) ||
-			match.route.name === "currentSale") &&
-		(userId === undefined || USER_IN_PATH.test(userId))
-	);
+	for (const [allowed, pattern] of ALLOWED) {
+		if (allowed !== method) continue;
+		const found = pattern.exec(path);
+		if (!found) continue;
+		const saleId = decode(found.groups?.saleId);
+		const userId = decode(found.groups?.userId);
+		return (
+			(saleId === undefined || UUID.test(saleId)) &&
+			(userId === undefined || USER_IN_PATH.test(userId))
+		);
+	}
+	return false;
 }
 
-function refuse(code: ErrorCode): Response {
-	return Response.json(errorPayload(code), { status: ERROR_STATUS[code] });
+function refuse(code: keyof typeof REFUSALS): Response {
+	const { status, message } = REFUSALS[code];
+	return Response.json({ errorCode: code, errorMessage: message }, { status });
 }
 
 // Passes a browser request under /api/sales on to flash-be and streams the answer back. The address of flash-be is read

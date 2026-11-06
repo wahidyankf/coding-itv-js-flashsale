@@ -2,9 +2,9 @@ import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import net from "node:net";
 import path from "node:path";
-import type { PurchaseView, ReservedView } from "@flash/contract";
 import { type APIResponse, expect } from "@playwright/test";
 import pg from "pg";
+import type { PurchaseView, ReservedView } from "./views.js";
 
 // The built API and its jobs, started as their own processes, as in production.
 const DIST = path.resolve(process.cwd(), "../flash-be/dist");

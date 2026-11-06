@@ -6,7 +6,7 @@ know about Redis or Fastify cannot break when they change.
 
 ```text
 src/
-  domain/          rules and values; imports only Node built-ins, @flash/typekit and @flash/contract/vocabulary
+  domain/          rules and values; imports only Node built-ins and @flash/typekit
   application/     services (use cases) and ports/
   adapters/
     inbound/       http (Fastify routes, SSE), cli (seed options)
@@ -29,11 +29,10 @@ src/
 ## The rule and how it is kept
 
 Dependencies point inward: adapters know the application and the domain, the application knows the domain, and the
-domain knows nothing. The packages the inner layers may import are [`@flash/typekit`](../reference/typekit.md),
-which has no dependency and no I/O (see [failures as values](failures-as-values.md)), and the Zod-free entry
-`@flash/contract/vocabulary` ([the API contract](api-contract.md)): the user id rule, the id rule and the error codes. The
-application may also `import type` from `@flash/contract`. Only the inbound HTTP adapter imports the full contract, which
-brings in Zod. Inbound adapters never import outbound adapters, and outbound adapters import only ports and the
+domain knows nothing. The only package the inner layers may import is [`@flash/typekit`](../reference/typekit.md),
+which has no dependency and no I/O (see [failures as values](failures-as-values.md)). The HTTP words (error codes, statuses,
+sentences) live in the inbound HTTP adapter, and the rules the domain needs, such as the user id rule, live in the domain.
+Inbound adapters never import outbound adapters, and outbound adapters import only ports and the
 domain. Only `composition.ts` and the entry points see both sides.
 
 `apps/flash-be/src/architecture_tests.ts` reads the imports of every source file and fails when one crosses a layer

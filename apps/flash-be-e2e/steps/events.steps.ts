@@ -1,11 +1,10 @@
-import { buildRequest, routes, TICKET_HEADER } from "@flash/contract";
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { shoppers } from "./queue.steps.js";
-import { send } from "./support/api.js";
+import { build, routes, send, TICKET_HEADER } from "./support/api.js";
 import { setResponse } from "./support/response.js";
 import { openStream, type Stream } from "./support/stream.js";
-import { query, startApi, world } from "./support/world.js";
+import { query, world } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
 
@@ -18,25 +17,17 @@ function current(): Stream {
 }
 
 async function watchSale(saleId: string) {
-	const built = buildRequest(
-		routes.saleEvents,
-		{ params: { saleId } },
-		await startApi(),
-	);
+	const built = await build(routes.saleEvents, { params: { saleId } });
 	await watch(built.url, built.headers);
 }
 
 async function watchPlace(user: string) {
-	const built = buildRequest(
-		routes.placeEvents,
-		{
-			params: { saleId: world.saleId ?? "", userId: user },
-			headers: {
-				[TICKET_HEADER]: shoppers().tickets.get(user.trim().toLowerCase()),
-			},
+	const built = await build(routes.placeEvents, {
+		params: { saleId: world.saleId ?? "", userId: user },
+		headers: {
+			[TICKET_HEADER]: shoppers().tickets.get(user.trim().toLowerCase()),
 		},
-		await startApi(),
-	);
+	});
 	await watch(built.url, built.headers);
 }
 

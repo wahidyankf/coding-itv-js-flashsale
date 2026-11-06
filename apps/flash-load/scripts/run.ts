@@ -4,7 +4,6 @@
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { MS_PER_SECOND } from "@flash/contract/vocabulary";
 import {
 	LIMITS,
 	PROFILE_NAMES,
@@ -14,6 +13,7 @@ import {
 } from "../k6/profiles.ts";
 import { bundleShop } from "./bundle.ts";
 
+const MS_PER_SECOND = 1000;
 // 256 MiB. A long k6 log and the container logs come back through one call, so the buffer is large.
 const MAX_COMPOSE_OUTPUT_BYTES = 268_435_456;
 // The instances cache the current sale for up to a second; the run waits a little longer before it starts k6.
@@ -197,7 +197,7 @@ async function main(): Promise<number> {
 		}
 	})();
 
-	// k6 runs one file, so the script and the contract it reads replies with are bundled first.
+	// k6 runs one file, so the script is bundled first.
 	await bundleShop();
 	console.log("load: running k6");
 	const log: string[] = [];

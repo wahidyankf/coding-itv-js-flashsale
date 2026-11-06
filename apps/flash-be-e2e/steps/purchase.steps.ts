@@ -1,8 +1,7 @@
-import { routes, TICKET_HEADER } from "@flash/contract";
 import { type APIRequestContext, expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { shoppers } from "./queue.steps.js";
-import { bodyOf, send } from "./support/api.js";
+import { bodyOf, routes, send, TICKET_HEADER } from "./support/api.js";
 import { currentResponse, setResponse } from "./support/response.js";
 import { query, world } from "./support/world.js";
 

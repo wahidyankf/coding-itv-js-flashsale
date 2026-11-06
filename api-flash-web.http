@@ -1,4 +1,4 @@
-# Requests to the flash-web server, which passes the sale routes on to flash-be. They follow the contract in libs/contract.
+# Requests to the flash-web server, which passes the sale routes on to flash-be. The routes are in docs/reference/http-endpoints.md.
 @web = http://localhost:3000
 
 ### Web: health check (Start server route, run with `npx nx dev flash-web`)

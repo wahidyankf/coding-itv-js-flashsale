@@ -6,13 +6,6 @@ import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import net from "node:net";
 import path from "node:path";
-import {
-	createClient,
-	ERROR_STATUS,
-	HTTP_STATUS,
-	routes,
-	TICKET_HEADER,
-} from "@flash/contract";
 
 const root = path.resolve(import.meta.dirname, "../..");
 const PROJECT = "flash-smoke";
@@ -24,6 +17,8 @@ const MAX_ADMISSION_CHECKS = 30;
 // A declined payment is tried again this many times in all.
 const MAX_PAYMENT_ATTEMPTS = 5;
 const MINUTE_MS = 60_000;
+const TICKET_HEADER = "x-queue-ticket";
+const STATUS = { ok: 200, created: 201, firstError: 400, notFound: 404 };
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -66,23 +61,33 @@ function step(label) {
 	console.log(`- ${label}`);
 }
 
-// A reply that is not the one expected stops the walk, with what came back.
-function expectOk(label, result, status) {
-	if (result.isErr()) {
-		throw new Error(`${label}: refused with ${JSON.stringify(result.error)}`);
-	}
-	if (status !== undefined && result.value.status !== status) {
-		throw new Error(
-			`${label}: status ${result.value.status}, wanted ${status}`,
-		);
-	}
-	return result.value.body;
+// One request to the API or to the web server. A refusal is `{ errorCode, errorMessage }` with a status of 400 or more.
+async function call(base, method, path, { headers = {}, body } = {}) {
+	const reply = await fetch(`${base}${path}`, {
+		method,
+		headers: body
+			? { ...headers, "content-type": "application/json" }
+			: headers,
+		body: body ? JSON.stringify(body) : undefined,
+	});
+	return { status: reply.status, body: await reply.json() };
 }
 
-function expectRefusal(label, result, error) {
-	if (result.isOk() || result.error.errorCode !== error) {
+// A reply that is not the one expected stops the walk, with what came back.
+function expectOk(label, reply, status) {
+	if (reply.status >= STATUS.firstError) {
+		throw new Error(`${label}: refused with ${JSON.stringify(reply.body)}`);
+	}
+	if (status !== undefined && reply.status !== status) {
+		throw new Error(`${label}: status ${reply.status}, wanted ${status}`);
+	}
+	return reply.body;
+}
+
+function expectRefusal(label, reply, errorCode) {
+	if (reply.body.errorCode !== errorCode) {
 		throw new Error(
-			`${label}: wanted ${error}, got ${JSON.stringify(result.isOk() ? result.value : result.error)}`,
+			`${label}: wanted ${errorCode}, got ${JSON.stringify(reply.body)}`,
 		);
 	}
 }
@@ -103,12 +108,14 @@ async function walk() {
 		);
 	}
 
-	const api = createClient({ baseUrl: `http://127.0.0.1:${bePort}` });
-	const web = createClient({ baseUrl: `http://127.0.0.1:${webPort}/api` });
+	const apiUrl = `http://127.0.0.1:${bePort}`;
+	const api = (method, path, options) => call(apiUrl, method, path, options);
+	const web = (method, path, options) =>
+		call(`http://127.0.0.1:${webPort}/api`, method, path, options);
 
 	step("the API is ready");
-	const ready = await fetch(`http://127.0.0.1:${bePort}/ready`);
-	if (ready.status !== HTTP_STATUS.ok)
+	const ready = await fetch(`${apiUrl}/ready`);
+	if (ready.status !== STATUS.ok)
 		throw new Error(`/ready answered ${ready.status}`);
 
 	step("an operator with a wrong token is refused");
@@ -120,7 +127,7 @@ async function walk() {
 	};
 	expectRefusal(
 		"wrong token",
-		await api.call(routes.createSale, {
+		await api("POST", "/admin/sales", {
 			headers: { authorization: "Bearer not-the-token-at-all" },
 			body,
 		}),
@@ -130,11 +137,11 @@ async function walk() {
 	step("an operator creates a sale through the API");
 	const sale = expectOk(
 		"create sale",
-		await api.call(routes.createSale, {
+		await api("POST", "/admin/sales", {
 			headers: { authorization: `Bearer ${adminToken}` },
 			body,
 		}),
-		HTTP_STATUS.created,
+		STATUS.created,
 	);
 
 	step("the web server does not pass the admin route on");
@@ -143,24 +150,24 @@ async function walk() {
 		headers: { "content-type": "application/json" },
 		body: "{}",
 	});
-	if (blocked.status !== ERROR_STATUS.not_found) {
+	if (blocked.status !== STATUS.notFound) {
 		throw new Error(`the web server answered ${blocked.status} to /api/admin`);
 	}
 
 	step("the shopper sees the sale through the web server");
 	const current = expectOk(
 		"current sale",
-		await web.call(routes.currentSale, {}),
-		HTTP_STATUS.ok,
+		await web("GET", "/sales/current"),
+		STATUS.ok,
 	);
 	if (current.id !== sale.id)
 		throw new Error("the current sale is not the new one");
 
 	step("the shopper joins the queue and is admitted");
-	const params = { saleId: sale.id };
+	const salePath = `/sales/${sale.id}`;
 	const joined = expectOk(
 		"join",
-		await web.call(routes.joinQueue, { params, body: { userId: "smoke" } }),
+		await web("POST", `${salePath}/queue`, { body: { userId: "smoke" } }),
 	);
 	const headers = { [TICKET_HEADER]: joined.ticket };
 	let state = joined.state;
@@ -172,11 +179,8 @@ async function walk() {
 		await sleep(ADMISSION_CHECK_MS);
 		const place = expectOk(
 			"place",
-			await web.call(routes.checkPlace, {
-				params: { ...params, userId: "smoke" },
-				headers,
-			}),
-			HTTP_STATUS.ok,
+			await web("GET", `${salePath}/queue/smoke`, { headers }),
+			STATUS.ok,
 		);
 		state = place.state;
 	}
@@ -185,8 +189,7 @@ async function walk() {
 	step("the shopper holds one item");
 	const held = expectOk(
 		"reserve",
-		await web.call(routes.reserve, {
-			params,
+		await web("POST", `${salePath}/reservations`, {
 			headers,
 			body: { userId: "smoke" },
 		}),
@@ -199,13 +202,12 @@ async function walk() {
 		purchase === undefined && attempt < MAX_PAYMENT_ATTEMPTS;
 		attempt++
 	) {
-		const paid = await web.call(routes.confirm, {
-			params,
+		const paid = await web("POST", `${salePath}/purchases`, {
 			body: { userId: "smoke", reservationId: held.reservationId },
 		});
-		if (paid.isOk()) purchase = paid.value.body;
-		else if (paid.error.errorCode !== "payment_failed") {
-			throw new Error(`confirm: ${JSON.stringify(paid.error)}`);
+		if (paid.status < STATUS.firstError) purchase = paid.body;
+		else if (paid.body.errorCode !== "payment_failed") {
+			throw new Error(`confirm: ${JSON.stringify(paid.body)}`);
 		}
 	}
 	if (purchase === undefined)
@@ -214,16 +216,15 @@ async function walk() {
 	step("the shopper asks if they got it, and cannot buy twice");
 	const outcome = expectOk(
 		"outcome",
-		await web.call(routes.outcome, { params: { ...params, userId: "smoke" } }),
-		HTTP_STATUS.ok,
+		await web("GET", `${salePath}/purchases/smoke`),
+		STATUS.ok,
 	);
 	if (outcome.state !== "purchased") {
 		throw new Error(`the outcome is ${outcome.state}, wanted purchased`);
 	}
 	expectRefusal(
 		"second reserve",
-		await web.call(routes.reserve, {
-			params,
+		await web("POST", `${salePath}/reservations`, {
 			headers,
 			body: { userId: "smoke" },
 		}),
