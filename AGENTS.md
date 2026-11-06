@@ -10,17 +10,17 @@ Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `fla
 ## Docs and specs
 
 - `docs/` is the documentation for users and developers, split into Diátaxis modes. Start at [docs/README.md](docs/README.md).
-- `specs/` holds the apps' behaviour scenarios and the C4 architecture. Start at [specs/README.md](specs/README.md). Specs win when they disagree with `docs/`.
+- `specs/` holds the apps' behaviour scenarios (`specs/apps/flash/`) and their C4 model. Start at [specs/README.md](specs/README.md). Specs win when they disagree with `docs/`.
 
 ## Repository rules
 
 - Default branch is `main`. Do not commit or push unless the user asks.
-- Node and npm are pinned with Volta in `package.json`. Run `npm install` at the root. All five apps are npm
+- Node and npm are pinned with Volta in `package.json`. Run `npm install` at the root. The apps and the libraries are npm
   workspaces with one `package-lock.json`.
 - Nx runs commands only. Do not add Nx plugins (`@nx/*`, `nx-*`) or run `nx init`. Define every target in the app's
   `project.json` with `"executor": "nx:run-commands"`.
 - `libs/typekit` is built to `dist` (`npx nx build typekit`). The Nx targets of the apps that use it build it first, and the
-  Dockerfiles build it too. It has `build`, `typecheck`, `lint`, `test:unit`, `test:coverage` and `test:quick`, and needs no Docker.
+  Dockerfiles build it too. It has `build`, `typecheck`, `lint`, `test:unit`, `test:coverage` and `test:quick`, each with a `:watch` variant where one exists, and needs no Docker.
 - Run targets with `npx nx <target> <app>`. Every app has `typecheck`, `lint`, `test:quick`, and `test:quick:watch`.
   - `flash-be` and `flash-web` also have `test:unit` and `test:integration`.
   - `flash-be-e2e` and `flash-web-e2e` have `test:e2e` instead.
@@ -64,7 +64,7 @@ Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `fla
   (`npx nx db:up flash-be`) and are not part of `test:quick`.
 - Vitest globals are off. Call `cleanup` in `afterEach` when rendering components.
 - Choose the kind of test by one question: if this breaks, does a shopper or an operator see the difference? If yes, write
-  a Gherkin scenario in `specs/` (behaviour that is part of the contract: HTTP, queue, hold, payment). If only a developer cares, write a plain Vitest test next to
+  a Gherkin scenario in `specs/apps/flash/` (behaviour that is part of the contract: HTTP, queue, hold, payment). If only a developer cares, write a plain Vitest test next to
   the code (branches and edge cases in one function, rules of structure such as `architecture_tests.ts`, the mapping of
   config and environment variables, types, internal helpers, tests that only reach a branch for coverage). Write new behaviour as a scenario first,
   then add plain tests for the branches that do not deserve one. A scenario that needs both `@integration-exempt` and
@@ -73,7 +73,8 @@ Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `fla
   are canonical in `specs/apps/flash/`. Bind each one at unit. Bind integration and e2e too, unless the
   scenario has `@integration-exempt` or `@e2e-exempt`. One scenario may carry both tags. Each tag needs the comment
   format in `docs/how-to/add-a-behaviour.md`, and the unit binding is the alternative proof.
-- Run `npm run bdd:check` after changing a feature file or a binding. It runs in the pre-push hook.
+- Run `npm run bdd:check` after changing a feature file or a binding. It checks the scenarios of `flash-be` and `flash-web`
+  only, and it runs in the pre-push hook.
 - Keep combined coverage at 99% (`npx nx test:coverage <app>`). Integration tests run inside that gate; e2e tests stay out of the hooks.
 - Write docs by Diátaxis mode (`docs/`). Show only commands you ran. Architecture diagrams are Mermaid with an
   `accTitle`, an `accDescr`, and the palette in `repo-config.yml`.
@@ -85,7 +86,8 @@ Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `fla
 - Never oversell and never sell one user twice. Postgres has the last word: the `UPDATE ... WHERE sold < stock`, the
   `UNIQUE(sale_id, user_id)` and the `CHECK (sold <= stock)` must stay, whatever Redis says. Redis is a fast gate that
   Postgres can rebuild. A change to the sale path needs a concurrency scenario, and `flash-load` must still pass.
-- Redis keys are `sale:<saleId>:{ready,buyers,holds,ids,rebuild-lock}`. Every command on the sale path must fail at
+- Redis keys are `sale:<saleId>:` plus `{ready,buyers,holds,ids,rebuild-lock}` for the hold gate, and plus
+  `{queue,queue-seq,admitted,admit-lead}` for the queue. Every command on the sale path must fail at
   once when Redis is down. Use single scripts, not `MULTI`, which waits for the connection.
 - `flash-be` is a hexagon (see `docs/explanation/hexagonal-architecture.md`). Rules go in `src/domain` (no I/O, only Node
   built-ins, `@flash/typekit` and `@flash/contract/vocabulary`). Use cases go in `src/application`, which reach stores only through `src/application/ports`. Adapters go in
