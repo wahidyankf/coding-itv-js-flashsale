@@ -16,9 +16,9 @@ No Zod. The domain of `flash-be` may import this entry.
 | `USER_ID_PATTERN`, `normalizeUserId`                                                                                | the user id rule; `normalizeUserId` trims, lowercases and returns `undefined` when the id is not usable |
 | `UUID_PATTERN`, `isUuid`                                                                                            | the id rule for sales and reservations                                        |
 | `TICKET_HEADER`, `RETRY_AFTER_HEADER`                                                                               | header names                                                                  |
-| `SALE_STATUSES`, `SaleStatus`, `PLACE_STATES`                                                                       | the states a sale and a place can have                                        |
-| `ERROR_STATUS`, `ErrorCode`, `isErrorCode`                                                                          | every error code and the one HTTP status that answers it                      |
-| `JOIN_ERRORS`, `CHECK_ERRORS`, `RESERVE_ERRORS`, `CONFIRM_ERRORS`, `OUTCOME_ERRORS`, `COMMON_ERRORS`, `FIELD_ERROR` | the codes each operation may answer with                                      |
+| `SALE_STATUSES`, `SaleStatus`                                                                                       | the states a sale can have                                                    |
+| `ERROR_STATUS`, `ErrorCode`                                                                                         | every error code and the one HTTP status that answers it                      |
+| `JOIN_ERRORS`, `CHECK_ERRORS`, `RESERVE_ERRORS`, `CONFIRM_ERRORS`, `OUTCOME_ERRORS`, `ADMIN_ERRORS`, `FIELD_ERROR`   | the codes each operation may answer with                                      |
 
 ## `@flash/contract`
 

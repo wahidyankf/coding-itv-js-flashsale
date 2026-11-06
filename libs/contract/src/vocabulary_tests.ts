@@ -2,11 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
 	ADMIN_ERRORS,
 	CHECK_ERRORS,
-	COMMON_ERRORS,
 	CONFIRM_ERRORS,
 	ERROR_STATUS,
 	FIELD_ERROR,
-	isErrorCode,
 	isUuid,
 	JOIN_ERRORS,
 	normalizeUserId,
@@ -47,12 +45,6 @@ describe("isUuid", () => {
 });
 
 describe("error codes", () => {
-	it("knows a code and refuses other values", () => {
-		expect(isErrorCode("sold_out")).toBe(true);
-		expect(isErrorCode("toString")).toBe(false);
-		expect(isErrorCode(404)).toBe(false);
-	});
-
 	it("gives every listed code a status", () => {
 		const listed = [
 			...ADMIN_ERRORS,
@@ -61,7 +53,6 @@ describe("error codes", () => {
 			...RESERVE_ERRORS,
 			...CONFIRM_ERRORS,
 			...OUTCOME_ERRORS,
-			...COMMON_ERRORS,
 			...Object.values(FIELD_ERROR),
 		];
 		for (const code of listed) expect(ERROR_STATUS[code]).toBeGreaterThan(0);

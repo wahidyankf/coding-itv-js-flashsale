@@ -31,8 +31,6 @@ export const SALE_STATUSES = [
 ] as const;
 export type SaleStatus = (typeof SALE_STATUSES)[number];
 
-export const PLACE_STATES = ["waiting", "admitted", "absent"] as const;
-
 // Every error code of the API and the HTTP status that answers it. A code has one status everywhere.
 export const ERROR_STATUS = {
 	invalid_user: 400,
@@ -60,10 +58,6 @@ export const ERROR_STATUS = {
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_STATUS;
-
-export function isErrorCode(value: unknown): value is ErrorCode {
-	return typeof value === "string" && Object.hasOwn(ERROR_STATUS, value);
-}
 
 // The codes each operation may answer with.
 export const JOIN_ERRORS = [
@@ -107,15 +101,6 @@ export const ADMIN_ERRORS = [
 	"invalid_admin_token",
 	"invalid_sale",
 	"sale_overlaps",
-] as const;
-
-// Answers that do not come from an operation: the edge of the server, the limiter and the web pass-through.
-export const COMMON_ERRORS = [
-	"invalid_request",
-	"rate_limited",
-	"not_found",
-	"internal",
-	"backend_unavailable",
 ] as const;
 
 // A request body field that is missing or not a string is refused with the code of that field.
