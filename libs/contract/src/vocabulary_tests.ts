@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
 	ADMIN_ERRORS,
 	CHECK_ERRORS,
+	CLIENT_FAILURE_MESSAGE,
 	CONFIRM_ERRORS,
+	ERROR_MESSAGE,
 	ERROR_STATUS,
+	errorPayload,
 	FIELD_ERROR,
 	isUuid,
 	JOIN_ERRORS,
@@ -56,6 +59,30 @@ describe("error codes", () => {
 			...Object.values(FIELD_ERROR),
 		];
 		for (const code of listed) expect(ERROR_STATUS[code]).toBeGreaterThan(0);
+	});
+
+	it("gives every code one sentence, and no two codes share it", () => {
+		const codes = Object.keys(ERROR_STATUS);
+		expect(Object.keys(ERROR_MESSAGE).sort()).toEqual(codes.sort());
+		const sentences = Object.values(ERROR_MESSAGE);
+		for (const sentence of sentences) expect(sentence.trim()).not.toBe("");
+		expect(new Set(sentences).size).toBe(sentences.length);
+	});
+
+	it("builds the body of an error from its code", () => {
+		expect(errorPayload("sold_out")).toEqual({
+			errorCode: "sold_out",
+			errorMessage: ERROR_MESSAGE.sold_out,
+		});
+	});
+
+	it("keeps the cause of an internal error out of its message", () => {
+		expect(ERROR_MESSAGE.internal).toBe("Something went wrong on the server.");
+	});
+
+	it("words the two failures that the server never sends", () => {
+		expect(CLIENT_FAILURE_MESSAGE.network).not.toBe("");
+		expect(CLIENT_FAILURE_MESSAGE.unexpected).not.toBe("");
 	});
 
 	it("keeps the statuses the API has always answered with", () => {

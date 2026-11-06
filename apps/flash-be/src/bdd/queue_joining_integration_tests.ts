@@ -199,7 +199,7 @@ describeFeature(
 				});
 
 				And('the error is "<error>"', () => {
-					expect(response(world).json().error).toBe(examples.error);
+					expect(response(world).json().errorCode).toBe(examples.error);
 				});
 			},
 		);
@@ -228,7 +228,7 @@ describeFeature(
 				});
 
 				And("the error is {string}", (_ctx, error: string) => {
-					expect(response(world).json().error).toBe(error);
+					expect(response(world).json().errorCode).toBe(error);
 				});
 			},
 		);
@@ -252,7 +252,7 @@ describeFeature(
 				});
 
 				And("the error is {string}", (_ctx, error: string) => {
-					expect(response(world).json().error).toBe(error);
+					expect(response(world).json().errorCode).toBe(error);
 				});
 			},
 		);

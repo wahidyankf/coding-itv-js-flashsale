@@ -1,6 +1,7 @@
 import {
 	ERROR_STATUS,
 	type ErrorCode,
+	errorPayload,
 	isUuid,
 	matchRoute,
 	RETRY_AFTER_HEADER,
@@ -35,7 +36,7 @@ export function isAllowed(method: string, path: string): boolean {
 }
 
 function refuse(code: ErrorCode): Response {
-	return Response.json({ error: code }, { status: ERROR_STATUS[code] });
+	return Response.json(errorPayload(code), { status: ERROR_STATUS[code] });
 }
 
 // Passes a browser request under /api/sales on to flash-be and streams the answer back. The address of flash-be is read

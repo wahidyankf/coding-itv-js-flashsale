@@ -5,7 +5,7 @@ Start from the contract, not from the handler. A change that skips the contract 
 1. **Write the scenario first** in `specs/` when a shopper or an operator can see the change. See
    [add a behaviour](add-a-behaviour.md).
 2. **Edit the contract** in `libs/contract/src`:
-   - a new error code goes in `vocabulary.ts`, in `ERROR_STATUS` and in the list of the operations that may answer it;
+   - a new error code goes in `vocabulary.ts`, in `ERROR_STATUS`, in `ERROR_MESSAGE` (one sentence, which the compiler asks for) and in the list of the operations that may answer it;
    - a new body or reply shape goes in `schemas.ts`;
    - a new route, or a changed path, method or reply, goes in `routes.ts`.
 3. **Run the contract tests.**

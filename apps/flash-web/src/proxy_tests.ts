@@ -1,3 +1,4 @@
+import { errorPayload } from "@flash/contract";
 import { describe, expect, it, vi } from "vitest";
 import { isAllowed, proxyToBackend } from "./proxy";
 
@@ -100,7 +101,7 @@ describe("proxyToBackend", () => {
 			fetcher,
 		);
 		expect(reply.status).toBe(404);
-		expect(await reply.json()).toEqual({ error: "not_found" });
+		expect(await reply.json()).toEqual(errorPayload("not_found"));
 		expect(fetcher).not.toHaveBeenCalled();
 	});
 
@@ -116,7 +117,7 @@ describe("proxyToBackend", () => {
 			fetcher,
 		);
 		expect(reply.status).toBe(404);
-		expect(await reply.json()).toEqual({ error: "not_found" });
+		expect(await reply.json()).toEqual(errorPayload("not_found"));
 		expect(fetcher).not.toHaveBeenCalled();
 	});
 
@@ -129,7 +130,7 @@ describe("proxyToBackend", () => {
 			},
 		);
 		expect(reply.status).toBe(502);
-		expect(await reply.json()).toEqual({ error: "backend_unavailable" });
+		expect(await reply.json()).toEqual(errorPayload("backend_unavailable"));
 	});
 
 	it("uses the global fetch and the default address", async () => {

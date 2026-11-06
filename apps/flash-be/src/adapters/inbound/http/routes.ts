@@ -1,6 +1,7 @@
 import {
 	ADMIN_AUTH_HEADER,
 	ERROR_STATUS,
+	errorPayload,
 	HTTP_STATUS,
 	MS_PER_SECOND,
 	type PlaceView,
@@ -53,7 +54,7 @@ export function registerRoutes(
 			.code(ERROR_STATUS.rate_limited)
 			.header("retry-after", String(verdict.retryAfterSeconds))
 			.send({
-				error: "rate_limited",
+				...errorPayload("rate_limited"),
 				retryAfterSeconds: verdict.retryAfterSeconds,
 			});
 	};
@@ -81,7 +82,7 @@ export function registerRoutes(
 		if (allowed.isOk()) return;
 		return reply
 			.code(ERROR_STATUS[allowed.error])
-			.send({ error: allowed.error });
+			.send(errorPayload(allowed.error));
 	};
 
 	// Public sale reads may be kept for the cache time, by this server and by the client.
@@ -132,7 +133,7 @@ export function registerRoutes(
 			if (!sale)
 				return reply
 					.code(ERROR_STATUS.sale_not_found)
-					.send({ error: "sale_not_found" });
+					.send(errorPayload("sale_not_found"));
 			return cacheable(reply).code(HTTP_STATUS.ok).send(sale);
 		},
 	});
@@ -145,7 +146,7 @@ export function registerRoutes(
 			if (!sale)
 				return reply
 					.code(ERROR_STATUS.sale_not_found)
-					.send({ error: "sale_not_found" });
+					.send(errorPayload("sale_not_found"));
 			return cacheable(reply).code(HTTP_STATUS.ok).send(sale);
 		},
 	});
@@ -160,7 +161,7 @@ export function registerRoutes(
 			if (!(await deps.sales.byId(saleId))) {
 				return reply
 					.code(ERROR_STATUS.sale_not_found)
-					.send({ error: "sale_not_found" });
+					.send(errorPayload("sale_not_found"));
 			}
 			return serveEvents(
 				request,
@@ -190,7 +191,7 @@ export function registerRoutes(
 			if (first.isErr()) {
 				return reply
 					.code(ERROR_STATUS[first.error])
-					.send({ error: first.error });
+					.send(errorPayload(first.error));
 			}
 			const { user } = first.value;
 			return serveEvents(
@@ -225,7 +226,7 @@ export function registerRoutes(
 			if (joined.isErr()) {
 				return reply
 					.code(ERROR_STATUS[joined.error])
-					.send({ error: joined.error });
+					.send(errorPayload(joined.error));
 			}
 			const { created, user, ticket, place } = joined.value;
 			return reply
@@ -246,7 +247,7 @@ export function registerRoutes(
 			if (checked.isErr()) {
 				return reply
 					.code(ERROR_STATUS[checked.error])
-					.send({ error: checked.error });
+					.send(errorPayload(checked.error));
 			}
 			return reply
 				.code(HTTP_STATUS.ok)
@@ -268,7 +269,7 @@ export function registerRoutes(
 			if (reserved.isErr()) {
 				return reply
 					.code(ERROR_STATUS[reserved.error])
-					.send({ error: reserved.error });
+					.send(errorPayload(reserved.error));
 			}
 			const { created, user, reservationId, expiresAt } = reserved.value;
 			return reply.code(created ? HTTP_STATUS.created : HTTP_STATUS.ok).send({
@@ -293,7 +294,7 @@ export function registerRoutes(
 			if (confirmed.isErr()) {
 				return reply
 					.code(ERROR_STATUS[confirmed.error])
-					.send({ error: confirmed.error });
+					.send(errorPayload(confirmed.error));
 			}
 			const { created, purchase } = confirmed.value;
 			return reply
@@ -313,7 +314,7 @@ export function registerRoutes(
 			if (created.isErr()) {
 				return reply
 					.code(ERROR_STATUS[created.error])
-					.send({ error: created.error });
+					.send(errorPayload(created.error));
 			}
 			return reply.code(HTTP_STATUS.created).send(created.value);
 		},
@@ -331,7 +332,7 @@ export function registerRoutes(
 			if (found.isErr()) {
 				return reply
 					.code(ERROR_STATUS[found.error])
-					.send({ error: found.error });
+					.send(errorPayload(found.error));
 			}
 			const { user, outcome } = found.value;
 			if (outcome.state === "purchased") {

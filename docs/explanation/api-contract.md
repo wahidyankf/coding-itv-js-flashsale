@@ -17,8 +17,8 @@ compiling, or its test fails because the reply no longer matches.
 ## What is in it
 
 - **The route table** (`routes`). Each route has a name, a method, a path, the schema of its params, headers and body,
-  and one schema per HTTP status it answers with. Errors are part of the table: every refusal is `{ "error": "<code>" }`,
-  and each code has exactly one status.
+  and one schema per HTTP status it answers with. Errors are part of the table: every refusal is `{ "errorCode": "<code>", "errorMessage": "<sentence>" }`,
+  and each code has exactly one status and one sentence. The status is not repeated in the body.
 - **The vocabulary.** The rules that need no schema library: the user id pattern and its normalisation, the id pattern,
   the header names and the error codes. The domain of `flash-be` imports this part, so it stays free of Zod.
 - **Two pure functions**, `buildRequest` and `parseReply`. They know nothing about the transport, so `fetch`,

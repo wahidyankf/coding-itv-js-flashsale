@@ -5,6 +5,7 @@ import { attemptAsync, Err, type Result } from "@flash/typekit";
 import { type ApiFailure, parseReply, type RawReply } from "./reply.js";
 import { type BuiltRequest, buildRequest } from "./request.js";
 import type { Reply, RequestInput, Route } from "./routes.js";
+import { CLIENT_FAILURE_MESSAGE } from "./vocabulary.js";
 
 export type Fetch = (
 	url: string,
@@ -27,7 +28,10 @@ export type Client = {
 	) => Promise<Result<Reply<R>, ApiFailure>>;
 };
 
-const network: ApiFailure = { error: "network" };
+const network: ApiFailure = {
+	errorCode: "network",
+	errorMessage: CLIENT_FAILURE_MESSAGE.network,
+};
 
 export function createClient(options: ClientOptions): Client {
 	const send = options.fetch ?? fetch;

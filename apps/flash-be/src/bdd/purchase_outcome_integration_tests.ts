@@ -194,7 +194,7 @@ describeFeature(
 				});
 
 				And("the error is {string}", (_ctx, error: string) => {
-					expect(response(world).json().error).toBe(error);
+					expect(response(world).json().errorCode).toBe(error);
 				});
 			},
 		);
@@ -218,7 +218,7 @@ describeFeature(
 				});
 
 				And("the error is {string}", (_ctx, error: string) => {
-					expect(response(world).json().error).toBe(error);
+					expect(response(world).json().errorCode).toBe(error);
 				});
 			},
 		);

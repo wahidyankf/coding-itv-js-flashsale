@@ -38,10 +38,10 @@ export const holdingText = (seconds: number) =>
 
 // One sentence for each error code the API can answer with.
 export function errorText(
-	error: ApiFailure["error"],
+	errorCode: ApiFailure["errorCode"],
 	retryAfterSeconds?: number,
 ): string {
-	switch (error) {
+	switch (errorCode) {
 		case "sold_out":
 			return "Sold out. No items are left.";
 		case "sale_ended":

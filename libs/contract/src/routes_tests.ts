@@ -1,7 +1,7 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 import type { AnyReply, ErrorCodeOf, Reply, RequestInput } from "./routes.js";
 import { routes } from "./routes.js";
-import { ERROR_STATUS, type JOIN_ERRORS } from "./vocabulary.js";
+import { ERROR_STATUS, errorPayload, type JOIN_ERRORS } from "./vocabulary.js";
 
 const all = Object.values(routes);
 
@@ -28,7 +28,10 @@ describe("the route table", () => {
 			for (const [status, schema] of Object.entries(route.replies)) {
 				const accepted = codes.filter(
 					(code) =>
-						schema.safeParse({ error: code, retryAfterSeconds: 1 }).success,
+						schema.safeParse({
+							...errorPayload(code),
+							retryAfterSeconds: 1,
+						}).success,
 				);
 				for (const code of accepted) {
 					expect(ERROR_STATUS[code]).toBe(Number(status));
@@ -82,7 +85,10 @@ describe("the types of a route", () => {
 		expectTypeOf<
 			Extract<Reply<typeof routes.joinQueue>, { status: 404 }>
 		>().toBeNever();
-		expectTypeOf<Gone["body"]>().toEqualTypeOf<{ error: "sale_not_found" }>();
+		expectTypeOf<Gone["body"]>().toEqualTypeOf<{
+			errorCode: "sale_not_found";
+			errorMessage: string;
+		}>();
 	});
 
 	it("asks for the token header and the body to create a sale", () => {

@@ -31,7 +31,7 @@ import { switchable } from "./switchable.js";
 export type EventWatcher = {
 	status: number;
 	// The JSON body of a refusal. Empty for a stream that opened.
-	body: { error?: string };
+	body: { errorCode?: string };
 	next: () => Promise<{ event: string; data: Record<string, unknown> }>;
 	close: () => void;
 };

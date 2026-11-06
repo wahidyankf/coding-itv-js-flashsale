@@ -56,7 +56,13 @@ Given(
 	/^flash-be answers \/health with status (\d+)$/,
 	// biome-ignore lint/correctness/noEmptyPattern: playwright-bdd needs an object pattern as the first argument
 	async ({}, status: string) => {
-		await answerWith(Number(status), JSON.stringify({ error: "internal" }));
+		await answerWith(
+			Number(status),
+			JSON.stringify({
+				errorCode: "internal",
+				errorMessage: "Something went wrong on the server.",
+			}),
+		);
 	},
 );
 

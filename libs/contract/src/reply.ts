@@ -5,6 +5,7 @@ import { attempt, Err, Ok, type Result } from "@flash/typekit";
 import type { Reply, Route } from "./routes.js";
 import { ErrorBody } from "./schemas.js";
 import {
+	CLIENT_FAILURE_MESSAGE,
 	ERROR_STATUS,
 	type ErrorCode,
 	FIRST_CLIENT_ERROR_STATUS,
@@ -18,10 +19,11 @@ export type RawReply = {
 	text: string;
 };
 
-// The API refused (`error` is one of its codes), nothing answered (`network`), or the answer broke the contract
-// (`unexpected`).
+// The API refused (`errorCode` is one of its codes), nothing answered (`network`), or the answer broke the contract
+// (`unexpected`). `errorMessage` is the sentence of the server, or of the contract when the server sent none.
 export type ApiFailure = {
-	error: ErrorCode | "network" | "unexpected";
+	errorCode: ErrorCode | "network" | "unexpected";
+	errorMessage: string;
 	status?: number | undefined;
 	retryAfterSeconds?: number | undefined;
 };
@@ -54,9 +56,10 @@ function refusal(raw: RawReply, body: unknown): ApiFailure | undefined {
 	const parsed = ErrorBody.safeParse(body);
 	if (!parsed.success || raw.status < FIRST_CLIENT_ERROR_STATUS)
 		return undefined;
-	if (ERROR_STATUS[parsed.data.error] !== raw.status) return undefined;
+	if (ERROR_STATUS[parsed.data.errorCode] !== raw.status) return undefined;
 	return {
-		error: parsed.data.error,
+		errorCode: parsed.data.errorCode,
+		errorMessage: parsed.data.errorMessage,
 		status: raw.status,
 		retryAfterSeconds: retryAfter(raw, body),
 	};
@@ -66,7 +69,11 @@ export function parseReply<R extends Route>(
 	route: R,
 	raw: RawReply,
 ): Result<Reply<R>, ApiFailure> {
-	const unexpected: ApiFailure = { error: "unexpected", status: raw.status };
+	const unexpected: ApiFailure = {
+		errorCode: "unexpected",
+		errorMessage: CLIENT_FAILURE_MESSAGE.unexpected,
+		status: raw.status,
+	};
 	const json = attempt(() => JSON.parse(raw.text) as unknown, SyntaxError);
 	if (json.isErr()) return new Err(unexpected);
 	const body = json.value;

@@ -1,6 +1,7 @@
 import {
 	ERROR_STATUS,
 	type ErrorCode,
+	errorPayload,
 	matchRoute,
 	normalizeUserId,
 	RETRY_AFTER_HEADER,
@@ -41,7 +42,7 @@ const reply = (
 	return { status, headers, body };
 };
 const refuse = (route: Route, error: ErrorCode) =>
-	reply(route, ERROR_STATUS[error], { error });
+	reply(route, ERROR_STATUS[error], errorPayload(error));
 
 // A small stand-in for flash-be that follows its rules for status codes, errors and what a shopper sees, but keeps
 // everything in memory. The unit scenarios call it directly. The integration scenarios put an HTTP server in front of
@@ -114,7 +115,7 @@ export function createFakeBackend(now: () => number) {
 			? reply(
 					route,
 					ERROR_STATUS.rate_limited,
-					{ error: "rate_limited", retryAfterSeconds: 30 },
+					{ ...errorPayload("rate_limited"), retryAfterSeconds: 30 },
 					{ [RETRY_AFTER_HEADER]: "30" },
 				)
 			: undefined;
@@ -293,7 +294,7 @@ export function createFakeBackend(now: () => number) {
 			if (unreachable) throw new TypeError("fetch failed");
 			const match = matchRoute(method, path);
 			if (!match)
-				return { status: 404, headers: {}, body: { error: "not_found" } };
+				return { status: 404, headers: {}, body: errorPayload("not_found") };
 			const { route, params } = match;
 			if (route === routes.currentSale) {
 				return sale
@@ -301,10 +302,10 @@ export function createFakeBackend(now: () => number) {
 					: refuse(route, "sale_not_found");
 			}
 			if (params.saleId !== SALE_ID || !sale) {
-				return route.replies[404]?.safeParse({ error: "sale_not_found" })
+				return route.replies[404]?.safeParse(errorPayload("sale_not_found"))
 					.success
 					? refuse(route, "sale_not_found")
-					: { status: 404, headers: {}, body: { error: "not_found" } };
+					: { status: 404, headers: {}, body: errorPayload("not_found") };
 			}
 			const name = String(body.userId ?? params.userId ?? "")
 				.trim()
@@ -321,7 +322,7 @@ export function createFakeBackend(now: () => number) {
 				case routes.outcome:
 					return outcome(name);
 				default:
-					return { status: 404, headers: {}, body: { error: "not_found" } };
+					return { status: 404, headers: {}, body: errorPayload("not_found") };
 			}
 		},
 	};

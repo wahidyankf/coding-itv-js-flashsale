@@ -80,7 +80,7 @@ function expectOk(label, result, status) {
 }
 
 function expectRefusal(label, result, error) {
-	if (result.isOk() || result.error.error !== error) {
+	if (result.isOk() || result.error.errorCode !== error) {
 		throw new Error(
 			`${label}: wanted ${error}, got ${JSON.stringify(result.isOk() ? result.value : result.error)}`,
 		);
@@ -204,7 +204,7 @@ async function walk() {
 			body: { userId: "smoke", reservationId: held.reservationId },
 		});
 		if (paid.isOk()) purchase = paid.value.body;
-		else if (paid.error.error !== "payment_failed") {
+		else if (paid.error.errorCode !== "payment_failed") {
 			throw new Error(`confirm: ${JSON.stringify(paid.error)}`);
 		}
 	}

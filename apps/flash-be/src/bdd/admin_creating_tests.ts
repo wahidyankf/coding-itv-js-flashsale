@@ -143,7 +143,7 @@ describeFeature(
 				});
 
 				And("the error is {string}", (_ctx, error: string) => {
-					expect(response.json().error).toBe(error);
+					expect(response.json().errorCode).toBe(error);
 				});
 
 				And("the number of sales is {int}", (_ctx, count: number) => {
@@ -185,7 +185,7 @@ describeFeature(
 				});
 
 				And("the error is {string}", (_ctx, error: string) => {
-					expect(response.json().error).toBe(error);
+					expect(response.json().errorCode).toBe(error);
 				});
 
 				And("the number of sales is {int}", (_ctx, count: number) => {
@@ -227,7 +227,7 @@ describeFeature(
 				});
 
 				And("the error is {string}", (_ctx, error: string) => {
-					expect(response.json().error).toBe(error);
+					expect(response.json().errorCode).toBe(error);
 				});
 
 				And("the number of sales is {int}", (_ctx, count: number) => {
@@ -263,7 +263,7 @@ describeFeature(
 				});
 
 				And("the error is {string}", (_ctx, error: string) => {
-					expect(response.json().error).toBe(error);
+					expect(response.json().errorCode).toBe(error);
 				});
 
 				And("the number of sales is {int}", (_ctx, count: number) => {
@@ -318,7 +318,7 @@ describeFeature(
 				});
 
 				And("the error is {string}", (_ctx, error: string) => {
-					expect(response.json().error).toBe(error);
+					expect(response.json().errorCode).toBe(error);
 				});
 
 				And("the number of sales is {int}", (_ctx, count: number) => {
@@ -425,7 +425,7 @@ describeFeature(
 						expect(others.length).toBeGreaterThan(0);
 						for (const other of others) {
 							expect(other.statusCode).toBe(status);
-							expect(other.json().error).toBe(error);
+							expect(other.json().errorCode).toBe(error);
 						}
 					},
 				);

@@ -5,8 +5,14 @@ status a route answers with, is in the contract ([the library](contract.md)) and
 [openapi.json](openapi.json); this page does not repeat them. The API routes are registered in
 `apps/flash-be/src/adapters/inbound/http/routes.ts`. The web routes are in `apps/flash-web/src/routes/`.
 
-Every error is `{"error": "<code>"}`, whether the route refused the request, the route does not exist (`404`
-`not_found`), the body is not JSON (`400` `invalid_request`) or the server failed (`500` `internal`).
+Every error is `{"errorCode": "<code>", "errorMessage": "<sentence>"}`, whether the route refused the request, the route
+does not exist (`404` `not_found`), the body is not JSON (`400` `invalid_request`) or the server failed (`500` `internal`).
+The status is the HTTP status of the reply and is not repeated in the body. `errorMessage` is one fixed English sentence per
+code, for a developer. A `500` never says what failed; the cause goes to the log. A `429` also has `retryAfterSeconds`.
+
+```json
+{ "errorCode": "sold_out", "errorMessage": "No items are left." }
+```
 
 ## flash-be (API, port 8080)
 
@@ -66,7 +72,7 @@ only operator route. The web server never passes it on, so it is reached on the 
 `name` (default `Flash sale`), `holdSeconds` (default `120`) and `admitPerSecond` (default `50`) are optional. The reply
 is `201` with the new sale (`SaleView`).
 
-| Status | `error`               | When                                                                                     |
+| Status | `errorCode`           | When                                                                                     |
 | ------ | --------------------- | ---------------------------------------------------------------------------------------- |
 | `404`  | `not_found`           | `ADMIN_TOKEN` is not set: the admin routes are off and look as if they were not there    |
 | `401`  | `invalid_admin_token` | the `Authorization: Bearer` header is missing or holds another token                     |
@@ -93,7 +99,7 @@ with the header `x-queue-ticket: <ticket>` answers with the place.
 A user id is trimmed and lowercased, then must match `[a-z0-9][a-z0-9._@+-]{0,63}`. Joining again returns the same place
 and the same ticket.
 
-| Status | `error`          | When                                                                     |
+| Status | `errorCode`      | When                                                                     |
 | ------ | ---------------- | ------------------------------------------------------------------------ |
 | `400`  | `invalid_user`   | the user id is missing or does not match the rule above                  |
 | `401`  | `invalid_ticket` | the ticket is missing or is not the one issued for this sale and user    |
@@ -114,7 +120,7 @@ An admitted shopper holds one item for the sale's hold time (`reservation_ttl_se
 Asking again while the hold lasts returns `200` with the same body. A hold that has expired stops counting at once, and
 the item can go to someone else.
 
-| Status | `error`             | When                                                                       |
+| Status | `errorCode`         | When                                                                       |
 | ------ | ------------------- | -------------------------------------------------------------------------- |
 | `400`  | `invalid_user`      | the user id is missing or invalid                                          |
 | `401`  | `invalid_ticket`    | the ticket is missing or is not the one issued for this sale and user      |
@@ -137,7 +143,7 @@ reservation reply.
 The reservation id is the idempotency key. Sending the same request again returns `200` with the same purchase, and the
 shopper is charged once.
 
-| Status | `error`                 | When                                                                                              |
+| Status | `errorCode`             | When                                                                                              |
 | ------ | ----------------------- | ------------------------------------------------------------------------------------------------- |
 | `400`  | `invalid_user`          | the user id is missing or invalid                                                                 |
 | `400`  | `invalid_reservation`   | the reservation id is missing or is not an id                                                     |
@@ -201,7 +207,7 @@ The scenarios are in [`specs/apps/flash/be/behaviours/degraded/`](../../specs/ap
 | ------ | -------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | GET    | `/`            | HTML page. It shows the current sale, a form to buy, and `Backend: ok` when `flash-be` answers `GET /health` with `{"status":"ok"}`. |
 | GET    | `/api/health`  | `200` `{"status":"ok"}`                                                                                                              |
-| any    | `/api/sales/*` | The routes below, passed on to `flash-be`. Anything else under this path answers `404` `{"error":"not_found"}`.                      |
+| any    | `/api/sales/*` | The routes below, passed on to `flash-be`. Anything else under this path answers `404` with `errorCode` `not_found`.                 |
 
 ### The sale routes
 
@@ -222,7 +228,7 @@ The browser reaches the sale only through `/api/sales`. The web server passes ea
 
 Only `content-type`, `accept`, `x-queue-ticket` and `x-forwarded-for` are sent on. Only `content-type`,
 `cache-control` and `retry-after` come back. When `flash-be` cannot be reached the answer is `502`
-`{"error":"backend_unavailable"}`. The address of `flash-be` is read on the server and never reaches the page. See
+with `errorCode` `backend_unavailable`. The address of `flash-be` is read on the server and never reaches the page. See
 [the web server in front of the API](../explanation/web-server-proxy.md).
 
 The scenarios are in [`specs/apps/flash/web/behaviours/proxy/`](../../specs/apps/flash/web/behaviours/proxy/README.md) and

@@ -59,6 +59,51 @@ export const ERROR_STATUS = {
 
 export type ErrorCode = keyof typeof ERROR_STATUS;
 
+// One sentence for each error code, for a developer reading a reply or a log. A shopper's text is the business of the web
+// app. The type makes a new code fail to compile until it has a sentence. `internal` says nothing of the cause.
+export const ERROR_MESSAGE = {
+	invalid_user: "The user id is missing or not valid.",
+	invalid_reservation: "The reservation id is missing or not valid.",
+	invalid_request: "The request could not be read.",
+	invalid_sale: "The sale to create is not valid.",
+	invalid_ticket: "The queue ticket is missing or not valid.",
+	invalid_admin_token: "The admin token is missing or wrong.",
+	payment_failed: "The payment did not go through.",
+	not_admitted: "The shopper has not been admitted yet.",
+	sale_not_found: "No sale was found.",
+	not_in_queue: "The shopper is not in the queue.",
+	reservation_not_found: "No reservation was found.",
+	not_found: "Nothing was found at this address.",
+	sale_not_started: "The sale has not started yet.",
+	sale_ended: "The sale has ended.",
+	sold_out: "No items are left.",
+	hold_expired: "The hold has ended.",
+	already_purchased: "The shopper has already bought an item.",
+	sale_overlaps: "Another sale already uses part of this time.",
+	rate_limited: "Too many requests. Try again later.",
+	internal: "Something went wrong on the server.",
+	backend_unavailable: "The API could not be reached.",
+	unavailable: "The service cannot take this request now. Try again later.",
+} as const satisfies Record<ErrorCode, string>;
+
+// The two failures a client sees without any reply from the server.
+export const CLIENT_FAILURE_MESSAGE = {
+	network: "The server could not be reached.",
+	unexpected: "The server sent a reply that the contract does not allow.",
+} as const;
+
+// The body of every error reply: the code, and its sentence. The status is not in the body; it is `ERROR_STATUS[code]`.
+export type ErrorPayload<C extends ErrorCode = ErrorCode> = {
+	errorCode: C;
+	errorMessage: string;
+};
+
+export function errorPayload<const C extends ErrorCode>(
+	code: C,
+): ErrorPayload<C> {
+	return { errorCode: code, errorMessage: ERROR_MESSAGE[code] };
+}
+
 // The statuses of a success. An error is answered with `ERROR_STATUS[code]`, never with a number written by hand.
 export const HTTP_STATUS = {
 	ok: 200,

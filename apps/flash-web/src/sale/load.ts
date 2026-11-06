@@ -16,7 +16,7 @@ export async function loadSale(
 	return found.match({
 		ok: (reply): SaleLoad => ({ state: "ok", sale: reply.body }),
 		err: (failure): SaleLoad =>
-			failure.error === "sale_not_found"
+			failure.errorCode === "sale_not_found"
 				? { state: "none" }
 				: { state: "error" },
 	});

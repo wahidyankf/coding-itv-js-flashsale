@@ -118,8 +118,8 @@ function bodyOf<R extends Route>(
 
 function errorOf<R extends Route>(
 	answer: Answer<R>,
-): ApiFailure["error"] | undefined {
-	return answer.result.isErr() ? answer.result.error.error : undefined;
+): ApiFailure["errorCode"] | undefined {
+	return answer.result.isErr() ? answer.result.error.errorCode : undefined;
 }
 
 // One request, built and read through the contract. The user's address goes in X-Forwarded-For, which the API trusts

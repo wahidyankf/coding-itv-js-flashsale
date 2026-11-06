@@ -27,7 +27,7 @@ describe("cleanUser", () => {
 });
 
 describe("errorText", () => {
-	it.each<[ApiFailure["error"], string]>([
+	it.each<[ApiFailure["errorCode"], string]>([
 		["sold_out", "Sold out. No items are left."],
 		["sale_ended", "The sale has ended."],
 		["sale_not_started", "The sale has not started yet."],

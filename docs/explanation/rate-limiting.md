@@ -6,7 +6,7 @@ and slow every other shopper down. The API therefore limits write requests befor
 ## What is limited
 
 Only the three write routes: join the queue, reserve and confirm. Reads are cheap and are not limited.
-A rejected request gets status `429`, the body `{"error":"rate_limited","retryAfterSeconds":n}` and a
+A rejected request gets status `429`, the body `{"errorCode":"rate_limited","errorMessage":"...","retryAfterSeconds":n}` and a
 `Retry-After` header, so a well-behaved client knows when to come back.
 
 ## Two counters, not one

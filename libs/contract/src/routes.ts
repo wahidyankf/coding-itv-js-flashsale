@@ -254,11 +254,11 @@ export type AnyReply<R extends Route> = {
 // The replies that are not refusals. A client gets these as `Ok`; a refusal is an `Err` that names the error.
 export type Reply<R extends Route> = Exclude<
 	AnyReply<R>,
-	{ body: { error: ErrorCode } }
+	{ body: { errorCode: ErrorCode } }
 >;
 
 // The error codes a route may answer with, so the error type of a handler can be checked against it.
 export type ErrorCodeOf<R extends Route> = Extract<
 	AnyReply<R>["body"],
-	{ error: ErrorCode }
->["error"];
+	{ errorCode: ErrorCode }
+>["errorCode"];

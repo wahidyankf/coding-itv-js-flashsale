@@ -1,3 +1,4 @@
+import { errorPayload } from "@flash/contract";
 import { describe, expect, it } from "vitest";
 import { loadSale } from "./load";
 import type { SaleView } from "./types";
@@ -29,7 +30,7 @@ describe("loadSale", () => {
 
 	it("tells a missing sale from a failure", async () => {
 		const none: typeof fetch = async () =>
-			Response.json({ error: "sale_not_found" }, { status: 404 });
+			Response.json(errorPayload("sale_not_found"), { status: 404 });
 		const broken: typeof fetch = async () => new Response("x", { status: 500 });
 		const down: typeof fetch = async () => {
 			throw new TypeError("fetch failed");

@@ -77,7 +77,7 @@ describeFeature(
 				});
 
 				And("the body has error {string}", (_ctx, error: string) => {
-					expect(reply().json.error).toBe(error);
+					expect(reply().json.errorCode).toBe(error);
 				});
 			},
 		);
@@ -123,7 +123,7 @@ describeFeature(
 				});
 
 				And("the body has error {string}", (_ctx, error: string) => {
-					expect(reply().json.error).toBe(error);
+					expect(reply().json.errorCode).toBe(error);
 				});
 			},
 		);

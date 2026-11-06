@@ -9,7 +9,7 @@ import {
 	ReadyView,
 	SaleView,
 } from "./schemas.js";
-import { CONFIRM_ERRORS } from "./vocabulary.js";
+import { CONFIRM_ERRORS, errorPayload } from "./vocabulary.js";
 
 describe("errorReplies", () => {
 	it("groups the codes by HTTP status", () => {
@@ -17,11 +17,11 @@ describe("errorReplies", () => {
 		expect(Object.keys(replies).sort()).toEqual(
 			["400", "402", "404", "409"].sort(),
 		);
-		expect(replies[409].safeParse({ error: "sold_out" }).success).toBe(true);
-		expect(replies[409].safeParse({ error: "invalid_user" }).success).toBe(
+		expect(replies[409].safeParse(errorPayload("sold_out")).success).toBe(true);
+		expect(replies[409].safeParse(errorPayload("invalid_user")).success).toBe(
 			false,
 		);
-		expect(replies[400].safeParse({ error: "invalid_user" }).success).toBe(
+		expect(replies[400].safeParse(errorPayload("invalid_user")).success).toBe(
 			true,
 		);
 	});
@@ -30,10 +30,12 @@ describe("errorReplies", () => {
 		const replies = errorReplies(["sale_not_found", "sold_out"]);
 		expectTypeOf<Parameters<(typeof replies)[404]["parse"]>[0]>().toBeUnknown();
 		expectTypeOf<ReturnType<(typeof replies)[404]["parse"]>>().toEqualTypeOf<{
-			error: "sale_not_found";
+			errorCode: "sale_not_found";
+			errorMessage: string;
 		}>();
 		expectTypeOf<ReturnType<(typeof replies)[409]["parse"]>>().toEqualTypeOf<{
-			error: "sold_out";
+			errorCode: "sold_out";
+			errorMessage: string;
 		}>();
 	});
 });
@@ -41,16 +43,22 @@ describe("errorReplies", () => {
 describe("errorBody", () => {
 	it("accepts only the listed codes and no other field shape", () => {
 		const schema = errorBody(["sold_out"]);
-		expect(schema.safeParse({ error: "sold_out" }).success).toBe(true);
-		expect(schema.safeParse({ error: "other" }).success).toBe(false);
+		expect(schema.safeParse(errorPayload("sold_out")).success).toBe(true);
+		expect(
+			schema.safeParse({ errorCode: "other", errorMessage: "x" }).success,
+		).toBe(false);
+		expect(schema.safeParse({ errorCode: "sold_out" }).success).toBe(false);
+		expect(schema.safeParse({ error: "sold_out" }).success).toBe(false);
 		expect(schema.safeParse("sold_out").success).toBe(false);
 	});
 });
 
 describe("ErrorBody", () => {
 	it("accepts any code of the API", () => {
-		expect(ErrorBody.safeParse({ error: "not_found" }).success).toBe(true);
-		expect(ErrorBody.safeParse({ error: "nope" }).success).toBe(false);
+		expect(ErrorBody.safeParse(errorPayload("not_found")).success).toBe(true);
+		expect(
+			ErrorBody.safeParse({ errorCode: "nope", errorMessage: "x" }).success,
+		).toBe(false);
 	});
 });
 

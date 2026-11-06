@@ -55,9 +55,31 @@ describeFeature(
 			});
 
 			And("the error is {string}", (_ctx, error: string) => {
-				expect(response?.json().error).toBe(error);
+				expect(response?.json().errorCode).toBe(error);
 			});
 		});
+
+		Scenario(
+			"An error reply carries a sentence as well as a code",
+			({ When, Then, And }) => {
+				let response: LightMyRequestResponse | undefined;
+
+				When("a client sends GET /nope", async () => {
+					response = await (await newApp()).inject({
+						method: "GET",
+						url: "/nope",
+					});
+				});
+
+				Then("the response status is 404", () => {
+					expect(response?.statusCode).toBe(404);
+				});
+
+				And("the error message is {string}", (_ctx, message: string) => {
+					expect(response?.json().errorMessage).toBe(message);
+				});
+			},
+		);
 
 		Scenario(
 			"A request body that is not JSON is refused",
@@ -79,7 +101,7 @@ describeFeature(
 				});
 
 				And("the error is {string}", (_ctx, error: string) => {
-					expect(response?.json().error).toBe(error);
+					expect(response?.json().errorCode).toBe(error);
 				});
 			},
 		);
@@ -98,7 +120,7 @@ describeFeature(
 				});
 
 				And('the error is "<error>"', () => {
-					expect(response?.json().error).toBe(String(examples.error));
+					expect(response?.json().errorCode).toBe(String(examples.error));
 				});
 			},
 		);

@@ -40,7 +40,7 @@ Return early on the failure, then use the value:
 
 ```ts
 const reserved = await service.reserve(saleId, userId, ticket);
-if (reserved.isErr()) return reply.code(STATUS[reserved.error]).send({ error: reserved.error });
+if (reserved.isErr()) return reply.code(STATUS[reserved.error]).send(errorPayload(reserved.error));
 const { reservationId } = reserved.value;
 ```
 

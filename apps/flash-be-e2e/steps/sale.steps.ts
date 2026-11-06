@@ -125,8 +125,15 @@ Then(
 );
 
 Then(
+	/^the error message is "([^"]+)"$/,
+	async ({ request: _request }, message: string) => {
+		expect((await currentResponse().json()).errorMessage).toBe(message);
+	},
+);
+
+Then(
 	/^the error is "([^"]+)"$/,
 	async ({ request: _request }, error: string) => {
-		expect((await currentResponse().json()).error).toBe(error);
+		expect((await currentResponse().json()).errorCode).toBe(error);
 	},
 );

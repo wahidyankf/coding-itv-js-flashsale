@@ -18,6 +18,8 @@ No Zod. The domain of `flash-be` may import this entry.
 | `TICKET_HEADER`, `RETRY_AFTER_HEADER`                                                                              | header names                                                                                            |
 | `SALE_STATUSES`, `SaleStatus`                                                                                      | the states a sale can have                                                                              |
 | `ERROR_STATUS`, `ErrorCode`                                                                                        | every error code and the one HTTP status that answers it                                                |
+| `ERROR_MESSAGE`, `errorPayload`, `ErrorPayload`                                                                    | the one sentence of each code, and the body `{ errorCode, errorMessage }` built from a code             |
+| `CLIENT_FAILURE_MESSAGE`                                                                                           | the sentences of `network` and `unexpected`, which no server sends                                      |
 | `JOIN_ERRORS`, `CHECK_ERRORS`, `RESERVE_ERRORS`, `CONFIRM_ERRORS`, `OUTCOME_ERRORS`, `ADMIN_ERRORS`, `FIELD_ERROR` | the codes each operation may answer with                                                                |
 | `HTTP_STATUS`, `FIRST_CLIENT_ERROR_STATUS`, `FIRST_SERVER_ERROR_STATUS`                                            | the statuses of a success, and where the client errors and the server errors start                      |
 | `MS_PER_SECOND`                                                                                                    | the one name for the thousand that turns seconds into milliseconds                                      |
@@ -26,18 +28,18 @@ No Zod. The domain of `flash-be` may import this entry.
 
 Everything above, and:
 
-| Export                                                                               | What it is                                                                                          |
-| ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
-| `SaleView`, `PlaceView`, `JoinedView`, `ReservedView`, `PurchaseView`, `OutcomeView` | Zod schemas and types of the replies                                                                |
-| `HealthView`, `ReadyView`, `RateLimitedBody`, `ErrorBody`, `QueuePlace`              | the rest of the schemas                                                                             |
-| `routes`, `Route`, `Routes`, `Method`                                                | the route table: twelve routes, each with its params, headers, body and replies                     |
-| `RequestInput<R>`, `Reply<R>`, `AnyReply<R>`, `ErrorCodeOf<R>`                       | types worked out from a route                                                                       |
-| `buildRequest(route, input, baseUrl)`                                                | method, URL, headers and body text of a request                                                     |
-| `pathOf`, `matchRoute(method, path)`                                                 | a path from a route, and the route a path belongs to                                                |
-| `parseReply(route, { status, headers, text })`                                       | `Ok` with a reply the route declares, or `Err` with an `ApiFailure`                                 |
-| `ApiFailure`                                                                         | `error` is an `ErrorCode`, `"network"` or `"unexpected"`; may hold `status` and `retryAfterSeconds` |
-| `createClient({ baseUrl, fetch })`                                                   | `call(route, input)` over `fetch`, returning a `Result`                                             |
-| `formatFrame`, `KEEP_ALIVE_FRAME`, `parseFrames`, `readStreamEvent`, `StreamEvent`   | the Server-Sent Events codec                                                                        |
+| Export                                                                               | What it is                                                                                                                              |
+| ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `SaleView`, `PlaceView`, `JoinedView`, `ReservedView`, `PurchaseView`, `OutcomeView` | Zod schemas and types of the replies                                                                                                    |
+| `HealthView`, `ReadyView`, `RateLimitedBody`, `ErrorBody`, `QueuePlace`              | the rest of the schemas                                                                                                                 |
+| `routes`, `Route`, `Routes`, `Method`                                                | the route table: twelve routes, each with its params, headers, body and replies                                                         |
+| `RequestInput<R>`, `Reply<R>`, `AnyReply<R>`, `ErrorCodeOf<R>`                       | types worked out from a route                                                                                                           |
+| `buildRequest(route, input, baseUrl)`                                                | method, URL, headers and body text of a request                                                                                         |
+| `pathOf`, `matchRoute(method, path)`                                                 | a path from a route, and the route a path belongs to                                                                                    |
+| `parseReply(route, { status, headers, text })`                                       | `Ok` with a reply the route declares, or `Err` with an `ApiFailure`                                                                     |
+| `ApiFailure`                                                                         | `errorCode` is an `ErrorCode`, `"network"` or `"unexpected"`; `errorMessage` is its sentence; may hold `status` and `retryAfterSeconds` |
+| `createClient({ baseUrl, fetch })`                                                   | `call(route, input)` over `fetch`, returning a `Result`                                                                                 |
+| `formatFrame`, `KEEP_ALIVE_FRAME`, `parseFrames`, `readStreamEvent`, `StreamEvent`   | the Server-Sent Events codec                                                                                                            |
 
 A route has three flags: `passThrough` (the web server passes it on to the API), `stream` (the `200` reply is an event
 stream) and `limited` (the rate limiter looks at it, so it can answer `429`).

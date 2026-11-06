@@ -169,7 +169,7 @@ describeFeature(
 					"{int} shoppers are told the item is sold out",
 					(_ctx, count: number) => {
 						const soldOut = replies.filter(
-							(r) => r.statusCode === 409 && r.json().error === "sold_out",
+							(r) => r.statusCode === 409 && r.json().errorCode === "sold_out",
 						);
 						expect(soldOut).toHaveLength(count);
 					},
@@ -354,7 +354,7 @@ describeFeature(
 				});
 
 				And("the error is {string}", (_ctx, error: string) => {
-					expect(response(world).json().error).toBe(error);
+					expect(response(world).json().errorCode).toBe(error);
 				});
 			},
 		);
@@ -405,7 +405,7 @@ describeFeature(
 				});
 
 				And("the error is {string}", (_ctx, error: string) => {
-					expect(response(world).json().error).toBe(error);
+					expect(response(world).json().errorCode).toBe(error);
 				});
 			},
 		);

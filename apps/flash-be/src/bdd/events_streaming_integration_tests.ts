@@ -127,7 +127,7 @@ describeFeature(
 				});
 
 				And("the error is {string}", (_ctx, error: string) => {
-					expect(watcher(world).body.error).toBe(error);
+					expect(watcher(world).body.errorCode).toBe(error);
 				});
 			},
 		);
@@ -216,7 +216,7 @@ describeFeature(
 				});
 
 				And("the error is {string}", (_ctx, error: string) => {
-					expect(watcher(world).body.error).toBe(error);
+					expect(watcher(world).body.errorCode).toBe(error);
 				});
 			},
 		);

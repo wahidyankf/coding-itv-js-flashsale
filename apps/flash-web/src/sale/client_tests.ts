@@ -1,7 +1,13 @@
+import { CLIENT_FAILURE_MESSAGE, errorPayload } from "@flash/contract";
 import { Err, Ok } from "@flash/typekit";
 import { describe, expect, it, vi } from "vitest";
 import { createSaleClient } from "./client";
 import type { Watcher } from "./sse";
+
+const unexpected = {
+	errorCode: "unexpected",
+	errorMessage: CLIENT_FAILURE_MESSAGE.unexpected,
+} as const;
 
 const SALE = "11111111-1111-4111-8111-111111111111";
 const WHEN = "2026-06-01T12:00:00.000Z";
@@ -77,38 +83,48 @@ describe("createSaleClient", () => {
 	it("reads the error code and the wait from a refusal", async () => {
 		const { api } = client(() =>
 			Response.json(
-				{ error: "rate_limited", retryAfterSeconds: 9 },
+				{ ...errorPayload("rate_limited"), retryAfterSeconds: 9 },
 				{ status: 429, headers: { "retry-after": "7" } },
 			),
 		);
 		expect(await api.join(SALE, "ana")).toEqual(
-			new Err({ error: "rate_limited", status: 429, retryAfterSeconds: 7 }),
+			new Err({
+				...errorPayload("rate_limited"),
+				status: 429,
+				retryAfterSeconds: 7,
+			}),
 		);
 	});
 
 	it("reads the wait from the body when there is no header", async () => {
 		const { api } = client(() =>
 			Response.json(
-				{ error: "rate_limited", retryAfterSeconds: 3 },
+				{ ...errorPayload("rate_limited"), retryAfterSeconds: 3 },
 				{ status: 429 },
 			),
 		);
 		expect(await api.join(SALE, "ana")).toEqual(
-			new Err({ error: "rate_limited", status: 429, retryAfterSeconds: 3 }),
+			new Err({
+				...errorPayload("rate_limited"),
+				status: 429,
+				retryAfterSeconds: 3,
+			}),
 		);
 	});
 
 	it("calls an answer it cannot read unexpected", async () => {
 		const { api } = client(() => new Response("<html>", { status: 500 }));
 		expect(await api.join(SALE, "ana")).toEqual(
-			new Err({ error: "unexpected", status: 500 }),
+			new Err({ ...unexpected, status: 500 }),
 		);
 	});
 
 	it("calls an error without a code unexpected", async () => {
-		const { api } = client(() => Response.json({ error: 5 }, { status: 400 }));
+		const { api } = client(() =>
+			Response.json({ errorCode: 5 }, { status: 400 }),
+		);
 		expect(await api.join(SALE, "ana")).toEqual(
-			new Err({ error: "unexpected", status: 400 }),
+			new Err({ ...unexpected, status: 400 }),
 		);
 	});
 
@@ -116,13 +132,18 @@ describe("createSaleClient", () => {
 		const { api } = client(() => {
 			throw new TypeError("fetch failed");
 		});
-		expect(await api.join(SALE, "ana")).toEqual(new Err({ error: "network" }));
+		expect(await api.join(SALE, "ana")).toEqual(
+			new Err({
+				errorCode: "network",
+				errorMessage: CLIENT_FAILURE_MESSAGE.network,
+			}),
+		);
 	});
 
 	it("calls a good answer that has no body unexpected", async () => {
 		const { api } = client(() => new Response(null, { status: 200 }));
 		expect(await api.outcome(SALE, "ana")).toEqual(
-			new Err({ error: "unexpected", status: 200 }),
+			new Err({ ...unexpected, status: 200 }),
 		);
 	});
 

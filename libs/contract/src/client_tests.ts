@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { createClient, type Fetch } from "./client.js";
 import { routes } from "./routes.js";
+import {
+	CLIENT_FAILURE_MESSAGE,
+	ERROR_MESSAGE,
+	errorPayload,
+} from "./vocabulary.js";
 
 const answer = (
 	status: number,
@@ -61,7 +66,7 @@ describe("createClient", () => {
 			fetch: async () =>
 				answer(
 					429,
-					{ error: "rate_limited", retryAfterSeconds: 9 },
+					{ ...errorPayload("rate_limited"), retryAfterSeconds: 9 },
 					{ "retry-after": "2" },
 				),
 		});
@@ -70,7 +75,8 @@ describe("createClient", () => {
 			body: { userId: "ana" },
 		});
 		expect(result.isErr() && result.error).toMatchObject({
-			error: "rate_limited",
+			errorCode: "rate_limited",
+			errorMessage: ERROR_MESSAGE.rate_limited,
 			retryAfterSeconds: 2,
 		});
 	});
@@ -83,12 +89,15 @@ describe("createClient", () => {
 			},
 		});
 		const result = await client.call(routes.health, {});
-		expect(result.isErr() && result.error).toEqual({ error: "network" });
+		expect(result.isErr() && result.error).toEqual({
+			errorCode: "network",
+			errorMessage: CLIENT_FAILURE_MESSAGE.network,
+		});
 	});
 
 	it("uses the global fetch when none is given", async () => {
 		const client = createClient({ baseUrl: "http://127.0.0.1:1" });
 		const result = await client.call(routes.health, {});
-		expect(result.isErr() && result.error.error).toBe("network");
+		expect(result.isErr() && result.error.errorCode).toBe("network");
 	});
 });

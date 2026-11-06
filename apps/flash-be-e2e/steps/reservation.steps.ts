@@ -164,7 +164,7 @@ When(
 
 async function errorOf(reply: Awaited<ReturnType<typeof post>>) {
 	const result = await read(routes.reserve, reply);
-	return result.isErr() ? result.error.error : undefined;
+	return result.isErr() ? result.error.errorCode : undefined;
 }
 
 Then("a reservation id is issued", async ({ request: _request }) => {

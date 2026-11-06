@@ -1,3 +1,8 @@
+import {
+	CLIENT_FAILURE_MESSAGE,
+	ERROR_MESSAGE,
+	type ErrorCode,
+} from "@flash/contract";
 import { Err, Ok } from "@flash/typekit";
 import {
 	act,
@@ -22,6 +27,14 @@ const SALE: SaleView = {
 };
 
 afterEach(cleanup);
+
+const failure = (errorCode: ErrorCode | "network") => ({
+	errorCode,
+	errorMessage:
+		errorCode === "network"
+			? CLIENT_FAILURE_MESSAGE.network
+			: ERROR_MESSAGE[errorCode],
+});
 
 // A client that answers with what the test gives it and lets the test push place changes.
 function stubClient(overrides: Partial<SaleClient> = {}) {
@@ -108,7 +121,7 @@ describe("SalePage", () => {
 				async () =>
 					new Ok({ userId: "ana", ticket: "t", state: "admitted" as const }),
 			),
-			confirm: vi.fn(async () => new Err({ error: "hold_expired" as const })),
+			confirm: vi.fn(async () => new Err(failure("hold_expired"))),
 		});
 		render(<SalePage load={{ state: "ok", sale: SALE }} client={client} />);
 		await buyAs("ana");
@@ -120,7 +133,7 @@ describe("SalePage", () => {
 
 	it("shows the reason when the check is refused", async () => {
 		const { client } = stubClient({
-			outcome: vi.fn(async () => new Err({ error: "network" as const })),
+			outcome: vi.fn(async () => new Err(failure("network"))),
 		});
 		render(<SalePage load={{ state: "ok", sale: SALE }} client={client} />);
 		fireEvent.change(screen.getByLabelText(/Your name/), {

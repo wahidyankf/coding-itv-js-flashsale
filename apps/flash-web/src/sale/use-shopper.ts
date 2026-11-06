@@ -74,8 +74,11 @@ export function useShopper(
 		}
 	}, [waiting, saleStatus, stop]);
 
-	const fail = ({ error, retryAfterSeconds }: ApiFailure) =>
-		setPhase({ kind: "message", text: errorText(error, retryAfterSeconds) });
+	const fail = ({ errorCode, retryAfterSeconds }: ApiFailure) =>
+		setPhase({
+			kind: "message",
+			text: errorText(errorCode, retryAfterSeconds),
+		});
 
 	const reserve = async (id: string, name: string, ticket: string) => {
 		setPhase({ kind: "busy", text: TEXT.reserving });
@@ -128,7 +131,7 @@ export function useShopper(
 			held.reservationId,
 		);
 		if (confirmed.isOk()) return setPhase({ kind: "purchased" });
-		if (confirmed.error.error === "payment_failed") {
+		if (confirmed.error.errorCode === "payment_failed") {
 			return setPhase({ ...held, notice: TEXT.paymentFailed });
 		}
 		fail(confirmed.error);

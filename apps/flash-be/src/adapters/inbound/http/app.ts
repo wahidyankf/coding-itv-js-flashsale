@@ -1,6 +1,7 @@
 import {
 	ERROR_STATUS,
 	type ErrorCode,
+	errorPayload,
 	FIELD_ERROR,
 	FIRST_CLIENT_ERROR_STATUS,
 	FIRST_SERVER_ERROR_STATUS,
@@ -37,14 +38,14 @@ export function buildApp(
 }
 
 // The schemas of @flash/contract check every request and every reply. A reply that breaks the contract is a bug, so it
-// is answered with `internal` and logged. Every error has the same body, `{ error: code }`, whatever raised it.
+// is answered with `internal` and logged. Every error has the same body, `{ errorCode, errorMessage }`, whatever raised it.
 export function applyContract(app: FastifyInstance): void {
 	app.setValidatorCompiler(validatorCompiler);
 	app.setSerializerCompiler(serializerCompiler);
 
 	const refuse = (code: ErrorCode) => ({
 		status: ERROR_STATUS[code],
-		body: { error: code },
+		body: errorPayload(code),
 	});
 	app.setNotFoundHandler((_request, reply) => {
 		const { status, body } = refuse("not_found");

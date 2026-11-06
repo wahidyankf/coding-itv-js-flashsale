@@ -30,7 +30,7 @@ Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `fla
     check in its own target, not in `test:quick`. Keep `test:quick:watch` in sync with it.
 - The HTTP API is written down once, in `libs/contract`. Do not write a hand-made request type, reply type, API path or
   error-code literal, or the name of the ticket header, in an app. Change the contract first (`docs/how-to/change-an-endpoint.md`),
-  then the handler and the consumers. Build requests with `buildRequest` and read replies with `parseReply` or the client.
+  then the handler and the consumers. Build requests with `buildRequest` and read replies with `parseReply` or the client. An error reply is `{ errorCode, errorMessage }` (plus `retryAfterSeconds` for `429`), built with `errorPayload`; the status is not in the body.
   `npm run contract:guard:test` fails on a path or the header written by hand. `docs/reference/openapi.json` is generated:
   run `npm run openapi:generate` after a change; `npm run openapi:check` runs in the pre-push hook.
 - `libs/contract` is built to `dist` like typekit (`npx nx build contract`), and the Nx targets of the apps that use it build it

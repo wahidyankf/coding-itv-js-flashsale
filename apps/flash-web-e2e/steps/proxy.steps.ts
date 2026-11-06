@@ -26,7 +26,7 @@ When("a client joins the queue through the web server", async ({ request }) => {
 Then(
 	/^the body has error "([^"]+)"$/,
 	async ({ request: _request }, error: string) => {
-		expect((await current().json()).error).toBe(error);
+		expect((await current().json()).errorCode).toBe(error);
 	},
 );
 

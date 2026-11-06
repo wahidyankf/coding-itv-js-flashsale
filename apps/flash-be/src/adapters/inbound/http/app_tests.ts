@@ -1,3 +1,4 @@
+import { errorPayload } from "@flash/contract";
 import { Err, Ok } from "@flash/typekit";
 import Fastify from "fastify";
 import { afterEach, describe, expect, it } from "vitest";
@@ -33,7 +34,7 @@ describe("the errors of the HTTP edge", () => {
 		});
 		const reply = await app.inject({ method: "GET", url: "/sales/current" });
 		expect(reply.statusCode).toBe(500);
-		expect(reply.json()).toEqual({ error: "internal" });
+		expect(reply.json()).toEqual(errorPayload("internal"));
 	});
 
 	it("answers a reply that breaks the contract with `internal`", async () => {
@@ -49,7 +50,7 @@ describe("the errors of the HTTP edge", () => {
 			url: "/sales/00000000-0000-4000-8000-000000000000",
 		});
 		expect(reply.statusCode).toBe(500);
-		expect(reply.json()).toEqual({ error: "internal" });
+		expect(reply.json()).toEqual(errorPayload("internal"));
 	});
 
 	it("refuses a request whose query is wrong as `invalid_request`", async () => {
@@ -63,7 +64,7 @@ describe("the errors of the HTTP edge", () => {
 		});
 		const reply = await app.inject({ method: "GET", url: "/probe?count=x" });
 		expect(reply.statusCode).toBe(400);
-		expect(reply.json()).toEqual({ error: "invalid_request" });
+		expect(reply.json()).toEqual(errorPayload("invalid_request"));
 		await app.close();
 	});
 
@@ -75,7 +76,7 @@ describe("the errors of the HTTP edge", () => {
 			payload: JSON.stringify({ userId: "a".repeat(2_000_000) }),
 		});
 		expect(reply.statusCode).toBe(400);
-		expect(reply.json()).toEqual({ error: "invalid_request" });
+		expect(reply.json()).toEqual(errorPayload("invalid_request"));
 	});
 
 	it("refuses an unsupported media type as `invalid_request`", async () => {
@@ -86,7 +87,7 @@ describe("the errors of the HTTP edge", () => {
 			payload: "ana",
 		});
 		expect(reply.statusCode).toBe(400);
-		expect(reply.json()).toEqual({ error: "invalid_request" });
+		expect(reply.json()).toEqual(errorPayload("invalid_request"));
 	});
 
 	it("refuses an empty JSON body as `invalid_request`", async () => {
@@ -97,7 +98,7 @@ describe("the errors of the HTTP edge", () => {
 			payload: "",
 		});
 		expect(reply.statusCode).toBe(400);
-		expect(reply.json()).toEqual({ error: "invalid_request" });
+		expect(reply.json()).toEqual(errorPayload("invalid_request"));
 	});
 
 	it("refuses a body that is null as `invalid_user`, like a missing name", async () => {
@@ -108,7 +109,7 @@ describe("the errors of the HTTP edge", () => {
 			payload: "null",
 		});
 		expect(reply.statusCode).toBe(400);
-		expect(reply.json()).toEqual({ error: "invalid_user" });
+		expect(reply.json()).toEqual(errorPayload("invalid_user"));
 	});
 
 	it("does not ask the service when the body is refused", async () => {
@@ -168,7 +169,7 @@ describe("the errors of the HTTP edge", () => {
 		expect(reply.statusCode).toBe(429);
 		expect(reply.headers["retry-after"]).toBe("7");
 		expect(reply.json()).toEqual({
-			error: "rate_limited",
+			...errorPayload("rate_limited"),
 			retryAfterSeconds: 7,
 		});
 	});
@@ -191,7 +192,7 @@ describe("the admin route at the edge", () => {
 			payload: JSON.stringify({ stock: "many" }),
 		});
 		expect(reply.statusCode).toBe(400);
-		expect(reply.json()).toEqual({ error: "invalid_sale" });
+		expect(reply.json()).toEqual(errorPayload("invalid_sale"));
 	});
 
 	it("refuses a body that is not JSON as `invalid_request`", async () => {
@@ -203,7 +204,7 @@ describe("the admin route at the edge", () => {
 			payload: "{oops",
 		});
 		expect(reply.statusCode).toBe(400);
-		expect(reply.json()).toEqual({ error: "invalid_request" });
+		expect(reply.json()).toEqual(errorPayload("invalid_request"));
 	});
 
 	it("checks the token before it reads the body", async () => {
@@ -218,7 +219,7 @@ describe("the admin route at the edge", () => {
 			payload: "{oops",
 		});
 		expect(reply.statusCode).toBe(401);
-		expect(reply.json()).toEqual({ error: "invalid_admin_token" });
+		expect(reply.json()).toEqual(errorPayload("invalid_admin_token"));
 	});
 
 	it("counts every try by address and tells a client over the limit to wait", async () => {

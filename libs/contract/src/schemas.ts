@@ -1,7 +1,12 @@
 // The shapes that go over the wire. Dates are ISO strings, as JSON carries them.
 
 import { z } from "zod";
-import { ERROR_STATUS, type ErrorCode, SALE_STATUSES } from "./vocabulary.js";
+import {
+	ERROR_STATUS,
+	type ErrorCode,
+	type ErrorPayload,
+	SALE_STATUSES,
+} from "./vocabulary.js";
 
 export const SaleView = z.object({
 	id: z.string(),
@@ -123,24 +128,25 @@ export const AdminHeaders = z.object({
 });
 
 export const RateLimitedBody = z.object({
-	error: z.literal("rate_limited"),
+	errorCode: z.literal("rate_limited"),
+	errorMessage: z.string(),
 	retryAfterSeconds: z.number().int().nonnegative(),
 });
 
-// An error reply is always `{ error: code }`.
+// An error reply is always `{ errorCode, errorMessage }`.
 export function errorBody<const C extends ErrorCode>(
 	codes: readonly C[],
-): z.ZodType<{ error: C }> {
-	return z.object({ error: z.enum(codes) });
+): z.ZodType<ErrorPayload<C>> {
+	return z.object({ errorCode: z.enum(codes), errorMessage: z.string() });
 }
 
 export type StatusOf<C extends ErrorCode> = (typeof ERROR_STATUS)[C];
 
 // The error replies of an operation, one schema per HTTP status, each listing only the codes with that status.
 export type ErrorReplies<C extends ErrorCode> = {
-	[S in StatusOf<C>]: z.ZodType<{
-		error: { [K in C]: StatusOf<K> extends S ? K : never }[C];
-	}>;
+	[S in StatusOf<C>]: z.ZodType<
+		ErrorPayload<{ [K in C]: StatusOf<K> extends S ? K : never }[C]>
+	>;
 };
 
 export function errorReplies<const C extends ErrorCode>(
@@ -159,5 +165,6 @@ export function errorReplies<const C extends ErrorCode>(
 
 // Any error reply, whatever the operation: used to tell a refusal from a reply that broke the contract.
 export const ErrorBody = z.object({
-	error: z.enum(Object.keys(ERROR_STATUS) as [ErrorCode, ...ErrorCode[]]),
+	errorCode: z.enum(Object.keys(ERROR_STATUS) as [ErrorCode, ...ErrorCode[]]),
+	errorMessage: z.string(),
 });

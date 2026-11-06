@@ -25,18 +25,18 @@ describe("confirming a purchase", () => {
 			saleId: "00000000-0000-4000-8000-000000000000",
 			reservationId: "00000000-0000-4000-8000-000000000001",
 		});
-		expect(unknown.json().error).toBe("sale_not_found");
+		expect(unknown.json().errorCode).toBe("sale_not_found");
 		const bad = await world.confirm("has space", {
 			reservationId: "00000000-0000-4000-8000-000000000001",
 		});
-		expect(bad.json().error).toBe("invalid_user");
+		expect(bad.json().errorCode).toBe("invalid_user");
 	});
 
 	it("does not hand a purchase to somebody who is not its buyer", async () => {
 		const world = await boughtByAna();
 		const reply = await world.confirm("ben", { owner: "ana" });
 		expect(reply.statusCode).toBe(404);
-		expect(reply.json().error).toBe("reservation_not_found");
+		expect(reply.json().errorCode).toBe("reservation_not_found");
 	});
 
 	it("refuses a second reservation of a user who already bought", async () => {
@@ -50,7 +50,7 @@ describe("confirming a purchase", () => {
 		});
 		const reply = await world.confirm("ana", { reservationId });
 		expect(reply.statusCode).toBe(409);
-		expect(reply.json().error).toBe("already_purchased");
+		expect(reply.json().errorCode).toBe("already_purchased");
 	});
 
 	it("refuses a hold of a sale that has ended", async () => {
@@ -67,7 +67,7 @@ describe("confirming a purchase", () => {
 			expiresAt: new Date(NOW.getTime() + 60_000),
 		});
 		const reply = await world.confirm("ana", { reservationId });
-		expect(reply.json().error).toBe("sale_ended");
+		expect(reply.json().errorCode).toBe("sale_ended");
 	});
 
 	it("still answers when Redis cannot be told about the purchase", async () => {

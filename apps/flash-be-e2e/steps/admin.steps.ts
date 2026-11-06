@@ -166,7 +166,7 @@ Then(
 		expect(others.length).toBeGreaterThan(0);
 		for (const other of others) {
 			expect(other.status()).toBe(Number(status));
-			expect((await other.json()).error).toBe(error);
+			expect((await other.json()).errorCode).toBe(error);
 		}
 	},
 );

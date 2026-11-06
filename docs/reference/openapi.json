@@ -43,15 +43,19 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"internal"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -162,15 +166,19 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"internal"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -338,15 +346,19 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"sale_not_found"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -360,15 +372,19 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"internal"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -457,15 +473,19 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"sale_not_found"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -479,15 +499,19 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"internal"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -576,15 +600,19 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"sale_not_found"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -598,15 +626,19 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"internal"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -728,15 +760,19 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"invalid_user"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -750,15 +786,19 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"invalid_ticket"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -772,16 +812,20 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"sale_not_found",
 												"not_in_queue"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -795,15 +839,19 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"internal"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -1025,16 +1073,20 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"invalid_user",
 												"invalid_request"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -1048,15 +1100,19 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"sale_not_found"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -1070,16 +1126,20 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"sale_ended",
 												"sold_out"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -1093,11 +1153,14 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"rate_limited"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										},
 										"retryAfterSeconds": {
 											"type": "integer",
@@ -1106,7 +1169,8 @@
 										}
 									},
 									"required": [
-										"error",
+										"errorCode",
+										"errorMessage",
 										"retryAfterSeconds"
 									],
 									"additionalProperties": false
@@ -1121,15 +1185,19 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"internal"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -1251,15 +1319,19 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"invalid_user"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -1273,15 +1345,19 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"invalid_ticket"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -1295,16 +1371,20 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"sale_not_found",
 												"not_in_queue"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -1318,15 +1398,19 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"internal"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -1442,16 +1526,20 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"invalid_user",
 												"invalid_request"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -1465,15 +1553,19 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"invalid_ticket"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -1487,15 +1579,19 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"not_admitted"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -1509,15 +1605,19 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"sale_not_found"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -1531,7 +1631,7 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"sale_not_started",
@@ -1539,10 +1639,14 @@
 												"sold_out",
 												"already_purchased"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -1556,11 +1660,14 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"rate_limited"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										},
 										"retryAfterSeconds": {
 											"type": "integer",
@@ -1569,7 +1676,8 @@
 										}
 									},
 									"required": [
-										"error",
+										"errorCode",
+										"errorMessage",
 										"retryAfterSeconds"
 									],
 									"additionalProperties": false
@@ -1584,15 +1692,19 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"internal"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -1606,15 +1718,19 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"unavailable"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -1734,17 +1850,21 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"invalid_user",
 												"invalid_reservation",
 												"invalid_request"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -1758,15 +1878,19 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"payment_failed"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -1780,16 +1904,20 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"sale_not_found",
 												"reservation_not_found"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -1803,7 +1931,7 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"hold_expired",
@@ -1811,10 +1939,14 @@
 												"sale_ended",
 												"sold_out"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -1828,11 +1960,14 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"rate_limited"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										},
 										"retryAfterSeconds": {
 											"type": "integer",
@@ -1841,7 +1976,8 @@
 										}
 									},
 									"required": [
-										"error",
+										"errorCode",
+										"errorMessage",
 										"retryAfterSeconds"
 									],
 									"additionalProperties": false
@@ -1856,15 +1992,19 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"internal"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -1988,16 +2128,20 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"invalid_sale",
 												"invalid_request"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -2011,15 +2155,19 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"invalid_admin_token"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -2033,15 +2181,19 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"not_found"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -2055,15 +2207,19 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"sale_overlaps"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -2077,11 +2233,14 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"rate_limited"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										},
 										"retryAfterSeconds": {
 											"type": "integer",
@@ -2090,7 +2249,8 @@
 										}
 									},
 									"required": [
-										"error",
+										"errorCode",
+										"errorMessage",
 										"retryAfterSeconds"
 									],
 									"additionalProperties": false
@@ -2105,15 +2265,19 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"internal"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -2245,15 +2409,19 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"invalid_user"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -2267,15 +2435,19 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"sale_not_found"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}
@@ -2289,15 +2461,19 @@
 								"schema": {
 									"type": "object",
 									"properties": {
-										"error": {
+										"errorCode": {
 											"type": "string",
 											"enum": [
 												"internal"
 											]
+										},
+										"errorMessage": {
+											"type": "string"
 										}
 									},
 									"required": [
-										"error"
+										"errorCode",
+										"errorMessage"
 									],
 									"additionalProperties": false
 								}

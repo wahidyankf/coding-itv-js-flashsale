@@ -9,6 +9,11 @@ Feature: Requests the API cannot serve
     Then the response status is 404
     And the error is "not_found"
 
+  Scenario: An error reply carries a sentence as well as a code
+    When a client sends GET /nope
+    Then the response status is 404
+    And the error message is "Nothing was found at this address."
+
   Scenario: A request body that is not JSON is refused
     When a client sends POST /sales/00000000-0000-4000-8000-000000000000/queue with a body that is not JSON
     Then the response status is 400
