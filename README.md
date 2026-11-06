@@ -4,7 +4,7 @@ A flash sale for one product with a limited stock. Shoppers see the sale, join a
 short time, and pay to keep it. The system never sells more than the stock and never sells a shopper more than one item,
 however many people press the button at once.
 
-It is an npm workspace with five apps in `apps/` and one library in `libs/`:
+It is an npm workspace with five apps in `apps/` and two libraries in `libs/`:
 
 | App             | What it is                                                                          |
 | --------------- | ----------------------------------------------------------------------------------- |
@@ -17,6 +17,12 @@ It is an npm workspace with five apps in `apps/` and one library in `libs/`:
 `libs/typekit` (`@flash/typekit`) is a TypeScript port of [py-typekit](https://github.com/wahidyankf/py-typekit): `Result`,
 `Option`, `attempt`, `pipe` and exhaustive matching. `flash-be` and `flash-web` use it, so a failure is a value and product
 code has no `catch`; the linter enforces that. See [failures as values](docs/explanation/failures-as-values.md).
+
+`libs/contract` (`@flash/contract`) is the HTTP contract of the API, written once with Zod: the route table, the schemas, the
+error codes, a small client and the Server-Sent Events codec. `flash-be` registers its routes from it, and `flash-web`, the
+e2e tests and the k6 script build their requests and read the replies through it, so no app writes a path or a reply type
+by hand. [docs/reference/openapi.json](docs/reference/openapi.json) is generated from it. See
+[the API contract](docs/explanation/api-contract.md).
 
 Nx runs the commands only. It has no plugins, and every target is in the project's `project.json`. The apps' targets build
 the library first.
@@ -125,7 +131,10 @@ npx nx test:quick <app>        # typecheck + lint + unit tests
 npx nx test:integration <app>  # needs the dev stack (flash-be, flash-web)
 npx nx test:e2e <app>          # Playwright (flash-be-e2e, flash-web-e2e)
 npx nx test:coverage <app>     # unit + integration, 99% floor; starts the dev stack
-npx nx test:quick typekit      # the library: typecheck + lint + unit tests (no Docker)
+npx nx test:quick typekit      # a library: typecheck + lint + unit tests (no Docker)
+npx nx test:quick contract     # the same for the contract
+npm run openapi:check          # docs/reference/openapi.json matches the routes
+npm run contract:guard:test    # no API path or ticket header written by hand in product code
 npm run lint:rules:test        # the lint rules: no catch, exhaustive switches
 npm run bdd:check              # every scenario is bound at the layers it needs
 npm run docs:install           # once: fetch the docs checker
@@ -138,7 +147,7 @@ next to the scenario with the test that proves it instead. A detail that only a 
 [scenario or plain test](docs/explanation/scenario-or-plain-test.md)). Playwright needs Chromium once:
 `npx playwright install chromium`. See [test layers and coverage](docs/reference/test-layers-and-coverage.md).
 
-`git push` runs the docs check, the behaviour coverage check, the lint rule tests, and typecheck, lint, unit tests and the
+`git push` runs the docs check, the behaviour coverage check, the lint rule tests, the OpenAPI check, the contract guard, and typecheck, lint, unit tests and the
 coverage floor for the projects the change touches. Commits are checked with commitlint (Conventional Commits).
 
 ## Load test

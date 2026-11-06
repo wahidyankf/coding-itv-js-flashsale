@@ -1,18 +1,23 @@
 # HTTP endpoints
 
-The routes of the two services. The API routes are in `apps/flash-be/src/adapters/inbound/http/routes.ts`. The web routes are in
-`apps/flash-web/src/routes/`.
+The routes of the two services, and the rules that a schema cannot say. The shape of every request and reply, and every
+status a route answers with, is in the contract ([the library](contract.md)) and in the generated
+[openapi.json](openapi.json); this page does not repeat them. The API routes are registered in
+`apps/flash-be/src/adapters/inbound/http/routes.ts`. The web routes are in `apps/flash-web/src/routes/`.
+
+Every error is `{"error": "<code>"}`, whether the route refused the request, the route does not exist (`404`
+`not_found`), the body is not JSON (`400` `invalid_request`) or the server failed (`500` `internal`).
 
 ## flash-be (API, port 8080)
 
-| Method | Path                           | Checks             | Response                                                                                   |
-| ------ | ------------------------------ | ------------------ | ------------------------------------------------------------------------------------------ |
-| GET    | `/health`                      | none; no I/O       | `200` `{"status":"ok"}`                                                                    |
-| GET    | `/ready`                       | Postgres and Redis | `200` `{"status":"ok","checks":{"database":"ok","redis":"ok"}}`                            |
-| GET    | `/sales/current`               | Postgres           | `200` with the sale (see below), or `404` `{"error":"sale_not_found"}` when no sale exists |
-| GET    | `/sales/:saleId`               | Postgres           | `200` with the sale, or `404` `{"error":"sale_not_found"}` for an unknown or malformed id  |
-| POST   | `/sales/:saleId/queue`         | Postgres, Redis    | `201` on a new place, `200` when the user already has one; see "The waiting queue"         |
-| GET    | `/sales/:saleId/queue/:userId` | Postgres, Redis    | `200` with the place, or an error; needs the `x-queue-ticket` header                       |
+| Method | Path                           | Checks             | Notes                                                     |
+| ------ | ------------------------------ | ------------------ | --------------------------------------------------------- |
+| GET    | `/health`                      | none; no I/O       | always `200`                                              |
+| GET    | `/ready`                       | Postgres and Redis | `200`, or `503` when a check fails                        |
+| GET    | `/sales/current`               | Postgres           | `404` `sale_not_found` when no sale exists                |
+| GET    | `/sales/:saleId`               | Postgres           | `404` `sale_not_found` for an unknown or malformed id     |
+| POST   | `/sales/:saleId/queue`         | Postgres, Redis    | `201` on a new place, `200` when the user already has one |
+| GET    | `/sales/:saleId/queue/:userId` | Postgres, Redis    | needs the `x-queue-ticket` header                         |
 
 `/ready` returns `503` when a check fails. Each failing check is `"error"`, and `status` is `"unavailable"`. For
 example, with Postgres stopped:
@@ -23,19 +28,7 @@ example, with Postgres stopped:
 
 ## The sale
 
-`GET /sales/current` and `GET /sales/:saleId` answer with the same body:
-
-```json
-{
-	"id": "ea6856b4-0cee-40c5-9cc9-deb80867039a",
-	"name": "Flash sale",
-	"status": "active",
-	"startsAt": "2026-11-05T13:41:17.105Z",
-	"endsAt": "2026-11-05T14:41:17.105Z",
-	"stock": 100,
-	"remaining": 100
-}
-```
+`GET /sales/current` and `GET /sales/:saleId` answer with the same body (`SaleView`).
 
 The current sale is the one that opens last. `remaining` is `stock` minus the items already sold, never below `0`.
 
@@ -62,22 +55,8 @@ The scenarios are in [`specs/flash/be/behaviours/sale/caching.feature`](../../sp
 Shoppers join a queue before they can reserve. The queue admits them in order, at the rate set on the sale
 (`admit_per_second`, 50 by default).
 
-`POST /sales/:saleId/queue` with the body `{"userId":"ana"}`:
-
-```json
-{
-	"userId": "ana",
-	"ticket": "pc03pRm1ag85sBp2-ZZul1gSLLfj3s3W_1lbQkQZj8g",
-	"state": "waiting",
-	"place": 1
-}
-```
-
-`GET /sales/:saleId/queue/:userId` with the header `x-queue-ticket: <ticket>`:
-
-```json
-{ "userId": "cai", "state": "admitted" }
-```
+`POST /sales/:saleId/queue` takes the user id and answers with the place and a `ticket`. `GET /sales/:saleId/queue/:userId`
+with the header `x-queue-ticket: <ticket>` answers with the place.
 
 `state` is `waiting` (with `place`, counted from 1) or `admitted`. An admission stays valid for
 `ADMISSION_TTL_SECONDS` (600 by default).
@@ -100,15 +79,8 @@ The scenarios are in [`specs/flash/be/behaviours/queue/`](../../specs/flash/be/b
 
 An admitted shopper holds one item for the sale's hold time (`reservation_ttl_seconds`, 120 by default).
 
-`POST /sales/:saleId/reservations` with the body `{"userId":"ana"}` and the header `x-queue-ticket: <ticket>`:
-
-```json
-{
-	"userId": "ana",
-	"reservationId": "1c9566e5-28b4-4968-88c6-605f20dca405",
-	"expiresAt": "2026-11-05T14:07:02.037Z"
-}
-```
+`POST /sales/:saleId/reservations` takes the user id and the header `x-queue-ticket: <ticket>`, and answers with the
+`reservationId` and when the hold ends (`expiresAt`).
 
 Asking again while the hold lasts returns `200` with the same body. A hold that has expired stops counting at once, and
 the item can go to someone else.
@@ -131,20 +103,7 @@ A sale that is not selling answers before the ticket is checked. The scenarios a
 ## Purchases
 
 `POST /sales/:saleId/purchases` pays for the held item. The body holds the user id and the reservation id from the
-reservation reply:
-
-```json
-{ "userId": "ana", "reservationId": "a05f1337-f21f-4936-a236-9277106c5ebb" }
-```
-
-```json
-{
-	"userId": "ana",
-	"purchaseId": "9f6b193e-e67c-4eba-bd93-bf600f05a419",
-	"reservationId": "a05f1337-f21f-4936-a236-9277106c5ebb",
-	"purchasedAt": "2026-11-05T14:20:52.736Z"
-}
-```
+reservation reply.
 
 The reservation id is the idempotency key. Sending the same request again returns `200` with the same purchase, and the
 shopper is charged once.
@@ -163,11 +122,11 @@ shopper is charged once.
 
 `GET /sales/:saleId/purchases/:userId` answers "did I get it?". `state` is one of:
 
-| `state`     | Body                                                                         |
-| ----------- | ---------------------------------------------------------------------------- |
-| `purchased` | the purchase, as above, plus `"state":"purchased"`                           |
-| `holding`   | `{"userId":"ana","state":"holding","reservationId":"...","expiresAt":"..."}` |
-| `none`      | `{"userId":"ana","state":"none"}`, also when the hold has expired            |
+| `state`     | Meaning                                              |
+| ----------- | ---------------------------------------------------- |
+| `purchased` | the shopper bought an item; the body is the purchase |
+| `holding`   | the shopper holds an item that has not expired       |
+| `none`      | nothing, also when the hold has expired              |
 
 The scenarios are in [`specs/flash/be/behaviours/purchase/`](../../specs/flash/be/behaviours/purchase/README.md).
 
@@ -177,6 +136,8 @@ The scenarios are in [`specs/flash/be/behaviours/purchase/`](../../specs/flash/b
 | ------ | ------------------------------------- | ------------------------------------------------------------------------------------------ |
 | GET    | `/sales/:saleId/events`               | `event: sale`, with the same body as `GET /sales/:saleId`                                  |
 | GET    | `/sales/:saleId/queue/:userId/events` | `event: place`, with the body of `GET /sales/:saleId/queue/:userId`; send `x-queue-ticket` |
+
+The frames are written and read by the codec of the contract (`formatFrame`, `parseFrames`).
 
 Both answer `Content-Type: text/event-stream`. The first event comes at once. Later events come only when the data
 changed, checked every `EVENTS_INTERVAL_MS` (1000). When nothing changes for 15 seconds, a `: keep-alive` comment line is
@@ -189,13 +150,8 @@ The scenarios are in [`specs/flash/be/behaviours/events/`](../../specs/flash/be/
 
 The three write routes (`POST .../queue`, `POST .../reservations` and `POST .../purchases`) count each request against
 the user id in the body and against the client address. Reads are not limited. When either count passes its limit in
-the current window, the answer is:
-
-```json
-{ "error": "rate_limited", "retryAfterSeconds": 7 }
-```
-
-with status `429` and a `Retry-After` header that holds the same number of seconds (at least 1). The window starts at
+the current window, the answer is `429` `rate_limited`, with `retryAfterSeconds` in the body and a `Retry-After` header that
+holds the same number of seconds (at least 1). The window starts at
 the first request, not at a fixed clock tick. The limits are `RATE_LIMIT_PER_USER` (30), `RATE_LIMIT_PER_IP` (600) and
 `RATE_LIMIT_WINDOW_SECONDS` (10). Set `TRUST_PROXY=true` only behind a proxy you control, so that the client address is
 read from `X-Forwarded-For`.

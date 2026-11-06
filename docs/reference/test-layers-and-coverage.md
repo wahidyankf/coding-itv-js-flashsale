@@ -22,6 +22,10 @@ The library `typekit` (`libs/typekit`) has `build`, `typecheck`, `lint`, `test:u
 tests are `libs/typekit/src/**/*_tests.ts` and its scenario bindings are in `libs/typekit/src/bdd`. It needs no Docker. The
 apps' targets build it first.
 
+The library `contract` (`libs/contract`) has the same targets, and needs no Docker either. Its tests are plain unit tests
+next to the source. `npm run openapi:check` and `npm run contract:guard:test` run in the pre-push hook beside the docs
+check and the behaviour check.
+
 | Target             | App                             | What it runs                                                 |
 | ------------------ | ------------------------------- | ------------------------------------------------------------ |
 | `typecheck`        | every app                       | `tsc --noEmit` with the strict flags in each `tsconfig.json` |

@@ -35,6 +35,8 @@ flowchart LR
 
 ## Constraints
 
+- Both containers read one HTTP contract, the library `@flash/contract`. `flash-be` registers its routes from it, and `flash-web`
+  calls the API and builds its pass-through allowlist from it.
 - The browser never receives `FLASH_BE_URL`: only the server reads it, and the pass-through route allows only the sale
   paths.
 - `GET /health` on `flash-be` does no I/O. Only `GET /ready` touches Postgres and Redis.
