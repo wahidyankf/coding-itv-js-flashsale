@@ -49,8 +49,9 @@ It is an npm workspace with five apps in `apps/` and two libraries in `libs/`:
 | `flash-web-e2e` | Playwright tests in a browser                                                       |
 | `flash-load`    | k6 load test against three API instances behind nginx, with a verdict from the data |
 
-`libs/typekit` (`@flash/typekit`) is a TypeScript port of [py-typekit](https://github.com/wahidyankf/py-typekit): `Result`, `attempt` and exhaustive matching. `flash-be` and `flash-web` use it, so a failure is a value and product
-code has no `catch`; the linter enforces that. See [failures as values](docs/explanation/failures-as-values.md).
+`libs/typekit` (`@flash/typekit`) is a TypeScript port of
+[py-typekit](https://github.com/wahidyankf/py-typekit): `Result` and `attempt`. `flash-be` and `flash-web` use it, so a
+failure is a value and product code has no `catch`; the linter enforces that. See [failures as values](docs/explanation/failures-as-values.md).
 
 `libs/contract` (`@flash/contract`) is the HTTP contract of the API, written once with Zod: the route table, the schemas, the
 error codes, a small client and the Server-Sent Events codec. `flash-be` registers its routes from it, and `flash-web`, the
