@@ -14,8 +14,8 @@ stack and its data. It exits with `0` when every check passed and `1` when one f
 up for a look: `npm run load:smoke --workspace flash-load -- --keep`. Stop it later with
 `docker compose -f apps/flash-load/compose.yaml down -v`.
 
-The other profiles are `load:full` (5,000 shoppers), `load:chaos` (Redis is stopped and started during the run), `load:burst`
-(700 shoppers arrive in one second) and `load:contention` (700 shoppers reserve for 50 items in the same moment).
+The other profiles are `load:full`, `load:chaos`, `load:burst` and `load:contention`. What each one sends is in the
+[profile table](../reference/load-test.md#profiles).
 
 ## 2. Read the result
 

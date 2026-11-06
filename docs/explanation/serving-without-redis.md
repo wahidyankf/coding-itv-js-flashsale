@@ -33,7 +33,7 @@ payment. A hold that has expired no longer counts, so no cleanup job is needed.
 Redis may come back empty (a restart) or with its old data (a network break). The two cases need different care:
 
 - **Empty.** The `ready` key is missing, so the next reservation finds the gate not ready and one instance rebuilds
-  it from Postgres under the sale row lock. Holds taken without Redis are in `reservations`, so they are rebuilt.
+  it from Postgres. The rules for that rebuild are in [reservations and recovery](reservations-and-recovery.md#when-redis-loses-its-state).
 - **With old data.** Redis looks ready but it missed the holds and purchases that Postgres decided meanwhile. Every
   failed Redis call marks the sale as stale in the process. The next reservation first deletes `ready`, which forces the
   same rebuild.

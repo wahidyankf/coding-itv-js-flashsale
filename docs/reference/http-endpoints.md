@@ -44,10 +44,9 @@ The scenarios are in [`specs/flash/be/behaviours/sale/status.feature`](../../spe
 
 ### Caching
 
-Both sale reads are answered from a short in-process cache. `SALE_CACHE_MS` sets its time (1000 by default, 0 turns it
-off). A cached `200` carries `Cache-Control: public, max-age=<seconds>`, rounded up, so `remaining` can be that old. The
-`status` is not stale in the same way, because it is worked out from the cached row and the clock on every request. A
-`404` is never cached and has no `Cache-Control` header. The write routes never read the cache.
+Both sale reads come from a short in-process cache. `SALE_CACHE_MS` sets its time (1000 by default, 0 turns it off). A
+cached `200` carries `Cache-Control: public, max-age=<seconds>`, rounded up. A `404` is never cached, and the write
+routes never read the cache. Why `remaining` may be that old is in [the sale read cache](../explanation/sale-read-cache.md).
 
 The scenarios are in [`specs/flash/be/behaviours/sale/caching.feature`](../../specs/flash/be/behaviours/sale/caching.feature).
 

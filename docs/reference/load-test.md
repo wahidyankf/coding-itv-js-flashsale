@@ -51,17 +51,13 @@ with a hold. One in five of those who bought presses confirm and reserve again. 
 once every hold has lapsed, and take the items that abandoned holds gave back. Ten to twenty extra users flood the queue
 to show that they get `429`, not an error.
 
-`smoke`, `full` and `chaos` send shoppers over many seconds, so the queue smooths the load before it reaches the sale.
-`burst` and `contention` do not: all 700 shoppers arrive inside one second. In `burst` the admission rate (300 a second)
-still spreads the reserve and confirm steps over about two seconds, so it tests the queue and the join route under a
-herd. In `contention` the admission rate equals the crowd, so every shopper is admitted in the first tick and reserves in
-the same moment for 50 items; that is the Redis script and `UPDATE ... WHERE sold < stock` under contention.
+`smoke`, `full` and `chaos` spread their shoppers over many seconds, so the queue smooths the load first. `burst` and
+`contention` send all 700 shoppers inside one second. `burst` tests the queue under a herd. `contention` admits everyone
+at once, so 700 shoppers reserve for 50 items in the same moment, which the other runs never reach.
 
-A visit lasts at least two seconds, so every shopper who arrives in the same second is in the system at once, and the
-virtual users needed equal the shoppers. The size of the herd is set by the machine that runs k6, not by the system: a
-first try with 2,000 shoppers never began, because k6 stopped starting virtual users at 1,186 of 2,070 on a Docker VM with
-7.7 GiB (about 6 MiB for each user with the contract bundled in). `full` starts 670 users and runs, so the two profiles
-use 700. A bigger herd needs a bigger client machine, or several k6 instances.
+A visit lasts at least two seconds, so the virtual users needed equal the shoppers. The herd is 700 because that is what
+the client machine could start; the reason is in
+[what the load runs found](../explanation/load-test-findings.md#a-herd-of-700-in-one-second).
 
 The chaos stock is 1,000 so that Redis is stopped while items are still for sale. With a small stock the sale is over
 before the stop and the run proves nothing.
