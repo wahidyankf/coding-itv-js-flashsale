@@ -10,6 +10,45 @@ No user bought twice. k6 and Postgres agreed on the number of purchases. After R
 rebuilt to the same size as the rows in Postgres. This held even while Redis was stopped, because the Postgres path
 takes a row lock and the database constraints refuse a second sale.
 
+## A herd of 700 in one second
+
+`smoke`, `full` and `chaos` send shoppers over many seconds, so the queue smooths the load before it reaches the sale.
+Two profiles, `burst` and `contention`, were added to send everyone inside one second. Their size and the reason for it
+are in `profiles.ts` and were written before they ran. The limits are the same as for every other run.
+
+**The first try never began.** With 2,000 shoppers k6 stopped starting virtual users at 1,186 of 2,070 on a Docker VM with
+7.7 GiB, about 6 MiB for each user with the contract (and Zod) bundled into the script. That is a limit of the machine
+that runs the load generator, not a result about the system. The herd was cut to 700, close to the 670 users that `full`
+starts. The runner now reports a missing k6 summary as a load-generator failure and removes the stack.
+
+**The invariants held.** In four runs (two of each profile) `sales.sold` equalled the number of purchase rows and never
+passed the stock (100 of 100 in `burst`, 50 of 50 in `contention`), no shopper bought twice, k6, Postgres and Redis agreed,
+the flooding users got `429`, and there were no server errors. Postgres never had a session waiting for a lock. The
+`contention` profile is the first one that sends hundreds of reserves for 50 items in the same moment, and the Lua gate
+and `UPDATE ... WHERE sold < stock` held.
+
+**The speed limits failed, as k6 measures them.**
+
+| Run          | Reserve p95 | Purchase p95 | Dropped | Note                                   |
+| ------------ | ----------- | ------------ | ------- | -------------------------------------- |
+| burst 1      | 2,379 ms    | 1,949 ms     | 3       |                                        |
+| burst 2      | 701 ms      | 724 ms       | 0       | API logs kept                          |
+| contention 1 | 349 ms      | 213 ms       | 0       | reserve over the limit, purchase under |
+| contention 2 | 551 ms      | 194 ms       | 0       | API logs kept                          |
+
+**Where the time is not.** In the runs with logs, the API logged a reserve at a median of 1.5 ms and a 95th percentile of
+5.3 to 5.5 ms (largest 46 ms). A purchase took 155 ms in the median, which is the 150 ms of the mock payment. A join took
+13 to 38 ms at the 95th percentile. So the handlers are not slow, and the database is not the wait. The gap between 5 ms
+and 350 to 2,400 ms is outside the handler: 700 to 770 virtual users running in k6's JavaScript runtime, nginx, and three
+Node processes all share six CPUs, and the run-to-run spread (701 against 2,379 ms for the same profile) says the machine is
+the noisy part.
+
+**What this does not show.** The API logs time a request from when Node hands it to the server. They do not include the
+time a request waits before that, in nginx, in the network or in a busy event loop. So the logs lower the suspicion on the
+handlers, but they do not prove that a real client would see 5 ms. A faithful speed result needs the load generator on
+another machine. Until then the two profiles are judged on speed with the fixed limits, and they fail on this machine; a
+limit was not changed or switched off to make them pass.
+
 ## Paying during a Redis outage was slow
 
 The first chaos run kept every invariant and had no server errors, but the 95th percentile of a purchase was about

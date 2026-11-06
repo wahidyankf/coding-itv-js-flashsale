@@ -50,7 +50,7 @@ create a sale over HTTP, with an absolute window:
 ```bash
 curl -s -X POST http://localhost:8080/admin/sales \
   -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" \
-  -d '{"stock":100,"startsAt":"2026-06-01T12:00:00Z","endsAt":"2026-06-01T13:00:00Z"}'
+  -d '{"stock":100,"startsAt":"2030-01-01T12:00:00Z","endsAt":"2030-01-01T13:00:00Z"}'
 ```
 
 The reply is `201` with the sale. A window that overlaps another sale is refused with `409` `sale_overlaps`. The seed

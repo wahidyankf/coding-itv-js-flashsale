@@ -22,7 +22,7 @@ POST {{backend}}/admin/sales
 Content-Type: application/json
 Authorization: Bearer replace-with-your-admin-token
 
-{ "stock": 100, "startsAt": "2026-06-01T12:00:00Z", "endsAt": "2026-06-01T13:00:00Z" }
+{ "stock": 100, "startsAt": "2030-01-01T12:00:00Z", "endsAt": "2030-01-01T13:00:00Z" }
 
 ### Backend: join the queue (replace the sale id; the reply holds your ticket; write requests can answer 429 with Retry-After)
 POST {{backend}}/sales/00000000-0000-4000-8000-000000000000/queue

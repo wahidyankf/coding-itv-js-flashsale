@@ -25,7 +25,7 @@ Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `fla
 - Run targets with `npx nx <target> <app>`. Every app has `typecheck`, `lint`, `test:quick`, and `test:quick:watch`.
   - `flash-be` and `flash-web` also have `test:unit` and `test:integration`.
   - `flash-be-e2e` and `flash-web-e2e` have `test:e2e` instead.
-  - `flash-load` has `load:smoke`, `load:full` and `load:chaos` instead. They need Docker and run the stack. Its limits are in
+  - `flash-load` has `load:smoke`, `load:full`, `load:chaos`, `load:burst` and `load:contention` instead. They need Docker and run the stack. Its limits are in
     `apps/flash-load/k6/profiles.ts`. A failed run is a finding; do not change a limit to make it pass.
   - `test:quick` runs `typecheck`, `lint`, and `test:unit`, or only `typecheck` and `lint` for the e2e apps. Change a
     check in its own target, not in `test:quick`. Keep `test:quick:watch` in sync with it.
