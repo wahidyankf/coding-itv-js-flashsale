@@ -7,7 +7,7 @@ import {
 	TEXT,
 	waitingText,
 } from "./messages";
-import type { ApiError, Place, SaleStatus } from "./types";
+import type { ApiFailure, Place, SaleStatus } from "./types";
 
 // Where the shopper is. `busy` is a request in flight; `message` is a result the shopper reads and moves on from.
 export type Phase =
@@ -73,7 +73,7 @@ export function useShopper(
 		}
 	}, [waiting, saleStatus, stop]);
 
-	const fail = ({ error, retryAfterSeconds }: ApiError) =>
+	const fail = ({ error, retryAfterSeconds }: ApiFailure) =>
 		setPhase({ kind: "message", text: errorText(error, retryAfterSeconds) });
 
 	const reserve = async (id: string, name: string, ticket: string) => {

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createWatcher, readFrames } from "./sse";
+import { createWatcher } from "./sse";
 
 const encoder = new TextEncoder();
 
@@ -12,23 +12,6 @@ function body(...chunks: string[]): ReadableStream<Uint8Array> {
 		},
 	});
 }
-
-describe("readFrames", () => {
-	it("reads complete frames and keeps the rest", () => {
-		const { frames, rest } = readFrames(
-			'event: sale\ndata: {"a":1}\n\nevent: place\ndata: {"b":',
-		);
-		expect(frames).toEqual([{ event: "sale", data: { a: 1 } }]);
-		expect(rest).toBe('event: place\ndata: {"b":');
-	});
-
-	it("skips keep-alive comments and frames without data", () => {
-		const { frames } = readFrames(
-			': keep-alive\n\nevent: empty\n\ndata: {"c":2}\n\n',
-		);
-		expect(frames).toEqual([{ event: "message", data: { c: 2 } }]);
-	});
-});
 
 describe("createWatcher", () => {
 	it("passes events on, with the headers it was given", async () => {

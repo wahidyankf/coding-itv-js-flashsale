@@ -1,3 +1,4 @@
+import { matchRoute, routes, TICKET_HEADER } from "@flash/contract";
 import {
 	act,
 	cleanup,
@@ -30,7 +31,7 @@ export function unitWorld(): WebWorld {
 	// The fake flash-be, as a fetch.
 	const backendFetch: typeof fetch = async (input, init) => {
 		const url = new URL(String(input));
-		const path = url.pathname.replace(/^\/sales\//, "");
+		const path = url.pathname;
 		const headers = new Headers(init?.headers);
 		const text = typeof init?.body === "string" ? init.body : "";
 		const reply = backend.handle(
@@ -55,7 +56,7 @@ export function unitWorld(): WebWorld {
 
 	// Streams are pushed from the fake backend's changes, the way the real streams push from flash-be.
 	const watch: Watcher = (url, onEvent, headers = {}) => {
-		const parts = url.split("/api/sales/")[1]?.split("/") ?? [];
+		const match = matchRoute("GET", url.replace(/^.*?\/api/, ""));
 		let last = "";
 		const send = (event: string, data: unknown) => {
 			const key = JSON.stringify([event, data]);
@@ -63,13 +64,13 @@ export function unitWorld(): WebWorld {
 			last = key;
 			onEvent(event, data);
 		};
-		if (parts[1] === "events") {
+		if (match?.route === routes.saleEvents) {
 			const push = () => backend.hasSale() && send("sale", backend.view());
 			push();
 			return backend.onChange(push);
 		}
-		const user = decodeURIComponent(parts[2] ?? "");
-		if (headers["x-queue-ticket"] !== `ticket-${user}`) return () => {};
+		const user = match?.params.userId ?? "";
+		if (headers[TICKET_HEADER] !== `ticket-${user}`) return () => {};
 		const push = () =>
 			send("place", { userId: user, ...backend.placeOf(user) });
 		push();

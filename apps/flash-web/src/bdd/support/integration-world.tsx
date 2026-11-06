@@ -6,6 +6,13 @@ import {
 } from "node:http";
 import type { AddressInfo } from "node:net";
 import {
+	formatFrame,
+	type Match,
+	matchRoute,
+	routes,
+	TICKET_HEADER,
+} from "@flash/contract";
+import {
 	cleanup,
 	fireEvent,
 	render,
@@ -49,18 +56,19 @@ async function readBody(request: IncomingMessage): Promise<string> {
 function backendServer(current: () => FakeBackend): Server {
 	return createServer(async (request, response) => {
 		const backend = current();
-		const path = (request.url ?? "").replace(/^\/sales\//, "");
-		const header = request.headers["x-queue-ticket"];
+		const path = request.url ?? "";
+		const header = request.headers[TICKET_HEADER];
 		const ticket = typeof header === "string" ? header : undefined;
 		try {
-			if (request.method === "GET" && path.endsWith("/events")) {
-				return stream(backend, path, ticket, request, response);
+			const match = matchRoute(request.method ?? "GET", path);
+			if (match?.route.stream) {
+				return stream(backend, match, ticket, request, response);
 			}
 			const text = await readBody(request);
 			const reply = backend.handle(
 				request.method ?? "GET",
 				path,
-				{ "x-queue-ticket": ticket },
+				{ [TICKET_HEADER]: ticket },
 				text ? JSON.parse(text) : {},
 			);
 			response.writeHead(reply.status, {
@@ -77,14 +85,13 @@ function backendServer(current: () => FakeBackend): Server {
 
 function stream(
 	backend: FakeBackend,
-	path: string,
+	match: Match,
 	ticket: string | undefined,
 	request: IncomingMessage,
 	response: ServerResponse,
 ): void {
-	const parts = path.split("/");
-	const user = decodeURIComponent(parts[2] ?? "");
-	const isPlace = parts[1] === "queue";
+	const user = match.params.userId ?? "";
+	const isPlace = match.route === routes.placeEvents;
 	if (backend.isCutOff()) throw new Error("unreachable");
 	if (isPlace && ticket !== `ticket-${user}`) {
 		response.writeHead(401).end();
@@ -97,7 +104,7 @@ function stream(
 		const [event, data] = isPlace
 			? ["place", { userId: user, ...backend.placeOf(user) }]
 			: ["sale", backend.view()];
-		const frame = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+		const frame = formatFrame(event, data);
 		if (frame === last) return;
 		last = frame;
 		response.write(frame);

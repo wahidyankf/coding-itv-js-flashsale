@@ -1,4 +1,6 @@
-import { type Option, Some } from "@flash/typekit";
+import type { ApiFailure } from "@flash/contract";
+import { normalizeUserId } from "@flash/contract/vocabulary";
+import type { Option } from "@flash/typekit";
 import type { SaleStatus } from "./types";
 
 export const STATUS_LABEL: Record<SaleStatus, string> = {
@@ -8,12 +10,9 @@ export const STATUS_LABEL: Record<SaleStatus, string> = {
 	ended: "Ended",
 };
 
-// The same pattern the API uses for a user id, so a bad name is refused before anything is sent.
-const USER_PATTERN = /^[a-z0-9][a-z0-9._@+-]{0,63}$/;
-
+// The same rule the API uses for a user id, so a bad name is refused before anything is sent.
 export function cleanUser(raw: string): Option<string> {
-	const user = raw.trim().toLowerCase();
-	return USER_PATTERN.test(user) ? new Some(user) : undefined;
+	return normalizeUserId(raw);
 }
 
 export const TEXT = {
@@ -39,7 +38,10 @@ export const holdingText = (seconds: number) =>
 	`An item is held for you. Confirm within ${seconds} seconds.`;
 
 // One sentence for each error code the API can answer with.
-export function errorText(error: string, retryAfterSeconds?: number): string {
+export function errorText(
+	error: ApiFailure["error"],
+	retryAfterSeconds?: number,
+): string {
 	switch (error) {
 		case "sold_out":
 			return "Sold out. No items are left.";

@@ -1,3 +1,4 @@
+import { ERROR_STATUS, parseFrames } from "@flash/contract";
 import { attemptAsync } from "@flash/typekit";
 // A Server-Sent Events reader built on fetch. The browser's EventSource cannot send a header, and the queue ticket
 // travels in one. The same code runs in the browser and in tests.
@@ -15,25 +16,6 @@ export type WatchOptions = {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Splits the text that arrived so far into complete frames. Returns the frames and the rest.
-export function readFrames(buffer: string): {
-	frames: Array<{ event: string; data: unknown }>;
-	rest: string;
-} {
-	const frames: Array<{ event: string; data: unknown }> = [];
-	let rest = buffer;
-	for (let end = rest.indexOf("\n\n"); end >= 0; end = rest.indexOf("\n\n")) {
-		const frame = rest.slice(0, end);
-		rest = rest.slice(end + 2);
-		// A line that starts with a colon is a keep-alive comment.
-		if (frame.startsWith(":")) continue;
-		const event = /^event: (.*)$/m.exec(frame)?.[1] ?? "message";
-		const data = /^data: (.*)$/m.exec(frame)?.[1];
-		if (data !== undefined) frames.push({ event, data: JSON.parse(data) });
-	}
-	return { frames, rest };
-}
-
 export function createWatcher(options: WatchOptions = {}): Watcher {
 	const retryMs = options.retryMs ?? 1000;
 	return (url, onEvent, headers = {}) => {
@@ -50,7 +32,12 @@ export function createWatcher(options: WatchOptions = {}): Watcher {
 							signal: controller.signal,
 						});
 						// A refusal will not change by asking again.
-						if (reply.status === 401 || reply.status === 404) return "refused";
+						if (
+							reply.status === ERROR_STATUS.invalid_ticket ||
+							reply.status === ERROR_STATUS.sale_not_found
+						) {
+							return "refused";
+						}
 						if (reply.ok && reply.body) {
 							const reader = reply.body.getReader();
 							const decoder = new TextDecoder();
@@ -59,7 +46,7 @@ export function createWatcher(options: WatchOptions = {}): Watcher {
 								const chunk = await reader.read();
 								if (chunk.done) break;
 								buffer += decoder.decode(chunk.value, { stream: true });
-								const { frames, rest } = readFrames(buffer);
+								const { frames, rest } = parseFrames(buffer);
 								buffer = rest;
 								for (const frame of frames) onEvent(frame.event, frame.data);
 							}

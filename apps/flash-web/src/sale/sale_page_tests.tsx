@@ -28,17 +28,34 @@ function stubClient(overrides: Partial<SaleClient> = {}) {
 	let push: (place: Place) => void = () => {};
 	const client: SaleClient = {
 		join: vi.fn(
-			async () => new Ok({ ticket: "t", state: "waiting" as const, place: 2 }),
+			async () =>
+				new Ok({
+					userId: "ana",
+					ticket: "t",
+					state: "waiting" as const,
+					place: 2,
+				}),
 		),
 		reserve: vi.fn(
 			async () =>
 				new Ok({
+					userId: "ana",
 					reservationId: "r1",
 					expiresAt: new Date(Date.now() + 60_000).toISOString(),
 				}),
 		),
-		confirm: vi.fn(async () => new Ok({ purchaseId: "p1" })),
-		outcome: vi.fn(async () => new Ok({ state: "none" as const })),
+		confirm: vi.fn(
+			async () =>
+				new Ok({
+					userId: "ana",
+					purchaseId: "p1",
+					reservationId: "r1",
+					purchasedAt: "2026-06-01T12:00:00.000Z",
+				}),
+		),
+		outcome: vi.fn(
+			async () => new Ok({ userId: "ana", state: "none" as const }),
+		),
 		watchSale: () => () => {},
 		watchPlace: (_id, _user, _ticket, onPlace) => {
 			push = onPlace;
@@ -88,9 +105,10 @@ describe("SalePage", () => {
 	it("shows the API's reason when a confirm is refused for another cause", async () => {
 		const { client } = stubClient({
 			join: vi.fn(
-				async () => new Ok({ ticket: "t", state: "admitted" as const }),
+				async () =>
+					new Ok({ userId: "ana", ticket: "t", state: "admitted" as const }),
 			),
-			confirm: vi.fn(async () => new Err({ error: "hold_expired" })),
+			confirm: vi.fn(async () => new Err({ error: "hold_expired" as const })),
 		});
 		render(<SalePage load={{ state: "ok", sale: SALE }} client={client} />);
 		await buyAs("ana");
@@ -102,7 +120,7 @@ describe("SalePage", () => {
 
 	it("shows the reason when the check is refused", async () => {
 		const { client } = stubClient({
-			outcome: vi.fn(async () => new Err({ error: "network" })),
+			outcome: vi.fn(async () => new Err({ error: "network" as const })),
 		});
 		render(<SalePage load={{ state: "ok", sale: SALE }} client={client} />);
 		fireEvent.change(screen.getByLabelText(/Your name/), {

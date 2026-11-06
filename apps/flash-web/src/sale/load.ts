@@ -1,21 +1,23 @@
-import { attemptAsync } from "@flash/typekit";
+import { createClient, type Fetch, routes } from "@flash/contract";
 import { buildConfig } from "../config";
-import type { SaleLoad, SaleView } from "./types";
+import type { SaleLoad } from "./types";
 
 // Asks flash-be for the current sale, on the server. A sale that is missing and a sale that cannot be read are told
 // apart, so the page can say which.
 export async function loadSale(
 	env: NodeJS.ProcessEnv,
-	fetcher: typeof fetch = fetch,
+	fetcher: Fetch = fetch,
 ): Promise<SaleLoad> {
-	const loaded = await attemptAsync(async (): Promise<SaleLoad> => {
-		const reply = await fetcher(`${buildConfig(env).backendUrl}/sales/current`);
-		if (reply.status === 404) return { state: "none" };
-		if (!reply.ok) return { state: "error" };
-		return { state: "ok", sale: (await reply.json()) as SaleView };
-	}, Error);
-	return loaded.match({
-		ok: (load) => load,
-		err: (): SaleLoad => ({ state: "error" }),
+	const api = createClient({
+		baseUrl: buildConfig(env).backendUrl,
+		fetch: fetcher,
+	});
+	const found = await api.call(routes.currentSale, {});
+	return found.match({
+		ok: (reply): SaleLoad => ({ state: "ok", sale: reply.body }),
+		err: (failure): SaleLoad =>
+			failure.error === "sale_not_found"
+				? { state: "none" }
+				: { state: "error" },
 	});
 }

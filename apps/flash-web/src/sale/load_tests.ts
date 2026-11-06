@@ -1,18 +1,28 @@
 import { describe, expect, it } from "vitest";
 import { loadSale } from "./load";
+import type { SaleView } from "./types";
 
 const ENV = { FLASH_BE_URL: "http://flash-be.test" };
+const SALE: SaleView = {
+	id: "s1",
+	name: "Drop",
+	status: "active",
+	startsAt: "2026-06-01T11:00:00.000Z",
+	endsAt: "2026-06-01T13:00:00.000Z",
+	stock: 10,
+	remaining: 4,
+};
 
 describe("loadSale", () => {
 	it("reads the current sale", async () => {
 		const urls: string[] = [];
 		const fetcher: typeof fetch = async (input) => {
 			urls.push(String(input));
-			return Response.json({ id: "s1", remaining: 4 });
+			return Response.json(SALE);
 		};
 		expect(await loadSale(ENV, fetcher)).toEqual({
 			state: "ok",
-			sale: { id: "s1", remaining: 4 },
+			sale: SALE,
 		});
 		expect(urls).toEqual(["http://flash-be.test/sales/current"]);
 	});
@@ -27,6 +37,8 @@ describe("loadSale", () => {
 		expect(await loadSale(ENV, none)).toEqual({ state: "none" });
 		expect(await loadSale(ENV, broken)).toEqual({ state: "error" });
 		expect(await loadSale(ENV, down)).toEqual({ state: "error" });
+		const odd: typeof fetch = async () => Response.json({ id: "s1" });
+		expect(await loadSale(ENV, odd)).toEqual({ state: "error" });
 	});
 
 	it("uses the global fetch by default", async () => {

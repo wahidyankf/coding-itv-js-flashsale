@@ -1,34 +1,41 @@
+import {
+	ERROR_STATUS,
+	type ErrorCode,
+	isUuid,
+	matchRoute,
+	RETRY_AFTER_HEADER,
+	routes,
+	TICKET_HEADER,
+} from "@flash/contract";
 import { attemptAsync } from "@flash/typekit";
 import { buildConfig } from "./config";
 
-const ID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
-const USER = "[A-Za-z0-9._@+%-]{1,200}";
+// The routes the browser may reach are the ones the contract marks `passThrough`, each with its one method. Anything
+// else is not the browser's.
+const PASS_THROUGH = Object.values(routes).filter((route) => route.passThrough);
 
-// The only paths the browser may reach, each with the one method it may use. Anything else is not the browser's.
-const ROUTES: Array<{ method: "GET" | "POST"; path: RegExp }> = [
-	{ method: "GET", path: /^current$/ },
-	{ method: "GET", path: new RegExp(`^${ID}$`) },
-	{ method: "GET", path: new RegExp(`^${ID}/events$`) },
-	{ method: "POST", path: new RegExp(`^${ID}/queue$`) },
-	{ method: "GET", path: new RegExp(`^${ID}/queue/${USER}$`) },
-	{ method: "GET", path: new RegExp(`^${ID}/queue/${USER}/events$`) },
-	{ method: "POST", path: new RegExp(`^${ID}/reservations$`) },
-	{ method: "POST", path: new RegExp(`^${ID}/purchases$`) },
-	{ method: "GET", path: new RegExp(`^${ID}/purchases/${USER}$`) },
-];
+// A name in a path may still be percent-encoded and in any case; the API normalises it.
+const USER_IN_PATH = /^[A-Za-z0-9._@+-]{1,200}$/;
 
 // Headers that carry something the API needs, or something the browser needs back.
-const SENT = ["content-type", "x-queue-ticket", "accept"];
-const RETURNED = ["content-type", "cache-control", "retry-after"];
+const SENT = ["content-type", TICKET_HEADER, "accept"];
+const RETURNED = ["content-type", "cache-control", RETRY_AFTER_HEADER];
 
+// `path` is what follows `/api`, such as `/sales/current`.
 export function isAllowed(method: string, path: string): boolean {
-	return ROUTES.some(
-		(route) => route.method === method && route.path.test(path),
+	const match = matchRoute(method, path, PASS_THROUGH);
+	if (!match) return false;
+	const { saleId, userId } = match.params;
+	return (
+		(saleId === undefined ||
+			isUuid(saleId) ||
+			match.route.name === "currentSale") &&
+		(userId === undefined || USER_IN_PATH.test(userId))
 	);
 }
 
-function json(status: number, body: unknown): Response {
-	return Response.json(body, { status });
+function refuse(code: ErrorCode): Response {
+	return Response.json({ error: code }, { status: ERROR_STATUS[code] });
 }
 
 // Passes a browser request under /api/sales on to flash-be and streams the answer back. The address of flash-be is read
@@ -39,10 +46,8 @@ export async function proxyToBackend(
 	fetcher: typeof fetch = fetch,
 ): Promise<Response> {
 	const url = new URL(request.url);
-	const path = url.pathname.replace(/^\/api\/sales\//, "");
-	if (!isAllowed(request.method, path)) {
-		return json(404, { error: "not_found" });
-	}
+	const path = url.pathname.replace(/^\/api/, "");
+	if (!isAllowed(request.method, path)) return refuse("not_found");
 
 	const headers = new Headers();
 	for (const name of SENT) {
@@ -54,15 +59,12 @@ export async function proxyToBackend(
 	if (forwarded !== null) headers.set("x-forwarded-for", forwarded);
 
 	const answered = await attemptAsync(async (): Promise<Response> => {
-		const upstream = await fetcher(
-			`${buildConfig(env).backendUrl}/sales/${path}`,
-			{
-				method: request.method,
-				headers,
-				body: request.method === "POST" ? await request.text() : null,
-				signal: request.signal,
-			},
-		);
+		const upstream = await fetcher(`${buildConfig(env).backendUrl}${path}`, {
+			method: request.method,
+			headers,
+			body: request.method === "POST" ? await request.text() : null,
+			signal: request.signal,
+		});
 		const returned = new Headers();
 		for (const name of RETURNED) {
 			const value = upstream.headers.get(name);
@@ -73,7 +75,5 @@ export async function proxyToBackend(
 			headers: returned,
 		});
 	}, Error);
-	return answered.isOk()
-		? answered.value
-		: json(502, { error: "backend_unavailable" });
+	return answered.isOk() ? answered.value : refuse("backend_unavailable");
 }

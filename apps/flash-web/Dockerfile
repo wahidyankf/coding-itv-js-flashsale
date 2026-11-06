@@ -3,6 +3,7 @@ FROM node:26.13.0-alpine AS build
 WORKDIR /repo
 COPY package.json package-lock.json ./
 COPY libs/typekit/package.json libs/typekit/
+COPY libs/contract/package.json libs/contract/
 COPY apps/flash-be/package.json apps/flash-be/
 COPY apps/flash-be-e2e/package.json apps/flash-be-e2e/
 COPY apps/flash-web/package.json apps/flash-web/
@@ -11,6 +12,8 @@ COPY apps/flash-load/package.json apps/flash-load/
 RUN npm ci --ignore-scripts
 COPY libs/typekit libs/typekit
 RUN npm run build -w @flash/typekit
+COPY libs/contract libs/contract
+RUN npm run build -w @flash/contract
 COPY apps/flash-web apps/flash-web
 RUN npm run build -w flash-web
 

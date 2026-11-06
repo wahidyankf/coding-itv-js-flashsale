@@ -1,3 +1,4 @@
+import type { ApiFailure } from "@flash/contract";
 import { Some } from "@flash/typekit";
 import { describe, expect, it } from "vitest";
 import {
@@ -29,7 +30,7 @@ describe("cleanUser", () => {
 });
 
 describe("errorText", () => {
-	it.each([
+	it.each<[ApiFailure["error"], string]>([
 		["sold_out", "Sold out. No items are left."],
 		["sale_ended", "The sale has ended."],
 		["sale_not_started", "The sale has not started yet."],
@@ -39,7 +40,7 @@ describe("errorText", () => {
 		["not_admitted", "Please wait for your turn."],
 		["network", "The sale could not be reached. Please try again."],
 		["unexpected", "Something went wrong. Please try again."],
-		["anything_else", "Something went wrong. Please try again."],
+		["internal", "Something went wrong. Please try again."],
 	])("says what %s means", (code, text) => {
 		expect(errorText(code)).toBe(text);
 	});

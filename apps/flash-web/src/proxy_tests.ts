@@ -6,27 +6,30 @@ const ID = "11111111-1111-4111-8111-111111111111";
 
 describe("isAllowed", () => {
 	it.each([
-		["GET", "current"],
-		["GET", ID],
-		["GET", `${ID}/events`],
-		["POST", `${ID}/queue`],
-		["GET", `${ID}/queue/ana`],
-		["GET", `${ID}/queue/ana/events`],
-		["POST", `${ID}/reservations`],
-		["POST", `${ID}/purchases`],
-		["GET", `${ID}/purchases/a%2Bb%40c`],
+		["GET", "/sales/current"],
+		["GET", `/sales/${ID}`],
+		["GET", `/sales/${ID}/events`],
+		["POST", `/sales/${ID}/queue`],
+		["GET", `/sales/${ID}/queue/ana`],
+		["GET", `/sales/${ID}/queue/ana/events`],
+		["POST", `/sales/${ID}/reservations`],
+		["POST", `/sales/${ID}/purchases`],
+		["GET", `/sales/${ID}/purchases/a%2Bb%40c`],
 	])("lets %s %s through", (method, path) => {
 		expect(isAllowed(method, path)).toBe(true);
 	});
 
 	it.each([
-		["POST", "current"],
-		["GET", `${ID}/queue`],
-		["GET", `${ID}/reservations`],
-		["DELETE", ID],
-		["GET", "../ready"],
-		["GET", `${ID}/purchases/a/b`],
-		["GET", "not-a-sale-id"],
+		["POST", "/sales/current"],
+		["GET", `/sales/${ID}/queue`],
+		["GET", `/sales/${ID}/reservations`],
+		["DELETE", `/sales/${ID}`],
+		["GET", "/sales/../ready"],
+		["GET", "/ready"],
+		["GET", "/health"],
+		["GET", `/sales/${ID}/purchases/a/b`],
+		["GET", "/sales/not-a-sale-id"],
+		["GET", `/sales/${ID}/queue/has space`],
 	])("refuses %s %s", (method, path) => {
 		expect(isAllowed(method, path)).toBe(false);
 	});

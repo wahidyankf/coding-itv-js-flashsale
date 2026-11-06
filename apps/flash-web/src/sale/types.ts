@@ -1,16 +1,18 @@
+import type { ApiFailure, QueuePlace, SaleView } from "@flash/contract";
 import type { Result } from "@flash/typekit";
-export type SaleStatus = "upcoming" | "active" | "sold_out" | "ended";
 
-// What GET /sales/:id sends, and what the sale stream pushes.
-export type SaleView = {
-	id: string;
-	name: string;
-	status: SaleStatus;
-	startsAt: string;
-	endsAt: string;
-	stock: number;
-	remaining: number;
-};
+// The shapes of the API come from @flash/contract. Only what the web page adds is defined here.
+export type {
+	ApiFailure,
+	JoinedView,
+	OutcomeView,
+	PlaceView,
+	PurchaseView,
+	QueuePlace,
+	ReservedView,
+	SaleView,
+} from "@flash/contract";
+export type { SaleStatus } from "@flash/contract/vocabulary";
 
 // What the server renders the first time: the sale, no sale yet, or a sale that could not be read.
 export type SaleLoad =
@@ -18,20 +20,8 @@ export type SaleLoad =
 	| { state: "none" }
 	| { state: "error" };
 
-export type Place =
-	| { state: "waiting"; place: number }
-	| { state: "admitted" }
-	| { state: "absent" };
+// Where the shopper stands in the line. The ticket and the name that come with a place are not needed to show it.
+export type Place = QueuePlace;
 
-export type Outcome =
-	| { state: "purchased" }
-	| { state: "holding"; reservationId: string; expiresAt: string }
-	| { state: "none" };
-
-// An answer from the web server: the body, or the error code the API gave, or "network" when nothing answered.
-export type ApiError = {
-	error: string;
-	retryAfterSeconds?: number | undefined;
-};
-
-export type ApiResult<T> = Result<T, ApiError>;
+// An answer from the web server: the body, or why there is none (the code the API gave, `network`, or `unexpected`).
+export type ApiResult<T> = Result<T, ApiFailure>;

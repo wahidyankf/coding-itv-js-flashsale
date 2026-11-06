@@ -1,27 +1,32 @@
-import { attemptAsync, Err, Ok } from "@flash/typekit";
+import {
+	createClient,
+	type JoinedView,
+	type OutcomeView,
+	type PurchaseView,
+	pathOf,
+	type ReservedView,
+	readStreamEvent,
+	routes,
+	type SaleView,
+	TICKET_HEADER,
+} from "@flash/contract";
 import { createWatcher, type Watcher } from "./sse";
-import type { ApiResult, Outcome, Place, SaleView } from "./types";
-
-// Joining gives a place in the line, or a way in at once. It never says the place is lost.
-export type Joined = Exclude<Place, { state: "absent" }>;
+import type { ApiResult, Place } from "./types";
 
 // Everything the page asks of the sale, in one place. The page gets a client, so tests can give it a fake.
 export type SaleClient = {
-	join: (
-		saleId: string,
-		user: string,
-	) => Promise<ApiResult<{ ticket: string } & Joined>>;
+	join: (saleId: string, user: string) => Promise<ApiResult<JoinedView>>;
 	reserve: (
 		saleId: string,
 		user: string,
 		ticket: string,
-	) => Promise<ApiResult<{ reservationId: string; expiresAt: string }>>;
+	) => Promise<ApiResult<ReservedView>>;
 	confirm: (
 		saleId: string,
 		user: string,
 		reservationId: string,
-	) => Promise<ApiResult<{ purchaseId: string }>>;
-	outcome: (saleId: string, user: string) => Promise<ApiResult<Outcome>>;
+	) => Promise<ApiResult<PurchaseView>>;
+	outcome: (saleId: string, user: string) => Promise<ApiResult<OutcomeView>>;
 	watchSale: (saleId: string, onSale: (sale: SaleView) => void) => () => void;
 	watchPlace: (
 		saleId: string,
@@ -31,79 +36,59 @@ export type SaleClient = {
 	) => () => void;
 };
 
-// The browser talks to its own web server under /api/sales. `base` is empty in the browser and a full address in tests.
+// The browser talks to its own web server under /api, which passes the sale routes on. `base` is empty in the browser
+// and a full address in tests.
 export function createSaleClient(
 	base = "",
 	fetcher: typeof fetch = fetch,
 	watch: Watcher = createWatcher({ fetcher }),
 ): SaleClient {
-	const path = (saleId: string, rest: string) =>
-		`${base}/api/sales/${saleId}${rest}`;
-	const user = (name: string) => encodeURIComponent(name);
-
-	async function call<T>(
-		method: "GET" | "POST",
-		url: string,
-		body?: unknown,
-		headers: Record<string, string> = {},
-	): Promise<ApiResult<T>> {
-		const sent = await attemptAsync(async () => {
-			const reply = await fetcher(url, {
-				method,
-				headers:
-					body === undefined
-						? headers
-						: { "content-type": "application/json", ...headers },
-				body: body === undefined ? null : JSON.stringify(body),
-			});
-			// A body that is not JSON is read as empty, so the status still tells what happened.
-			const parsed = await attemptAsync(
-				() => reply.json() as Promise<Record<string, unknown>>,
-				Error,
-			);
-			return { reply, json: parsed.isOk() ? parsed.value : {} };
-		}, Error);
-		if (sent.isErr()) return new Err({ error: "network" });
-
-		const { reply, json } = sent.value;
-		if (reply.ok) return new Ok(json as T);
-		const waited = Number(
-			reply.headers.get("retry-after") ?? json.retryAfterSeconds,
-		);
-		return new Err({
-			error: typeof json.error === "string" ? json.error : "unexpected",
-			retryAfterSeconds: Number.isFinite(waited) ? waited : undefined,
-		});
-	}
+	const baseUrl = `${base}/api`;
+	const api = createClient({ baseUrl, fetch: fetcher });
 
 	return {
-		join: (saleId, name) =>
-			call("POST", path(saleId, "/queue"), { userId: name }),
-		reserve: (saleId, name, ticket) =>
-			call(
-				"POST",
-				path(saleId, "/reservations"),
-				{ userId: name },
-				{ "x-queue-ticket": ticket },
+		join: async (saleId, userId) =>
+			(
+				await api.call(routes.joinQueue, {
+					params: { saleId },
+					body: { userId },
+				})
+			).map((reply) => reply.body),
+		reserve: async (saleId, userId, ticket) =>
+			(
+				await api.call(routes.reserve, {
+					params: { saleId },
+					headers: { [TICKET_HEADER]: ticket },
+					body: { userId },
+				})
+			).map((reply) => reply.body),
+		confirm: async (saleId, userId, reservationId) =>
+			(
+				await api.call(routes.confirm, {
+					params: { saleId },
+					body: { userId, reservationId },
+				})
+			).map((reply) => reply.body),
+		outcome: async (saleId, userId) =>
+			(await api.call(routes.outcome, { params: { saleId, userId } })).map(
+				(reply) => reply.body,
 			),
-		confirm: (saleId, name, reservationId) =>
-			call("POST", path(saleId, "/purchases"), {
-				userId: name,
-				reservationId,
-			}),
-		outcome: (saleId, name) =>
-			call("GET", path(saleId, `/purchases/${user(name)}`)),
 		watchSale: (saleId, onSale) =>
-			watch(path(saleId, "/events"), (event, data) => {
-				if (event === "sale") onSale(data as SaleView);
-			}),
-		watchPlace: (saleId, name, ticket, onPlace) =>
 			watch(
-				path(saleId, `/queue/${user(name)}/events`),
+				`${baseUrl}${pathOf(routes.saleEvents, { saleId })}`,
 				(event, data) => {
-					if (event === "place") onPlace(data as Place);
+					const read = readStreamEvent({ event, data });
+					if (read?.value.event === "sale") onSale(read.value.data);
 				},
-				{ "x-queue-ticket": ticket },
+			),
+		watchPlace: (saleId, userId, ticket, onPlace) =>
+			watch(
+				`${baseUrl}${pathOf(routes.placeEvents, { saleId, userId })}`,
+				(event, data) => {
+					const read = readStreamEvent({ event, data });
+					if (read?.value.event === "place") onPlace(read.value.data);
+				},
+				{ [TICKET_HEADER]: ticket },
 			),
 	};
 }
