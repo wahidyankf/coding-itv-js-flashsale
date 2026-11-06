@@ -59,6 +59,7 @@
 	},
 	"workspaces": [
 		"libs/typekit",
+		"libs/contract",
 		"apps/flash-be",
 		"apps/flash-be-e2e",
 		"apps/flash-web",
