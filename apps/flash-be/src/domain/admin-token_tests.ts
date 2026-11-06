@@ -3,8 +3,8 @@ import { bearerToken, tokenMatches } from "./admin-token.js";
 
 describe("bearerToken", () => {
 	it("reads the token of a Bearer header, whatever the case of the scheme", () => {
-		expect(bearerToken("Bearer abc.def-1")?.value).toBe("abc.def-1");
-		expect(bearerToken("bearer abc")?.value).toBe("abc");
+		expect(bearerToken("Bearer abc.def-1")).toBe("abc.def-1");
+		expect(bearerToken("bearer abc")).toBe("abc");
 	});
 
 	it.each([

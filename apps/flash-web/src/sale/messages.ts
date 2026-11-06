@@ -1,6 +1,5 @@
 import type { ApiFailure } from "@flash/contract";
 import { normalizeUserId } from "@flash/contract/vocabulary";
-import type { Option } from "@flash/typekit";
 import type { SaleStatus } from "./types";
 
 export const STATUS_LABEL: Record<SaleStatus, string> = {
@@ -11,7 +10,7 @@ export const STATUS_LABEL: Record<SaleStatus, string> = {
 };
 
 // The same rule the API uses for a user id, so a bad name is refused before anything is sent.
-export function cleanUser(raw: string): Option<string> {
+export function cleanUser(raw: string): string | undefined {
 	return normalizeUserId(raw);
 }
 

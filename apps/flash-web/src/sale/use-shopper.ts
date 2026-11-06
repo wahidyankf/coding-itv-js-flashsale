@@ -90,9 +90,9 @@ export function useShopper(
 	};
 
 	const buy = async (raw: string) => {
-		const cleaned = cleanUser(raw);
-		if (!cleaned) return setPhase({ kind: "message", text: TEXT.invalidUser });
-		const name = cleaned.value;
+		const name = cleanUser(raw);
+		if (name === undefined)
+			return setPhase({ kind: "message", text: TEXT.invalidUser });
 		stop();
 		user.current = name;
 		setPhase({ kind: "busy", text: TEXT.joining });
@@ -134,9 +134,9 @@ export function useShopper(
 	};
 
 	const check = async (raw: string) => {
-		const cleaned = cleanUser(raw);
-		if (!cleaned) return setPhase({ kind: "message", text: TEXT.invalidUser });
-		const name = cleaned.value;
+		const name = cleanUser(raw);
+		if (name === undefined)
+			return setPhase({ kind: "message", text: TEXT.invalidUser });
 		stop();
 		user.current = name;
 		setPhase({ kind: "busy", text: TEXT.checking });

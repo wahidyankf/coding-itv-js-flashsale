@@ -17,7 +17,7 @@ import {
 
 describe("normalizeUserId", () => {
 	it("trims and lowercases a name", () => {
-		expect(normalizeUserId("  Ana ")?.value).toBe("ana");
+		expect(normalizeUserId("  Ana ")).toBe("ana");
 	});
 
 	it.each([
@@ -32,8 +32,8 @@ describe("normalizeUserId", () => {
 	});
 
 	it("accepts the longest name and the allowed symbols", () => {
-		expect(normalizeUserId("a".repeat(64))?.value).toHaveLength(64);
-		expect(normalizeUserId("a.b_c@d+e-f")?.value).toBe("a.b_c@d+e-f");
+		expect(normalizeUserId("a".repeat(64))).toHaveLength(64);
+		expect(normalizeUserId("a.b_c@d+e-f")).toBe("a.b_c@d+e-f");
 		expect(USER_ID_PATTERN.test("a")).toBe(true);
 	});
 });

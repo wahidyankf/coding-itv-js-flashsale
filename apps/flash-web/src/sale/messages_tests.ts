@@ -1,5 +1,4 @@
 import type { ApiFailure } from "@flash/contract";
-import { Some } from "@flash/typekit";
 import { describe, expect, it } from "vitest";
 import {
 	cleanUser,
@@ -12,9 +11,7 @@ import {
 
 describe("cleanUser", () => {
 	it("trims and lowercases a good name", () => {
-		expect(cleanUser("  Ana.B@Example.com ")).toEqual(
-			new Some("ana.b@example.com"),
-		);
+		expect(cleanUser("  Ana.B@Example.com ")).toEqual("ana.b@example.com");
 	});
 
 	it.each(["", "   ", "has space", "-start", "x".repeat(65), "a/b"])(
@@ -25,7 +22,7 @@ describe("cleanUser", () => {
 	);
 
 	it("accepts the longest name", () => {
-		expect(cleanUser("a".repeat(64))).toEqual(new Some("a".repeat(64)));
+		expect(cleanUser("a".repeat(64))).toBe("a".repeat(64));
 	});
 });
 

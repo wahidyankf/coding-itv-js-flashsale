@@ -1,4 +1,4 @@
-import { Err, Ok, Some } from "@flash/typekit";
+import { Err, Ok } from "@flash/typekit";
 import { afterEach, describe, expect, it } from "vitest";
 import { healthyDeps } from "../../../bdd/support/deps.js";
 import { fakeSale } from "../../../bdd/support/fake-sales.js";
@@ -43,11 +43,11 @@ describe("the event stream", () => {
 
 	it("sends a keep-alive comment when nothing changed", async () => {
 		const sale = fakeSale({});
-		const view = new Some({
+		const view = {
 			...sale,
 			status: "active",
 			remaining: 10,
-		} as never);
+		} as never;
 		const app = buildApp(
 			{
 				...healthyDeps,
@@ -68,7 +68,7 @@ describe("the event stream", () => {
 
 	it("keeps the stream open when a read fails, and goes on afterwards", async () => {
 		let calls = 0;
-		const view = new Some({ id: "s", status: "active", remaining: 4 } as never);
+		const view = { id: "s", status: "active", remaining: 4 } as never;
 		const app = buildApp(
 			{
 				...healthyDeps,
@@ -175,7 +175,7 @@ describe("the event stream", () => {
 
 	it("stops reading once the client left in the middle of a read", async () => {
 		let calls = 0;
-		const view = new Some({ id: "s", status: "active", remaining: 4 } as never);
+		const view = { id: "s", status: "active", remaining: 4 } as never;
 		const app = buildApp(
 			{
 				...healthyDeps,

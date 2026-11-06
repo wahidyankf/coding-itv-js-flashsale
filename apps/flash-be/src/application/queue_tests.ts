@@ -1,4 +1,4 @@
-import { Err, Some } from "@flash/typekit";
+import { Err } from "@flash/typekit";
 import { describe, expect, it } from "vitest";
 import { queueWorld } from "../bdd/support/queue-world.js";
 import { relativeTime } from "../bdd/support/time.js";
@@ -24,9 +24,7 @@ describe("normalizeUser", () => {
 	});
 
 	it("accepts letters, digits and . _ @ + -", () => {
-		expect(normalizeUser("  Ana.B_1@x+y-z ")).toEqual(
-			new Some("ana.b_1@x+y-z"),
-		);
+		expect(normalizeUser("  Ana.B_1@x+y-z ")).toEqual("ana.b_1@x+y-z");
 	});
 });
 

@@ -1,7 +1,7 @@
 // Server-Sent Events: how a frame is written and how the text that arrived so far is split back into frames.
 // One codec serves the server, the browser and the tests.
 
-import { attempt, type Option, Some } from "@flash/typekit";
+import { attempt } from "@flash/typekit";
 import { PlaceView, SaleView } from "./schemas.js";
 
 export const KEEP_ALIVE_FRAME = ": keep-alive\n\n";
@@ -35,18 +35,14 @@ export type StreamEvent =
 	| { event: "sale"; data: SaleView }
 	| { event: "place"; data: PlaceView };
 
-export function readStreamEvent(frame: Frame): Option<StreamEvent> {
+export function readStreamEvent(frame: Frame): StreamEvent | undefined {
 	if (frame.event === "sale") {
 		const sale = SaleView.safeParse(frame.data);
-		return sale.success
-			? new Some({ event: "sale", data: sale.data })
-			: undefined;
+		return sale.success ? { event: "sale", data: sale.data } : undefined;
 	}
 	if (frame.event === "place") {
 		const place = PlaceView.safeParse(frame.data);
-		return place.success
-			? new Some({ event: "place", data: place.data })
-			: undefined;
+		return place.success ? { event: "place", data: place.data } : undefined;
 	}
 	return undefined;
 }

@@ -128,7 +128,7 @@ export function registerRoutes(
 		handler: async (_request, reply) => {
 			const sale = await deps.sales.current();
 			if (!sale) return reply.code(404).send({ error: "sale_not_found" });
-			return cacheable(reply).code(200).send(sale.value);
+			return cacheable(reply).code(200).send(sale);
 		},
 	});
 
@@ -138,7 +138,7 @@ export function registerRoutes(
 		handler: async (request, reply) => {
 			const sale = await deps.sales.byId(request.params.saleId);
 			if (!sale) return reply.code(404).send({ error: "sale_not_found" });
-			return cacheable(reply).code(200).send(sale.value);
+			return cacheable(reply).code(200).send(sale);
 		},
 	});
 
@@ -160,7 +160,7 @@ export function registerRoutes(
 					if (!sale) throw new Error("the sale is gone");
 					return {
 						event: "sale",
-						data: sale.value,
+						data: sale,
 					} satisfies SaleEvent;
 				},
 				stream,

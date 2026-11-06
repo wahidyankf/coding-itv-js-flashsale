@@ -2,15 +2,13 @@
 // backend imports this file, so it stays free of Zod and of I/O. The schemas and routes are built from it in the
 // main entry of the package.
 
-import { type Option, Some } from "@flash/typekit";
-
 // A user id is a short name the shopper types. It is trimmed and lowercased so "Ana " and "ana" are one person.
 export const USER_ID_PATTERN = /^[a-z0-9][a-z0-9._@+-]{0,63}$/;
 
-export function normalizeUserId(raw: unknown): Option<string> {
+export function normalizeUserId(raw: unknown): string | undefined {
 	if (typeof raw !== "string") return undefined;
 	const user = raw.trim().toLowerCase();
-	return USER_ID_PATTERN.test(user) ? new Some(user) : undefined;
+	return USER_ID_PATTERN.test(user) ? user : undefined;
 }
 
 export const UUID_PATTERN =

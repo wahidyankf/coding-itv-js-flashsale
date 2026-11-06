@@ -1,10 +1,8 @@
 import { createHash, timingSafeEqual } from "node:crypto";
-import { type Option, Some } from "@flash/typekit";
 
 // The token of `Authorization: Bearer <token>`, or nothing when the header is missing or has another scheme.
-export function bearerToken(header: string | undefined): Option<string> {
-	const found = /^Bearer (\S+)$/i.exec(header ?? "");
-	return found?.[1] === undefined ? undefined : new Some(found[1]);
+export function bearerToken(header: string | undefined): string | undefined {
+	return /^Bearer (\S+)$/i.exec(header ?? "")?.[1];
 }
 
 const digest = (value: string): Buffer =>

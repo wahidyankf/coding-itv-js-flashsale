@@ -1,4 +1,3 @@
-import { type Option, option, pipe } from "@flash/typekit";
 import { isSaleId, type Sale } from "../domain/sale.js";
 import type { Clock } from "./ports/clock.js";
 import type { SaleRepository } from "./ports/sale-repository.js";
@@ -15,10 +14,10 @@ export type SaleService = {
 	// How long public reads may be cached, in milliseconds. Zero means not at all.
 	cacheMs: () => number;
 	// The public reads. They may be up to `cacheMs` old.
-	current: () => Promise<Option<SaleView>>;
-	byId: (id: string) => Promise<Option<SaleView>>;
+	current: () => Promise<SaleView | undefined>;
+	byId: (id: string) => Promise<SaleView | undefined>;
 	// Always fresh, because the write routes decide on it.
-	details: (id: string) => Promise<Option<SaleDetails>>;
+	details: (id: string) => Promise<SaleDetails | undefined>;
 };
 
 export function createSaleService(
@@ -31,17 +30,19 @@ export function createSaleService(
 
 	return {
 		cacheMs: () => cache.ttlMs,
-		current: async () => pipe(await reads.findCurrent(), option.map(view)),
-		byId: async (id) =>
-			isSaleId(id)
-				? pipe(await reads.findById(id), option.map(view))
-				: undefined,
-		details: async (id) =>
-			isSaleId(id)
-				? pipe(
-						await repository.findById(id),
-						option.map((sale) => ({ sale, view: view(sale) })),
-					)
-				: undefined,
+		current: async () => {
+			const sale = await reads.findCurrent();
+			return sale === undefined ? undefined : view(sale);
+		},
+		byId: async (id) => {
+			if (!isSaleId(id)) return undefined;
+			const sale = await reads.findById(id);
+			return sale === undefined ? undefined : view(sale);
+		},
+		details: async (id) => {
+			if (!isSaleId(id)) return undefined;
+			const sale = await repository.findById(id);
+			return sale === undefined ? undefined : { sale, view: view(sale) };
+		},
 	};
 }

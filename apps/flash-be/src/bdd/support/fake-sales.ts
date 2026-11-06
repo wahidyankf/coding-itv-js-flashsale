@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { fromOptional } from "@flash/typekit";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../../adapters/inbound/http/app.js";
 import type { Clock } from "../../application/ports/clock.js";
@@ -28,13 +27,13 @@ export function fakeRepository(sales: Sale[]): SaleRepository {
 		// Copies, as a database does: a cache must not see later changes to the stored row.
 		findById: async (id) => {
 			const found = sales.find((sale) => sale.id === id);
-			return fromOptional(found && { ...found });
+			return found && { ...found };
 		},
 		findCurrent: async () => {
 			const found = [...sales].sort(
 				(a, b) => b.startsAt.getTime() - a.startsAt.getTime(),
 			)[0];
-			return fromOptional(found && { ...found });
+			return found && { ...found };
 		},
 	};
 }

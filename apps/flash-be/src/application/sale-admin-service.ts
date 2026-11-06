@@ -26,7 +26,7 @@ export function createSaleAdminService(
 		authorize: (authorization) => {
 			if (token === undefined) return new Err("not_found");
 			const given = bearerToken(authorization);
-			return given && tokenMatches(token, given.value)
+			return given !== undefined && tokenMatches(token, given)
 				? new Ok(true as const)
 				: new Err("invalid_admin_token");
 		},

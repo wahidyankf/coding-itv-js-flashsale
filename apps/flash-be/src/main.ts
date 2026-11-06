@@ -20,7 +20,7 @@ const app = buildApp(deps, {
 const admitter = setInterval(async () => {
 	const ticked = await attemptAsync(async () => {
 		const sale = await deps.sales.current();
-		if (sale) await deps.queue.admitTick(sale.value.id);
+		if (sale) await deps.queue.admitTick(sale.id);
 	}, Error);
 	if (ticked.isErr()) {
 		app.log.error({ err: ticked.error }, "admission tick failed");

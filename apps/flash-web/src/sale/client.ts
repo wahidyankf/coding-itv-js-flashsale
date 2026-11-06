@@ -78,7 +78,7 @@ export function createSaleClient(
 				`${baseUrl}${pathOf(routes.saleEvents, { saleId })}`,
 				(event, data) => {
 					const read = readStreamEvent({ event, data });
-					if (read?.value.event === "sale") onSale(read.value.data);
+					if (read?.event === "sale") onSale(read.data);
 				},
 			),
 		watchPlace: (saleId, userId, ticket, onPlace) =>
@@ -86,7 +86,7 @@ export function createSaleClient(
 				`${baseUrl}${pathOf(routes.placeEvents, { saleId, userId })}`,
 				(event, data) => {
 					const read = readStreamEvent({ event, data });
-					if (read?.value.event === "place") onPlace(read.value.data);
+					if (read?.event === "place") onPlace(read.data);
 				},
 				{ [TICKET_HEADER]: ticket },
 			),

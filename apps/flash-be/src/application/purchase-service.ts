@@ -2,16 +2,7 @@ import type {
 	CONFIRM_ERRORS,
 	OUTCOME_ERRORS,
 } from "@flash/contract/vocabulary";
-import {
-	attemptAsync,
-	Err,
-	Ok,
-	type Option,
-	option,
-	pipe,
-	type Result,
-	result,
-} from "@flash/typekit";
+import { attemptAsync, Err, Ok, type Result } from "@flash/typekit";
 import { isPurchaseOf, type Purchase } from "../domain/purchase.js";
 import { isLive } from "../domain/reservation.js";
 import { isSaleId } from "../domain/sale.js";
@@ -44,26 +35,17 @@ type Request = { details: SaleDetails; user: string; reservationId: string };
 
 // What a confirmation must be before any store is asked: a known sale, a usable name and a well-formed reservation id.
 function wellFormed(
-	found: Option<SaleDetails>,
+	found: SaleDetails | undefined,
 	rawUser: unknown,
 	reservationId: unknown,
 ): Result<Request, ConfirmError> {
-	return pipe(
-		found,
-		option.okOr<SaleDetails, ConfirmError>("sale_not_found"),
-		result.flatMap((details: SaleDetails) =>
-			pipe(
-				normalizeUser(rawUser),
-				option.okOr<string, ConfirmError>("invalid_user"),
-				result.map((user: string) => ({ details, user })),
-			),
-		),
-		result.flatMap(({ details, user }) =>
-			typeof reservationId === "string" && isSaleId(reservationId)
-				? new Ok({ details, user, reservationId })
-				: new Err<Request, ConfirmError>("invalid_reservation"),
-		),
-	);
+	if (found === undefined) return new Err("sale_not_found");
+	const user = normalizeUser(rawUser);
+	if (user === undefined) return new Err("invalid_user");
+	if (typeof reservationId !== "string" || !isSaleId(reservationId)) {
+		return new Err("invalid_reservation");
+	}
+	return new Ok({ details: found, user, reservationId });
 }
 
 export type PurchaseService = ReturnType<typeof createPurchaseService>;
@@ -92,8 +74,8 @@ export function createPurchaseService(
 
 			const same = await repository.findByReservation(held);
 			if (same) {
-				return isPurchaseOf(same.value, saleId, user)
-					? new Ok({ created: false, purchase: same.value })
+				return isPurchaseOf(same, saleId, user)
+					? new Ok({ created: false, purchase: same })
 					: new Err("reservation_not_found");
 			}
 			if (await repository.findByUser(saleId, user)) {
@@ -102,10 +84,10 @@ export function createPurchaseService(
 			if (details.view.status === "ended") return new Err("sale_ended");
 
 			const hold = await repository.findReservation(saleId, user);
-			if (!hold || hold.value.reservationId !== held) {
+			if (!hold || hold.reservationId !== held) {
 				return new Err("reservation_not_found");
 			}
-			if (!isLive(hold.value, clock())) return new Err("hold_expired");
+			if (!isLive(hold, clock())) return new Err("hold_expired");
 
 			// The hold is checked before the charge. If it runs out during the charge, the database decides below.
 			const charge = await payment.charge(held);
@@ -133,34 +115,24 @@ export function createPurchaseService(
 
 		// "Did I get it?": a purchase, a live hold, or nothing.
 		async outcome(saleId: string, rawUser: unknown): Promise<OutcomeResult> {
-			const known = pipe(
-				await sales.byId(saleId),
-				option.okOr<unknown, OutcomeError>("sale_not_found"),
-				result.flatMap(() =>
-					pipe(
-						normalizeUser(rawUser),
-						option.okOr<string, OutcomeError>("invalid_user"),
-					),
-				),
-			);
-			if (known.isErr()) return new Err(known.error);
-			const user = known.value;
+			if ((await sales.byId(saleId)) === undefined) {
+				return new Err("sale_not_found");
+			}
+			const user = normalizeUser(rawUser);
+			if (user === undefined) return new Err("invalid_user");
 
 			const purchase = await repository.findByUser(saleId, user);
 			if (purchase) {
-				return new Ok({
-					user,
-					outcome: { state: "purchased", purchase: purchase.value },
-				});
+				return new Ok({ user, outcome: { state: "purchased", purchase } });
 			}
 			const hold = await repository.findReservation(saleId, user);
-			if (hold && isLive(hold.value, clock())) {
+			if (hold && isLive(hold, clock())) {
 				return new Ok({
 					user,
 					outcome: {
 						state: "holding",
-						reservationId: hold.value.reservationId,
-						expiresAt: hold.value.expiresAt,
+						reservationId: hold.reservationId,
+						expiresAt: hold.expiresAt,
 					},
 				});
 			}

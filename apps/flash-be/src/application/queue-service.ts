@@ -1,26 +1,12 @@
 import type { CHECK_ERRORS, JOIN_ERRORS } from "@flash/contract/vocabulary";
-import {
-	attemptAsync,
-	Err,
-	Ok,
-	type Option,
-	option,
-	pipe,
-	type Result,
-	result,
-} from "@flash/typekit";
+import { attemptAsync, Err, Ok, type Result } from "@flash/typekit";
 import type { QueuePlace } from "../domain/queue.js";
-import {
-	admissionsPerTick,
-	type QueueBlock,
-	queueBlock,
-} from "../domain/sale.js";
+import { admissionsPerTick, queueBlock } from "../domain/sale.js";
 import { issueTicket, ticketMatches } from "../domain/ticket.js";
 import { normalizeUser } from "../domain/user.js";
 import type { Clock } from "./ports/clock.js";
 import type { QueueStore } from "./ports/queue-store.js";
 import type { SaleDetails, SaleService } from "./sale-service.js";
-import type { SaleView } from "./sale-view.js";
 
 export type QueueOptions = {
 	ticketSecret: string;
@@ -50,28 +36,14 @@ const ADMITTED: QueuePlace = { state: "admitted" };
 
 // Who may join: the sale exists, the name is usable and the sale is not over. Pure, so it needs no store.
 function admissible(
-	found: Option<SaleDetails>,
+	found: SaleDetails | undefined,
 	rawUser: unknown,
 ): Result<string, JoinError> {
-	return pipe(
-		found,
-		option.okOr<SaleDetails, JoinError>("sale_not_found"),
-		result.flatMap(({ view }: SaleDetails) =>
-			pipe(
-				normalizeUser(rawUser),
-				option.okOr<string, JoinError>("invalid_user"),
-				result.flatMap((user: string) =>
-					pipe(
-						queueBlock(view.status),
-						option.match<QueueBlock, Result<string, JoinError>>({
-							some: (block) => new Err(block),
-							none: () => new Ok(user),
-						}),
-					),
-				),
-			),
-		),
-	);
+	if (found === undefined) return new Err("sale_not_found");
+	const user = normalizeUser(rawUser);
+	if (user === undefined) return new Err("invalid_user");
+	const block = queueBlock(found.view.status);
+	return block === undefined ? new Ok(user) : new Err(block);
 }
 
 export type QueueService = ReturnType<typeof createQueueService>;
@@ -107,23 +79,14 @@ export function createQueueService(
 			rawUser: unknown,
 			ticket: string | undefined,
 		): Promise<CheckResult> {
-			const checked = pipe(
-				await sales.byId(saleId),
-				option.okOr<SaleView, CheckError>("sale_not_found"),
-				result.flatMap(() =>
-					pipe(
-						normalizeUser(rawUser),
-						option.okOr<string, CheckError>("invalid_user"),
-					),
-				),
-				result.flatMap((user: string) =>
-					ticketMatches(options.ticketSecret, saleId, user, ticket)
-						? new Ok(user)
-						: new Err<string, CheckError>("invalid_ticket"),
-				),
-			);
-			if (checked.isErr()) return new Err(checked.error);
-			const user = checked.value;
+			if ((await sales.byId(saleId)) === undefined) {
+				return new Err("sale_not_found");
+			}
+			const user = normalizeUser(rawUser);
+			if (user === undefined) return new Err("invalid_user");
+			if (!ticketMatches(options.ticketSecret, saleId, user, ticket)) {
+				return new Err("invalid_ticket");
+			}
 
 			const looked = await attemptAsync(
 				() => store.place(saleId, user, clock()),
@@ -138,8 +101,8 @@ export function createQueueService(
 		// Admits the next shoppers of the sale that is open now. Several instances may call this; only one wins a tick.
 		async admitTick(saleId: string): Promise<string[]> {
 			const found = await sales.details(saleId);
-			if (found?.value.view.status !== "active") return [];
-			const { sale } = found.value;
+			if (found?.view.status !== "active") return [];
+			const { sale } = found;
 			if (!(await store.tryLead(saleId, options.admissionTickMs - 1))) {
 				return [];
 			}

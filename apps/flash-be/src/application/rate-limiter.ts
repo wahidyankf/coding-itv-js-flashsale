@@ -45,7 +45,7 @@ export function createRateLimiter(
 			// A request with no usable user id still counts against its address. The route answers the bad id.
 			const user = normalizeUser(request.user);
 			const person = user
-				? await hit(`user:${request.saleId}:${user.value}`, windowMs)
+				? await hit(`user:${request.saleId}:${user}`, windowMs)
 				: undefined;
 
 			const over: Array<typeof address> = [];

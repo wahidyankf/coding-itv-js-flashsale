@@ -1,21 +1,12 @@
 import { randomUUID } from "node:crypto";
 import type { RESERVE_ERRORS } from "@flash/contract/vocabulary";
-import {
-	attemptAsync,
-	Err,
-	Ok,
-	type Option,
-	option,
-	pipe,
-	type Result,
-	result,
-} from "@flash/typekit";
+import { attemptAsync, Err, Ok, type Result } from "@flash/typekit";
 import {
 	type GateAnswer,
 	holdRequest,
 	type ReserveRequest,
 } from "../domain/reservation.js";
-import { type ReserveBlock, reserveBlock } from "../domain/sale.js";
+import { reserveBlock } from "../domain/sale.js";
 import { normalizeUser } from "../domain/user.js";
 import type { GuardedGate } from "./guarded-gate.js";
 import type { Clock } from "./ports/clock.js";
@@ -50,29 +41,14 @@ const POLL_MS = 25;
 
 // What must hold before the queue or a store is asked: the sale exists, the name is usable and the sale is selling.
 function selling(
-	found: Option<SaleDetails>,
+	found: SaleDetails | undefined,
 	rawUser: unknown,
 ): Result<SaleDetails, ReserveError> {
-	return pipe(
-		found,
-		option.okOr<SaleDetails, ReserveError>("sale_not_found"),
-		result.flatMap((details: SaleDetails) =>
-			pipe(
-				normalizeUser(rawUser),
-				option.okOr<string, ReserveError>("invalid_user"),
-				result.flatMap(() =>
-					// A sale that is not selling answers first, so a shopper learns it without a valid ticket.
-					pipe(
-						reserveBlock(details.view.status),
-						option.match<ReserveBlock, Result<SaleDetails, ReserveError>>({
-							some: (block) => new Err(block),
-							none: () => new Ok(details),
-						}),
-					),
-				),
-			),
-		),
-	);
+	if (found === undefined) return new Err("sale_not_found");
+	if (normalizeUser(rawUser) === undefined) return new Err("invalid_user");
+	// A sale that is not selling answers first, so a shopper learns it without a valid ticket.
+	const block = reserveBlock(found.view.status);
+	return block === undefined ? new Ok(found) : new Err(block);
 }
 
 export type ReservationService = ReturnType<typeof createReservationService>;
@@ -169,8 +145,7 @@ export function createReservationService(
 				// The queue is only in Redis and can be lost. A shopper who already bought is told so, not sent back.
 				const user = normalizeUser(rawUser);
 				const bought =
-					user !== undefined &&
-					(await repository.hasPurchase(saleId, user.value));
+					user !== undefined && (await repository.hasPurchase(saleId, user));
 				return new Err(bought ? "already_purchased" : "not_admitted");
 			}
 			const { user, place } = entry.value;

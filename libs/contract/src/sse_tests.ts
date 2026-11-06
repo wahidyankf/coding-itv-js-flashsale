@@ -48,11 +48,9 @@ describe("readStreamEvent", () => {
 	};
 
 	it("reads a sale and a place", () => {
-		expect(readStreamEvent({ event: "sale", data: sale })?.value.event).toBe(
-			"sale",
-		);
+		expect(readStreamEvent({ event: "sale", data: sale })?.event).toBe("sale");
 		const place = { userId: "a", state: "admitted" };
-		expect(readStreamEvent({ event: "place", data: place })?.value.event).toBe(
+		expect(readStreamEvent({ event: "place", data: place })?.event).toBe(
 			"place",
 		);
 	});

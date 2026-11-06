@@ -1,4 +1,3 @@
-import { fromOptional, option, pipe } from "@flash/typekit";
 import { type Kysely, type Selectable, sql } from "kysely";
 import type {
 	CommitResult,
@@ -38,7 +37,7 @@ export function createPurchaseRepository(
 				.selectAll()
 				.where("reservation_id", "=", reservationId)
 				.executeTakeFirst();
-			return pipe(fromOptional(row), option.map(toPurchase));
+			return row === undefined ? undefined : toPurchase(row);
 		},
 
 		async findByUser(saleId, user) {
@@ -48,7 +47,7 @@ export function createPurchaseRepository(
 				.where("sale_id", "=", saleId)
 				.where("user_id", "=", user)
 				.executeTakeFirst();
-			return pipe(fromOptional(row), option.map(toPurchase));
+			return row === undefined ? undefined : toPurchase(row);
 		},
 
 		async findReservation(saleId, user) {
@@ -58,7 +57,7 @@ export function createPurchaseRepository(
 				.where("sale_id", "=", saleId)
 				.where("user_id", "=", user)
 				.executeTakeFirst();
-			return pipe(fromOptional(row), option.map(toReservation));
+			return row === undefined ? undefined : toReservation(row);
 		},
 
 		async commit(input) {
