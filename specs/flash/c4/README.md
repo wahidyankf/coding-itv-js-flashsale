@@ -1,10 +1,10 @@
-# Architecture
+# C4 model
 
-The as-built architecture of the flash sale product. It describes the system that runs today, not a proposal. A design
+The as-built C4 model of the flash sale product. It describes the system that runs today, not a proposal. A design
 that is not built yet belongs in a plan, not here.
 
-Read the views in order: the system context, the containers, the components of the API, then the sequences. Each view is Mermaid, and every relationship it
-draws is also stated in prose in the same file.
+Read the views in order: the system context, the containers, the components of the API, then the sequences. Each view
+is Mermaid, and every relationship it draws is also stated in prose in the same file.
 
 ## Directory Map
 
