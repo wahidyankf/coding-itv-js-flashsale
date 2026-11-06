@@ -62,38 +62,13 @@ the client machine could start; the reason is in
 The chaos stock is 1,000 so that Redis is stopped while items are still for sale. With a small stock the sale is over
 before the stop and the run proves nothing.
 
-## Limits
+## Limits and checks
 
-These were written down before the first run and are not changed to make a run pass.
-
-| Measure                       | Limit        | Applies to                        |
-| ----------------------------- | ------------ | --------------------------------- |
-| Reserve, 95th percentile      | under 300 ms | smoke, full, burst and contention |
-| Purchase, 95th percentile     | under 500 ms | smoke, full, burst and contention |
-| Server errors (5xx, no reply) | 0            | smoke, full, burst and contention |
-
-The purchase time includes the 150 ms of the mock payment. The chaos profile is not judged on these limits, because a
-stopped Redis may fail the few requests that were in flight. k6 still reports its numbers, and
-[explanation: what the load runs found](../explanation/load-test-findings.md) reads them.
-
-## Checks
-
-The runner decides the verdict from Postgres and Redis, then compares k6 with them.
-
-| Check                                | Passes when                                        |
-| ------------------------------------ | -------------------------------------------------- |
-| No oversell                          | `sales.sold` is at most the stock                  |
-| Sold count is true                   | `sales.sold` equals the number of `purchases` rows |
-| One item per user                    | no user has more than one purchase                 |
-| k6 and Postgres agree                | the purchases k6 saw confirmed equal the rows      |
-| The stock sold out                   | `sales.sold` equals the stock                      |
-| Floods are limited                   | k6 saw replies of `429` from the flooding users    |
-| Redis and Postgres agree (not chaos) | the size of the Redis buyers set equals the rows   |
-| Speed and errors (not chaos)         | the three limits above hold                        |
-
-A failed check is a finding about the system, to be investigated. It is not a reason to change a limit.
+The limits a run must meet are in [specification: limits](../../specs/apps/flash/load/limits.md). The checks that decide
+the verdict, read from Postgres and Redis, are in [specification: checks](../../specs/apps/flash/load/checks.md). The
+specification is the source; this page does not repeat them.
 
 ## Output
 
-Each run writes to `generated-reports/load/` (ignored by Git): `<profile>.md` with the table above, `<profile>-k6.json`
+Each run writes to `generated-reports/load/` (ignored by Git): `<profile>.md` with the verdict table, `<profile>-k6.json`
 with the k6 summary and `<profile>-k6.log` with the k6 output.

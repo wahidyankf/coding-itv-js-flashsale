@@ -5,4 +5,4 @@ written as a C4 model.
 
 ## Directory Map
 
-- [flash/](flash/README.md) - the flash sale product: its C4 model, the API (`be`), and the web app (`web`).
+- [flash/](flash/README.md) - the flash sale product: its C4 model, the API (`be`), the web app (`web`), and the load test (`load`).

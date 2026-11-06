@@ -6,6 +6,6 @@ bug to fix.
 
 ## Directory Map
 
-- [apps/](apps/README.md) - the specifications of the apps: their behaviour scenarios and the flash sale C4 model.
+- [apps/](apps/README.md) - the specifications of the apps: their behaviour scenarios, the flash sale C4 model, and the load test rules.
 
 Only the apps use Gherkin. The libraries and the repository's tools are tested with plain Vitest tests next to their code.
