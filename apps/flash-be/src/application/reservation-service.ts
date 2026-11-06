@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { RESERVE_ERRORS } from "@flash/contract/vocabulary";
 import {
 	attemptAsync,
 	Err,
@@ -22,16 +23,7 @@ import type { ReservationRepository } from "./ports/reservation-repository.js";
 import type { QueueService } from "./queue-service.js";
 import type { SaleDetails, SaleService } from "./sale-service.js";
 
-export type ReserveError =
-	| "sale_not_found"
-	| "invalid_user"
-	| "invalid_ticket"
-	| "not_admitted"
-	| "sale_not_started"
-	| "sale_ended"
-	| "sold_out"
-	| "already_purchased"
-	| "unavailable";
+export type ReserveError = (typeof RESERVE_ERRORS)[number];
 
 export type Reserved = {
 	created: boolean;

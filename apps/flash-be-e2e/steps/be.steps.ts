@@ -14,6 +14,32 @@ When(/^a client sends GET (\/\S*)$/, async ({ request }, path: string) => {
 	setResponse(await request.get(`${world.api?.url ?? ""}${path}`));
 });
 
+// A write whose body is sent as given, so a scenario can send what the API must refuse.
+When(
+	/^a client sends POST (\/\S*) with a body that is not JSON$/,
+	async ({ request }, path: string) => {
+		setResponse(
+			await request.post(`${world.api?.url ?? ""}${path}`, {
+				headers: { "content-type": "application/json" },
+				// Playwright wraps a string that is not JSON in quotes; a buffer is sent as it is.
+				data: Buffer.from("{oops"),
+			}),
+		);
+	},
+);
+
+When(
+	/^a client sends POST (\/\S*) with the body (.+)$/,
+	async ({ request }, path: string, body: string) => {
+		setResponse(
+			await request.post(`${world.api?.url ?? ""}${path}`, {
+				headers: { "content-type": "application/json" },
+				data: body,
+			}),
+		);
+	},
+);
+
 Given("the API is running and Redis answers", async ({ request }) => {
 	expect((await request.get("/ready")).status()).toBe(200);
 });

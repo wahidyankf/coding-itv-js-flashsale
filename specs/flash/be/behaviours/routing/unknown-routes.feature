@@ -1,9 +1,27 @@
-Feature: Unknown routes on the API
+Feature: Requests the API cannot serve
 
   As a client
-  I want a path the API does not serve to get a clear "not found" answer
-  So that a typo does not look like a working endpoint
+  I want a path the API does not serve, or a request it cannot read, to get a clear answer
+  So that a typo or a broken body does not look like a working endpoint
 
   Scenario: Unknown routes return 404
     When a client sends GET /nope
     Then the response status is 404
+    And the error is "not_found"
+
+  Scenario: A request body that is not JSON is refused
+    When a client sends POST /sales/00000000-0000-4000-8000-000000000000/queue with a body that is not JSON
+    Then the response status is 400
+    And the error is "invalid_request"
+
+  Scenario Outline: A request body with a missing or mistyped field is refused with the code of that field
+    When a client sends POST <path> with the body <body>
+    Then the response status is 400
+    And the error is "<error>"
+
+    Examples:
+      | path                                                 | body                               | error               |
+      | /sales/00000000-0000-4000-8000-000000000000/queue     | {}                                 | invalid_user        |
+      | /sales/00000000-0000-4000-8000-000000000000/queue     | {"userId":5}                       | invalid_user        |
+      | /sales/00000000-0000-4000-8000-000000000000/purchases | {"userId":"ana"}                   | invalid_reservation |
+      | /sales/00000000-0000-4000-8000-000000000000/purchases | {"userId":"ana","reservationId":7} | invalid_reservation |

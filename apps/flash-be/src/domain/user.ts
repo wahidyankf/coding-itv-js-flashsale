@@ -1,10 +1,3 @@
-import { type Option, Some } from "@flash/typekit";
-
-// A user id is a short name the shopper types. It is trimmed and lowercased so "Ana " and "ana" are one person.
-const USER_PATTERN = /^[a-z0-9][a-z0-9._@+-]{0,63}$/;
-
-export function normalizeUser(raw: unknown): Option<string> {
-	if (typeof raw !== "string") return undefined;
-	const user = raw.trim().toLowerCase();
-	return USER_PATTERN.test(user) ? new Some(user) : undefined;
-}
+// A user id is a short name the shopper types. The rule lives in the contract, so the web page, the API and the tests
+// share one definition.
+export { normalizeUserId as normalizeUser } from "@flash/contract/vocabulary";

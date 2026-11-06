@@ -31,20 +31,27 @@ function layerOf(file: string): Layer {
 	return "root";
 }
 
-type Import = { from: string; target: string };
+// `typeOnly` is an `import type`, which is erased and loads nothing at run time.
+type Import = { from: string; target: string; typeOnly: boolean };
 
 // Every import and re-export, as written. Relative targets are resolved to a path under src.
 function importsOf(file: string): Import[] {
 	const text = readFileSync(file, "utf8");
-	const found = [...text.matchAll(/\bfrom\s+"([^"]+)"/g)].map((m) => m[1]);
-	return found.flatMap((spec) => {
+	const found = [
+		...text.matchAll(
+			/\b(?:import|export)(\s+type)?\b[^;"]*?\bfrom\s+"([^"]+)"/g,
+		),
+	];
+	return found.flatMap((match) => {
+		const spec = match[2];
+		const typeOnly = match[1] !== undefined;
 		if (spec === undefined) return [];
-		if (!spec.startsWith(".")) return [{ from: file, target: spec }];
+		if (!spec.startsWith(".")) return [{ from: file, target: spec, typeOnly }];
 		const resolved = path.resolve(
 			path.dirname(file),
 			spec.replace(/\.js$/, ".ts"),
 		);
-		return [{ from: file, target: path.relative(SRC, resolved) }];
+		return [{ from: file, target: path.relative(SRC, resolved), typeOnly }];
 	});
 }
 
@@ -54,20 +61,33 @@ const product = files.filter((file) => layerOf(file) !== "test");
 const isNode = (target: string) => target.startsWith("node:");
 // The typekit library has no dependencies of its own and no I/O, so the inner layers may use it.
 const isKernel = (target: string) => target === "@flash/typekit";
+// The vocabulary of the contract (format rules, error codes) has no dependency and no I/O, so the inner layers may use
+// it. The rest of the contract holds Zod, so they may only name its types.
+const isVocabulary = (target: string) =>
+	target === "@flash/contract/vocabulary";
+const isContractType = (target: string, typeOnly: boolean) =>
+	typeOnly && target === "@flash/contract";
 const isDomain = (target: string) => target.startsWith("domain/");
 const isPort = (target: string) => target.startsWith("application/ports/");
 const isWiring = (target: string) =>
 	target.startsWith("composition") || target.startsWith("config");
 
 // What a layer may import. A package name or a path outside the list is a violation.
-function allowed(layer: Layer, target: string): boolean {
+function allowed(layer: Layer, target: string, typeOnly = false): boolean {
 	switch (layer) {
 		case "domain":
-			return isNode(target) || isKernel(target) || isDomain(target);
+			return (
+				isNode(target) ||
+				isKernel(target) ||
+				isVocabulary(target) ||
+				isDomain(target)
+			);
 		case "application":
 			return (
 				isNode(target) ||
 				isKernel(target) ||
+				isVocabulary(target) ||
+				isContractType(target, typeOnly) ||
 				isDomain(target) ||
 				target.startsWith("application/")
 			);
@@ -88,7 +108,7 @@ function violations(layer: Layer): string[] {
 	return product
 		.filter((file) => layerOf(file) === layer)
 		.flatMap(importsOf)
-		.filter((imp) => !allowed(layer, imp.target))
+		.filter((imp) => !allowed(layer, imp.target, imp.typeOnly))
 		.map((imp) => `${path.relative(SRC, imp.from)} -> ${imp.target}`);
 }
 
@@ -130,6 +150,9 @@ describe("hexagonal architecture", () => {
 		).toBe(false);
 		expect(allowed("application", "fastify")).toBe(false);
 		expect(allowed("domain", "@flash/typekit-extras")).toBe(false);
+		expect(allowed("domain", "@flash/contract")).toBe(false);
+		expect(allowed("domain", "@flash/contract", true)).toBe(false);
+		expect(allowed("application", "@flash/contract")).toBe(false);
 		expect(allowed("inbound", "adapters/outbound/postgres/database.ts")).toBe(
 			false,
 		);
@@ -141,6 +164,10 @@ describe("hexagonal architecture", () => {
 		expect(allowed("domain", "node:crypto")).toBe(true);
 		expect(allowed("domain", "@flash/typekit")).toBe(true);
 		expect(allowed("application", "@flash/typekit")).toBe(true);
+		expect(allowed("domain", "@flash/contract/vocabulary")).toBe(true);
+		expect(allowed("application", "@flash/contract/vocabulary")).toBe(true);
+		expect(allowed("application", "@flash/contract", true)).toBe(true);
+		expect(allowed("inbound", "@flash/contract")).toBe(true);
 		expect(allowed("application", "application/ports/clock.ts")).toBe(true);
 		expect(allowed("outbound", "application/ports/clock.ts")).toBe(true);
 		expect(allowed("outbound", "domain/sale.ts")).toBe(true);

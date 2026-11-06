@@ -60,27 +60,34 @@ function defineRoute<const R extends Omit<Route, keyof Flags> & Partial<Flags>>(
 
 const limitedReply = { 429: RateLimitedBody } as const;
 
+// Any route can fail inside the server. A route with a body can also be sent a body that cannot be read.
+const readFailures = ["internal"] as const;
+const writeFailures = ["invalid_request", "internal"] as const;
+
 export const routes = {
 	health: defineRoute({
 		name: "health",
 		summary: "Liveness: the process is up. It checks no dependency.",
 		method: "GET",
 		path: "/health",
-		replies: { 200: HealthView },
+		replies: { 200: HealthView, ...errorReplies(readFailures) },
 	}),
 	ready: defineRoute({
 		name: "ready",
 		summary: "Readiness: Postgres and Redis both answer.",
 		method: "GET",
 		path: "/ready",
-		replies: { 200: ReadyView, 503: ReadyView },
+		replies: { 200: ReadyView, 503: ReadyView, ...errorReplies(readFailures) },
 	}),
 	currentSale: defineRoute({
 		name: "currentSale",
 		summary: "The sale a shopper sees: the one that opens last.",
 		method: "GET",
 		path: "/sales/current",
-		replies: { 200: SaleView, ...errorReplies(["sale_not_found"]) },
+		replies: {
+			200: SaleView,
+			...errorReplies(["sale_not_found", ...readFailures]),
+		},
 		passThrough: true,
 	}),
 	sale: defineRoute({
@@ -89,7 +96,10 @@ export const routes = {
 		method: "GET",
 		path: "/sales/:saleId",
 		params: SaleParams,
-		replies: { 200: SaleView, ...errorReplies(["sale_not_found"]) },
+		replies: {
+			200: SaleView,
+			...errorReplies(["sale_not_found", ...readFailures]),
+		},
 		passThrough: true,
 	}),
 	saleEvents: defineRoute({
@@ -98,7 +108,10 @@ export const routes = {
 		method: "GET",
 		path: "/sales/:saleId/events",
 		params: SaleParams,
-		replies: { 200: SaleView, ...errorReplies(["sale_not_found"]) },
+		replies: {
+			200: SaleView,
+			...errorReplies(["sale_not_found", ...readFailures]),
+		},
 		stream: true,
 		passThrough: true,
 	}),
@@ -109,7 +122,10 @@ export const routes = {
 		path: "/sales/:saleId/queue/:userId/events",
 		params: PlaceParams,
 		headers: TicketHeaders,
-		replies: { 200: PlaceView, ...errorReplies(CHECK_ERRORS) },
+		replies: {
+			200: PlaceView,
+			...errorReplies([...CHECK_ERRORS, ...readFailures]),
+		},
 		stream: true,
 		passThrough: true,
 	}),
@@ -123,7 +139,7 @@ export const routes = {
 		replies: {
 			200: JoinedView,
 			201: JoinedView,
-			...errorReplies(JOIN_ERRORS),
+			...errorReplies([...JOIN_ERRORS, ...writeFailures]),
 			...limitedReply,
 		},
 		limited: true,
@@ -136,7 +152,10 @@ export const routes = {
 		path: "/sales/:saleId/queue/:userId",
 		params: PlaceParams,
 		headers: TicketHeaders,
-		replies: { 200: PlaceView, ...errorReplies(CHECK_ERRORS) },
+		replies: {
+			200: PlaceView,
+			...errorReplies([...CHECK_ERRORS, ...readFailures]),
+		},
 		passThrough: true,
 	}),
 	reserve: defineRoute({
@@ -150,7 +169,7 @@ export const routes = {
 		replies: {
 			200: ReservedView,
 			201: ReservedView,
-			...errorReplies(RESERVE_ERRORS),
+			...errorReplies([...RESERVE_ERRORS, ...writeFailures]),
 			...limitedReply,
 		},
 		limited: true,
@@ -166,7 +185,7 @@ export const routes = {
 		replies: {
 			200: PurchaseView,
 			201: PurchaseView,
-			...errorReplies(CONFIRM_ERRORS),
+			...errorReplies([...CONFIRM_ERRORS, ...writeFailures]),
 			...limitedReply,
 		},
 		limited: true,
@@ -178,7 +197,10 @@ export const routes = {
 		method: "GET",
 		path: "/sales/:saleId/purchases/:userId",
 		params: PlaceParams,
-		replies: { 200: OutcomeView, ...errorReplies(OUTCOME_ERRORS) },
+		replies: {
+			200: OutcomeView,
+			...errorReplies([...OUTCOME_ERRORS, ...readFailures]),
+		},
 		passThrough: true,
 	}),
 } as const;

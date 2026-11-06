@@ -78,7 +78,10 @@ describe("the types of a route", () => {
 
 	it("lists the error codes of a route", () => {
 		expectTypeOf<ErrorCodeOf<typeof routes.joinQueue>>().toEqualTypeOf<
-			(typeof JOIN_ERRORS)[number] | "rate_limited"
+			| (typeof JOIN_ERRORS)[number]
+			| "rate_limited"
+			| "invalid_request"
+			| "internal"
 		>();
 	});
 });

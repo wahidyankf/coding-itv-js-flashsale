@@ -1,3 +1,7 @@
+import type {
+	CONFIRM_ERRORS,
+	OUTCOME_ERRORS,
+} from "@flash/contract/vocabulary";
 import {
 	attemptAsync,
 	Err,
@@ -18,16 +22,7 @@ import type { Payment } from "./ports/payment.js";
 import type { PurchaseRepository } from "./ports/purchase-repository.js";
 import type { SaleDetails, SaleService } from "./sale-service.js";
 
-export type ConfirmError =
-	| "sale_not_found"
-	| "invalid_user"
-	| "invalid_reservation"
-	| "reservation_not_found"
-	| "hold_expired"
-	| "already_purchased"
-	| "sale_ended"
-	| "sold_out"
-	| "payment_failed";
+export type ConfirmError = (typeof CONFIRM_ERRORS)[number];
 
 export type Confirmed = { created: boolean; purchase: Purchase };
 
@@ -38,7 +33,7 @@ export type Outcome =
 	| { state: "holding"; reservationId: string; expiresAt: Date }
 	| { state: "none" };
 
-export type OutcomeError = "sale_not_found" | "invalid_user";
+export type OutcomeError = (typeof OUTCOME_ERRORS)[number];
 
 export type OutcomeResult = Result<
 	{ user: string; outcome: Outcome },

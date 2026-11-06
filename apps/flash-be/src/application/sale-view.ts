@@ -1,19 +1,7 @@
-import {
-	remaining,
-	type Sale,
-	type SaleStatus,
-	saleStatus,
-} from "../domain/sale.js";
+import type { SaleView } from "@flash/contract";
+import { remaining, type Sale, saleStatus } from "../domain/sale.js";
 
-export type SaleView = {
-	id: string;
-	name: string;
-	status: SaleStatus;
-	startsAt: string;
-	endsAt: string;
-	stock: number;
-	remaining: number;
-};
+export type { SaleView };
 
 export function describeSale(sale: Sale, now: Date): SaleView {
 	return {

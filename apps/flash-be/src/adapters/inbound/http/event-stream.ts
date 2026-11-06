@@ -1,3 +1,4 @@
+import { formatFrame, KEEP_ALIVE_FRAME } from "@flash/contract";
 import { attemptAsync } from "@flash/typekit";
 import type { FastifyReply, FastifyRequest } from "fastify";
 
@@ -18,7 +19,7 @@ export const DEFAULT_STREAM_OPTIONS: StreamOptions = {
 };
 
 export function formatEvent(item: StreamItem): string {
-	return `event: ${item.event}\ndata: ${JSON.stringify(item.data)}\n\n`;
+	return formatFrame(item.event, item.data);
 }
 
 // Turns the request into a Server-Sent Events stream. `read` is called every interval; the client hears about it
@@ -55,7 +56,7 @@ export function serveEvents(
 				raw.write(formatEvent(item));
 				lastWrite = Date.now();
 			} else if (Date.now() - lastWrite >= options.heartbeatMs) {
-				raw.write(": keep-alive\n\n");
+				raw.write(KEEP_ALIVE_FRAME);
 				lastWrite = Date.now();
 			}
 		}, Error);

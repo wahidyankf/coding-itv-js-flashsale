@@ -1,3 +1,4 @@
+import type { SaleStatus } from "@flash/contract/vocabulary";
 import { type Option, Some } from "@flash/typekit";
 
 export type Sale = {
@@ -11,7 +12,7 @@ export type Sale = {
 	admitPerSecond: number;
 };
 
-export type SaleStatus = "upcoming" | "active" | "sold_out" | "ended";
+export type { SaleStatus };
 
 // The window decides first: after it closes the sale is ended, even if it sold out. Sold out only
 // matters while the window is open.
@@ -62,9 +63,6 @@ export function admissionsPerTick(sale: Sale, tickMs: number): number {
 	return Math.max(1, Math.round((sale.admitPerSecond * tickMs) / 1000));
 }
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-// A malformed id can never match a row, so the lookup is skipped instead of failing in Postgres.
-export function isSaleId(value: string): boolean {
-	return UUID.test(value);
-}
+// A malformed id can never match a row, so the lookup is skipped instead of failing in Postgres. The rule lives in the
+// contract.
+export { isUuid as isSaleId } from "@flash/contract/vocabulary";
