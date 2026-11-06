@@ -30,7 +30,7 @@ it to understand the system; it only matters when you change the code.
 | One product, limited stock        | `sales.stock`, with `UPDATE ... WHERE sold < stock` and `CHECK (sold <= stock)` in Postgres                                                                                                                                                              |
 | One item per user                 | `UNIQUE(sale_id, user_id)` on purchases and on reservations; a Redis set of buyers in front of it                                                                                                                                                        |
 | An endpoint for the sale status   | `GET /sales/current` and `GET /sales/:saleId`, plus a live stream at `.../events`                                                                                                                                                                        |
-| An endpoint to attempt a purchase | Three calls, because a rush needs a queue: `POST /sales/:saleId/queue` (join, returns a ticket), `POST .../reservations` (hold one item), `POST .../purchases` (pay). The page's **Buy Now** does the first two, and **Confirm purchase** does the third |
+| An endpoint to attempt a purchase | Three calls, because a rush needs a queue: `POST /sales/:saleId/queue` (join, get a ticket), `POST .../reservations` (hold one item), `POST .../purchases` (pay). **Buy Now** makes the first two; **Confirm purchase** makes the third |
 | An endpoint to check the outcome  | `GET /sales/:saleId/purchases/:userId`: a purchase, a live hold, or nothing                                                                                                                                                                              |
 | A simple React frontend           | `apps/flash-web`                                                                                                                                                                                                                                         |
 | A system diagram                  | below; the C4 views are in [specs/flash/architecture](specs/flash/architecture/README.md)                                                                                                                                                                |
@@ -49,9 +49,9 @@ It is an npm workspace with five apps in `apps/` and two libraries in `libs/`:
 | `flash-web-e2e` | Playwright tests in a browser                                                       |
 | `flash-load`    | k6 load test against three API instances behind nginx, with a verdict from the data |
 
-`libs/typekit` (`@flash/typekit`) is a TypeScript port of
-[py-typekit](https://github.com/wahidyankf/py-typekit): `Result` and `attempt`. `flash-be` and `flash-web` use it, so a
-failure is a value and product code has no `catch`; the linter enforces that. See [failures as values](docs/explanation/failures-as-values.md).
+`libs/typekit` (`@flash/typekit`) is a TypeScript port of [py-typekit](https://github.com/wahidyankf/py-typekit). It has
+`Result` and `attempt`. `flash-be` and `flash-web` use it, so a failure is a value and product code has no `catch`. The
+linter enforces that; see [failures as values](docs/explanation/failures-as-values.md).
 
 `libs/contract` (`@flash/contract`) is the HTTP contract of the API, written once with Zod: the route table, the schemas, the
 error codes, a small client and the Server-Sent Events codec. `flash-be` registers its routes from it, and `flash-web`, the
@@ -204,8 +204,8 @@ npx nx dev flash-web           # web on http://localhost:3000
 npm run docker:dev:down        # stop Postgres + Redis
 ```
 
-To create the sale through the API instead of the seed command, set `ADMIN_TOKEN` in `.env` (16 characters or more), restart
-the API, and send an absolute window. A window that overlaps another sale is refused with `409`:
+To create the sale through the API instead of the seed command, set `ADMIN_TOKEN` in `.env` (16 characters or more) and
+restart the API. Send an absolute window. A window that overlaps another sale gets `409`:
 
 ```bash
 curl -s -X POST http://localhost:8080/admin/sales \
@@ -251,13 +251,14 @@ npm run docs:check             # links, structure and diagrams in the docs
 ```
 
 The behaviour is written as Gherkin scenarios in [specs/](specs/README.md) first. Each scenario is bound at unit,
-integration and end-to-end level, except where a real boundary makes that impossible; those few exceptions are written
-next to the scenario with the test that proves it instead. A detail that only a developer would notice is a plain test next to the code, not a scenario (see
-[scenario or plain test](docs/explanation/scenario-or-plain-test.md)). Playwright needs Chromium once:
+integration and end-to-end level, except where a real boundary makes that impossible. Those few exceptions sit next to
+the scenario, with the test that proves it. A detail that only a developer would notice is a plain test next to the code,
+not a scenario (see [scenario or plain test](docs/explanation/scenario-or-plain-test.md)). Playwright needs Chromium once:
 `npx playwright install chromium`. See [test layers and coverage](docs/reference/test-layers-and-coverage.md).
 
-`git push` runs the docs check, the behaviour coverage check, the lint rule tests, the OpenAPI check, the contract guard, and typecheck, lint, unit tests and the
-coverage floor for the projects the change touches. Commits are checked with commitlint (Conventional Commits).
+`git push` runs the docs check, the behaviour coverage check, the lint rule tests, the OpenAPI check and the contract guard.
+It also runs typecheck, lint, unit tests and the coverage floor for the projects the change touches. Commits are checked
+with commitlint (Conventional Commits).
 
 ## Load test
 
@@ -276,10 +277,11 @@ npx nx load:contention flash-load  # 700 shoppers reserve in the same moment, fo
 150 ms of the mock payment), and no server errors. A failed run is a finding about the system; a limit is not changed
 to make a run pass.
 
-**Expected outcome.** `smoke`, `full` and `chaos` exit `0` and print a table in which every check passes: no oversell (`sold` is at most
-the stock), `sold` equals the purchase rows, no shopper bought twice, k6 and Postgres agree, the stock sells out, the
-shopper who floods the queue gets `429`, and Redis and Postgres agree on the buyers. These are the numbers of the last
-runs on a laptop where the client and the servers share the same CPUs, so treat the times as relative:
+**Expected outcome.** `smoke`, `full` and `chaos` exit `0` and print a table where every check passes. The checks are: no
+oversell (`sold` is at most the stock), `sold` equals the purchase rows, no shopper bought twice, k6 and Postgres agree,
+the stock sells out, the shopper who floods the queue gets `429`, and Redis and Postgres agree on the buyers. These are
+the numbers from the last runs on a laptop where the client and the servers share the same CPUs, so read the times as
+relative:
 
 | Profile | Sold      | Reserve p95 | Purchase p95 | Server errors |
 | ------- | --------- | ----------- | ------------ | ------------- |
@@ -287,19 +289,20 @@ runs on a laptop where the client and the servers share the same CPUs, so treat 
 | full    | 100/100   | 1.6 ms      | 156 ms       | 0             |
 | chaos   | 1000/1000 | 3.0 ms      | 155 ms       | 0             |
 
-**The two herd runs.** `burst` and `contention` put 700 shoppers into the system inside one second, which the other
-runs never do. Every invariant held in all four runs: no oversell (100/100 and 50/50 sold), no shopper bought twice,
-k6, Postgres and Redis agreed, no server errors. The speed limits **did not hold** as k6 measures them on this machine:
+**The two herd runs.** `burst` and `contention` put 700 shoppers into the system within one second, which the other runs
+never do. In all four runs every invariant held: no oversell (100/100 and 50/50 sold), no shopper bought twice, k6,
+Postgres and Redis agreed, and there were no server errors. The speed limits **did not hold** as k6 measures them on
+this machine:
 
 | Profile    | Sold    | Reserve p95 (k6) | Purchase p95 (k6) | Reserve p95 in the API | Verdict                              |
 | ---------- | ------- | ---------------- | ----------------- | ---------------------- | ------------------------------------ |
 | burst      | 100/100 | 701 and 2,379 ms | 724 and 1,949 ms  | 5.3 ms                 | invariants pass, speed fails         |
 | contention | 50/50   | 349 and 551 ms   | 213 and 194 ms    | 5.5 ms                 | invariants pass, reserve speed fails |
 
-The API logged a reserve in about 5 ms at the 95th percentile and Postgres never had a session waiting for a lock, so the
+The API logged a reserve at about 5 ms (95th percentile), and Postgres never had a session waiting for a lock, so the
 handlers and the database are not where the time goes. What k6 measures also includes 770 virtual users sharing six CPUs
-with nginx and three API instances, and the numbers swing a lot from run to run. So this shows that the sale stays
-correct under a herd; it does not show how fast production would answer, and a faithful speed test needs the load
+with nginx and three API instances, and the numbers swing a lot from run to run. So these runs show that the sale stays
+correct under a herd. They do not show how fast production would answer, and a faithful speed test needs the load
 generator on its own machine. The limits were not changed. See
 [what the load runs found](docs/explanation/load-test-findings.md).
 
