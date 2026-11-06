@@ -4,7 +4,7 @@ import { Err } from "@flash/typekit";
 import Fastify from "fastify";
 import { jsonSchemaTransform } from "fastify-type-provider-zod";
 import type { Dependencies } from "../../../application/dependencies.js";
-import { useContract } from "./app.js";
+import { applyContract } from "./app.js";
 import { DEFAULT_STREAM_OPTIONS } from "./event-stream.js";
 import { registerRoutes } from "./routes.js";
 
@@ -53,7 +53,7 @@ const STATUS_TEXT: Record<string, string> = {
 // `text/event-stream`, because that is what its 200 reply is.
 export async function buildOpenApi(): Promise<object> {
 	const app = Fastify();
-	useContract(app);
+	applyContract(app);
 	await app.register(swagger, {
 		openapi: {
 			openapi: "3.1.0",

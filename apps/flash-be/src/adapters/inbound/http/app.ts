@@ -23,7 +23,7 @@ export function buildApp(
 		// Open event streams must not keep the server from closing.
 		forceCloseConnections: true,
 	});
-	useContract(app);
+	applyContract(app);
 
 	registerRoutes(app, deps, options.events ?? DEFAULT_STREAM_OPTIONS);
 	return app;
@@ -31,7 +31,7 @@ export function buildApp(
 
 // The schemas of @flash/contract check every request and every reply. A reply that breaks the contract is a bug, so it
 // is answered with `internal` and logged. Every error has the same body, `{ error: code }`, whatever raised it.
-export function useContract(app: FastifyInstance): void {
+export function applyContract(app: FastifyInstance): void {
 	app.setValidatorCompiler(validatorCompiler);
 	app.setSerializerCompiler(serializerCompiler);
 

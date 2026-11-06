@@ -224,16 +224,22 @@ export type RequestInput<R extends Route> = ([Input<R, "params">] extends [
 		: { headers?: Input<R, "headers"> }) &
 	([Input<R, "body">] extends [never] ? unknown : { body: Input<R, "body"> });
 
-// The replies a route may answer with: each HTTP status with the body its schema gives.
-export type Reply<R extends Route> = {
+// Every reply a route may answer with: each HTTP status with the body its schema gives, errors included.
+export type AnyReply<R extends Route> = {
 	[S in keyof R["replies"] & number]: {
 		status: S;
 		body: z.output<R["replies"][S]>;
 	};
 }[keyof R["replies"] & number];
 
+// The replies that are not refusals. A client gets these as `Ok`; a refusal is an `Err` that names the error.
+export type Reply<R extends Route> = Exclude<
+	AnyReply<R>,
+	{ body: { error: ErrorCode } }
+>;
+
 // The error codes a route may answer with, so the error type of a handler can be checked against it.
 export type ErrorCodeOf<R extends Route> = Extract<
-	Reply<R>["body"],
+	AnyReply<R>["body"],
 	{ error: ErrorCode }
 >["error"];

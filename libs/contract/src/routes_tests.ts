@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
-import type { ErrorCodeOf, Reply, RequestInput } from "./routes.js";
+import type { AnyReply, ErrorCodeOf, Reply, RequestInput } from "./routes.js";
 import { routes } from "./routes.js";
 import { ERROR_STATUS, type JOIN_ERRORS } from "./vocabulary.js";
 
@@ -72,7 +72,10 @@ describe("the types of a route", () => {
 	it("gives a reply the body of its status", () => {
 		type Joined = Extract<Reply<typeof routes.joinQueue>, { status: 201 }>;
 		expectTypeOf<Joined["body"]["ticket"]>().toBeString();
-		type Gone = Extract<Reply<typeof routes.joinQueue>, { status: 404 }>;
+		type Gone = Extract<AnyReply<typeof routes.joinQueue>, { status: 404 }>;
+		expectTypeOf<
+			Extract<Reply<typeof routes.joinQueue>, { status: 404 }>
+		>().toBeNever();
 		expectTypeOf<Gone["body"]>().toEqualTypeOf<{ error: "sale_not_found" }>();
 	});
 

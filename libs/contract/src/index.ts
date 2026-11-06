@@ -5,8 +5,15 @@ export {
 	type Fetch,
 } from "./client.js";
 export { type ApiFailure, parseReply, type RawReply } from "./reply.js";
-export { type BuiltRequest, buildRequest, pathOf } from "./request.js";
 export {
+	type BuiltRequest,
+	buildRequest,
+	type Match,
+	matchRoute,
+	pathOf,
+} from "./request.js";
+export {
+	type AnyReply,
 	type ErrorCodeOf,
 	type Method,
 	type Reply,

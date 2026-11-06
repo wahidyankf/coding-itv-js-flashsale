@@ -26,6 +26,13 @@ export const PlaceView = z.discriminatedUnion("state", [
 ]);
 export type PlaceView = z.infer<typeof PlaceView>;
 
+// The same states without the user, for a caller that already knows whose place it is.
+export type QueuePlace = PlaceView extends infer V
+	? V extends unknown
+		? Omit<V, "userId">
+		: never
+	: never;
+
 // The place a shopper gets on joining, with the ticket that proves it.
 export const JoinedView = z.discriminatedUnion("state", [
 	z.object({

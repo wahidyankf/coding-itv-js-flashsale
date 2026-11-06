@@ -1,7 +1,13 @@
 // A request as plain data. It does not depend on fetch, so the same builder serves a browser, a Playwright test and
 // k6, which each send it their own way.
 
-import type { Method, RequestInput, Route } from "./routes.js";
+import { attempt } from "@flash/typekit";
+import {
+	type Method,
+	type RequestInput,
+	type Route,
+	routes,
+} from "./routes.js";
 
 export type BuiltRequest = {
 	method: Method;
@@ -45,4 +51,29 @@ export function buildRequest<R extends Route>(
 		headers,
 		body: parts.body === undefined ? undefined : JSON.stringify(parts.body),
 	};
+}
+
+export type Match = { route: Route; params: Record<string, string> };
+
+// Which route a request is for, and the values of its parameters. A route with a fixed path comes before one with a
+// parameter in the table, so `/sales/current` is not taken for a sale. A value that cannot be decoded matches nothing.
+export function matchRoute(
+	method: string,
+	path: string,
+	candidates: readonly Route[] = Object.values(routes),
+): Match | undefined {
+	for (const route of candidates) {
+		if (route.method !== method) continue;
+		const pattern = route.path.replace(/:([A-Za-z]+)/g, "(?<$1>[^/]+)");
+		const found = new RegExp(`^${pattern}$`).exec(path);
+		if (!found) continue;
+		const params: Record<string, string> = {};
+		for (const [name, value] of Object.entries(found.groups ?? {})) {
+			const decoded = attempt(() => decodeURIComponent(value), URIError);
+			if (decoded.isErr()) return undefined;
+			params[name] = decoded.value;
+		}
+		return { route, params };
+	}
+	return undefined;
 }
