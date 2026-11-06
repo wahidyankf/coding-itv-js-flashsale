@@ -80,16 +80,17 @@ ehthumbs.db
 .tools/
 
 # Frontend and backend build output
-.output/
 .nitro/
 .tanstack/
-dist/
 .vitest/
 test-results/
 playwright-report/
 blob-report/
 playwright/.cache/
-*.tsbuildinfo
+
+# Local Claude Code state (the shared .claude/settings.json stays tracked)
+.claude/settings.local.json
+.claude/worktrees/
 
 # Local scratch and generated output (not committed)
 local-tmp/
