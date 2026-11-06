@@ -17,6 +17,37 @@ The script counts the items that are not free: `SCARD(buyers) + ZCOUNT(holds, no
 stock, the answer is `sold_out`. Otherwise it adds the hold. Because the count and the add run as one command, two
 requests can never both take the last item.
 
+```mermaid
+flowchart TD
+  accTitle: How a reservation is decided
+  accDescr: The reserve request first checks that the Redis gate is ready. If it is not ready, one instance rebuilds it from Postgres. The Lua script counts buyers plus live holds. If the count has reached the stock, the answer is sold_out. Otherwise the hold is added in Redis and written to Postgres. If the Postgres write fails, the hold is removed from Redis again.
+  request["Reserve request"]
+  ready{"Gate ready?"}
+  rebuild["Rebuild from Postgres<br/>one instance"]
+  count{"Buyers + holds<br/>reached stock?"}
+  soldout["Answer sold_out"]
+  hold["Add hold in Redis"]
+  write["Write hold to Postgres"]
+  undo["Remove hold from Redis"]
+  done["Return the hold"]
+  request --> ready
+  ready -->|no| rebuild
+  rebuild --> count
+  ready -->|yes| count
+  count -->|yes| soldout
+  count -->|no| hold
+  hold --> write
+  write -->|ok| done
+  write -->|fails| undo
+  classDef redis fill:#0173B2,stroke:#000000,color:#FFFFFF
+  classDef pg fill:#029E73,stroke:#000000,color:#000000
+  classDef answer fill:#DE8F05,stroke:#000000,color:#000000
+  classDef default fill:#808080,stroke:#000000,color:#000000
+  class ready,count,hold,undo redis
+  class rebuild,write pg
+  class soldout,done answer
+```
+
 A hold that has expired has a score in the past, so it stops counting without any work. There is no sweep job and no
 counter that can drift away from the truth.
 

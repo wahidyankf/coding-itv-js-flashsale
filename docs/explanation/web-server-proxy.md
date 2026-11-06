@@ -9,8 +9,33 @@ server passes it on. This page gives the reasons and what it costs.
   contain it, so the API can sit on a private network. A scenario checks that the rendered page does not hold the
   address.
 - **One origin.** The browser makes same-origin requests, so no CORS rules are needed and none can be got wrong.
-- **One place to narrow the surface.** The server passes on a short list of method and path pairs and nothing else, so a
-  path such as `../ready` cannot be used to reach other routes. It also sends on only the headers the API needs.
+- **One place to narrow the surface.** The server passes on a short list of method and path pairs (the `ALLOWED` list in
+  `apps/flash-web/src/proxy.ts`) and nothing else, so a path such as `../ready` cannot be used to reach other routes. The
+  operator route `POST /admin/sales` is not on the list. A sale id must be a UUID and a name must fit the name pattern,
+  or the answer is `404 not_found`. The server also sends on only the headers the API needs.
+
+```mermaid
+flowchart LR
+  accTitle: A browser request through the web server
+  accDescr: The browser calls the web server under /api/sales. The proxy checks the method and path against its allow-list. A request that is not on the list gets 404 not_found from the proxy. An allowed request is passed to flash-be with only the needed headers, and the answer is streamed back. If flash-be cannot be reached, the proxy answers 502 backend_unavailable.
+  browser["Browser"]
+  proxy["Web server<br/>proxy allow-list"]
+  api["flash-be<br/>API"]
+  refused["Reply<br/>404 not_found"]
+  down["Reply<br/>502 backend_unavailable"]
+  browser -->|/api/sales| proxy
+  proxy -->|allowed| api
+  api -->|streamed back| browser
+  proxy -->|not listed| refused
+  proxy -->|no answer| down
+  classDef edge fill:#0173B2,stroke:#000000,color:#FFFFFF
+  classDef app fill:#029E73,stroke:#000000,color:#000000
+  classDef refusal fill:#DE8F05,stroke:#000000,color:#000000
+  classDef default fill:#808080,stroke:#000000,color:#000000
+  class browser edge
+  class proxy,api app
+  class refused,down refusal
+```
 
 ## What it costs
 
@@ -31,7 +56,9 @@ After that it follows the sale stream and updates by itself. A shopper types a n
 A waiting shopper is told when the sale ends or sells out. The queue stops admitting then, so without this the page
 would show the last place forever.
 
-Names are checked in the page with the same pattern the API uses, so a bad name never leaves the browser.
+Names are checked in the page with the same pattern the API uses, so a bad name never leaves the browser. The web app
+keeps its own copy of that rule, and of the sale id rule and the `not_found` reply; `same_as_be_tests.ts` fails if a
+copy drifts from `flash-be`.
 
 ## Related
 

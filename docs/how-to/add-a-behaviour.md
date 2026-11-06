@@ -7,6 +7,29 @@ Write the scenario first. Then bind it to the tests, so each layer proves what i
 guide applies to `apps/` only. It uses `flash-be`.
 The steps are the same for `flash-web`, with its own folders.
 
+```mermaid
+flowchart LR
+  accTitle: Add a behaviour
+  accDescr: Write the scenario first. Then bind it at the unit layer, which is always required, then at the integration layer and the end-to-end layer unless a layer is exempt with a reason. Finish with the behaviour check, which fails when a binding is missing.
+  write["1 Write the scenario"]
+  unit["2 Bind unit"]
+  integ["3 Bind integration"]
+  e2e["4 Bind end-to-end"]
+  check["6 npm run bdd:check"]
+  exempt["5 Exempt, with a reason"]
+  write --> unit --> integ --> e2e --> check
+  integ -.->|cannot prove it| exempt
+  e2e -.->|cannot prove it| exempt
+  exempt -.-> check
+  classDef step fill:#0173B2,stroke:#000000,color:#FFFFFF
+  classDef gate fill:#029E73,stroke:#000000,color:#000000
+  classDef warn fill:#DE8F05,stroke:#000000,color:#000000
+  classDef default fill:#808080,stroke:#000000,color:#000000
+  class write,unit,integ,e2e step
+  class check gate
+  class exempt warn
+```
+
 ## 1. Write the scenario
 
 Add it to a feature file under `specs/apps/flash/be/behaviours/`. Put it in the folder for its area, for example

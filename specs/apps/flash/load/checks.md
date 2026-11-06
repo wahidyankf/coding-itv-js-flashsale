@@ -5,6 +5,7 @@ k6 with them. The implementation is in `apps/flash-load/scripts/run.ts`.
 
 | Check                    | Passes when                                               | Profiles      |
 | ------------------------ | --------------------------------------------------------- | ------------- |
+| k6 started every shopper | k6 dropped no planned iteration                           | all           |
 | No oversell              | the sold count is at most the stock                       | all           |
 | Sold count is true       | the sold count equals the number of purchase rows         | all           |
 | One item per user        | no shopper has more than one purchase                     | all           |

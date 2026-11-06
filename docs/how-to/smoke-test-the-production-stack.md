@@ -12,10 +12,9 @@ random secrets and free ports, so it does not touch a stack you started with `np
 
 1. checks that three `flash-be` instances are healthy and `/ready` answers;
 2. refuses an operator with a wrong token, then creates a sale through `POST /admin/sales` with the right one;
-3. checks that the web server does not pass `/api/admin` on;
-4. joins the queue as a shopper, waits to be admitted, holds an item, pays (a declined charge is tried again), and asks
-   whether the item was bought;
-5. checks that a second reserve is refused with `already_purchased`;
+3. checks that the web server does not pass `/api/admin` on, and that the shopper sees the sale through it;
+4. joins the queue as a shopper, waits to be admitted, holds an item, and pays (a declined charge is tried again);
+5. asks whether the item was bought, and checks that a second reserve is refused with `already_purchased`;
 6. removes the stack and its volumes, whether or not a step failed.
 
 It prints one line for each step and ends with `smoke:prod passed`, or stops at the first step that fails and exits

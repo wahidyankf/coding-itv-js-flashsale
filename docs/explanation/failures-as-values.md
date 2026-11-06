@@ -14,6 +14,30 @@ and a new error fails the build until it is mapped.
 Exceptions still exist for what the code does not expect: a bug, or a store that is down. `attempt` catches only what a
 call site names, and anything else goes on. That is why there is no catch-all by default.
 
+```mermaid
+flowchart LR
+  accTitle: A failure travels as a value
+  accDescr: A service returns a Result. An Ok carries the answer and the route sends 200 or 201. An Err carries a code, and the route looks up the status and the message for that code. A call that throws goes through attempt, which turns the named failure into an Err; anything else keeps going up and becomes a 500 internal.
+  service["Service<br/>returns Result"]
+  ok["Ok<br/>200 or 201"]
+  err["Err with a code<br/>sold_out, ..."]
+  reply["Reply<br/>ERROR_STATUS"]
+  attempt["attempt<br/>names the failure"]
+  internal["500 internal<br/>cause in the log"]
+  service --> ok
+  service --> err
+  err --> reply
+  attempt -->|expected failure| err
+  attempt -.->|anything else| internal
+  classDef step fill:#0173B2,stroke:#000000,color:#FFFFFF
+  classDef gate fill:#029E73,stroke:#000000,color:#000000
+  classDef problem fill:#DE8F05,stroke:#000000,color:#000000
+  classDef default fill:#808080,stroke:#000000,color:#000000
+  class service,attempt step
+  class ok gate
+  class err,reply,internal problem
+```
+
 ## Why absence is undefined
 
 A lookup that may find nothing returns `T | undefined`. TypeScript already tracks it, and strict mode makes the caller

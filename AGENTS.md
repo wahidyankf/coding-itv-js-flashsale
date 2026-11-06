@@ -52,8 +52,8 @@ Flash sale monorepo with five apps in `apps/` and one library in `libs/`: `flash
 - Commit messages follow Conventional Commits (commitlint hook). Make one coherent change per commit.
 - Docs are checked by RHINO, which reads the policy in `repo-config.yml`. Run `npm run docs:install` once per machine,
   then `npm run docs:check`. The version and digests are pinned in `scripts/install-rhino.sh`; bump them together.
-- The pre-push hook runs `npm run lint` (Biome check of the whole repo, warnings fail), `npm run docs:check`, the behaviour
-  coverage check (`bdd:check:test`, `bdd:check`), the lint rule tests (`lint:rules:test`), then
+- The pre-push hook runs, in order, `npm run lint` (Biome check of the whole repo, warnings fail), `npm run docs:check`,
+  `bdd:check:test`, `lint:rules:test`, `bdd:check` (the behaviour coverage check), then
   `nx affected -t test:quick` (typecheck, lint, unit tests) and `nx affected -t test:coverage` (the 99% floor) against
   `origin/main`. `test:coverage` starts the dev stack itself, so Docker must run. Do not skip hooks with `--no-verify`
   unless the user asks.

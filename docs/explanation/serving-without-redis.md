@@ -17,6 +17,29 @@ request therefore learns within a few milliseconds that Redis is gone, and each 
 | Rate limits          | Each process counts in its own memory, so the limit stays on and grows with the number of processes. |
 | `GET /ready`         | `503` with `redis: error`. The process still serves the other routes.                                |
 
+```mermaid
+flowchart TD
+  accTitle: Redis down and back
+  accDescr: While Redis is up, the sale path uses the Redis gate and Postgres records the result. When a Redis call fails, the sale is marked stale in the process and Postgres decides alone under a row lock. When Redis answers again, the next reservation deletes the ready flag, one instance rebuilds the gate from Postgres, and the Redis gate is used again.
+  up["Redis up<br/>gate decides"]
+  failed["A Redis call fails<br/>sale marked stale"]
+  alone["Postgres decides alone<br/>row lock on the sale"]
+  back["Redis answers again"]
+  rebuild["Delete ready, then<br/>rebuild from Postgres"]
+  up -->|Redis fails| failed
+  failed --> alone
+  alone -->|Redis returns| back
+  back --> rebuild
+  rebuild -->|gate ready| up
+  classDef redis fill:#0173B2,stroke:#000000,color:#FFFFFF
+  classDef pg fill:#029E73,stroke:#000000,color:#000000
+  classDef event fill:#DE8F05,stroke:#000000,color:#000000
+  classDef default fill:#808080,stroke:#000000,color:#000000
+  class up,back redis
+  class alone,rebuild pg
+  class failed event
+```
+
 Skipping the queue is a choice. The queue is there for fairness and for protecting Postgres from a stampede. The stock
 and the one item per user do not depend on it, so a stalled queue would stop the sale for nothing. The cost is that
 fairness is lost while Redis is down.

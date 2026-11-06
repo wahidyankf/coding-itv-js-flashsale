@@ -19,6 +19,30 @@ A rejected request gets status `429`, the body `{"errorCode":"rate_limited","err
 A request is refused when either counter is over its limit. A refused request still counts, so a client that keeps
 retrying does not get through earlier.
 
+```mermaid
+flowchart LR
+  accTitle: How a write request is limited
+  accDescr: A write request is counted against the user and against the address. If either count is over its limit, the API answers 429 with Retry-After. Otherwise the request goes on to the queue, the gate or the payment. If Redis fails, the counts are kept in the memory of the process.
+  request["Write request"]
+  user["Count per user"]
+  address["Count per address"]
+  refused["429 rate_limited<br/>Retry-After"]
+  work["Queue, gate<br/>or payment"]
+  memory["Count in process<br/>memory"]
+  request --> user
+  user --> address
+  address -->|over a limit| refused
+  address -->|within limits| work
+  user -.->|Redis fails| memory
+  classDef step fill:#0173B2,stroke:#000000,color:#FFFFFF
+  classDef gate fill:#029E73,stroke:#000000,color:#000000
+  classDef problem fill:#DE8F05,stroke:#000000,color:#000000
+  classDef default fill:#808080,stroke:#000000,color:#000000
+  class request,user,address step
+  class work gate
+  class refused,memory problem
+```
+
 ## The window
 
 Each counter is a fixed window that starts at the first request. Redis does the work with `INCR`, then `PEXPIRE` on the

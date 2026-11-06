@@ -38,7 +38,7 @@ it to understand the system; it only matters when you change the code.
 
 ## What is in the repository
 
-It is an npm workspace with five apps in `apps/` and two libraries in `libs/`:
+It is an npm workspace with five apps in `apps/` and one library in `libs/`:
 
 | App             | What it is                                                                          |
 | --------------- | ----------------------------------------------------------------------------------- |
@@ -94,6 +94,36 @@ flowchart LR
 3. **Pay.** The shopper confirms. The payment is charged once, however often the request is repeated. A short Postgres
    transaction raises `sold` only while `sold < stock` and inserts the purchase, which is unique per shopper.
 4. **Ask "did I get it".** One call returns the purchase, a live hold, or nothing.
+
+A shopper moves through these states. Buy Now makes the first two moves; Confirm purchase makes the last.
+
+```mermaid
+flowchart LR
+  accTitle: A shopper's path
+  accDescr: A shopper joins the queue. If nobody is ahead they are admitted at once, otherwise they wait for their place and are then admitted. An admitted shopper reserves and holds one item. Confirming turns the hold into a purchase. If the time runs out the hold ends, and Buy Now takes the shopper back to admitted. A join after the sale ended or sold out is refused.
+  join["Join the queue"]
+  wait["Waiting<br/>place in line"]
+  admit["Admitted"]
+  hold["Holding one item"]
+  paid["Purchased"]
+  lapse["Hold ended"]
+  out["Sold out or ended"]
+  join -->|nobody ahead| admit
+  join -->|others ahead| wait
+  wait -->|admitted| admit
+  admit -->|reserve| hold
+  hold -->|confirm| paid
+  hold -->|time runs out| lapse
+  lapse -->|Buy Now again| admit
+  join -->|sale is over| out
+  classDef step fill:#0173B2,stroke:#000000,color:#FFFFFF
+  classDef good fill:#029E73,stroke:#000000,color:#000000
+  classDef warn fill:#DE8F05,stroke:#000000,color:#000000
+  classDef default fill:#808080,stroke:#000000,color:#000000
+  class wait,admit,hold step
+  class paid good
+  class lapse,out warn
+```
 
 An expired hold stops counting by itself, because its expiry time has passed. There is no sweep job and no counter that
 can drift.

@@ -13,6 +13,26 @@ shoppers. Callers that arrive while a read is running wait for it instead of sta
 The reply carries `Cache-Control: public, max-age=1`, so a browser or a proxy in front of the API may also keep it for
 that second.
 
+```mermaid
+flowchart LR
+  accTitle: Which reads use the sale cache
+  accDescr: A display read of the sale uses the cache in the API process. The row lives for one second, then the next read goes to Postgres. A decision to join, reserve or pay skips the cache and always reads Postgres.
+  display["Display read<br/>GET /sales/..."]
+  cache["Cache in the<br/>API process, 1 s"]
+  decision["Join, reserve,<br/>confirm"]
+  postgres[("Postgres<br/>sale row")]
+  display --> cache
+  cache -->|expired or empty| postgres
+  decision -->|always| postgres
+  classDef step fill:#0173B2,stroke:#000000,color:#FFFFFF
+  classDef gate fill:#029E73,stroke:#000000,color:#000000
+  classDef store fill:#CC78BC,stroke:#000000,color:#000000
+  classDef default fill:#808080,stroke:#000000,color:#000000
+  class display,decision step
+  class cache gate
+  class postgres store
+```
+
 ## What may be old
 
 Only `remaining`, the count of items sold, can be up to one second old. The `status` is computed on each request from

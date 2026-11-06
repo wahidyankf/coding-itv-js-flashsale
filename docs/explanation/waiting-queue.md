@@ -12,6 +12,31 @@ Postgres, and it gives everyone a fair order.
 - Only an admitted shopper can reserve an item. This keeps the queue from being skipped by calling the reserve route
   directly.
 
+```mermaid
+flowchart LR
+  accTitle: The life of a place in the queue
+  accDescr: A shopper joins the queue and waits. Each tick, the instance that holds the lease admits the first shoppers. An admitted shopper can reserve an item, then pay for it. A shopper whose place was lost, for example after a Redis restart, gets 404 not_in_queue and joins again.
+  join["Join<br/>get a ticket"]
+  waiting["Waiting<br/>by arrival number"]
+  admitted["Admitted<br/>valid 10 minutes"]
+  hold["Reserve<br/>take a hold"]
+  bought["Purchase<br/>pay for the hold"]
+  lost["Place lost<br/>404 not_in_queue"]
+  join --> waiting
+  waiting -->|tick admits| admitted
+  admitted --> hold
+  hold --> bought
+  waiting -.->|Redis restart| lost
+  lost -.->|join again| join
+  classDef step fill:#0173B2,stroke:#000000,color:#FFFFFF
+  classDef gate fill:#029E73,stroke:#000000,color:#000000
+  classDef problem fill:#DE8F05,stroke:#000000,color:#000000
+  classDef default fill:#808080,stroke:#000000,color:#000000
+  class join,waiting step
+  class admitted,hold,bought gate
+  class lost problem
+```
+
 The queue lives in Redis, in two sorted sets per sale: one for the waiting users (scored by arrival number) and one for
 the admitted users (scored by the time the admission ends). A small Lua script joins a user, so a user is never both
 waiting and admitted. The arrival number comes from a counter, not from the clock, so two users who join in the same

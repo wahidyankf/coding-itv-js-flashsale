@@ -15,8 +15,7 @@ if (asked.isErr()) return fallback;
 const reply = asked.value;
 ```
 
-A thrown value that no guard accepts is thrown on. For a thrown value that is not an error class, wrap a predicate with
-.
+A thrown value that no guard accepts is thrown on, so a bug is not hidden.
 
 A swallowed failure, like a Redis call that may fail, is the same call with the result left unread:
 
@@ -47,7 +46,9 @@ const { reservationId } = reserved.value;
 ```
 
 `ERROR_STATUS` and `errorPayload` are in `apps/flash-be/src/adapters/inbound/http/errors.ts`. Indexing `ERROR_STATUS` with
-`reserved.error` compiles only when every `ReserveError` has a status, so a new error without one fails the build. Use `.match({ ok, err })` when both sides produce a value of the same type.
+`reserved.error` compiles only when every `ReserveError` has a status, so a new error without one fails the build.
+
+Use `.match({ ok, err })` when both sides produce a value of the same type.
 
 ## 4. Check several steps in a row
 

@@ -5,12 +5,12 @@ C4 level 1. It shows who uses the flash sale product and what it depends on.
 ```mermaid
 flowchart LR
   accTitle: Flash sale system context
-  accDescr: A shopper uses the flash sale web app. An operator checks the health of the API directly. The flash sale product is the only system drawn; it needs nothing outside itself at runtime.
+  accDescr: A shopper uses the flash sale web app. An operator talks to the API directly to check its health and to create a sale. The flash sale product is the only system drawn; it needs nothing outside itself at runtime.
   shopper["Shopper<br/>person"]
   operator["Operator<br/>person"]
   system["Flash sale<br/>software system"]
-  shopper -->|browses over HTTPS| system
-  operator -->|checks health over HTTP| system
+  shopper -->|browses over HTTP| system
+  operator -->|health, creates sales| system
   classDef person fill:#0173B2,stroke:#000000,color:#FFFFFF
   classDef software fill:#DE8F05,stroke:#000000,color:#000000
   classDef default fill:#808080,stroke:#000000,color:#000000
@@ -20,7 +20,9 @@ flowchart LR
 
 ## Relationships in Prose
 
-- A shopper opens the flash sale site in a browser. The request goes to the web app over HTTPS.
-- An operator calls the API's health endpoints directly over HTTP to check that the service is alive and ready.
+- A shopper opens the flash sale site in a browser. The request goes to the web app over HTTP. The repository ships no
+  TLS; a real deployment puts a TLS proxy in front.
+- An operator calls the API directly over HTTP: the health endpoints, to check that the service is alive and ready, and
+  `POST /admin/sales`, with a token, to create a sale.
 - The product has no runtime dependency outside itself: the sale data lives in its own Postgres database and cache.
   The system context therefore draws no external system.

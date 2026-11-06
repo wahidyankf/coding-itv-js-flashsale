@@ -8,10 +8,39 @@ are in [`apps/flash-load/k6/profiles.ts`](../../../../apps/flash-load/k6/profile
 Shoppers arrive at a fixed rate, one new shopper per iteration. The load therefore does not slow down when the system
 does. Each shopper:
 
-1. joins the queue and waits to be admitted;
+1. joins the queue (and tries again, a few times, when the API says to slow down) and waits to be admitted;
 2. reserves one item;
-3. usually confirms the purchase, then asks whether they got it;
+3. usually confirms the purchase (and tries again, a few times, when the payment is declined), then asks whether they
+   got it;
 4. while waiting, reads the sale and gives up when it is sold out or has ended.
+
+```mermaid
+flowchart LR
+  accTitle: The shopper of the load test
+  accDescr: A shopper joins the queue and waits, giving up if the sale is sold out or ended. An admitted shopper reserves once and leaves if the answer is sold out. One shopper in twenty then walks away with the hold. The others confirm, retrying when the payment is declined, and one in five confirms again and tries a second reserve. Every shopper who got that far asks whether they got it.
+  join["Join the queue"]
+  wait["Wait to be admitted"]
+  reserve["Reserve once"]
+  walk["Walk away<br/>with the hold"]
+  confirm["Confirm the purchase"]
+  again["Confirm again,<br/>reserve again"]
+  outcome["Ask: did I get it?"]
+  leave["Leave"]
+  join --> wait
+  wait -->|sold out or ended| leave
+  wait -->|admitted| reserve
+  reserve -->|sold out| leave
+  reserve -->|1 in 20| walk
+  reserve --> confirm
+  confirm -->|1 in 5| again
+  confirm --> outcome
+  again --> outcome
+  classDef step fill:#029E73,stroke:#000000,color:#000000
+  classDef exit fill:#DE8F05,stroke:#000000,color:#000000
+  classDef default fill:#808080,stroke:#000000,color:#000000
+  class join,wait,reserve,confirm,again,outcome step
+  class walk,leave exit
+```
 
 One shopper in twenty walks away with a hold and does not confirm. One in five of the shoppers who bought confirms again:
 the repeat must return the same purchase, and a second reserve must not give a second item. Flooders join the queue many

@@ -56,5 +56,7 @@ flowchart LR
 - Dependencies point inward. The domain imports nothing but Node built-ins, and `@flash/typekit` (no dependency, no I/O). The
   application imports the domain and its own ports. An inbound adapter never imports an outbound adapter, and an outbound adapter imports only ports and the
   domain. `apps/flash-be/src/architecture_tests.ts` fails the unit tests when an import breaks this.
-- The same rules run against memory in unit tests, because the ports (`QueueStore`, `HoldGate`,
-  `ReservationRepository`, `PurchaseRepository`, `RateLimitStore`, `Payment`) have memory copies.
+- The same rules run against memory in unit tests, because the ports `QueueStore`, `HoldGate`,
+  `ReservationRepository`, `PurchaseRepository` and `SaleAdmin` have in-memory copies in `src/bdd/support/`. They are
+  test code. `RateLimitStore` has an in-memory adapter that product code also uses, when Redis fails, and `Payment` is
+  a mock.

@@ -89,7 +89,7 @@ Open <http://localhost:3000>. The page shows **Flash Sale**, the status **On sal
 ## 8. Buy an item
 
 1. Type `ana` in **Your name** and press **Buy Now**. The shopper is let in at once, because nobody is waiting. The
-   page says **An item is held for you. Confirm within 45 seconds.** and the seconds count down.
+   page says **An item is held for you. Confirm within 60 seconds.** (the hold time you seeded) and the seconds count down.
 2. Press **Confirm purchase**. The page says **You got it! Your purchase is confirmed.** and **Items left** drops to 2.
 3. Press **Buy Now** again with the same name. The page says **You already bought an item.** One shopper can buy one
    item.

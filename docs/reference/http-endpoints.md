@@ -15,15 +15,20 @@ code, for a developer. A `500` never says what failed; the cause goes to the log
 
 ## flash-be (API, port 8080)
 
-| Method | Path                           | Checks             | Notes                                                     |
-| ------ | ------------------------------ | ------------------ | --------------------------------------------------------- |
-| GET    | `/health`                      | none; no I/O       | always `200`                                              |
-| GET    | `/ready`                       | Postgres and Redis | `200`, or `503` when a check fails                        |
-| GET    | `/sales/current`               | Postgres           | `404` `sale_not_found` when no sale exists                |
-| GET    | `/sales/:saleId`               | Postgres           | `404` `sale_not_found` for an unknown or malformed id     |
-| POST   | `/sales/:saleId/queue`         | Postgres, Redis    | `201` on a new place, `200` when the user already has one |
-| GET    | `/sales/:saleId/queue/:userId` | Postgres, Redis    | needs the `x-queue-ticket` header                         |
-| POST   | `/admin/sales`                 | Postgres           | operator only; needs `Authorization: Bearer <token>`      |
+| Method | Path                                  | Checks             | Notes                                                      |
+| ------ | ------------------------------------- | ------------------ | ---------------------------------------------------------- |
+| GET    | `/health`                             | none; no I/O       | always `200`                                               |
+| GET    | `/ready`                              | Postgres and Redis | `200`, or `503` when a check fails                         |
+| GET    | `/sales/current`                      | Postgres           | `404` `sale_not_found` when no sale exists                 |
+| GET    | `/sales/:saleId`                      | Postgres           | `404` `sale_not_found` for an unknown or malformed id      |
+| GET    | `/sales/:saleId/events`               | Postgres           | event stream of the sale (see Live updates)                |
+| POST   | `/sales/:saleId/queue`                | Postgres, Redis    | `201` on a new place, `200` when the user already has one  |
+| GET    | `/sales/:saleId/queue/:userId`        | Postgres, Redis    | needs the `x-queue-ticket` header                          |
+| GET    | `/sales/:saleId/queue/:userId/events` | Postgres, Redis    | event stream of a place; needs `x-queue-ticket`            |
+| POST   | `/sales/:saleId/reservations`         | Postgres, Redis    | `201` on a new hold, `200` when the user already holds one |
+| POST   | `/sales/:saleId/purchases`            | Postgres, Redis    | `201` on a new purchase, `200` when it was already paid    |
+| GET    | `/sales/:saleId/purchases/:userId`    | Postgres           | "did I get it?": a purchase, a live hold, or nothing       |
+| POST   | `/admin/sales`                        | Postgres           | operator only; needs `Authorization: Bearer <token>`       |
 
 ### Reply bodies
 
@@ -64,6 +69,18 @@ The current sale is the one that opens last. `remaining` is `stock` minus the it
 | `active`   | the window is open and items remain                      |
 | `sold_out` | the window is open and no item remains                   |
 | `ended`    | the window has closed, whether or not the stock sold out |
+
+```mermaid
+stateDiagram-v2
+  accTitle: Sale status
+  accDescr: A sale is upcoming until its window opens, then active while items remain. It becomes sold out when the last item is bought, and ended when the window closes. The window decides first, so a sold out sale also becomes ended when the window closes.
+  [*] --> upcoming
+  upcoming --> active: window opens
+  active --> sold_out: last item bought
+  active --> ended: window closes
+  sold_out --> ended: window closes
+  ended --> [*]
+```
 
 The scenarios are in [`specs/apps/flash/be/behaviours/sale/status.feature`](../../specs/apps/flash/be/behaviours/sale/status.feature).
 
@@ -184,6 +201,25 @@ shopper is charged once.
 
 The scenarios are in [`specs/apps/flash/be/behaviours/purchase/`](../../specs/apps/flash/be/behaviours/purchase/README.md).
 
+## A shopper's path
+
+The three reads (`queue/:userId`, `purchases/:userId` and the place stream) report where the shopper is on this path.
+
+```mermaid
+stateDiagram-v2
+  accTitle: A shopper's path
+  accDescr: A shopper joins the queue and waits, then is admitted at the sale's rate. An admitted shopper reserves an item and holds it for the hold time, then pays and has bought it. When the hold ends before payment, the item goes back and the shopper is admitted again. A place that is lost, for example when Redis loses its data, shows as absent, and joining again gives a new place.
+  [*] --> waiting: join the queue
+  waiting --> admitted: queue admits
+  admitted --> holding: reserve
+  holding --> purchased: pay
+  holding --> admitted: hold ends
+  waiting --> absent: place lost
+  admitted --> absent: place lost
+  absent --> waiting: join again
+  purchased --> [*]
+```
+
 ## Live updates (Server-Sent Events)
 
 | Method | Path                                  | What it streams                                                                            |
@@ -195,15 +231,16 @@ A frame is `event: <name>`, `data: <JSON>` and a blank line.
 
 Both answer `Content-Type: text/event-stream`. The first event comes at once. Later events come only when the data
 changed, checked every `EVENTS_INTERVAL_MS` (1000). When nothing changes for 15 seconds, a `: keep-alive` comment line is
-sent. If the sale or the ticket is wrong, the answer is a normal JSON error (`404 sale_not_found`, `401 invalid_ticket`)
-and no stream opens. If a shopper's place is lost while watching, the stream sends `{"state":"absent"}`.
+sent. If the sale, the user or the ticket is wrong, the answer is a normal JSON error (such as `404 sale_not_found` or
+`401 invalid_ticket`) and no stream opens. If a shopper's place is lost while watching, the stream sends `{"state":"absent"}`.
 
 The scenarios are in [`specs/apps/flash/be/behaviours/events/`](../../specs/apps/flash/be/behaviours/events/README.md).
 
 ## Rate limits
 
 The three write routes (`POST .../queue`, `POST .../reservations` and `POST .../purchases`) count each request against
-the user id in the body and against the client address. Reads are not limited. When either count passes its limit in
+the user id in the body and against the client address. Reads are not limited. `POST /admin/sales` is counted by address only, before its token is read, so a wrong guess is
+counted too. When either count passes its limit in
 the current window, the answer is `429` `rate_limited`, with `retryAfterSeconds` in the body and a `Retry-After` header that
 holds the same number of seconds (at least 1). The window starts at
 the first request, not at a fixed clock tick. The limits are `RATE_LIMIT_PER_USER` (30), `RATE_LIMIT_PER_IP` (600) and
@@ -244,6 +281,32 @@ The browser reaches the sale only through `/api/sales`. The web server passes ea
 | POST   | `/:saleId/reservations`         | hold an item           |
 | POST   | `/:saleId/purchases`            | pay for the held item  |
 | GET    | `/:saleId/purchases/:userId`    | "did I get it"         |
+
+A request is refused at once with `404 not_found`, and `flash-be` is not asked, when its method and path are not in the
+table, when a sale id is not a UUID, or when a user name has other characters than letters, digits and `. _ @ + -`.
+
+```mermaid
+flowchart LR
+  accTitle: A request through the web server
+  accDescr: The browser sends a request under api sales. The web server checks the method and path against its list. A path that is not listed gets a 404 at once. A listed request is passed to the API with a few headers, and the reply comes back with a few headers, streams included. If the API cannot be reached, the shopper gets a 502.
+  browser["Browser"]
+  check{"Method and path<br/>on the list?"}
+  refuse404["404 not_found"]
+  api["flash-be<br/>or nginx in front of it"]
+  refuse502["502 backend_unavailable"]
+  browser -->|/api/sales/...| check
+  check -->|no| refuse404
+  check -->|yes| api
+  api -->|reply or stream| browser
+  api -.->|unreachable| refuse502
+  classDef actor fill:#0173B2,stroke:#000000,color:#FFFFFF
+  classDef answer fill:#DE8F05,stroke:#000000,color:#000000
+  classDef service fill:#029E73,stroke:#000000,color:#000000
+  classDef default fill:#808080,stroke:#000000,color:#000000
+  class browser actor
+  class refuse404,refuse502 answer
+  class api service
+```
 
 Only `content-type`, `accept`, `x-queue-ticket` and `x-forwarded-for` are sent on. Only `content-type`,
 `cache-control` and `retry-after` come back. When `flash-be` cannot be reached the answer is `502`

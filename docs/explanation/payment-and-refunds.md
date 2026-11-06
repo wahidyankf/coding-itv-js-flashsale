@@ -11,6 +11,32 @@ explains how a hold becomes a purchase, and what happens when something goes wro
 3. **Commit.** One short Postgres transaction turns the hold into a purchase.
 4. **Tell Redis.** The user becomes a buyer in the gate and the hold is dropped.
 
+```mermaid
+flowchart TD
+  accTitle: How a hold becomes a purchase
+  accDescr: The service checks the hold, then charges the provider. A declined charge gives 402 payment_failed and the hold stays. If the charge works, one Postgres transaction commits the purchase. If the commit says sold_out or already_purchased, the charge is refunded and a 409 is returned. If the commit works, the service tells Redis and returns the purchase.
+  check["Check the hold<br/>no side effects"]
+  charge{"Charge the provider"}
+  declined["402 payment_failed<br/>hold stays"]
+  commit{"Commit in Postgres"}
+  refund["Refund the charge<br/>409 sold_out or<br/>already_purchased"]
+  tell["Tell Redis"]
+  done["Return the purchase"]
+  check --> charge
+  charge -->|declined| declined
+  charge -->|ok| commit
+  commit -->|refused| refund
+  commit -->|ok| tell
+  tell --> done
+  classDef step fill:#0173B2,stroke:#000000,color:#FFFFFF
+  classDef store fill:#029E73,stroke:#000000,color:#000000
+  classDef answer fill:#DE8F05,stroke:#000000,color:#000000
+  classDef default fill:#808080,stroke:#000000,color:#000000
+  class check,charge,tell step
+  class commit store
+  class declined,refund,done answer
+```
+
 The provider is a mock that lives in the process. It waits `PAYMENT_LATENCY_MS` (150 by default) and declines
 `PAYMENT_FAILURE_RATE` of the charges (2 percent by default). A real provider would replace it behind the same port.
 

@@ -21,7 +21,8 @@ deployment that never set it exposes nothing. The value must be at least 16 char
 - It runs in the `onRequest` hook, before the body is read, so a client without the token learns nothing from a broken
   body. The address is counted by the rate limiter first, so guesses are counted too.
 - It is never logged: the start-up line only says `admin=on` or `admin=off`.
-- The web server does not pass `/api/admin` on, and a test fails if a route under `/admin` is marked as passed on.
+- The web server does not pass `/api/admin` on. Its proxy has an allow-list of method and path pairs, `POST /admin/sales`
+  is not on it, and a test fails if it ever is.
 
 ## Windows may not overlap
 
