@@ -103,11 +103,12 @@ Each tag needs the comment described in [how-to: add a behaviour](../how-to/add-
 
 `git push` runs, in order:
 
-1. `npm run docs:check` (RHINO: links, heading structure, README indexes, Mermaid diagrams)
-2. `npm run bdd:check:test` (the behaviour check's own tests)
-3. `npm run lint:rules:test` (the lint rules for product code, run on sample code)
-4. `npm run bdd:check` (the behaviour check)
-5. `npx nx affected -t test:quick --base=origin/main`
-6. `npx nx affected -t test:coverage --base=origin/main` (unit and integration, the 99% floor)
+1. `npm run lint` (Biome check of the whole repo: format, lint and imports; warnings fail)
+2. `npm run docs:check` (RHINO: links, heading structure, README indexes, Mermaid diagrams)
+3. `npm run bdd:check:test` (the behaviour check's own tests)
+4. `npm run lint:rules:test` (the lint rules for product code, run on sample code)
+5. `npm run bdd:check` (the behaviour check)
+6. `npx nx affected -t test:quick --base=origin/main`
+7. `npx nx affected -t test:coverage --base=origin/main` (unit and integration, the 99% floor)
 
 End-to-end tests are not in the hook. Run them yourself before you finish a change.

@@ -14,15 +14,15 @@ import { attempt, attemptAsync, Err, Ok, type Result } from "@flash/typekit";
 `type Result<T, E> = Ok<T, E> | Err<T, E>`. Both classes are frozen: a field cannot be written, and a write is a type
 error. Both carry both type parameters, so every method has the same signature on `Ok` and on `Err`.
 
-| Member                 | On `Ok`                | On `Err`                |
-| ---------------------- | ---------------------- | ----------------------- |
-| `new Ok(value)`        | holds `value`          | -                       |
-| `new Err(error)`       | -                      | holds `error`           |
-| `.value` / `.error`    | the value              | the fault               |
-| `.isOk()` / `.isErr()` | `true` / `false`       | `false` / `true`        |
-| `.map(f)`              | `Ok(f(value))`         | itself                  |
-| `.mapErr(f)`           | itself                 | `Err(f(error))`         |
-| `.match({ ok, err })`  | `ok(value)`            | `err(error)`            |
+| Member                 | On `Ok`          | On `Err`         |
+| ---------------------- | ---------------- | ---------------- |
+| `new Ok(value)`        | holds `value`    | -                |
+| `new Err(error)`       | -                | holds `error`    |
+| `.value` / `.error`    | the value        | the fault        |
+| `.isOk()` / `.isErr()` | `true` / `false` | `false` / `true` |
+| `.map(f)`              | `Ok(f(value))`   | itself           |
+| `.mapErr(f)`           | itself           | `Err(f(error))`  |
+| `.match({ ok, err })`  | `ok(value)`      | `err(error)`     |
 
 ## Absence
 

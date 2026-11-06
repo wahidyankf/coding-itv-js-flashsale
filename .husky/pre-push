@@ -1,3 +1,4 @@
+npm run --silent lint
 npm run --silent docs:check
 npm run --silent bdd:check:test
 npm run --silent lint:rules:test
