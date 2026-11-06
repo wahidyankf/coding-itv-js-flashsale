@@ -16,7 +16,7 @@ const reply = asked.value;
 ```
 
 A thrown value that no guard accepts is thrown on. For a thrown value that is not an error class, wrap a predicate with
-`satisfying`.
+.
 
 A swallowed failure, like a Redis call that may fail, is the same call with the result left unread:
 
@@ -67,7 +67,7 @@ before you read the value. Keep parameters, optional object fields and JSON bodi
 
 ## 6. Close every switch
 
-End a `switch` over a union with every case, or with `assertNever(value)` in the `default`. Biome's
+End a `switch` over a union with every case. Biome's
 `useExhaustiveSwitchCases` fails the lint when a case is missing.
 
 ## 7. Check it

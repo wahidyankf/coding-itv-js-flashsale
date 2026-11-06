@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
-import { attempt, attemptAsync, satisfying } from "./boundary.js";
+import { attempt, attemptAsync } from "./boundary.js";
 import { Err, Ok, type Result } from "./result.js";
 
 class NotFound extends Error {}
@@ -33,11 +33,9 @@ describe("attempt with several guards", () => {
 		).toThrow("plain");
 	});
 
-	it("types a predicate guard by what it accepts", () => {
-		const isCode = (thrown: unknown): thrown is number =>
-			typeof thrown === "number";
-		const outcome = attempt(() => 1, satisfying(isCode));
-		expectTypeOf(outcome).toEqualTypeOf<Result<number, number>>();
+	it("returns the value of a call that does not throw", () => {
+		const outcome = attempt(() => 1, Error);
+		expectTypeOf(outcome).toEqualTypeOf<Result<number, Error>>();
 		expect(outcome).toEqual(new Ok(1));
 	});
 });
@@ -50,11 +48,11 @@ describe("attemptAsync with guards", () => {
 		).rejects.toThrow(TypeError);
 	});
 
-	it("catches a predicate-guarded rejection", async () => {
+	it("catches a rejection of the named class", async () => {
 		const outcome = await attemptAsync(
-			() => Promise.reject("plain"),
-			satisfying((thrown): thrown is string => typeof thrown === "string"),
+			() => Promise.reject(new NotFound("x")),
+			NotFound,
 		);
-		expect(outcome).toEqual(new Err("plain"));
+		expect(outcome.isErr()).toBe(true);
 	});
 });

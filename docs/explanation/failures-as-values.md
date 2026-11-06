@@ -23,8 +23,7 @@ not have one.
 ## Why exhaustive match
 
 TypeScript has no `match` statement. A `switch` over a union that ends without a case is silent unless the build checks it.
-`assertNever`, the `match` methods and Biome's `useExhaustiveSwitchCases` turn a forgotten case into an error at build
-time, which is when a new error code or a new sale status is added.
+Biome's `useExhaustiveSwitchCases` turns a forgotten case into an error at build time, which is when a new error code or a new sale status is added.
 
 ## How the rules are kept
 

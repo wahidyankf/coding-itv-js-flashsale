@@ -1,11 +1,8 @@
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import { expect } from "vitest";
-import { attempt, attemptAsync, satisfying } from "../boundary.js";
+import { attempt, attemptAsync } from "../boundary.js";
 import { Err, Ok } from "../result.js";
 import { specFile } from "./support/paths.js";
-
-const isString = (thrown: unknown): thrown is string =>
-	typeof thrown === "string";
 
 describeFeature(
 	await loadFeature(specFile("typekit/attempt/attempting.feature")),
@@ -67,26 +64,6 @@ describeFeature(
 				});
 				Then("the same TypeError is thrown to the caller", () => {
 					expect(run).toThrow(thrown);
-				});
-			},
-		);
-
-		Scenario(
-			"Attempt accepts a type predicate as the guard",
-			({ Given, When, Then }) => {
-				let call: () => number = () => 0;
-				let outcome: unknown;
-
-				Given("a call that throws a plain string", () => {
-					call = () => {
-						throw "plain";
-					};
-				});
-				When("it is attempted with a predicate that accepts strings", () => {
-					outcome = attempt(call, satisfying(isString));
-				});
-				Then("the result is an Err holding that string", () => {
-					expect(outcome).toEqual(new Err("plain"));
 				});
 			},
 		);

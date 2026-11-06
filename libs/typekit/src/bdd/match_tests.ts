@@ -1,10 +1,7 @@
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import { expect } from "vitest";
-import { assertNever } from "../match.js";
 import { Err, Ok, type Result } from "../result.js";
 import { specFile } from "./support/paths.js";
-
-type Light = "red" | "amber" | "green";
 
 describeFeature(
 	await loadFeature(specFile("typekit/match/matching.feature")),
@@ -59,48 +56,5 @@ describeFeature(
 				});
 			},
 		);
-
-		Scenario(
-			"A switch that forgets a case is a type error",
-			({ Given, When, Then }) => {
-				let describe: (light: Light) => string = () => "";
-
-				Given("a union of three string literals", () => {
-					describe = () => "";
-				});
-				When("a switch handles two of them and ends with assertNever", () => {
-					describe = (light: Light): string => {
-						switch (light) {
-							case "red":
-								return "stop";
-							case "amber":
-								return "slow";
-							default:
-								// @ts-expect-error "green" is not handled, so it is not never
-								return assertNever(light);
-						}
-					};
-				});
-				Then("the type checker refuses the call", () => {
-					// The @ts-expect-error above fails `tsc` when the switch becomes exhaustive.
-					expect(describe("red")).toBe("stop");
-				});
-			},
-		);
-
-		Scenario("AssertNever throws if it is reached", ({ Given, When, Then }) => {
-			let value: unknown;
-			let run: () => unknown = () => undefined;
-
-			Given("a value that the types said could not exist", () => {
-				value = "surprise";
-			});
-			When("it is passed to assertNever", () => {
-				run = () => assertNever(value as never);
-			});
-			Then("an error names the value", () => {
-				expect(run).toThrow(/surprise/);
-			});
-		});
 	},
 );

@@ -6,10 +6,8 @@ describe("public surface", () => {
 		expect(Object.keys(typekit).sort()).toEqual([
 			"Err",
 			"Ok",
-			"assertNever",
 			"attempt",
 			"attemptAsync",
-			"satisfying",
 		]);
 	});
 });

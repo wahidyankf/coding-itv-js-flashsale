@@ -28,14 +28,6 @@ Feature: Turning a throwing call into a Result
     When it is attempted with the guard RangeError
     Then the same TypeError is thrown to the caller
 
-  # Exemption(integration): a pure library opens no resource, so there is nothing to integrate with; alternative-proof: typekit:unit / Attempt accepts a type predicate as the guard
-  # Exemption(e2e): a pure library has no process or page to drive from outside; alternative-proof: typekit:unit / Attempt accepts a type predicate as the guard
-  @integration-exempt @e2e-exempt
-  Scenario: Attempt accepts a type predicate as the guard
-    Given a call that throws a plain string
-    When it is attempted with a predicate that accepts strings
-    Then the result is an Err holding that string
-
   # Exemption(integration): a pure library opens no resource, so there is nothing to integrate with; alternative-proof: typekit:unit / Attempt with no guard is a type error
   # Exemption(e2e): a pure library has no process or page to drive from outside; alternative-proof: typekit:unit / Attempt with no guard is a type error
   @integration-exempt @e2e-exempt
