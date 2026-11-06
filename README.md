@@ -8,14 +8,14 @@ however many people press the button at once.
 
 If you have five minutes, read these files in this order:
 
-| File                                                                  | What you learn                                                                   |
-| --------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `apps/flash-be/src/domain/sale.ts`                                    | the sale rules: upcoming, active, sold out or ended, from window and stock       |
-| `apps/flash-be/src/adapters/outbound/redis/redis-hold-gate.ts`        | the Redis script that takes one item for one shopper, atomically                 |
-| `apps/flash-be/src/adapters/outbound/postgres/purchase-repository.ts` | the transaction that has the last word: `sold < stock`, one purchase per shopper |
-| `apps/flash-be/src/adapters/inbound/http/routes.ts`                   | every endpoint, and what it does                                                 |
+| File                                                                  | What you learn                                                                                                           |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `apps/flash-be/src/domain/sale.ts`                                    | the sale rules: upcoming, active, sold out or ended, from window and stock                                               |
+| `apps/flash-be/src/adapters/outbound/redis/redis-hold-gate.ts`        | the Redis script that takes one item for one shopper, atomically                                                         |
+| `apps/flash-be/src/adapters/outbound/postgres/purchase-repository.ts` | the transaction that has the last word: `sold < stock`, one purchase per shopper                                         |
+| `apps/flash-be/src/adapters/inbound/http/routes.ts`                   | every endpoint, and what it does                                                                                         |
 | `apps/flash-web/src/sale/sale-page.tsx`                               | the page: status, name, Buy Now, feedback. Tailwind classes make it responsive and follow the system light or dark theme |
-| `apps/flash-load/k6/profiles.ts`, `apps/flash-load/scripts/run.ts`    | the stress profiles, and the verdict that is read from the data                  |
+| `apps/flash-load/k6/profiles.ts`, `apps/flash-load/scripts/run.ts`    | the stress profiles, and the verdict that is read from the data                                                          |
 
 That is the core. The rest is support that keeps the code checked as it grows: Nx targets, the `typekit`
 library, the hexagon layers, the behaviour-coverage check, the docs check and the lint rules. You can ignore all of
@@ -40,13 +40,13 @@ it to understand the system; it only matters when you change the code.
 
 It is an npm workspace with five apps in `apps/` and one library in `libs/`:
 
-| App             | What it is                                                                          |
-| --------------- | ----------------------------------------------------------------------------------- |
-| `flash-be`      | REST API (Fastify) with the sale logic, on Postgres (Kysely, no ORM) and Redis      |
+| App             | What it is                                                                                |
+| --------------- | ----------------------------------------------------------------------------------------- |
+| `flash-be`      | REST API (Fastify) with the sale logic, on Postgres (Kysely, no ORM) and Redis            |
 | `flash-web`     | React client (TanStack Start, Tailwind CSS). The browser only talks to its own web server |
-| `flash-be-e2e`  | Playwright tests against the running API                                            |
-| `flash-web-e2e` | Playwright tests in a browser                                                       |
-| `flash-load`    | k6 load test against three API instances behind nginx, with a verdict from the data |
+| `flash-be-e2e`  | Playwright tests against the running API                                                  |
+| `flash-web-e2e` | Playwright tests in a browser                                                             |
+| `flash-load`    | k6 load test against three API instances behind nginx, with a verdict from the data       |
 
 `libs/typekit` (`@flash/typekit`) is a TypeScript port of [py-typekit](https://github.com/wahidyankf/py-typekit). It has
 `Result` and `attempt`. `flash-be` and `flash-web` use it, so a failure is a value and product code has no `catch`. The
