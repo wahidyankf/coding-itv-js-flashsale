@@ -9,13 +9,7 @@ describe("public surface", () => {
 			"assertNever",
 			"attempt",
 			"attemptAsync",
-			"pipe",
-			"result",
 			"satisfying",
 		]);
-	});
-
-	it("reaches the curried combinators through their namespace", () => {
-		expect(Object.keys(typekit.result).sort()).toContain("flatMapErr");
 	});
 });

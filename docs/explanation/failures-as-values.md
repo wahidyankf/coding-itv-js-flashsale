@@ -39,5 +39,5 @@ time, which is when a new error code or a new sale status is added.
 ## What it costs
 
 A `Result` is an object, so a hot path allocates a little more. The load test shows no change in its limits. `await` and
-`Result` do not chain by themselves: pure steps use `pipe`, and steps that await check the result and return early. The
+`Result` do not chain by themselves: steps check each result and return early. The
 library is small, and its types are the part that matters.

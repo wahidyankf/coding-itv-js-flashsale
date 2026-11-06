@@ -32,7 +32,7 @@ export async function openStream(
 		buffer = parsed.rest;
 		for (const frame of parsed.frames) {
 			const event = readStreamEvent(frame);
-			if (event) events.push(event.value);
+			if (event) events.push(event);
 		}
 	};
 

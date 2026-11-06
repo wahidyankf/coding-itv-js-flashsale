@@ -1,7 +1,6 @@
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import { expect } from "vitest";
 import { assertNever } from "../match.js";
-import * as result from "../result.js";
 import { Err, Ok, type Result } from "../result.js";
 import { specFile } from "./support/paths.js";
 
@@ -52,11 +51,9 @@ describeFeature(
 					run = () => [
 						// @ts-expect-error the err handler is missing
 						good.match({ ok: (n: number) => n }),
-						// @ts-expect-error the curried result match needs both handlers too
-						result.match({ ok: (n: number) => n }),
 					];
 				});
-				Then("the type checker refuses both calls", () => {
+				Then("the type checker refuses the call", () => {
 					// The @ts-expect-error lines above fail `tsc` when a call becomes valid.
 					expect(typeof run).toBe("function");
 				});

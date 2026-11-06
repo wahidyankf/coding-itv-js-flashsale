@@ -1,5 +1,4 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
-import * as result from "./result.js";
 import { Err, Ok, type Result } from "./result.js";
 
 const good: Result<number, string> = new Ok(2);
@@ -28,41 +27,6 @@ describe("Result guards and discriminant", () => {
 		};
 		expect(read(good)).toBe("value 2");
 		expect(read(bad)).toBe("error bad");
-	});
-});
-
-describe("curried combinators", () => {
-	it("map and mapErr act on their own side", () => {
-		expect(result.map((n: number) => n + 1)(good)).toEqual(new Ok(3));
-		expect(result.map((n: number) => n + 1)(bad)).toEqual(new Err("bad"));
-		expect(result.mapErr((e: string) => e.length)(bad)).toEqual(new Err(3));
-		expect(result.mapErr((e: string) => e.length)(good)).toEqual(new Ok(2));
-	});
-
-	it("flatMap and flatMapErr continue with a step that may fail", () => {
-		const half = (n: number): Result<number, string> =>
-			n % 2 === 0 ? new Ok(n / 2) : new Err("odd");
-		expect(result.flatMap(half)(good)).toEqual(new Ok(1));
-		expect(result.flatMap(half)(bad)).toEqual(new Err("bad"));
-		const recover = (): Result<number, string> => new Ok(0);
-		expect(result.flatMapErr(recover)(bad)).toEqual(new Ok(0));
-		expect(result.flatMapErr(recover)(good)).toEqual(new Ok(2));
-	});
-
-	it("tap and tapErr see one side and return the result", () => {
-		const seen: unknown[] = [];
-		expect(result.tap((n: number) => seen.push(n))(good)).toBe(good);
-		expect(result.tapErr((e: string) => seen.push(e))(bad)).toBe(bad);
-		expect(seen).toEqual([2, "bad"]);
-	});
-
-	it("match picks the handler of the side", () => {
-		const run = result.match({
-			ok: (n: number) => n,
-			err: (e: string) => e.length,
-		});
-		expect(run(good)).toBe(2);
-		expect(run(bad)).toBe(3);
 	});
 });
 

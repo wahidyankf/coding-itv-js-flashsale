@@ -19,7 +19,7 @@ Feature: Matching exhaustively
   Scenario: A match without a handler for a side is a type error
     Given a Result
     When each is matched without one of its handlers
-    Then the type checker refuses both calls
+    Then the type checker refuses the call
 
   # Exemption(integration): a pure library opens no resource, so there is nothing to integrate with; alternative-proof: typekit:unit / A switch that forgets a case is a type error
   # Exemption(e2e): a pure library has no process or page to drive from outside; alternative-proof: typekit:unit / A switch that forgets a case is a type error

@@ -12,8 +12,6 @@ import {
 	attemptAsync,
 	Err,
 	Ok,
-	pipe,
-	result,
 	satisfying,
 	type Result,
 } from "@flash/typekit";
@@ -38,8 +36,7 @@ error. Both carry both type parameters, so every method has the same signature o
 | `.tapErr(f)`           | returns itself               | calls `f(error)`, returns it |
 | `.match({ ok, err })`  | `ok(value)`                  | `err(error)`                 |
 
-`._tag` is `"ok"` or `"err"`, so a `switch` on it narrows. The `result` namespace has the same operations curried, for
-`pipe`: `result.map(f)`, `mapErr`, `flatMap`, `flatMapErr`, `tap`, `tapErr` and `match({ ok, err })`.
+`._tag` is `"ok"` or `"err"`, so a `switch` on it narrows.
 
 ## Absence
 
@@ -62,12 +59,6 @@ They are the only places in product code that catch. `call` takes no arguments; 
 - There is no default guard. Naming none is a type error, and a `TypeError` at run time.
 - The fault type is the union of what the guards accept.
 - `attemptAsync` also catches a call that throws before it returns a promise.
-
-## pipe
-
-`pipe(value, f1, ..., f9)` applies the functions left to right. It takes one to nine functions, each typed from the one
-before, so a mismatched stage is a type error. Nest `pipe` for a longer chain. An exception in a stage goes to the
-caller and later stages do not run.
 
 ## assertNever
 

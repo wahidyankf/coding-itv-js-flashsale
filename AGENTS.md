@@ -5,7 +5,7 @@ Guidance for AI coding agents working in this repository. For setup and run comm
 ## Project
 
 Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `flash-be` (Fastify REST API), `flash-web` (TanStack Start client),
-`flash-be-e2e` and `flash-web-e2e` (Playwright), and `flash-load` (k6 load test). `libs/typekit` (`@flash/typekit`) holds `Result`, `attempt`, `pipe` and
+`flash-be-e2e` and `flash-web-e2e` (Playwright), and `flash-load` (k6 load test). `libs/typekit` (`@flash/typekit`) holds `Result`, `attempt` and
 `assertNever`; `flash-be` and `flash-web` use it. `libs/contract` (`@flash/contract`) holds the HTTP contract of the API; every app uses it. Data lives in Postgres (Kysely, no ORM) and Redis.
 
 ## Docs and specs

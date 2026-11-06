@@ -47,11 +47,9 @@ const { reservationId } = reserved.value;
 Make the table of statuses a `satisfies Record<ReserveError, number>`. A new error without a status then fails the
 build. Use `.match({ ok, err })` when both sides produce a value of the same type.
 
-## 4. Chain steps
+## 4. Check several steps in a row
 
-Use `pipe` with the curried combinators to transform a Result that already exists, such as `result.map(f)`. To check
-several things in a row, return early on each failure. The first failure is what comes out, and the code reads from top
-to bottom:
+Return early on each failure. The first failure is what comes out, and the code reads from top to bottom:
 
 ```ts
 const found = await sales.details(saleId);
@@ -59,6 +57,8 @@ if (found === undefined) return new Err("sale_not_found");
 const user = normalizeUser(rawUser);
 if (user === undefined) return new Err("invalid_user");
 ```
+
+Use `.map(f)` on a Result that already exists to change its value without unpacking it.
 
 ## 5. Absent values
 

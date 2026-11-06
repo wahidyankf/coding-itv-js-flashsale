@@ -6,7 +6,6 @@
 //
 // Both classes carry both type parameters, so every method has the same signature on Ok and on Err and can be called on
 // the union. They are frozen and their fields are readonly, so a write is a type error and, at run time, a TypeError.
-// The curried twins at the bottom (map, mapErr, ...) are the same operations for pipe: `result.map(f)`.
 
 export class Ok<out T, out E = never> {
 	readonly _tag = "ok" as const;
@@ -103,46 +102,3 @@ export class Err<out T = never, out E = never> {
 }
 
 export type Result<T, E> = Ok<T, E> | Err<T, E>;
-
-export function map<T, U, E>(
-	transform: (value: T) => U,
-): (result: Result<T, E>) => Result<U, E> {
-	return (result) => result.map(transform);
-}
-
-export function mapErr<T, E, F>(
-	transform: (error: E) => F,
-): (result: Result<T, E>) => Result<T, F> {
-	return (result) => result.mapErr(transform);
-}
-
-export function flatMap<T, U, E, F>(
-	step: (value: T) => Result<U, F>,
-): (result: Result<T, E>) => Result<U, E | F> {
-	return (result) => result.flatMap(step);
-}
-
-export function flatMapErr<T, U, E, F>(
-	step: (error: E) => Result<U, F>,
-): (result: Result<T, E>) => Result<T | U, F> {
-	return (result) => result.flatMapErr(step);
-}
-
-export function tap<T, E>(
-	action: (value: T) => unknown,
-): (result: Result<T, E>) => Result<T, E> {
-	return (result) => result.tap(action);
-}
-
-export function tapErr<T, E>(
-	action: (error: E) => unknown,
-): (result: Result<T, E>) => Result<T, E> {
-	return (result) => result.tapErr(action);
-}
-
-export function match<T, E, R>(handlers: {
-	ok: (value: T) => R;
-	err: (error: E) => R;
-}): (result: Result<T, E>) => R {
-	return (result) => result.match(handlers);
-}
