@@ -4,6 +4,7 @@ import {
 	routes,
 	type SaleView,
 	type StreamEvent,
+	TICKET_HEADER,
 } from "@flash/contract";
 import { attemptAsync } from "@flash/typekit";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -134,7 +135,7 @@ export function registerRoutes(
 		schema: schemaOf(routes.placeEvents),
 		handler: async (request, reply) => {
 			const { saleId, userId } = request.params;
-			const ticket = request.headers["x-queue-ticket"];
+			const ticket = request.headers[TICKET_HEADER];
 			const first = await deps.queue.check(saleId, userId, ticket);
 			if (first.isErr()) {
 				return reply
@@ -190,7 +191,7 @@ export function registerRoutes(
 			const checked = await deps.queue.check(
 				request.params.saleId,
 				request.params.userId,
-				request.headers["x-queue-ticket"],
+				request.headers[TICKET_HEADER],
 			);
 			if (checked.isErr()) {
 				return reply
@@ -212,7 +213,7 @@ export function registerRoutes(
 			const reserved = await deps.reservations.reserve(
 				request.params.saleId,
 				request.body.userId,
-				request.headers["x-queue-ticket"],
+				request.headers[TICKET_HEADER],
 			);
 			if (reserved.isErr()) {
 				return reply

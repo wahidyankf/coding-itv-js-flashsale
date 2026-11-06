@@ -3,5 +3,6 @@ npm run --silent bdd:check:test
 npm run --silent lint:rules:test
 npm run --silent bdd:check
 npm run --silent openapi:check
+npm run --silent contract:guard:test
 npx --no -- nx affected -t test:quick --base=origin/main
 npx --no -- nx affected -t test:coverage --base=origin/main
