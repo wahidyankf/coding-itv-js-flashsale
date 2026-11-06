@@ -7,11 +7,25 @@ GET {{web}}/api/health
 ### Web: the current sale through the pass-through route (what the page calls; run with `npx nx dev flash-web`)
 GET {{web}}/api/sales/current
 
+### Web: one sale by id through the pass-through route (replace the sale id)
+GET {{web}}/api/sales/00000000-0000-4000-8000-000000000000
+
+### Web: live sale status through the pass-through route (Server-Sent Events; stays open)
+GET {{web}}/api/sales/00000000-0000-4000-8000-000000000000/events
+
 ### Web: join the queue through the pass-through route (replace the sale id; the reply holds your ticket)
 POST {{web}}/api/sales/00000000-0000-4000-8000-000000000000/queue
 Content-Type: application/json
 
 { "userId": "ana" }
+
+### Web: check your place through the pass-through route (send the ticket from the join reply)
+GET {{web}}/api/sales/00000000-0000-4000-8000-000000000000/queue/ana
+x-queue-ticket: paste-the-ticket-here
+
+### Web: live place in the queue through the pass-through route (send the ticket; stays open)
+GET {{web}}/api/sales/00000000-0000-4000-8000-000000000000/queue/ana/events
+x-queue-ticket: paste-the-ticket-here
 
 ### Web: reserve one item through the pass-through route (send the ticket from the join reply)
 POST {{web}}/api/sales/00000000-0000-4000-8000-000000000000/reservations
@@ -31,3 +45,9 @@ GET {{web}}/api/sales/00000000-0000-4000-8000-000000000000/purchases/ana
 
 ### Web: a path that is not allowed answers 404 not_found
 GET {{web}}/api/sales/current/secret
+
+### Web: the operator route is never passed on, so it answers 404 not_found (create sales on the API, see api-flash-be.http)
+POST {{web}}/api/admin/sales
+Content-Type: application/json
+
+{ "stock": 100, "startsAt": "2030-01-01T12:00:00Z", "endsAt": "2030-01-01T13:00:00Z" }

@@ -1,5 +1,8 @@
 # Requests to the flash-be API. They follow the contract in libs/contract; docs/reference/openapi.json is generated from it.
 @backend = http://localhost:8080
+# The operator token is read from ADMIN_TOKEN in the .env file next to this file (see .env.example). kulala.nvim and the
+# REST Client extension read it with $dotenv; in another client, paste the token in the Authorization header.
+@adminToken = {{$dotenv ADMIN_TOKEN}}
 
 ### Backend: liveness (no dependencies, run with `npx nx dev flash-be`)
 GET {{backend}}/health
@@ -13,10 +16,11 @@ GET {{backend}}/sales/current
 ### Backend: one sale by id (replace the id with the one the seed command printed)
 GET {{backend}}/sales/00000000-0000-4000-8000-000000000000
 
-### Backend: create a sale (operator; needs ADMIN_TOKEN set for the API; 404 when it is off, 401 for a wrong token, 409 when the window overlaps)
+### Backend: create a sale (operator; the API needs ADMIN_TOKEN in .env, at least 16 characters; 404 when it is off, 401 for a wrong token, 409 when the window overlaps)
+# Optional fields: name, holdSeconds, admitPerSecond.
 POST {{backend}}/admin/sales
 Content-Type: application/json
-Authorization: Bearer replace-with-your-admin-token
+Authorization: Bearer {{adminToken}}
 
 { "stock": 100, "startsAt": "2030-01-01T12:00:00Z", "endsAt": "2030-01-01T13:00:00Z" }
 

@@ -239,4 +239,4 @@ rate limits. `SALE_CACHE_MS` (1000) sets the sale read cache. `EVENTS_INTERVAL_M
 
 ## Manual requests
 
-[`api-flash-be.http`](../../api-flash-be.http) and [`api-flash-web.http`](../../api-flash-web.http) hold the requests above in the kulala.nvim format, one file per app.
+[`api-flash-be.http`](../../api-flash-be.http) and [`api-flash-web.http`](../../api-flash-web.http) hold the requests above in the kulala.nvim format, one file per app. Every route of the contract is in the first file, and every route the web server passes on is in the second. The create-sale request reads `ADMIN_TOKEN` from `.env` with `$dotenv`, so set it there first (see [`.env.example`](../../.env.example)).
