@@ -16,14 +16,14 @@ import {
 export const OWNERS = [
 	{
 		name: "flash-be",
-		spec: "specs/flash/be",
+		spec: "specs/apps/flash/be",
 		unit: "apps/flash-be/src/bdd",
 		integration: "apps/flash-be/src/bdd",
 		e2e: "apps/flash-be-e2e/steps",
 	},
 	{
 		name: "flash-web",
-		spec: "specs/flash/web",
+		spec: "specs/apps/flash/web",
 		unit: "apps/flash-web/src/bdd",
 		integration: "apps/flash-web/src/bdd",
 		e2e: "apps/flash-web-e2e/steps",

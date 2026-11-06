@@ -4,7 +4,7 @@
 export const FLASH_OWNERS = [
 	{
 		name: "flash-be",
-		spec: "specs/flash/be",
+		spec: "specs/apps/flash/be",
 		unit: "apps/flash-be/src/bdd",
 		integration: "apps/flash-be/src/bdd",
 		e2e: "apps/flash-be-e2e/steps",
@@ -12,8 +12,8 @@ export const FLASH_OWNERS = [
 ];
 
 export const PATHS = {
-	feature: "specs/flash/be/behaviours/health/liveness.feature",
-	readme: "specs/flash/be/behaviours/health/README.md",
+	feature: "specs/apps/flash/be/behaviours/health/liveness.feature",
+	readme: "specs/apps/flash/be/behaviours/health/README.md",
 	unit: "apps/flash-be/src/bdd/health_tests.ts",
 	integration: "apps/flash-be/src/bdd/health_integration_tests.ts",
 	e2e: "apps/flash-be-e2e/steps/be.steps.ts",

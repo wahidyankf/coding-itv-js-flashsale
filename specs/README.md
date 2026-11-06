@@ -6,6 +6,6 @@ bug to fix.
 
 ## Directory Map
 
-- [flash/](flash/README.md) - the flash sale product: its architecture, the API (`be`), and the web app (`web`).
+- [apps/](apps/README.md) - the specifications of the apps: their behaviour scenarios and the flash sale C4 model.
 
 Only the apps use Gherkin. The libraries and the repository's tools are tested with plain Vitest tests next to their code.

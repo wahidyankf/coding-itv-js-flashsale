@@ -15,8 +15,8 @@ const baseURL = `http://localhost:${webPort}`;
 
 // The scenarios come from the specs. Scenarios tagged @e2e-exempt are proven by another layer.
 const testDir = defineBddConfig({
-	featuresRoot: "../../specs/flash/web/behaviours",
-	features: "../../specs/flash/web/behaviours/**/*.feature",
+	featuresRoot: "../../specs/apps/flash/web/behaviours",
+	features: "../../specs/apps/flash/web/behaviours/**/*.feature",
 	steps: ["./steps/**/*.steps.ts"],
 	tags: "not @e2e-exempt",
 });

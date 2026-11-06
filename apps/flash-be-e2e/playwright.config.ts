@@ -13,8 +13,8 @@ const baseURL = process.env.FLASH_BE_URL ?? `http://localhost:${port}`;
 
 // The scenarios come from the specs. Scenarios tagged @e2e-exempt are proven by another layer.
 const testDir = defineBddConfig({
-	featuresRoot: "../../specs/flash/be/behaviours",
-	features: "../../specs/flash/be/behaviours/**/*.feature",
+	featuresRoot: "../../specs/apps/flash/be/behaviours",
+	features: "../../specs/apps/flash/be/behaviours/**/*.feature",
 	steps: ["./steps/**/*.steps.ts"],
 	tags: "not @e2e-exempt",
 });
