@@ -33,7 +33,7 @@ it to understand the system; it only matters when you change the code.
 | An endpoint to attempt a purchase | Three calls, because a rush needs a queue: `POST /sales/:saleId/queue` (join, get a ticket), `POST .../reservations` (hold one item), `POST .../purchases` (pay). **Buy Now** makes the first two; **Confirm purchase** makes the third |
 | An endpoint to check the outcome  | `GET /sales/:saleId/purchases/:userId`: a purchase, a live hold, or nothing                                                                                                                                                                              |
 | A simple React frontend           | `apps/flash-web`                                                                                                                                                                                                                                         |
-| A system diagram                  | below; the C4 views are in [specs/flash/c4](specs/flash/c4/README.md)                                                                                                                                                                |
+| A system diagram                  | below; the C4 views are in [specs/apps/flash/c4](specs/apps/flash/c4/README.md)                                                                                                                                                                |
 | Unit and integration tests        | next to the code; the apps add Gherkin scenarios bound at unit, integration and end-to-end level (see [Tests](#tests))                                                                                                                                           |
 | Stress tests                      | `apps/flash-load` (see [Load test](#load-test))                                                                                                                                                                                                          |
 
@@ -151,7 +151,7 @@ any request, so adding capacity is adding instances.
 | Names, not accounts                     | A queue ticket binds a name to a request. No sign-up is needed                                                                                             | A name can be taken by anyone; this is not authentication          |
 
 Longer explanations are in [docs/explanation](docs/explanation/README.md), and the architecture diagrams are in
-[specs/flash/c4](specs/flash/c4/README.md). One sale runs at a time. `POST /admin/sales` refuses a
+[specs/apps/flash/c4](specs/apps/flash/c4/README.md). One sale runs at a time. `POST /admin/sales` refuses a
 window that overlaps another sale; the seed command does not check. There is no admin page.
 
 ## How it scales, and where it stops
@@ -249,7 +249,7 @@ npm run docs:install           # once: fetch the docs checker
 npm run docs:check             # links, structure and diagrams in the docs
 ```
 
-The apps' behaviour is written as Gherkin scenarios in [specs/flash/](specs/flash/README.md) first. Each scenario is bound at unit,
+The apps' behaviour is written as Gherkin scenarios in [specs/apps/flash/](specs/apps/flash/README.md) first. Each scenario is bound at unit,
 integration and end-to-end level, except where a real boundary makes that impossible. Those few exceptions sit next to
 the scenario, with the test that proves it. A detail that only a developer would notice is a plain test next to the code,
 not a scenario (see [scenario or plain test](docs/explanation/scenario-or-plain-test.md)). Playwright needs Chromium once:

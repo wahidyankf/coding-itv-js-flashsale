@@ -9,7 +9,7 @@ The steps are the same for `flash-web`, with its own folders.
 
 ## 1. Write the scenario
 
-Add it to a feature file under `specs/flash/be/behaviours/`. Put it in the folder for its area, for example
+Add it to a feature file under `specs/apps/flash/be/behaviours/`. Put it in the folder for its area, for example
 `health/` or `config/`. If the folder has no feature file for this behaviour yet, create one and link it from the
 folder's `README.md`:
 

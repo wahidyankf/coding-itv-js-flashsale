@@ -29,5 +29,5 @@ A Redis connection that drops after start-up does not stop the API. The Redis cl
 ends the process on the first dropped socket.
 
 The scenario "Readiness recovers after Redis drops the API's connection" in
-`specs/flash/be/behaviours/health/readiness.feature` checks the recovery at unit, integration, and e2e level. The
+`specs/apps/flash/be/behaviours/health/readiness.feature` checks the recovery at unit, integration, and e2e level. The
 integration and e2e bindings drop a real Redis connection with `CLIENT KILL`.

@@ -40,7 +40,7 @@ The current sale is the one that opens last. `remaining` is `stock` minus the it
 | `sold_out` | the window is open and no item remains                   |
 | `ended`    | the window has closed, whether or not the stock sold out |
 
-The scenarios are in [`specs/flash/be/behaviours/sale/status.feature`](../../specs/flash/be/behaviours/sale/status.feature).
+The scenarios are in [`specs/apps/flash/be/behaviours/sale/status.feature`](../../specs/apps/flash/be/behaviours/sale/status.feature).
 
 ### Caching
 
@@ -48,7 +48,7 @@ Both sale reads come from a short in-process cache. `SALE_CACHE_MS` sets its tim
 cached `200` carries `Cache-Control: public, max-age=<seconds>`, rounded up. A `404` is never cached, and the write
 routes never read the cache. Why `remaining` may be that old is in [the sale read cache](../explanation/sale-read-cache.md).
 
-The scenarios are in [`specs/flash/be/behaviours/sale/caching.feature`](../../specs/flash/be/behaviours/sale/caching.feature).
+The scenarios are in [`specs/apps/flash/be/behaviours/sale/caching.feature`](../../specs/apps/flash/be/behaviours/sale/caching.feature).
 
 ## Creating a sale (operator)
 
@@ -75,7 +75,7 @@ is `201` with the new sale (`SaleView`).
 | `429`  | `rate_limited`        | too many tries from one address; the token is checked after the count                    |
 
 The token is checked before the body is read. The scenarios are in
-[`specs/flash/be/behaviours/sale/admin.feature`](../../specs/flash/be/behaviours/sale/admin.feature). See
+[`specs/apps/flash/be/behaviours/sale/admin.feature`](../../specs/apps/flash/be/behaviours/sale/admin.feature). See
 [admin and sale windows](../explanation/admin-and-sale-windows.md) for why it only creates and where the overlap rule
 stops.
 
@@ -102,7 +102,7 @@ and the same ticket.
 | `409`  | `sale_ended`     | the window has closed; the queue takes no new shoppers                   |
 | `409`  | `sold_out`       | no item remains; the queue takes no new shoppers                         |
 
-The scenarios are in [`specs/flash/be/behaviours/queue/`](../../specs/flash/be/behaviours/queue/README.md).
+The scenarios are in [`specs/apps/flash/be/behaviours/queue/`](../../specs/apps/flash/be/behaviours/queue/README.md).
 
 ## Reservations
 
@@ -127,7 +127,7 @@ the item can go to someone else.
 | `503`  | `unavailable`       | the reservation state could not be rebuilt in time; try again              |
 
 A sale that is not selling answers before the ticket is checked. The scenarios are in
-[`specs/flash/be/behaviours/reservation/`](../../specs/flash/be/behaviours/reservation/README.md).
+[`specs/apps/flash/be/behaviours/reservation/`](../../specs/apps/flash/be/behaviours/reservation/README.md).
 
 ## Purchases
 
@@ -157,7 +157,7 @@ shopper is charged once.
 | `holding`   | the shopper holds an item that has not expired       |
 | `none`      | nothing, also when the hold has expired              |
 
-The scenarios are in [`specs/flash/be/behaviours/purchase/`](../../specs/flash/be/behaviours/purchase/README.md).
+The scenarios are in [`specs/apps/flash/be/behaviours/purchase/`](../../specs/apps/flash/be/behaviours/purchase/README.md).
 
 ## Live updates (Server-Sent Events)
 
@@ -173,7 +173,7 @@ changed, checked every `EVENTS_INTERVAL_MS` (1000). When nothing changes for 15 
 sent. If the sale or the ticket is wrong, the answer is a normal JSON error (`404 sale_not_found`, `401 invalid_ticket`)
 and no stream opens. If a shopper's place is lost while watching, the stream sends `{"state":"absent"}`.
 
-The scenarios are in [`specs/flash/be/behaviours/events/`](../../specs/flash/be/behaviours/events/README.md).
+The scenarios are in [`specs/apps/flash/be/behaviours/events/`](../../specs/apps/flash/be/behaviours/events/README.md).
 
 ## Rate limits
 
@@ -185,7 +185,7 @@ the first request, not at a fixed clock tick. The limits are `RATE_LIMIT_PER_USE
 `RATE_LIMIT_WINDOW_SECONDS` (10). Set `TRUST_PROXY=true` only behind a proxy you control, so that the client address is
 read from `X-Forwarded-For`.
 
-The scenarios are in [`specs/flash/be/behaviours/rate-limit/`](../../specs/flash/be/behaviours/rate-limit/README.md).
+The scenarios are in [`specs/apps/flash/be/behaviours/rate-limit/`](../../specs/apps/flash/be/behaviours/rate-limit/README.md).
 
 ## While Redis is down
 
@@ -193,7 +193,7 @@ The scenarios are in [`specs/flash/be/behaviours/rate-limit/`](../../specs/flash
 valid ticket, and reservations are decided by Postgres alone. `GET /ready` answers `503` with `"redis":"error"`. The rest
 of the API behaves as usual. See [serving without Redis](../explanation/serving-without-redis.md).
 
-The scenarios are in [`specs/flash/be/behaviours/degraded/`](../../specs/flash/be/behaviours/degraded/README.md).
+The scenarios are in [`specs/apps/flash/be/behaviours/degraded/`](../../specs/apps/flash/be/behaviours/degraded/README.md).
 
 ## flash-web (port 3000)
 
@@ -225,8 +225,8 @@ Only `content-type`, `accept`, `x-queue-ticket` and `x-forwarded-for` are sent o
 `{"error":"backend_unavailable"}`. The address of `flash-be` is read on the server and never reaches the page. See
 [the web server in front of the API](../explanation/web-server-proxy.md).
 
-The scenarios are in [`specs/flash/web/behaviours/proxy/`](../../specs/flash/web/behaviours/proxy/README.md) and
-[`sale/`](../../specs/flash/web/behaviours/sale/README.md).
+The scenarios are in [`specs/apps/flash/web/behaviours/proxy/`](../../specs/apps/flash/web/behaviours/proxy/README.md) and
+[`sale/`](../../specs/apps/flash/web/behaviours/sale/README.md).
 
 ## Configuration
 

@@ -55,6 +55,6 @@ back.
 
 ## Where to read more
 
-- The exact behaviour: [`reservation/`](../../specs/flash/be/behaviours/reservation/README.md) and
-  [`recovery/`](../../specs/flash/be/behaviours/recovery/README.md) in the specs.
+- The exact behaviour: [`reservation/`](../../specs/apps/flash/be/behaviours/reservation/README.md) and
+  [`recovery/`](../../specs/apps/flash/be/behaviours/recovery/README.md) in the specs.
 - The routes: [HTTP endpoints](../reference/http-endpoints.md).

@@ -40,7 +40,7 @@ curl -s http://localhost:8080/sales/current
 The body is described in [HTTP endpoints](../reference/http-endpoints.md#the-sale).
 
 The scenarios for this command are in
-[`specs/flash/be/behaviours/sale/seeding.feature`](../../specs/flash/be/behaviours/sale/seeding.feature).
+[`specs/apps/flash/be/behaviours/sale/seeding.feature`](../../specs/apps/flash/be/behaviours/sale/seeding.feature).
 
 ## Create the sale through the API instead
 

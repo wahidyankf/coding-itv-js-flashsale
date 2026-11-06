@@ -59,5 +59,5 @@ itself: if the item is still free, the commit sells it. If another shopper took 
 
 ## Where to read more
 
-- The exact behaviour: [`purchase/`](../../specs/flash/be/behaviours/purchase/README.md) in the specs.
+- The exact behaviour: [`purchase/`](../../specs/apps/flash/be/behaviours/purchase/README.md) in the specs.
 - The routes: [HTTP endpoints](../reference/http-endpoints.md).

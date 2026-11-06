@@ -70,7 +70,7 @@ Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `fla
   then add plain tests for the branches that do not deserve one. A scenario that needs both `@integration-exempt` and
   `@e2e-exempt` in an app is a sign of a detail: make it a plain test. See `docs/explanation/scenario-or-plain-test.md`.
 - Only the apps use Gherkin. `libs/` and `scripts/` have plain Vitest tests and no `specs/` scenarios. Behaviour scenarios
-  are canonical in `specs/flash/`. Bind each one at unit. Bind integration and e2e too, unless the
+  are canonical in `specs/apps/flash/`. Bind each one at unit. Bind integration and e2e too, unless the
   scenario has `@integration-exempt` or `@e2e-exempt`. One scenario may carry both tags. Each tag needs the comment
   format in `docs/how-to/add-a-behaviour.md`, and the unit binding is the alternative proof.
 - Run `npm run bdd:check` after changing a feature file or a binding. It runs in the pre-push hook.

@@ -11,7 +11,7 @@
 The pre-push hook runs the combined coverage gate, so integration tests run there too. `test:coverage` starts the dev
 stack itself. End-to-end tests are never part of the hooks.
 
-Only the apps use Gherkin. In an app, a **scenario binding** (`src/bdd/*_tests.ts(x)`) runs a scenario from `specs/flash/`.
+Only the apps use Gherkin. In an app, a **scenario binding** (`src/bdd/*_tests.ts(x)`) runs a scenario from `specs/apps/flash/`.
 Everything else is a **plain test** next to the code (`*_tests.ts(x)`): it guards a branch, a rule of structure or an
 internal detail. The libraries (`libs/`) and the repository's scripts (`scripts/`) have no Gherkin at all. The choice is
 explained in [scenario or plain test](../explanation/scenario-or-plain-test.md). Plain integration tests sit next to the
@@ -59,7 +59,7 @@ Excluded from the coverage denominator:
 
 ## Behaviour coverage
 
-Every scenario in `specs/flash/` must be bound at the unit layer. It must also be bound at the integration and end-to-end
+Every scenario in `specs/apps/flash/` must be bound at the unit layer. It must also be bound at the integration and end-to-end
 layers, unless it carries an exemption tag. `npm run bdd:check` checks this without running any tests. It fails when:
 
 - a scenario has no unit binding, or a binding names no scenario;

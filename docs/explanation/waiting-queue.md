@@ -42,5 +42,5 @@ id gets the same ticket. The trade-off is deliberate. The queue is a fairness an
 
 ## Where to read more
 
-- The exact behaviour: [`specs/flash/be/behaviours/queue/`](../../specs/flash/be/behaviours/queue/README.md).
+- The exact behaviour: [`specs/apps/flash/be/behaviours/queue/`](../../specs/apps/flash/be/behaviours/queue/README.md).
 - The routes: [HTTP endpoints](../reference/http-endpoints.md).
