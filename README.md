@@ -150,28 +150,27 @@ any request, so adding capacity is adding instances.
 | In-process mock payment                 | The flow, the refund and the retry rules are real; no provider is needed                                                                                   | It proves nothing about a real provider                            |
 | Names, not accounts                     | A queue ticket binds a name to a request. No sign-up is needed                                                                                             | A name can be taken by anyone; this is not authentication          |
 
-The longer explanations are in [docs/explanation](docs/explanation/README.md). The architecture diagrams are in
-[specs/flash/architecture](specs/flash/architecture/README.md). One sale runs at a time. A sale is created with
-`POST /admin/sales`, which refuses a window that overlaps another sale, or with the seed command, which does not check.
-There is no admin page.
+Longer explanations are in [docs/explanation](docs/explanation/README.md), and the architecture diagrams are in
+[specs/flash/architecture](specs/flash/architecture/README.md). One sale runs at a time. `POST /admin/sales` refuses a
+window that overlaps another sale; the seed command does not check. There is no admin page.
 
 ## How it scales, and where it stops
 
-**What scales.** The API tier. Instances are identical and stateless, so capacity grows by adding an instance. In
-`compose.prod.yaml` that is one more service next to `flash-be-1..3` and one more `server` line in `nginx.prod.conf`;
-each instance opens a small connection pool (ten), so raise Postgres `max_connections` with it. The hot path is one Redis
-script per hold, so a rush reaches Postgres only for the hold's write-through and the payment step. Reads of the sale
-are cached for a second, and watchers share one read through the event stream.
+**What scales.** The API tier. Instances are identical and stateless, so capacity grows by adding one. In
+`compose.prod.yaml` that means one more service next to `flash-be-1..3`, one more `server` line in `nginx.prod.conf`,
+and a higher Postgres `max_connections`, since each instance opens a pool of ten. The hot path is one Redis script per
+hold, so a rush reaches Postgres only for the hold's write-through and the payment step. Reads of the sale are cached
+for a second, and watchers share one read through the event stream.
 
 **What does not.** Postgres and Redis are each one instance here.
 
-- Postgres is the last word, so if it is down nothing can be sold. Every purchase raises `sold` on one row, so one sale is
-  limited by what one row can take; that is the price of never overselling.
+- Postgres has the last word, so when it is down nothing can be sold. Every purchase raises `sold` on one row, so one
+  sale is capped by what that row can take. That is the price of never overselling.
 - Redis is only a fast gate. If it is down the API keeps selling from Postgres alone, slower, and `/ready` answers `503`
   (see [serving without Redis](docs/explanation/serving-without-redis.md)).
-- Beyond this laptop-sized setup the next steps are managed Postgres with a standby for failover (and a replica for
-  reads), and Redis behind Sentinel or a managed failover. Redis Cluster would spread many sales over shards, but one
-  sale's keys stay together, so it would not speed up a single sale.
+- Beyond one laptop, the next steps are managed Postgres with a standby (and a read replica), and Redis behind Sentinel
+  or a managed failover. Redis Cluster spreads many sales over shards, but one sale's keys stay together, so it does not
+  speed up a single sale.
 
 **Other limits to know.**
 
