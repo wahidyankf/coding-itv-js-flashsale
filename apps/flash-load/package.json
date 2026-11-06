@@ -9,7 +9,9 @@
 		"load:smoke": "node scripts/run.ts smoke",
 		"load:full": "node scripts/run.ts full",
 		"load:chaos": "node scripts/run.ts chaos",
-		"bundle": "node scripts/bundle.ts"
+		"bundle": "node scripts/bundle.ts",
+		"load:burst": "node scripts/run.ts burst",
+		"load:contention": "node scripts/run.ts contention"
 	},
 	"devDependencies": {
 		"@types/k6": "^2.3.1",

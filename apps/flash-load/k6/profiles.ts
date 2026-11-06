@@ -67,6 +67,46 @@ export const PROFILES = {
 		redisStartsAtSeconds: 9,
 		judgeSpeed: false,
 	},
+	// Everyone arrives inside one second. The runs above spread their shoppers over many seconds, which lets the queue
+	// smooth the load. These two do not: the herd arrives first and the system has to take it.
+	//
+	// Sizing, written before the first run. A visit lasts at least two seconds (a poll for admission, then the reserve),
+	// so every shopper who arrives in the same second is in the system at once: the virtual users needed equal the
+	// shoppers. `full` already ran with 1,500 virtual users, so 2,000 shoppers asks for a third more and stays inside
+	// what this machine is known to run. All of them are started before the clock begins, so k6 does not stall the herd
+	// while it starts users. The speed limits below are the same as for every other run and are not loosened for a herd.
+	//
+	// burst: the herd hits the queue. 2,000 shoppers join within a second for 100 items; admission still lets in 300 a
+	// second, so the reserve and confirm steps are spread over about seven seconds.
+	burst: {
+		stock: 100,
+		holdSeconds: 10,
+		admitPerSecond: 300,
+		users: 2000,
+		arrivalsPerSecond: 2000,
+		latecomers: 100,
+		hammerUsers: 20,
+		preAllocatedVUs: 2000,
+		maxVUs: 2200,
+		abandonShare: 0.05,
+		judgeSpeed: true,
+	},
+	// contention: the herd hits the sale. Everyone is admitted in the first tick (admission is as large as the crowd), so
+	// 2,000 shoppers reserve in the same moment for 50 items. This is the Lua script and
+	// `UPDATE ... WHERE sold < stock` under contention, which the other runs never reach.
+	contention: {
+		stock: 50,
+		holdSeconds: 10,
+		admitPerSecond: 2000,
+		users: 2000,
+		arrivalsPerSecond: 2000,
+		latecomers: 100,
+		hammerUsers: 20,
+		preAllocatedVUs: 2000,
+		maxVUs: 2200,
+		abandonShare: 0.05,
+		judgeSpeed: true,
+	},
 } as const satisfies Record<string, Profile>;
 
 export type ProfileName = keyof typeof PROFILES;

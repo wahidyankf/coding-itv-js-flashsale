@@ -84,6 +84,32 @@
 					"target": "build"
 				}
 			]
+		},
+		"load:burst": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "npm run load:burst",
+				"cwd": "apps/flash-load"
+			},
+			"dependsOn": [
+				{
+					"projects": ["typekit", "contract"],
+					"target": "build"
+				}
+			]
+		},
+		"load:contention": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "npm run load:contention",
+				"cwd": "apps/flash-load"
+			},
+			"dependsOn": [
+				{
+					"projects": ["typekit", "contract"],
+					"target": "build"
+				}
+			]
 		}
 	}
 }
