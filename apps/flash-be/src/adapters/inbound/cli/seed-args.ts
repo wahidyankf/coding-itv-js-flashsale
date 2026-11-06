@@ -1,5 +1,10 @@
 import { parseArgs } from "node:util";
 import type { NewSale } from "../../../application/ports/sale-seeder.js";
+import {
+	DEFAULT_ADMIT_PER_SECOND,
+	DEFAULT_HOLD_SECONDS,
+	DEFAULT_SALE_NAME,
+} from "../../../domain/sale-window.js";
 
 const MINUTE_MS = 60_000;
 
@@ -50,20 +55,20 @@ export function parseSeedArgs(argv: string[], now: Date): NewSale {
 	const startsAt = new Date(now.getTime() + startsIn * MINUTE_MS);
 
 	return {
-		name: values.name ?? "Flash sale",
+		name: values.name ?? DEFAULT_SALE_NAME,
 		stock,
 		startsAt,
 		endsAt: new Date(startsAt.getTime() + duration * MINUTE_MS),
 		reservationTtlSeconds: integer(
 			"hold-seconds",
 			values["hold-seconds"],
-			120,
+			DEFAULT_HOLD_SECONDS,
 			1,
 		),
 		admitPerSecond: integer(
 			"admit-per-second",
 			values["admit-per-second"],
-			50,
+			DEFAULT_ADMIT_PER_SECOND,
 			1,
 		),
 	};

@@ -28,7 +28,7 @@ Everything above, and:
 | ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
 | `SaleView`, `PlaceView`, `JoinedView`, `ReservedView`, `PurchaseView`, `OutcomeView` | Zod schemas and types of the replies                                                                |
 | `HealthView`, `ReadyView`, `RateLimitedBody`, `ErrorBody`, `QueuePlace`              | the rest of the schemas                                                                             |
-| `routes`, `Route`, `Routes`, `Method`                                                | the route table: eleven routes, each with its params, headers, body and replies                     |
+| `routes`, `Route`, `Routes`, `Method`                                                | the route table: twelve routes, each with its params, headers, body and replies                     |
 | `RequestInput<R>`, `Reply<R>`, `AnyReply<R>`, `ErrorCodeOf<R>`                       | types worked out from a route                                                                       |
 | `buildRequest(route, input, baseUrl)`                                                | method, URL, headers and body text of a request                                                     |
 | `pathOf`, `matchRoute(method, path)`                                                 | a path from a route, and the route a path belongs to                                                |

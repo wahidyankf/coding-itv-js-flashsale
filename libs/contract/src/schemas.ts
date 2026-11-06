@@ -101,10 +101,25 @@ export const ConfirmBody = z.object({
 	reservationId: z.string(),
 });
 
+// A sale to create. The window is two ISO times. Whether the numbers and times make a usable sale is the rule of the
+// domain, so a bad value gets `invalid_sale` there and not a shape error here.
+export const CreateSaleBody = z.object({
+	name: z.string().optional(),
+	stock: z.number(),
+	startsAt: z.string(),
+	endsAt: z.string(),
+	holdSeconds: z.number().optional(),
+	admitPerSecond: z.number().optional(),
+});
+
 export const SaleParams = z.object({ saleId: z.string() });
 export const PlaceParams = z.object({ saleId: z.string(), userId: z.string() });
 export const TicketHeaders = z.object({
 	"x-queue-ticket": z.string().optional(),
+});
+
+export const AdminHeaders = z.object({
+	authorization: z.string().optional(),
 });
 
 export const RateLimitedBody = z.object({

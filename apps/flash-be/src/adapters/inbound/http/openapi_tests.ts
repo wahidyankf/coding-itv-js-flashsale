@@ -59,7 +59,11 @@ describe("the OpenAPI document", () => {
 			const found = operations.find(
 				({ operation }) => operation.operationId === route.name,
 			);
-			const ok = found?.operation.responses["200"];
+			// The first success status the route declares: 200, or 201 for a route that only creates.
+			const status = Object.keys(route.replies)
+				.map(Number)
+				.find((code) => code >= 200 && code < 300);
+			const ok = found?.operation.responses[String(status)];
 			expect(Object.keys(ok?.content ?? {})).toEqual([
 				route.stream ? "text/event-stream" : "application/json",
 			]);

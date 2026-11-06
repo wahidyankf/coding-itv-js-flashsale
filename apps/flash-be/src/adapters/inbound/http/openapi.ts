@@ -11,7 +11,7 @@ type Reply = {
 	description?: string | undefined;
 	content: Record<string, unknown>;
 };
-// Every route answers 200, and every reply has a JSON body.
+// Every reply has a JSON body. A stream answers 200, which is the reply that is rewritten below.
 type Operation = { responses: Record<string, Reply> & Record<"200", Reply> };
 type Document = { paths: Record<string, Record<string, Operation>> };
 

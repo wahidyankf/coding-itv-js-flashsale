@@ -5,6 +5,7 @@ import { findViolations, violationsIn } from "./guard.mjs";
 describe("the contract guard", () => {
 	it("finds an API path in a string", () => {
 		expect(violationsIn('const url = "/sales/current";')).toHaveLength(1);
+		expect(violationsIn('const url = "/admin/sales";')).toHaveLength(1);
 	});
 
 	it("finds an API path in a template", () => {

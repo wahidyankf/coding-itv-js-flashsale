@@ -22,6 +22,8 @@ export function isUuid(value: string): boolean {
 
 export const TICKET_HEADER = "x-queue-ticket";
 export const RETRY_AFTER_HEADER = "retry-after";
+// The operator proves who they are with `Authorization: Bearer <token>`.
+export const ADMIN_AUTH_HEADER = "authorization";
 
 export const SALE_STATUSES = [
 	"upcoming",
@@ -38,7 +40,9 @@ export const ERROR_STATUS = {
 	invalid_user: 400,
 	invalid_reservation: 400,
 	invalid_request: 400,
+	invalid_sale: 400,
 	invalid_ticket: 401,
+	invalid_admin_token: 401,
 	payment_failed: 402,
 	not_admitted: 403,
 	sale_not_found: 404,
@@ -50,6 +54,7 @@ export const ERROR_STATUS = {
 	sold_out: 409,
 	hold_expired: 409,
 	already_purchased: 409,
+	sale_overlaps: 409,
 	rate_limited: 429,
 	internal: 500,
 	backend_unavailable: 502,
@@ -98,6 +103,13 @@ export const CONFIRM_ERRORS = [
 	"payment_failed",
 ] as const;
 export const OUTCOME_ERRORS = ["sale_not_found", "invalid_user"] as const;
+// Creating a sale. `not_found` is how the admin routes answer when no token is set: they look like they are not there.
+export const ADMIN_ERRORS = [
+	"not_found",
+	"invalid_admin_token",
+	"invalid_sale",
+	"sale_overlaps",
+] as const;
 
 // Answers that do not come from an operation: the edge of the server, the limiter and the web pass-through.
 export const COMMON_ERRORS = [

@@ -18,6 +18,7 @@ Every error is `{"error": "<code>"}`, whether the route refused the request, the
 | GET    | `/sales/:saleId`               | Postgres           | `404` `sale_not_found` for an unknown or malformed id     |
 | POST   | `/sales/:saleId/queue`         | Postgres, Redis    | `201` on a new place, `200` when the user already has one |
 | GET    | `/sales/:saleId/queue/:userId` | Postgres, Redis    | needs the `x-queue-ticket` header                         |
+| POST   | `/admin/sales`                 | Postgres           | operator only; needs `Authorization: Bearer <token>`      |
 
 `/ready` returns `503` when a check fails. Each failing check is `"error"`, and `status` is `"unavailable"`. For
 example, with Postgres stopped:
@@ -49,6 +50,35 @@ off). A cached `200` carries `Cache-Control: public, max-age=<seconds>`, rounded
 `404` is never cached and has no `Cache-Control` header. The write routes never read the cache.
 
 The scenarios are in [`specs/flash/be/behaviours/sale/caching.feature`](../../specs/flash/be/behaviours/sale/caching.feature).
+
+## Creating a sale (operator)
+
+`POST /admin/sales` creates a sale from a stock and a window, so an operator needs no shell on the server. It is the
+only operator route. The web server never passes it on, so it is reached on the API port only.
+
+```json
+{
+	"stock": 100,
+	"startsAt": "2026-06-01T12:00:00.000Z",
+	"endsAt": "2026-06-01T13:00:00.000Z"
+}
+```
+
+`name` (default `Flash sale`), `holdSeconds` (default `120`) and `admitPerSecond` (default `50`) are optional. The reply
+is `201` with the new sale (`SaleView`).
+
+| Status | `error`               | When                                                                                     |
+| ------ | --------------------- | ---------------------------------------------------------------------------------------- |
+| `404`  | `not_found`           | `ADMIN_TOKEN` is not set: the admin routes are off and look as if they were not there    |
+| `401`  | `invalid_admin_token` | the `Authorization: Bearer` header is missing or holds another token                     |
+| `400`  | `invalid_sale`        | the stock, hold or admission rate is not a positive whole number, or the window is empty |
+| `409`  | `sale_overlaps`       | the window overlaps the window of another sale (a window may open when another closes)   |
+| `429`  | `rate_limited`        | too many tries from one address; the token is checked after the count                    |
+
+The token is checked before the body is read. The scenarios are in
+[`specs/flash/be/behaviours/sale/admin.feature`](../../specs/flash/be/behaviours/sale/admin.feature). See
+[admin and sale windows](../explanation/admin-and-sale-windows.md) for why it only creates and where the overlap rule
+stops.
 
 ## The waiting queue
 
@@ -205,7 +235,8 @@ Environment variables are listed in [`.env.example`](../../.env.example), with a
 local development are there too. `apps/flash-be/src/config.ts` builds the API configuration from them. In production,
 the API stops at start-up when `DATABASE_URL`, `REDIS_URL` or `TICKET_SECRET` is missing. `PAYMENT_LATENCY_MS` (150) and
 `PAYMENT_FAILURE_RATE` (0.02) tune the mock payment provider. The `RATE_LIMIT_*` and `TRUST_PROXY` variables tune the
-rate limits. `SALE_CACHE_MS` (1000) sets the sale read cache. `EVENTS_INTERVAL_MS` (1000) sets how often an event stream reads.
+rate limits. `SALE_CACHE_MS` (1000) sets the sale read cache. `EVENTS_INTERVAL_MS` (1000) sets how often an event stream reads. `ADMIN_TOKEN` (at least 16 characters) turns on
+`POST /admin/sales`; without it the route answers `404`.
 
 ## Manual requests
 

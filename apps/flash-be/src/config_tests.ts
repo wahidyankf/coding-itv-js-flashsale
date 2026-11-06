@@ -124,7 +124,7 @@ it("describeConfig shows host and port without credentials", () => {
 		}),
 	);
 	expect(line).toBe(
-		"flash-be config: port=9000 database=db:5432 redis=cache:6379 payment=150ms/0.02 limit=30/600/10s cache=1000ms events=1000ms proxy=false",
+		"flash-be config: port=9000 database=db:5432 redis=cache:6379 payment=150ms/0.02 limit=30/600/10s cache=1000ms events=1000ms proxy=false admin=off",
 	);
 	expect(line).not.toContain("secret");
 });
@@ -136,4 +136,27 @@ it("reads TRUST_PROXY as a true or false flag", () => {
 	expect(() => buildConfig({ TRUST_PROXY: "yes" })).toThrow(
 		"TRUST_PROXY must be true or false",
 	);
+});
+
+describe("the admin token", () => {
+	const token = "operator-secret-0001";
+
+	it("is off when ADMIN_TOKEN is missing or empty", () => {
+		expect(buildConfig({}).adminToken).toBeUndefined();
+		expect(buildConfig({ ADMIN_TOKEN: "" }).adminToken).toBeUndefined();
+	});
+
+	it("is read when it is long enough, and shown only as on", () => {
+		const config = buildConfig({ ADMIN_TOKEN: token });
+		expect(config.adminToken).toBe(token);
+		const line = describeConfig(config);
+		expect(line).toContain("admin=on");
+		expect(line).not.toContain(token);
+	});
+
+	it("refuses a token that is too short to resist guessing", () => {
+		expect(() => buildConfig({ ADMIN_TOKEN: "short" })).toThrow(
+			"ADMIN_TOKEN must be at least 16 characters",
+		);
+	});
 });

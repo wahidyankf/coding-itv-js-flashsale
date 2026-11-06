@@ -49,6 +49,8 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:?}
       REDIS_URL: redis://redis:6379
       TICKET_SECRET: ${TICKET_SECRET:?set TICKET_SECRET in .env}
+      # Optional. Empty means the admin routes are off.
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
       FLASH_BE_PORT: 8080
     ports:
       - "${FLASH_BE_PORT:-8080}:8080"

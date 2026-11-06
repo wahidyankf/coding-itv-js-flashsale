@@ -1,3 +1,4 @@
+import { Err, Ok } from "@flash/typekit";
 import Fastify from "fastify";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -170,5 +171,77 @@ describe("the errors of the HTTP edge", () => {
 			error: "rate_limited",
 			retryAfterSeconds: 7,
 		});
+	});
+});
+
+describe("the admin route at the edge", () => {
+	const TOKEN = "operator-secret-0001";
+	const admin = (authorize: Dependencies["admin"]["authorize"]) => ({
+		...healthyDeps.admin,
+		authorize,
+	});
+	const open = admin(() => new Ok(true as const));
+
+	it("refuses a body of the wrong shape as `invalid_sale`, not as a bad user", async () => {
+		const app = appWith({ ...healthyDeps, admin: open });
+		const reply = await app.inject({
+			method: "POST",
+			url: "/admin/sales",
+			headers: { ...json, authorization: `Bearer ${TOKEN}` },
+			payload: JSON.stringify({ stock: "many" }),
+		});
+		expect(reply.statusCode).toBe(400);
+		expect(reply.json()).toEqual({ error: "invalid_sale" });
+	});
+
+	it("refuses a body that is not JSON as `invalid_request`", async () => {
+		const app = appWith({ ...healthyDeps, admin: open });
+		const reply = await app.inject({
+			method: "POST",
+			url: "/admin/sales",
+			headers: { ...json, authorization: `Bearer ${TOKEN}` },
+			payload: "{oops",
+		});
+		expect(reply.statusCode).toBe(400);
+		expect(reply.json()).toEqual({ error: "invalid_request" });
+	});
+
+	it("checks the token before it reads the body", async () => {
+		const app = appWith({
+			...healthyDeps,
+			admin: admin(() => new Err("invalid_admin_token")),
+		});
+		const reply = await app.inject({
+			method: "POST",
+			url: "/admin/sales",
+			headers: json,
+			payload: "{oops",
+		});
+		expect(reply.statusCode).toBe(401);
+		expect(reply.json()).toEqual({ error: "invalid_admin_token" });
+	});
+
+	it("counts every try by address and tells a client over the limit to wait", async () => {
+		const seen: unknown[] = [];
+		const app = appWith({
+			...healthyDeps,
+			admin: open,
+			rateLimiter: {
+				check: async (request) => {
+					seen.push(request);
+					return { limited: true, retryAfterSeconds: 3 };
+				},
+			},
+		});
+		const reply = await app.inject({
+			method: "POST",
+			url: "/admin/sales",
+			headers: json,
+			payload: "{}",
+		});
+		expect(reply.statusCode).toBe(429);
+		expect(reply.headers["retry-after"]).toBe("3");
+		expect(seen).toHaveLength(1);
+		expect(seen[0]).toMatchObject({ saleId: "admin", user: undefined });
 	});
 });

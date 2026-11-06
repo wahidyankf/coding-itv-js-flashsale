@@ -8,6 +8,10 @@ export const healthyDeps: Dependencies = {
 	checkDatabase: async () => {},
 	checkRedis: async () => {},
 	sales: { cacheMs: () => 0, current: noSale, byId: noSale, details: noSale },
+	admin: {
+		authorize: () => new Err("not_found"),
+		create: async () => new Err("sale_overlaps"),
+	},
 	queue: {
 		join: async () => new Err("sale_not_found"),
 		check: async () => new Err("sale_not_found"),

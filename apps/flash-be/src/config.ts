@@ -21,7 +21,11 @@ export type Config = {
 	eventsIntervalMs: number;
 	// True only behind a proxy you control, so request.ip comes from X-Forwarded-For.
 	trustProxy: boolean;
+	// The operator's token for the admin routes. Without it they are off.
+	adminToken: string | undefined;
 };
+
+const ADMIN_TOKEN_MIN_LENGTH = 16;
 
 const localDefaults = {
 	host: "::",
@@ -80,6 +84,17 @@ export function buildConfig(env: NodeJS.ProcessEnv): Config {
 		return value;
 	};
 
+	const adminToken = ((): string | undefined => {
+		const value = env.ADMIN_TOKEN;
+		if (value === undefined || value === "") return undefined;
+		if (value.length < ADMIN_TOKEN_MIN_LENGTH) {
+			throw new Error(
+				`ADMIN_TOKEN must be at least ${ADMIN_TOKEN_MIN_LENGTH} characters`,
+			);
+		}
+		return value;
+	})();
+
 	return {
 		host: env.FLASH_BE_HOST ?? localDefaults.host,
 		port,
@@ -96,6 +111,7 @@ export function buildConfig(env: NodeJS.ProcessEnv): Config {
 		saleCacheMs: latency("SALE_CACHE_MS", 1000),
 		eventsIntervalMs: positive("EVENTS_INTERVAL_MS", 1000),
 		trustProxy: flag("TRUST_PROXY", false),
+		adminToken,
 	};
 }
 
@@ -105,7 +121,7 @@ export function describeConfig(config: Config): string {
 		const parsed = new URL(url);
 		return `${parsed.hostname}:${parsed.port}`;
 	};
-	return `flash-be config: port=${config.port} database=${endpoint(config.databaseUrl)} redis=${endpoint(config.redisUrl)} payment=${config.paymentLatencyMs}ms/${config.paymentFailureRate} limit=${config.rateLimitPerUser}/${config.rateLimitPerIp}/${config.rateLimitWindowSeconds}s cache=${config.saleCacheMs}ms events=${config.eventsIntervalMs}ms proxy=${config.trustProxy}`;
+	return `flash-be config: port=${config.port} database=${endpoint(config.databaseUrl)} redis=${endpoint(config.redisUrl)} payment=${config.paymentLatencyMs}ms/${config.paymentFailureRate} limit=${config.rateLimitPerUser}/${config.rateLimitPerIp}/${config.rateLimitWindowSeconds}s cache=${config.saleCacheMs}ms events=${config.eventsIntervalMs}ms proxy=${config.trustProxy} admin=${config.adminToken === undefined ? "off" : "on"}`;
 }
 
 export const config = buildConfig(process.env);

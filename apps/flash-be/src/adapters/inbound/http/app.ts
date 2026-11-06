@@ -1,4 +1,9 @@
-import { ERROR_STATUS, type ErrorCode, FIELD_ERROR } from "@flash/contract";
+import {
+	ERROR_STATUS,
+	type ErrorCode,
+	FIELD_ERROR,
+	routes,
+} from "@flash/contract";
 import Fastify, { type FastifyInstance } from "fastify";
 import {
 	hasZodFastifySchemaValidationErrors,
@@ -44,17 +49,21 @@ export function applyContract(app: FastifyInstance): void {
 		return reply.code(status).send(body);
 	});
 	app.setErrorHandler((error, request, reply) => {
-		const { status, body } = refuse(errorCodeOf(error));
+		const { status, body } = refuse(
+			errorCodeOf(error, request.routeOptions.url),
+		);
 		if (status >= 500) request.log.error({ err: error }, "request failed");
 		return reply.code(status).send(body);
 	});
 }
 
-// A body that is missing a field, or has it in the wrong type, is refused with the code of that field. Anything else
+// A body that is missing a field, or has it in the wrong type, is refused with the code of that field (or of the route). Anything else
 // the client got wrong (broken JSON, too large, wrong media type) is `invalid_request`. The rest is our fault.
-function errorCodeOf(error: unknown): ErrorCode {
+function errorCodeOf(error: unknown, url: string | undefined): ErrorCode {
 	if (hasZodFastifySchemaValidationErrors(error)) {
 		if (error.validationContext !== "body") return "invalid_request";
+		// A sale to create has its own code, whichever field is wrong.
+		if (url === routes.createSale.path) return "invalid_sale";
 		const field = error.validation[0]?.instancePath.split("/")[1];
 		return field === "reservationId"
 			? FIELD_ERROR.reservationId

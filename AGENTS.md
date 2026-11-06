@@ -98,6 +98,8 @@ Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `fla
   `compose.dev.yaml`. In production, a missing required URL must fail fast.
 - Env vars are listed in `.env.example`. Never commit `.env`. Do not use the example passwords outside local
   development.
+- `POST /admin/sales` creates a sale and is the only operator route. It needs `ADMIN_TOKEN` and is never passed on by `flash-web`. Keep it
+  off the `passThrough` routes of the contract; a contract test fails if it is on. Overlap is refused there only, not in the seed command.
 - `api.http` holds manual requests. Update it when an endpoint changes. It does not replace tests.
 
 ## Code style

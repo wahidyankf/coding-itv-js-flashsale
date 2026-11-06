@@ -104,6 +104,22 @@ describe("proxyToBackend", () => {
 		expect(fetcher).not.toHaveBeenCalled();
 	});
 
+	it("never passes an operator route on to the API", async () => {
+		const fetcher = vi.fn<typeof fetch>();
+		const reply = await proxyToBackend(
+			new Request("http://web.test/api/admin/sales", {
+				method: "POST",
+				headers: { authorization: "Bearer operator-secret-0001" },
+				body: "{}",
+			}),
+			ENV,
+			fetcher,
+		);
+		expect(reply.status).toBe(404);
+		expect(await reply.json()).toEqual({ error: "not_found" });
+		expect(fetcher).not.toHaveBeenCalled();
+	});
+
 	it("answers 502 when the API cannot be reached", async () => {
 		const reply = await proxyToBackend(
 			new Request("http://web.test/api/sales/current"),

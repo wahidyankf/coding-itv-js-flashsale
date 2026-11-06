@@ -34,15 +34,16 @@ flowchart LR
 ## Components in Prose
 
 - **HTTP adapter** (`adapters/inbound/http/`) maps paths to the services and turns their results into status codes.
-  It also turns a sale or a shopper's place into Server-Sent Events. It holds no rules.
+  It also turns a sale or a shopper's place into Server-Sent Events, and guards the operator route that creates a sale
+  (a token, checked before the body). It holds no rules.
 - **CLI adapter** (`adapters/inbound/cli/`) reads the seed command's options. `seed-sale.ts` wires it to the database.
 - **Application** (`application/`) has one service per use case: the sale status with its read cache, the waiting queue,
-  reserving, paying and the rate limiter. A service orders the steps and calls ports. Its ports are in
+  reserving, paying, the rate limiter and the operator's create-a-sale service. A service orders the steps and calls ports. Its ports are in
   `application/ports/`: `SaleRepository`, `QueueStore`, `HoldGate`, `ReservationRepository`, `PurchaseRepository`,
-  `RateLimitStore`, `Payment`, `Clock` and `SaleSeeder`.
+  `RateLimitStore`, `Payment`, `Clock`, `SaleSeeder` and `SaleAdmin`.
 - **Domain** (`domain/`) holds the rules and imports nothing else: when a sale is upcoming, active, sold out or
   ended, who may queue or reserve, how long a hold lives, how many shoppers one tick admits, what a user id and a
-  ticket are.
+  ticket are, and whether a new sale has a usable window and overlaps another.
 - **Driven adapters** (`adapters/outbound/`) implement the ports. `postgres/` reads and writes the sales, holds and
   purchases and runs the migrations. `redis/` holds the gate script, the queue and the rate counters. `memory/` counts
   rate limits when Redis fails. `payment/` is the mock provider. `system/` reads the clock.

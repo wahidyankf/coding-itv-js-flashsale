@@ -4,7 +4,9 @@
 
 import type { z } from "zod";
 import {
+	AdminHeaders,
 	ConfirmBody,
+	CreateSaleBody,
 	errorReplies,
 	HealthView,
 	JoinedView,
@@ -21,6 +23,7 @@ import {
 	UserBody,
 } from "./schemas.js";
 import {
+	ADMIN_ERRORS,
 	CHECK_ERRORS,
 	CONFIRM_ERRORS,
 	type ErrorCode,
@@ -190,6 +193,22 @@ export const routes = {
 		},
 		limited: true,
 		passThrough: true,
+	}),
+	// An operator route. The web server never passes it on, and it answers `not_found` when no admin token is set.
+	createSale: defineRoute({
+		name: "createSale",
+		summary:
+			"Create a sale. Needs the admin token; refuses a window that overlaps another sale.",
+		method: "POST",
+		path: "/admin/sales",
+		headers: AdminHeaders,
+		body: CreateSaleBody,
+		replies: {
+			201: SaleView,
+			...errorReplies([...ADMIN_ERRORS, ...writeFailures]),
+			...limitedReply,
+		},
+		limited: true,
 	}),
 	outcome: defineRoute({
 		name: "outcome",

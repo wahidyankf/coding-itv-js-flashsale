@@ -14,6 +14,7 @@ behaviour, read the specs.
 - [sale-read-cache.md](sale-read-cache.md) - why sale reads may be one second old, and why writes never are.
 - [serving-without-redis.md](serving-without-redis.md) - what each step does when Redis is down, and how Redis catches up when it returns.
 - [live-updates.md](live-updates.md) - why the page hears about changes over Server-Sent Events, and what a stream costs.
+- [admin-and-sale-windows.md](admin-and-sale-windows.md) - why the admin route only creates a sale, how its token is guarded, and why windows may not overlap.
 - [web-server-proxy.md](web-server-proxy.md) - why the browser talks to its own web server, and what the page does while a shopper waits.
 - [load-test-findings.md](load-test-findings.md) - what the load runs showed, and what was fixed because of them.
 - [api-contract.md](api-contract.md) - why the API is written down once in `libs/contract`, and how every app reads it.

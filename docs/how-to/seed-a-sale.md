@@ -41,3 +41,18 @@ The body is described in [HTTP endpoints](../reference/http-endpoints.md#the-sal
 
 The scenarios for this command are in
 [`specs/flash/be/behaviours/sale/seeding.feature`](../../specs/flash/be/behaviours/sale/seeding.feature).
+
+## Create the sale through the API instead
+
+With `ADMIN_TOKEN` set for the API (at least 16 characters; see [`.env.example`](../../.env.example)), an operator can
+create a sale over HTTP, with an absolute window:
+
+```bash
+curl -s -X POST http://localhost:8080/admin/sales \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" \
+  -d '{"stock":100,"startsAt":"2026-06-01T12:00:00Z","endsAt":"2026-06-01T13:00:00Z"}'
+```
+
+The reply is `201` with the sale. A window that overlaps another sale is refused with `409` `sale_overlaps`. The seed
+command above does not check this, so it can still create overlapping sales; the API is the safe way to set up a real
+sale. See [admin and sale windows](../explanation/admin-and-sale-windows.md).

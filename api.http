@@ -17,6 +17,13 @@ GET {{backend}}/sales/current
 ### Backend: one sale by id (replace the id with the one the seed command printed)
 GET {{backend}}/sales/00000000-0000-4000-8000-000000000000
 
+### Backend: create a sale (operator; needs ADMIN_TOKEN set for the API; 404 when it is off, 401 for a wrong token, 409 when the window overlaps)
+POST {{backend}}/admin/sales
+Content-Type: application/json
+Authorization: Bearer replace-with-your-admin-token
+
+{ "stock": 100, "startsAt": "2026-06-01T12:00:00Z", "endsAt": "2026-06-01T13:00:00Z" }
+
 ### Backend: join the queue (replace the sale id; the reply holds your ticket; write requests can answer 429 with Retry-After)
 POST {{backend}}/sales/00000000-0000-4000-8000-000000000000/queue
 Content-Type: application/json

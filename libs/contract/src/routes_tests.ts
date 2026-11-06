@@ -56,6 +56,12 @@ describe("the route table", () => {
 		expect(routes.ready.passThrough).toBe(false);
 		expect(all.filter((route) => route.passThrough)).toHaveLength(9);
 	});
+
+	it("never passes an admin route on to the API through the web server", () => {
+		const admin = all.filter((route) => route.path.startsWith("/admin/"));
+		expect(admin.map((route) => route.name)).toEqual(["createSale"]);
+		for (const route of admin) expect(route.passThrough).toBe(false);
+	});
 });
 
 describe("the types of a route", () => {
@@ -77,6 +83,14 @@ describe("the types of a route", () => {
 			Extract<Reply<typeof routes.joinQueue>, { status: 404 }>
 		>().toBeNever();
 		expectTypeOf<Gone["body"]>().toEqualTypeOf<{ error: "sale_not_found" }>();
+	});
+
+	it("asks for the token header and the body to create a sale", () => {
+		type Input = RequestInput<typeof routes.createSale>;
+		expectTypeOf<Input["body"]["stock"]>().toBeNumber();
+		expectTypeOf<
+			NonNullable<Input["headers"]>["authorization"]
+		>().toEqualTypeOf<string | undefined>();
 	});
 
 	it("lists the error codes of a route", () => {

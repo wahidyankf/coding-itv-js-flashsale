@@ -1874,6 +1874,255 @@
 				}
 			}
 		},
+		"/admin/sales": {
+			"post": {
+				"operationId": "createSale",
+				"summary": "Create a sale. Needs the admin token; refuses a window that overlaps another sale.",
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"name": {
+										"type": "string"
+									},
+									"stock": {
+										"type": "number"
+									},
+									"startsAt": {
+										"type": "string"
+									},
+									"endsAt": {
+										"type": "string"
+									},
+									"holdSeconds": {
+										"type": "number"
+									},
+									"admitPerSecond": {
+										"type": "number"
+									}
+								},
+								"required": [
+									"stock",
+									"startsAt",
+									"endsAt"
+								]
+							}
+						}
+					}
+				},
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"in": "header",
+						"name": "authorization",
+						"required": false
+					}
+				],
+				"responses": {
+					"201": {
+						"description": "Created",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"id": {
+											"type": "string"
+										},
+										"name": {
+											"type": "string"
+										},
+										"status": {
+											"type": "string",
+											"enum": [
+												"upcoming",
+												"active",
+												"sold_out",
+												"ended"
+											]
+										},
+										"startsAt": {
+											"type": "string",
+											"format": "date-time",
+											"pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+										},
+										"endsAt": {
+											"type": "string",
+											"format": "date-time",
+											"pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+										},
+										"stock": {
+											"type": "integer",
+											"minimum": 0,
+											"maximum": 9007199254740991
+										},
+										"remaining": {
+											"type": "integer",
+											"minimum": 0,
+											"maximum": 9007199254740991
+										}
+									},
+									"required": [
+										"id",
+										"name",
+										"status",
+										"startsAt",
+										"endsAt",
+										"stock",
+										"remaining"
+									],
+									"additionalProperties": false
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "The request cannot be used",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"error": {
+											"type": "string",
+											"enum": [
+												"invalid_sale",
+												"invalid_request"
+											]
+										}
+									},
+									"required": [
+										"error"
+									],
+									"additionalProperties": false
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "The ticket is not valid",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"error": {
+											"type": "string",
+											"enum": [
+												"invalid_admin_token"
+											]
+										}
+									},
+									"required": [
+										"error"
+									],
+									"additionalProperties": false
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Not found",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"error": {
+											"type": "string",
+											"enum": [
+												"not_found"
+											]
+										}
+									},
+									"required": [
+										"error"
+									],
+									"additionalProperties": false
+								}
+							}
+						}
+					},
+					"409": {
+						"description": "The sale or the hold does not allow it",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"error": {
+											"type": "string",
+											"enum": [
+												"sale_overlaps"
+											]
+										}
+									},
+									"required": [
+										"error"
+									],
+									"additionalProperties": false
+								}
+							}
+						}
+					},
+					"429": {
+						"description": "Too many requests; wait `retry-after` seconds",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"error": {
+											"type": "string",
+											"enum": [
+												"rate_limited"
+											]
+										},
+										"retryAfterSeconds": {
+											"type": "integer",
+											"minimum": 0,
+											"maximum": 9007199254740991
+										}
+									},
+									"required": [
+										"error",
+										"retryAfterSeconds"
+									],
+									"additionalProperties": false
+								}
+							}
+						}
+					},
+					"500": {
+						"description": "A failure inside the server",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"error": {
+											"type": "string",
+											"enum": [
+												"internal"
+											]
+										}
+									},
+									"required": [
+										"error"
+									],
+									"additionalProperties": false
+								}
+							}
+						}
+					}
+				}
+			}
+		},
 		"/sales/{saleId}/purchases/{userId}": {
 			"get": {
 				"operationId": "outcome",

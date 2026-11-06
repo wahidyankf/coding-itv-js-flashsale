@@ -4,6 +4,7 @@ import { createMockPayment } from "./adapters/outbound/payment/mock-payment.js";
 import type { Database } from "./adapters/outbound/postgres/database.js";
 import { createPurchaseRepository } from "./adapters/outbound/postgres/purchase-repository.js";
 import { createReservationRepository } from "./adapters/outbound/postgres/reservation-repository.js";
+import { createPostgresSaleAdmin } from "./adapters/outbound/postgres/sale-admin.js";
 import { createSaleRepository } from "./adapters/outbound/postgres/sale-repository.js";
 import type { RedisClient } from "./adapters/outbound/redis/redis-client.js";
 import { createRedisHoldGate } from "./adapters/outbound/redis/redis-hold-gate.js";
@@ -23,6 +24,7 @@ import {
 	type RateLimits,
 } from "./application/rate-limiter.js";
 import { createReservationService } from "./application/reservation-service.js";
+import { createSaleAdminService } from "./application/sale-admin-service.js";
 import type { SaleCacheSettings } from "./application/sale-cache.js";
 import { createSaleService } from "./application/sale-service.js";
 
@@ -33,6 +35,9 @@ export type RateLimitSettings = {
 };
 
 export type SaleCacheOptions = { saleCacheMs: number };
+
+// Without a token the admin routes are off.
+export type AdminSettings = { adminToken?: string | undefined };
 
 export type PaymentSettings = {
 	paymentLatencyMs: number;
@@ -46,7 +51,8 @@ export function dependenciesFrom(
 	settings: QueueOptions &
 		PaymentSettings &
 		RateLimitSettings &
-		SaleCacheOptions,
+		SaleCacheOptions &
+		AdminSettings,
 	clock: Clock = systemClock,
 	// Tests pass their own, so a scenario can change the cache time while the app runs.
 	cache: SaleCacheSettings = { ttlMs: settings.saleCacheMs },
@@ -67,6 +73,11 @@ export function dependenciesFrom(
 			await redis.ping();
 		},
 		sales,
+		admin: createSaleAdminService(
+			settings.adminToken,
+			createPostgresSaleAdmin(db),
+			clock,
+		),
 		queue,
 		reservations: createReservationService(
 			gate,

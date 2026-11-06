@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	ADMIN_ERRORS,
 	CHECK_ERRORS,
 	COMMON_ERRORS,
 	CONFIRM_ERRORS,
@@ -54,6 +55,7 @@ describe("error codes", () => {
 
 	it("gives every listed code a status", () => {
 		const listed = [
+			...ADMIN_ERRORS,
 			...JOIN_ERRORS,
 			...CHECK_ERRORS,
 			...RESERVE_ERRORS,
@@ -75,6 +77,9 @@ describe("error codes", () => {
 			sold_out: 409,
 			rate_limited: 429,
 			unavailable: 503,
+			invalid_sale: 400,
+			invalid_admin_token: 401,
+			sale_overlaps: 409,
 		});
 	});
 });

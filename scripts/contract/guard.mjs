@@ -29,7 +29,8 @@ const SKIPPED_FILES = [
 ];
 
 // A string or template literal that holds an API path, or the ticket header name.
-const HAND_WRITTEN = /["'`][^"'`\n]*\/sales(?:[/"'`]|$)|x-queue-ticket/i;
+const HAND_WRITTEN =
+	/["'`][^"'`\n]*\/(?:sales|admin)(?:[/"'`]|$)|x-queue-ticket/i;
 
 export function violationsIn(text) {
 	return text

@@ -1,4 +1,5 @@
 import {
+	ADMIN_AUTH_HEADER,
 	ERROR_STATUS,
 	type PlaceView,
 	routes,
@@ -31,11 +32,20 @@ export function registerRoutes(
 		},
 		reply: FastifyReply,
 	) => {
-		const verdict = await deps.rateLimiter.check({
-			saleId: request.params.saleId,
-			user: fieldOf(request.body, "userId"),
-			ip: request.ip,
-		});
+		return tellToWait(
+			reply,
+			await deps.rateLimiter.check({
+				saleId: request.params.saleId,
+				user: fieldOf(request.body, "userId"),
+				ip: request.ip,
+			}),
+		);
+	};
+
+	const tellToWait = (
+		reply: FastifyReply,
+		verdict: Awaited<ReturnType<Dependencies["rateLimiter"]["check"]>>,
+	) => {
 		if (!verdict.limited) return;
 		return reply
 			.code(429)
@@ -44,6 +54,32 @@ export function registerRoutes(
 				error: "rate_limited",
 				retryAfterSeconds: verdict.retryAfterSeconds,
 			});
+	};
+
+	// The admin routes count by address only, and before the token is read, so a guess is counted too.
+	const limitAdmin = async (
+		request: Pick<FastifyRequest, "ip">,
+		reply: FastifyReply,
+	) =>
+		tellToWait(
+			reply,
+			await deps.rateLimiter.check({
+				saleId: "admin",
+				user: undefined,
+				ip: request.ip,
+			}),
+		);
+
+	// No token in the settings means the route is not there; a wrong token is refused.
+	const authorizeAdmin = async (
+		request: Pick<FastifyRequest, "headers">,
+		reply: FastifyReply,
+	) => {
+		const allowed = deps.admin.authorize(request.headers[ADMIN_AUTH_HEADER]);
+		if (allowed.isOk()) return;
+		return reply
+			.code(ERROR_STATUS[allowed.error])
+			.send({ error: allowed.error });
 	};
 
 	// Public sale reads may be kept for the cache time, by this server and by the client.
@@ -251,6 +287,23 @@ export function registerRoutes(
 			}
 			const { created, purchase } = confirmed.value;
 			return reply.code(created ? 201 : 200).send(purchaseView(purchase));
+		},
+	});
+
+	// An operator creates a sale. The window must not overlap another sale.
+	app.route({
+		...endpoint(routes.createSale),
+		schema: schemaOf(routes.createSale),
+		// onRequest runs before the body is read, so a client without the token learns nothing from a broken body.
+		onRequest: [limitAdmin, authorizeAdmin],
+		handler: async (request, reply) => {
+			const created = await deps.admin.create(request.body);
+			if (created.isErr()) {
+				return reply
+					.code(ERROR_STATUS[created.error])
+					.send({ error: created.error });
+			}
+			return reply.code(201).send(created.value);
 		},
 	});
 
