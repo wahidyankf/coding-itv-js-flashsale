@@ -23,12 +23,18 @@ export function buildApp(
 		// Open event streams must not keep the server from closing.
 		forceCloseConnections: true,
 	});
-	// The schemas of @flash/contract check every request and every reply. A reply that breaks the contract is a bug, so
-	// it is answered with `internal` and logged.
+	useContract(app);
+
+	registerRoutes(app, deps, options.events ?? DEFAULT_STREAM_OPTIONS);
+	return app;
+}
+
+// The schemas of @flash/contract check every request and every reply. A reply that breaks the contract is a bug, so it
+// is answered with `internal` and logged. Every error has the same body, `{ error: code }`, whatever raised it.
+export function useContract(app: FastifyInstance): void {
 	app.setValidatorCompiler(validatorCompiler);
 	app.setSerializerCompiler(serializerCompiler);
 
-	// Every error has the same body, `{ error: code }`, whatever raised it.
 	const refuse = (code: ErrorCode) => ({
 		status: ERROR_STATUS[code],
 		body: { error: code },
@@ -42,9 +48,6 @@ export function buildApp(
 		if (status >= 500) request.log.error({ err: error }, "request failed");
 		return reply.code(status).send(body);
 	});
-
-	registerRoutes(app, deps, options.events ?? DEFAULT_STREAM_OPTIONS);
-	return app;
 }
 
 // A body that is missing a field, or has it in the wrong type, is refused with the code of that field. Anything else

@@ -3,15 +3,19 @@ import type { z } from "zod";
 
 // What Fastify is told about a route: only the parts the route declares, and the reply schema of every status.
 type SchemaOf<R extends Route> = {
+	summary: string;
+	operationId: string;
 	response: R["replies"];
 } & (R["params"] extends z.ZodObject ? { params: R["params"] } : unknown) &
 	(R["headers"] extends z.ZodObject ? { headers: R["headers"] } : unknown) &
 	(R["body"] extends z.ZodObject ? { body: R["body"] } : unknown);
 
 export function schemaOf<const R extends Route>(route: R): SchemaOf<R> {
-	const { params, headers, body, replies } = route;
+	const { params, headers, body, replies, summary, name } = route;
 	// The conditional type above says which parts are there; they are added here on the same condition.
 	return {
+		summary,
+		operationId: name,
 		response: replies,
 		...(params && { params }),
 		...(headers && { headers }),

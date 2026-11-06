@@ -12,6 +12,8 @@
 		"docs:check": "sh scripts/check-docs.sh",
 		"bdd:check": "node scripts/bdd/check-behaviour-coverage.mjs",
 		"bdd:check:test": "vitest run --config scripts/bdd/vitest.config.mjs",
+		"openapi:generate": "npm run openapi -w flash-be -- ../../docs/reference/openapi.json",
+		"openapi:check": "node scripts/openapi/check.mjs",
 		"lint:rules:test": "vitest run --config scripts/lint/vitest.config.mjs",
 		"bdd:e2e": "cd scripts/bdd/e2e && bddgen && playwright test",
 		"docker:dev:up": "docker compose -f compose.dev.yaml up -d --wait",

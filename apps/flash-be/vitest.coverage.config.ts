@@ -21,6 +21,8 @@ export default defineConfig({
 				// seed-sale.ts only reads the command line, wires config and sets the exit code. The parser and
 				// the insert it calls are covered by unit and integration tests, and the e2e suite runs the command.
 				"src/seed-sale.ts",
+				// openapi.ts only writes the document that the tested builder makes to a file.
+				"src/openapi.ts",
 			],
 			reporter: ["text", "text-summary"],
 			thresholds: { lines: 99, functions: 99, branches: 99, statements: 99 },
