@@ -40,12 +40,14 @@ Return early on the failure, then use the value:
 
 ```ts
 const reserved = await service.reserve(saleId, userId, ticket);
-if (reserved.isErr()) return reply.code(STATUS[reserved.error]).send(errorPayload(reserved.error));
+if (reserved.isErr()) {
+	return reply.code(ERROR_STATUS[reserved.error]).send(errorPayload(reserved.error));
+}
 const { reservationId } = reserved.value;
 ```
 
-Make the table of statuses a `satisfies Record<ReserveError, number>`. A new error without a status then fails the
-build. Use `.match({ ok, err })` when both sides produce a value of the same type.
+`ERROR_STATUS` and `errorPayload` are in `apps/flash-be/src/adapters/inbound/http/errors.ts`. Indexing `ERROR_STATUS` with
+`reserved.error` compiles only when every `ReserveError` has a status, so a new error without one fails the build. Use `.match({ ok, err })` when both sides produce a value of the same type.
 
 ## 4. Check several steps in a row
 
