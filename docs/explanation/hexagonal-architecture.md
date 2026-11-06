@@ -26,6 +26,46 @@ src/
 - **Adapters.** Inbound adapters drive the application (HTTP, the seed command). Outbound adapters implement ports
   (Postgres through Kysely, Redis scripts, an in-process rate counter, the mock payment, the system clock).
 
+## One request through the layers
+
+A shopper asks for an item: `POST /sales/:saleId/reservations`. The diagram follows that request. Solid arrows are calls.
+Dotted arrows say which port an adapter implements, so the code dependency always points inward.
+
+```mermaid
+flowchart LR
+  accTitle: One request through the layers
+  accDescr: A reserve request enters the HTTP route, an inbound adapter. The route calls the reservation service in the application layer. The service asks the domain rules, then uses the HoldGate and ReservationRepository ports. The Redis adapter implements the gate and the Postgres adapter implements the repository. The adapters depend on the ports, not the other way round.
+  route["Inbound adapter<br/>reservations route"]
+  service["Application<br/>ReservationService"]
+  rules["Domain<br/>holdRequest, isLive"]
+  gate["Port<br/>HoldGate"]
+  repo["Port<br/>ReservationRepository"]
+  redis["Outbound adapter<br/>Redis hold gate"]
+  pg["Outbound adapter<br/>Postgres repository"]
+  route -->|calls| service
+  service -->|asks| rules
+  service -->|uses| gate
+  service -->|uses| repo
+  redis -.->|implements| gate
+  pg -.->|implements| repo
+  classDef adapter fill:#0173B2,stroke:#000000,color:#FFFFFF
+  classDef app fill:#029E73,stroke:#000000,color:#000000
+  classDef domain fill:#DE8F05,stroke:#000000,color:#000000
+  classDef port fill:#CC78BC,stroke:#000000,color:#000000
+  classDef default fill:#808080,stroke:#000000,color:#000000
+  class route,redis,pg adapter
+  class service app
+  class rules domain
+  class gate,repo port
+```
+
+1. The route reads the request and hands the user, the sale and the ticket to the service. It knows HTTP, and nothing else.
+2. The service checks the sale and the queue, asks the domain whether a hold may be taken, then calls the ports in the
+   order the rules need.
+3. The Redis gate says yes or no fast. The Postgres repository writes the hold, and Postgres has the last word.
+4. When Redis is down, the guarded gate fails at once and the Postgres repository decides alone. The route and the
+   service do not change (see [serving without Redis](serving-without-redis.md)).
+
 ## The rule and how it is kept
 
 Dependencies point inward: adapters know the application and the domain, the application knows the domain, and the
@@ -44,6 +84,10 @@ it must not know. It runs with the unit tests, so the pre-push hook enforces it.
   behaviour scenarios run at unit level against the same services that run in production.
 - A store can change behind its port. Redis down is one more adapter state: the guarded gate and the Postgres fallback
   sit behind the same ports.
+- Most ports have one real implementation, and that is on purpose. They are not there so that a store can be swapped
+  one day. They keep a service from naming Redis or Postgres, and they let a scenario run the same service against an
+  in-memory copy (`src/bdd/support/memory-*.ts`). The two ports with a real second life are the payment (a mock now) and
+  the clock (a fixed one in tests).
 - It costs more files and one place of wiring. A change to a port touches the port, its adapters and its memory copy.
 
 ## Where the ports bend

@@ -16,6 +16,7 @@ const ALLOWED: Array<[method: string, path: RegExp]> = [
 	["GET", /^\/sales\/(?<saleId>[^/]+)\/purchases\/(?<userId>[^/]+)$/],
 ];
 
+// A copy of the sale id rule of flash-be (`isSaleId`); `same_as_be_tests.ts` checks it.
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // A name in a path may still be percent-encoded and in any case; the API normalises it.
 const USER_IN_PATH = /^[A-Za-z0-9._@+-]{1,200}$/;
@@ -24,7 +25,8 @@ const USER_IN_PATH = /^[A-Za-z0-9._@+-]{1,200}$/;
 const SENT = ["content-type", TICKET_HEADER, "accept"];
 const RETURNED = ["content-type", "cache-control", RETRY_AFTER_HEADER];
 
-// The answers this server gives on its own, in the shape of the API's errors.
+// The answers this server gives on its own, in the shape of the API's errors. `not_found` is a copy of flash-be's code,
+// status and sentence (`same_as_be_tests.ts` checks it); `backend_unavailable` exists only here.
 const REFUSALS = {
 	not_found: {
 		status: STATUS.notFound,

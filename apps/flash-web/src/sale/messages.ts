@@ -8,6 +8,7 @@ export const STATUS_LABEL: Record<SaleStatus, string> = {
 };
 
 // The same rule the API uses for a user id (trimmed, lowercased), so a bad name is refused before anything is sent.
+// A copy of `normalizeUser` in flash-be; `same_as_be_tests.ts` fails when the two differ.
 const USER_ID = /^[a-z0-9][a-z0-9._@+-]{0,63}$/;
 
 export function cleanUser(raw: string): string | undefined {
