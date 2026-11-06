@@ -5,7 +5,7 @@ import {
 	Scripts,
 } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-import { PAGE_CSS } from "../styles";
+import appCss from "../styles.css?url";
 
 export const Route = createRootRoute({
 	head: () => ({
@@ -14,9 +14,11 @@ export const Route = createRootRoute({
 			{ name: "viewport", content: "width=device-width, initial-scale=1" },
 			{ title: "Flash Sale" },
 		],
-		// An empty icon, so the browser does not ask for /favicon.ico.
-		links: [{ rel: "icon", href: "data:," }],
-		styles: [{ children: PAGE_CSS }],
+		links: [
+			// An empty icon, so the browser does not ask for /favicon.ico.
+			{ rel: "icon", href: "data:," },
+			{ rel: "stylesheet", href: appCss },
+		],
 	}),
 	component: RootComponent,
 });
@@ -35,7 +37,7 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
 			<head>
 				<HeadContent />
 			</head>
-			<body>
+			<body className="min-h-screen bg-stone-50 font-sans text-slate-800 antialiased dark:bg-slate-950 dark:text-slate-200">
 				{children}
 				<Scripts />
 			</body>

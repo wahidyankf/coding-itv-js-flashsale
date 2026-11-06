@@ -27,8 +27,10 @@ export function HomePage({
 	sale?: SaleLoad;
 }) {
 	return (
-		<main>
-			<h1>Flash Sale</h1>
+		<main className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6 sm:py-12 lg:py-16">
+			<h1 className="mb-6 text-3xl font-semibold tracking-tight sm:mb-8 sm:text-4xl">
+				Flash Sale
+			</h1>
 			<SalePage load={sale} />
 			<BackendStatusView status={status} />
 		</main>

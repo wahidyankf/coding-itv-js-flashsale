@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+/* Form controls and scrollbars follow the system theme; the classes in the components handle the rest. */
+@layer base {
+	:root {
+		color-scheme: light dark;
+	}
+}
