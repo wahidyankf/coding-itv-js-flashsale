@@ -1,8 +1,8 @@
 // Runs one load profile end to end: starts the stack, seeds a sale, runs k6, then checks Postgres and Redis.
-// Usage: node scripts/run.ts <smoke|full|chaos> [--keep]
+// Usage: node scripts/run.ts <smoke|full|chaos|burst|contention> [--keep]
 // The verdict comes from Postgres and Redis, not from what k6 says it did. k6 is compared with them.
 import { spawn, spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
 	LIMITS,
@@ -227,6 +227,15 @@ async function main(): Promise<number> {
 	if (profile.redisStopsAtSeconds !== undefined) docker("start", "redis");
 	await sleep(2000);
 
+	// k6 writes its summary when it finishes. Without it the load generator failed, which says nothing about the system:
+	// for example it ran out of memory while starting virtual users.
+	if (!existsSync(path.join(reports, `${name}-k6.json`))) {
+		throw new Error(
+			`k6 produced no summary (exit code ${k6Exit}); see generated-reports/load/${name}-k6.log. ` +
+				"The load generator failed, so this run says nothing about the system.",
+		);
+	}
+
 	// What Postgres says.
 	const [stock = 0, sold = 0] = sql(
 		`select stock, sold from sales where id = '${saleId}'`,
@@ -388,6 +397,7 @@ main().then(
 	(error) => {
 		console.error(error);
 		docker("start", "redis");
+		if (!keep) docker("down", "-v", "--remove-orphans");
 		process.exit(1);
 	},
 );

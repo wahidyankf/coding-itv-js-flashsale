@@ -70,40 +70,42 @@ export const PROFILES = {
 	// Everyone arrives inside one second. The runs above spread their shoppers over many seconds, which lets the queue
 	// smooth the load. These two do not: the herd arrives first and the system has to take it.
 	//
-	// Sizing, written before the first run. A visit lasts at least two seconds (a poll for admission, then the reserve),
-	// so every shopper who arrives in the same second is in the system at once: the virtual users needed equal the
-	// shoppers. `full` already ran with 1,500 virtual users, so 2,000 shoppers asks for a third more and stays inside
-	// what this machine is known to run. All of them are started before the clock begins, so k6 does not stall the herd
-	// while it starts users. The speed limits below are the same as for every other run and are not loosened for a herd.
+	// Sizing. A visit lasts at least two seconds, so every shopper who arrives in the same second is in the system at
+	// once: the virtual users needed equal the shoppers, and k6 starts all of them before the clock begins. The
+	// machine sets the ceiling, not the system under test. A first try with 2,000 never began: k6 stopped starting
+	// virtual users at 1,186 of 2,070 on a Docker VM with 7.7 GiB, which is about 6 MiB for each user with the
+	// contract bundled in. `full` starts 670 users and runs, so 700 shoppers are used here, about the largest herd
+	// this machine is known to start. The speed limits below are the same as for every other run and are not loosened
+	// for a herd.
 	//
-	// burst: the herd hits the queue. 2,000 shoppers join within a second for 100 items; admission still lets in 300 a
-	// second, so the reserve and confirm steps are spread over about seven seconds.
+	// burst: the herd hits the queue. 700 shoppers join within a second for 100 items; admission still lets in 300 a
+	// second, so the reserve and confirm steps are spread over about two seconds.
 	burst: {
 		stock: 100,
 		holdSeconds: 10,
 		admitPerSecond: 300,
-		users: 2000,
-		arrivalsPerSecond: 2000,
+		users: 700,
+		arrivalsPerSecond: 700,
 		latecomers: 100,
 		hammerUsers: 20,
-		preAllocatedVUs: 2000,
-		maxVUs: 2200,
+		preAllocatedVUs: 700,
+		maxVUs: 700,
 		abandonShare: 0.05,
 		judgeSpeed: true,
 	},
 	// contention: the herd hits the sale. Everyone is admitted in the first tick (admission is as large as the crowd), so
-	// 2,000 shoppers reserve in the same moment for 50 items. This is the Lua script and
+	// 700 shoppers reserve in the same moment for 50 items. This is the Lua script and
 	// `UPDATE ... WHERE sold < stock` under contention, which the other runs never reach.
 	contention: {
 		stock: 50,
 		holdSeconds: 10,
-		admitPerSecond: 2000,
-		users: 2000,
-		arrivalsPerSecond: 2000,
+		admitPerSecond: 700,
+		users: 700,
+		arrivalsPerSecond: 700,
 		latecomers: 100,
 		hammerUsers: 20,
-		preAllocatedVUs: 2000,
-		maxVUs: 2200,
+		preAllocatedVUs: 700,
+		maxVUs: 700,
 		abandonShare: 0.05,
 		judgeSpeed: true,
 	},

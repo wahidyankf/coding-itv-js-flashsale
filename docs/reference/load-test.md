@@ -35,11 +35,13 @@ on, so each virtual shopper gets an address of their own through `X-Forwarded-Fo
 
 ## Profiles
 
-| Profile | Stock | Shoppers | Arrival rate | Late | Hold | Admission | Notes                                  |
-| ------- | ----- | -------- | ------------ | ---- | ---- | --------- | -------------------------------------- |
-| smoke   | 20    | 500      | 50 a second  | 50   | 10 s | 100 a sec | Short enough to run in a few minutes   |
-| full    | 100   | 5,000    | 250 a second | 100  | 10 s | 300 a sec | Many more shoppers than items          |
-| chaos   | 1,000 | 2,000    | 100 a second | 150  | 10 s | 200 a sec | Redis stops at +4 s and starts at +9 s |
+| Profile    | Stock | Shoppers | Arrival rate | Late | Hold | Admission | Notes                                              |
+| ---------- | ----- | -------- | ------------ | ---- | ---- | --------- | -------------------------------------------------- |
+| smoke      | 20    | 500      | 50 a second  | 50   | 10 s | 100 a sec | Short enough to run in a few minutes               |
+| full       | 100   | 5,000    | 250 a second | 100  | 10 s | 300 a sec | Many more shoppers than items                      |
+| chaos      | 1,000 | 2,000    | 100 a second | 150  | 10 s | 200 a sec | Redis stops at +4 s and starts at +9 s             |
+| burst      | 100   | 700      | all in 1 s   | 100  | 10 s | 300 a sec | The herd arrives first and hits the queue          |
+| contention | 50    | 700      | all in 1 s   | 100  | 10 s | 700 a sec | Everyone is admitted at once and reserves together |
 
 The numbers live in [`apps/flash-load/k6/profiles.ts`](../../apps/flash-load/k6/profiles.ts), which both k6 and the
 runner read. Shoppers arrive at a fixed rate, one new shopper per iteration, so the load does not slow down when the
@@ -49,6 +51,18 @@ with a hold. One in five of those who bought presses confirm and reserve again. 
 once every hold has lapsed, and take the items that abandoned holds gave back. Ten to twenty extra users flood the queue
 to show that they get `429`, not an error.
 
+`smoke`, `full` and `chaos` send shoppers over many seconds, so the queue smooths the load before it reaches the sale.
+`burst` and `contention` do not: all 700 shoppers arrive inside one second. In `burst` the admission rate (300 a second)
+still spreads the reserve and confirm steps over about two seconds, so it tests the queue and the join route under a
+herd. In `contention` the admission rate equals the crowd, so every shopper is admitted in the first tick and reserves in
+the same moment for 50 items; that is the Redis script and `UPDATE ... WHERE sold < stock` under contention.
+
+A visit lasts at least two seconds, so every shopper who arrives in the same second is in the system at once, and the
+virtual users needed equal the shoppers. The size of the herd is set by the machine that runs k6, not by the system: a
+first try with 2,000 shoppers never began, because k6 stopped starting virtual users at 1,186 of 2,070 on a Docker VM with
+7.7 GiB (about 6 MiB for each user with the contract bundled in). `full` starts 670 users and runs, so the two profiles
+use 700. A bigger herd needs a bigger client machine, or several k6 instances.
+
 The chaos stock is 1,000 so that Redis is stopped while items are still for sale. With a small stock the sale is over
 before the stop and the run proves nothing.
 
@@ -56,11 +70,11 @@ before the stop and the run proves nothing.
 
 These were written down before the first run and are not changed to make a run pass.
 
-| Measure                       | Limit        | Applies to     |
-| ----------------------------- | ------------ | -------------- |
-| Reserve, 95th percentile      | under 300 ms | smoke and full |
-| Purchase, 95th percentile     | under 500 ms | smoke and full |
-| Server errors (5xx, no reply) | 0            | smoke and full |
+| Measure                       | Limit        | Applies to                        |
+| ----------------------------- | ------------ | --------------------------------- |
+| Reserve, 95th percentile      | under 300 ms | smoke, full, burst and contention |
+| Purchase, 95th percentile     | under 500 ms | smoke, full, burst and contention |
+| Server errors (5xx, no reply) | 0            | smoke, full, burst and contention |
 
 The purchase time includes the 150 ms of the mock payment. The chaos profile is not judged on these limits, because a
 stopped Redis may fail the few requests that were in flight. k6 still reports its numbers, and
@@ -70,16 +84,16 @@ stopped Redis may fail the few requests that were in flight. k6 still reports it
 
 The runner decides the verdict from Postgres and Redis, then compares k6 with them.
 
-| Check                                     | Passes when                                        |
-| ----------------------------------------- | -------------------------------------------------- |
-| No oversell                               | `sales.sold` is at most the stock                  |
-| Sold count is true                        | `sales.sold` equals the number of `purchases` rows |
-| One item per user                         | no user has more than one purchase                 |
-| k6 and Postgres agree                     | the purchases k6 saw confirmed equal the rows      |
-| The stock sold out                        | `sales.sold` equals the stock                      |
-| Floods are limited                        | k6 saw replies of `429` from the flooding users    |
-| Redis and Postgres agree (smoke and full) | the size of the Redis buyers set equals the rows   |
-| Speed and errors (smoke and full)         | the three limits above hold                        |
+| Check                                | Passes when                                        |
+| ------------------------------------ | -------------------------------------------------- |
+| No oversell                          | `sales.sold` is at most the stock                  |
+| Sold count is true                   | `sales.sold` equals the number of `purchases` rows |
+| One item per user                    | no user has more than one purchase                 |
+| k6 and Postgres agree                | the purchases k6 saw confirmed equal the rows      |
+| The stock sold out                   | `sales.sold` equals the stock                      |
+| Floods are limited                   | k6 saw replies of `429` from the flooding users    |
+| Redis and Postgres agree (not chaos) | the size of the Redis buyers set equals the rows   |
+| Speed and errors (not chaos)         | the three limits above hold                        |
 
 A failed check is a finding about the system, to be investigated. It is not a reason to change a limit.
 
