@@ -1,7 +1,8 @@
 # Sequences
 
 Three flows that cross the parts of `flash-be`. The sequence diagrams show the order of the calls. The prose below each
-one states the rule behind it.
+one states the rule behind it. A request from the shopper is written with its method and path, where `:id` is the
+sale id. The paths are in the [endpoint reference](../../../../docs/reference/http-endpoints.md).
 
 ## Reserve and pay
 
@@ -13,15 +14,15 @@ sequenceDiagram
   participant A as flash-be
   participant R as Redis
   participant P as Postgres
-  S->>A: POST queue
+  S->>A: POST /sales/:id/queue
   A->>R: add to the line
   A-->>S: ticket and place
   A->>R: admit the next shoppers
-  S->>A: POST reservations
+  S->>A: POST /sales/:id/reservations
   A->>R: gate script
   A->>P: save the hold
   A-->>S: reservation id and end
-  S->>A: POST purchases
+  S->>A: POST /sales/:id/purchases
   A->>A: charge the mock payment
   A->>P: lock, count, insert
   A->>R: mark the buyer
@@ -44,7 +45,7 @@ sequenceDiagram
   participant A as flash-be
   participant Y as Payment
   participant P as Postgres
-  S->>A: POST purchases
+  S->>A: POST /sales/:id/purchases
   A->>P: check the hold
   A->>Y: charge
   Note over A,P: the hold ends, another shopper buys
@@ -68,7 +69,7 @@ sequenceDiagram
   participant A as flash-be
   participant R as Redis
   participant P as Postgres
-  S->>A: POST reservations
+  S->>A: POST /sales/:id/reservations
   A->>R: gate script
   R--xA: connection refused
   A->>P: lock the sale row
@@ -76,7 +77,7 @@ sequenceDiagram
   A->>P: save the hold
   A-->>S: reservation id and end
   Note over A,R: Redis returns
-  S->>A: POST reservations
+  S->>A: POST /sales/:id/reservations
   A->>R: mark not ready
   A->>P: rebuild buyers and holds
   A->>R: restore and mark ready
