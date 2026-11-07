@@ -1,3 +1,6 @@
+// The composition root: the one place that picks an adapter for each port, and that wires the services together. Only this
+// file and the entry points see both the adapters and the application. The choice of the hexagon for the API is recorded
+// in decision 004. The Redis gate with Postgres as the last word is in decision 002.
 import { type Kysely, sql } from "kysely";
 import { createScryptHasher } from "./adapters/outbound/crypto/scrypt-hasher.js";
 import { randomTokenSource } from "./adapters/outbound/crypto/token-source.js";
@@ -14,7 +17,7 @@ import type { RedisClient } from "./adapters/outbound/redis/redis-client.js";
 import { createRedisHoldGate } from "./adapters/outbound/redis/redis-hold-gate.js";
 import { createRedisQueueStore } from "./adapters/outbound/redis/redis-queue-store.js";
 import { createRedisRateLimitStore } from "./adapters/outbound/redis/redis-rate-limit-store.js";
-import { createCachedSessionStore } from "./adapters/outbound/redis/redis-session-cache.js";
+import { createRedisSessionCache } from "./adapters/outbound/redis/redis-session-cache.js";
 import { systemClock } from "./adapters/outbound/system/system-clock.js";
 import {
 	type AuthService,
@@ -37,6 +40,7 @@ import { createSaleAdminService } from "./application/sale-admin-service.js";
 import type { SaleCacheSettings } from "./application/sale-cache.js";
 import { createSaleService } from "./application/sale-service.js";
 
+// The rate-limit settings, as the configuration names them.
 export type RateLimitSettings = {
 	rateLimitWindowSeconds: number;
 	rateLimitPerUser: number;
@@ -44,14 +48,18 @@ export type RateLimitSettings = {
 	authRateLimitPerIp: number;
 };
 
+// How long a sale read may be served from memory, as the configuration names it.
 export type SaleCacheOptions = { saleCacheMs: number };
 
+// The mock payment's behaviour: its latency and the share of charges it declines.
 export type PaymentSettings = {
 	paymentLatencyMs: number;
 	paymentFailureRate: number;
 };
 
-// The composition root: the one place that knows which adapter sits behind each port.
+// Builds every service the HTTP adapter calls, with the adapter behind each port: Postgres for the records, Redis for
+// the fast state, the memory copies for the rate limit when Redis is down, and the mock payment. `clock` and `cache` are
+// passed by tests, so a scenario can fix the time or change the cache while the app runs.
 export function dependenciesFrom(
 	db: Kysely<Database>,
 	redis: RedisClient,
@@ -60,7 +68,6 @@ export function dependenciesFrom(
 		RateLimitSettings &
 		SaleCacheOptions,
 	clock: Clock = systemClock,
-	// Tests pass their own, so a scenario can change the cache time while the app runs.
 	cache: SaleCacheSettings = { ttlMs: settings.saleCacheMs },
 ): Dependencies {
 	const sales = createSaleService(createSaleRepository(db), clock, cache);
@@ -81,7 +88,7 @@ export function dependenciesFrom(
 		auth: createAuthService(
 			createAccountStore(db),
 			// Postgres has the last word on a session; Redis only answers faster.
-			createCachedSessionStore(createSessionStore(db), redis),
+			createRedisSessionCache(createSessionStore(db), redis),
 			createScryptHasher(),
 			clock,
 			randomTokenSource,
@@ -128,6 +135,7 @@ export function postgresAuth(db: Kysely<Database>): AuthService {
 	);
 }
 
+// The rate limits in the shape the rate limiter takes. Only the names change; the values are the same.
 function rateLimitsFrom(settings: RateLimitSettings): RateLimits {
 	return {
 		windowSeconds: settings.rateLimitWindowSeconds,

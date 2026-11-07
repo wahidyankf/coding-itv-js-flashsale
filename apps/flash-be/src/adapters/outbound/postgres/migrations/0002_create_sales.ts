@@ -1,3 +1,5 @@
+// Migration 0002: the sale schema, which is sales, purchases and reservations. Its constraints are the last wall
+// against overselling and against buying twice. It drops the placeholder table of migration 0001.
 import { type Kysely, sql } from "kysely";
 
 // The defaults of the two columns, frozen here: a migration never reads a live default, or an old database would change
@@ -5,7 +7,7 @@ import { type Kysely, sql } from "kysely";
 const HOLD_SECONDS_DEFAULT = 120;
 const ADMIT_PER_SECOND_DEFAULT = 50;
 
-// The sale schema. Postgres is the source of truth: the constraints below are the last wall against
+// Creates the sale tables. Postgres is the source of truth: the constraints below are the last wall against
 // overselling and against a user buying twice, whatever Redis said.
 export async function up(db: Kysely<unknown>): Promise<void> {
 	// The placeholder table from the first migration is replaced by the real domain.
@@ -71,6 +73,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 		.execute();
 }
 
+// Drops the sale tables, and puts the placeholder table back, so the schema is what migration 0001 left.
 export async function down(db: Kysely<unknown>): Promise<void> {
 	await db.schema.dropTable("reservations").execute();
 	await db.schema.dropTable("purchases").execute();

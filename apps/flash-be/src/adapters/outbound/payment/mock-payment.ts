@@ -1,9 +1,13 @@
+// The payment provider of flash-be, which lives in the process: a mock with real retry and refund rules. Outbound adapter
+// for the Payment port. It stands in for a real provider, so the purchase flow can be run end to end without money.
 import { Err, Ok } from "@flash/typekit";
 import type {
 	Payment,
 	PaymentResult,
 } from "../../../application/ports/payment.js";
 
+// How the mock behaves: how long a charge takes, how often it declines, and the seams a test uses to replace randomness,
+// waiting and logging.
 export type MockPaymentOptions = {
 	latencyMs: number;
 	// Share of charges that are declined, from 0 to 1.
@@ -13,6 +17,8 @@ export type MockPaymentOptions = {
 	log?: (message: string) => void;
 };
 
+// The mock as the composition sees it. `refunded` lists the refs refunded so far, and `settings` can change while the
+// app runs, so a scenario can make the payment slow or failing.
 export type MockPayment = Payment & {
 	readonly refunded: string[];
 	settings: { latencyMs: number; failureRate: number };

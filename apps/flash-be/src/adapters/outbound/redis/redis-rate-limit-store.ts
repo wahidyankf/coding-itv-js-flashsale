@@ -1,3 +1,5 @@
+// The rate-limit counter in Redis, shared by every instance. Outbound Redis adapter for the RateLimitStore port. When Redis
+// is down, the application counts in a memory copy instead (see memory-rate-limit-store).
 import type { RateLimitStore } from "../../../application/ports/rate-limit-store.js";
 import type { RedisClient } from "./redis-client.js";
 
@@ -8,6 +10,7 @@ if count == 1 then redis.call('PEXPIRE', KEYS[1], ARGV[1]) end
 return {count, redis.call('PTTL', KEYS[1])}
 `;
 
+// Counts hits of a key in a fixed window, in Redis.
 export function createRedisRateLimitStore(redis: RedisClient): RateLimitStore {
 	return {
 		async hit(key, windowMs) {

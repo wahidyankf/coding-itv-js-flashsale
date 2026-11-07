@@ -1,10 +1,24 @@
+// Holds in Postgres, the source of truth for who holds an item. Redis decides fast; this repository keeps the copy that a
+// rebuild reads, and it decides alone when Redis is down (decision 003). Outbound Postgres adapter for the
+// ReservationRepository port.
 import { attemptAsync } from "@flash/typekit";
 import { type Kysely, sql } from "kysely";
 import type { ReservationRepository } from "../../../application/ports/reservation-repository.js";
-import type { FallbackAnswer } from "../../../domain/reservation.js";
+import type {
+	FallbackAnswer,
+	HoldSnapshot,
+	Reservation,
+	ReserveRequest,
+} from "../../../domain/reservation.js";
 import { hasRoom } from "../../../domain/sale.js";
 import { isLive } from "../../../domain/time.js";
 import type { Database } from "./database.js";
+import {
+	livePurchaseOf,
+	lockSaleRow,
+	purchasesWithBuyer,
+	reservationsWithUser,
+} from "./queries.js";
 import { ensureUser } from "./users.js";
 
 // Saves or renews the hold of one user. A shopper has at most one live hold in a sale; a renewal keeps the row and
@@ -41,132 +55,149 @@ async function upsertHold(
 		.execute();
 }
 
+// Writes the hold a reservation asks for, as the shopper's one live hold in the sale.
+async function saveHold(
+	db: Kysely<Database>,
+	reservation: Reservation,
+): Promise<void> {
+	const userId = await ensureUser(db, reservation.user);
+	await upsertHold(db, {
+		id: reservation.reservationId,
+		saleId: reservation.saleId,
+		userId,
+		expiresAt: reservation.expiresAt,
+	});
+}
+
+// The shopper's own hold in the sale, live or not. The caller decides whether it is still live.
+async function ownHoldOf(
+	trx: Kysely<Database>,
+	saleId: string,
+	userId: string,
+) {
+	return trx
+		.selectFrom("reservations")
+		.select(["id", "expires_at"])
+		.where("sale_id", "=", saleId)
+		.where("user_id", "=", userId)
+		.where("deleted_at", "is", null)
+		.executeTakeFirst();
+}
+
+// How many shoppers other than this one hold an item now. A hold counts while `expires_at > now`, which is the domain's
+// rule (`isLive`). Redis counts a hold that expires exactly now as still live (`>=`). The two differ by one millisecond,
+// and the difference errs on the safe side: Redis may refuse, but it never oversells. Neither side is changed for it.
+async function countHoldsOfOthers(
+	trx: Kysely<Database>,
+	saleId: string,
+	userId: string,
+	now: Date,
+): Promise<number> {
+	const live = await trx
+		.selectFrom("reservations")
+		.select((builder) => builder.fn.countAll<string>().as("count"))
+		.where("sale_id", "=", saleId)
+		.where("deleted_at", "is", null)
+		.where("expires_at", ">", now)
+		.where("user_id", "!=", userId)
+		.executeTakeFirstOrThrow();
+	return Number(live.count);
+}
+
+// The Postgres fallback, under the sale's row lock. The steps run in this order, and the order is the rule: the lock
+// first, then the rebuild check, then the shopper's purchase and hold, and only then the count of the stock.
+async function reserveUnderLock(
+	trx: Kysely<Database>,
+	request: ReserveRequest,
+	redisReady: () => Promise<boolean>,
+): Promise<FallbackAnswer> {
+	// The sale row lock. The rebuild takes the same lock, so after it Redis is ready and holds everything written so far.
+	const sale = await trx
+		.selectFrom("sales")
+		.select("sold")
+		.where("id", "=", request.saleId)
+		.where("deleted_at", "is", null)
+		.forUpdate()
+		.executeTakeFirstOrThrow();
+	const ready = await attemptAsync(redisReady, Error);
+	if (ready.isOk() && ready.value) return { kind: "redis_ready" };
+
+	const userId = await ensureUser(trx, request.user);
+	// The one-item rule. A shopper who already bought gets no hold: the purchases table has one live row per shopper and
+	// sale (the partial unique index), and this check reads that row under the lock.
+	if (await livePurchaseOf(trx, request.saleId, request.user)) {
+		return { kind: "purchased" };
+	}
+	const own = await ownHoldOf(trx, request.saleId, userId);
+	if (own && isLive({ expiresAt: own.expires_at }, request.now)) {
+		return { kind: "held", reservationId: own.id, expiresAt: own.expires_at };
+	}
+
+	const others = await countHoldsOfOthers(
+		trx,
+		request.saleId,
+		userId,
+		request.now,
+	);
+	if (!hasRoom(sale.sold, others, request.stock)) return { kind: "sold_out" };
+
+	await upsertHold(trx, {
+		id: request.reservationId,
+		saleId: request.saleId,
+		userId,
+		expiresAt: request.expiresAt,
+	});
+	return {
+		kind: "reserved",
+		reservationId: request.reservationId,
+		expiresAt: request.expiresAt,
+	};
+}
+
+// The buyers and the live holds of a sale, read for a rebuild of Redis. The caller holds the sale lock.
+async function snapshotOf(
+	trx: Kysely<Database>,
+	saleId: string,
+	now: Date,
+): Promise<HoldSnapshot> {
+	const purchases = await purchasesWithBuyer(trx)
+		.where("purchases.sale_id", "=", saleId)
+		.execute();
+	const holds = await reservationsWithUser(trx)
+		.where("reservations.sale_id", "=", saleId)
+		.where("reservations.expires_at", ">", now)
+		.execute();
+	return {
+		buyers: purchases.map((row) => row.username),
+		holds: holds.map((row) => ({
+			user: row.username,
+			reservationId: row.id,
+			expiresAt: row.expires_at,
+		})),
+	};
+}
+
+// The repository over Postgres for holds. `rebuild` hands the snapshot to `restore` inside the same locked transaction,
+// so no hold can be written between the read and the restore.
 export function createReservationRepository(
 	db: Kysely<Database>,
 ): ReservationRepository {
 	return {
-		async hasPurchase(saleId, user) {
-			const row = await db
-				.selectFrom("purchases")
-				.innerJoin("users", "users.id", "purchases.user_id")
-				.select("purchases.id")
-				.where("purchases.sale_id", "=", saleId)
-				.where("purchases.deleted_at", "is", null)
-				.where("users.username", "=", user)
-				.where("users.deleted_at", "is", null)
-				.executeTakeFirst();
-			return row !== undefined;
-		},
+		// True when the shopper already bought in this sale. The purchase row is the proof, not the hold.
+		hasPurchase: async (saleId, user) =>
+			(await livePurchaseOf(db, saleId, user)) !== undefined,
 
-		async save(reservation) {
-			const userId = await ensureUser(db, reservation.user);
-			await upsertHold(db, {
-				id: reservation.reservationId,
-				saleId: reservation.saleId,
-				userId,
-				expiresAt: reservation.expiresAt,
-			});
-		},
+		save: (reservation) => saveHold(db, reservation),
 
-		async reserveWithoutRedis(request, redisReady) {
-			return db.transaction().execute(async (trx): Promise<FallbackAnswer> => {
-				const sale = await trx
-					.selectFrom("sales")
-					.select("sold")
-					.where("id", "=", request.saleId)
-					.where("deleted_at", "is", null)
-					.forUpdate()
-					.executeTakeFirstOrThrow();
-				// Rebuilding takes the same lock, so after it Redis is ready and holds everything written so far.
-				const ready = await attemptAsync(redisReady, Error);
-				if (ready.isOk() && ready.value) return { kind: "redis_ready" };
-				const userId = await ensureUser(trx, request.user);
-				const bought = await trx
-					.selectFrom("purchases")
-					.select("id")
-					.where("sale_id", "=", request.saleId)
-					.where("user_id", "=", userId)
-					.where("deleted_at", "is", null)
-					.executeTakeFirst();
-				if (bought) return { kind: "purchased" };
+		reserveWithoutRedis: (request, redisReady) =>
+			db
+				.transaction()
+				.execute((trx) => reserveUnderLock(trx, request, redisReady)),
 
-				const own = await trx
-					.selectFrom("reservations")
-					.select(["id", "expires_at"])
-					.where("sale_id", "=", request.saleId)
-					.where("user_id", "=", userId)
-					.where("deleted_at", "is", null)
-					.executeTakeFirst();
-				if (own && isLive({ expiresAt: own.expires_at }, request.now)) {
-					return {
-						kind: "held",
-						reservationId: own.id,
-						expiresAt: own.expires_at,
-					};
-				}
-
-				const live = await trx
-					.selectFrom("reservations")
-					.select((builder) => builder.fn.countAll<string>().as("count"))
-					.where("sale_id", "=", request.saleId)
-					.where("deleted_at", "is", null)
-					.where("expires_at", ">", request.now)
-					.where("user_id", "!=", userId)
-					.executeTakeFirstOrThrow();
-				if (!hasRoom(sale.sold, Number(live.count), request.stock)) {
-					return { kind: "sold_out" };
-				}
-
-				await upsertHold(trx, {
-					id: request.reservationId,
-					saleId: request.saleId,
-					userId,
-					expiresAt: request.expiresAt,
-				});
-				return {
-					kind: "reserved",
-					reservationId: request.reservationId,
-					expiresAt: request.expiresAt,
-				};
-			});
-		},
-
-		async rebuild(saleId, now, restore) {
-			await db.transaction().execute(async (trx) => {
-				await trx
-					.selectFrom("sales")
-					.select("id")
-					.where("id", "=", saleId)
-					.forUpdate()
-					.execute();
-				const purchases = await trx
-					.selectFrom("purchases")
-					.innerJoin("users", "users.id", "purchases.user_id")
-					.select("users.username")
-					.where("purchases.sale_id", "=", saleId)
-					.where("purchases.deleted_at", "is", null)
-					.execute();
-				const holds = await trx
-					.selectFrom("reservations")
-					.innerJoin("users", "users.id", "reservations.user_id")
-					.select([
-						"users.username",
-						"reservations.id",
-						"reservations.expires_at",
-					])
-					.where("reservations.sale_id", "=", saleId)
-					.where("reservations.deleted_at", "is", null)
-					.where("reservations.expires_at", ">", now)
-					.execute();
-				await restore({
-					buyers: purchases.map((row) => row.username),
-					holds: holds.map((row) => ({
-						user: row.username,
-						reservationId: row.id,
-						expiresAt: row.expires_at,
-					})),
-				});
-			});
-		},
+		rebuild: (saleId, now, restore) =>
+			db.transaction().execute(async (trx) => {
+				await lockSaleRow(trx, saleId);
+				await restore(await snapshotOf(trx, saleId, now));
+			}),
 	};
 }

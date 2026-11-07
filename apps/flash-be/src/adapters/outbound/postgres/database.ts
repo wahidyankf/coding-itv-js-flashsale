@@ -1,3 +1,5 @@
+// The shape of the Postgres tables, as Kysely reads them, and the connection that the app and the commands share. Outbound
+// Postgres adapter. The tables are changed only by the migrations; this file must follow them.
 import { type Generated, Kysely, PostgresDialect } from "kysely";
 import pg from "pg";
 import type { Role } from "../../../domain/auth.js";
@@ -13,6 +15,7 @@ type Audit = {
 	deleted_by: string | null;
 };
 
+// The tables of the database and their columns, one entry per table. A new table gets the audit columns above.
 export type Database = {
 	users: Audit & {
 		id: Generated<string>;
@@ -63,6 +66,8 @@ export type Database = {
 	};
 };
 
+// Opens a connection pool to the database at `connectionString` and returns the Kysely query builder over it. Callers
+// close it with `destroy()`.
 export function createDb(connectionString: string): Kysely<Database> {
 	return new Kysely<Database>({
 		dialect: new PostgresDialect({

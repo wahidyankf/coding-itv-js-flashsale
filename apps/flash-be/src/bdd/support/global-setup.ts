@@ -5,16 +5,15 @@ import pg from "pg";
 import { createClient } from "redis";
 import { createDb } from "../../adapters/outbound/postgres/database.js";
 import { createMigrator } from "../../adapters/outbound/postgres/migrator.js";
+import { localDefaults } from "../../local-defaults.js";
 
 // Redis database index reserved for tests. FLUSHDB runs only on this index, never on dev data (index 0).
 const TEST_REDIS_DB = 15;
-const DEFAULT_DATABASE_URL = "postgres://flash:flash@localhost:5432/flash";
-const DEFAULT_REDIS_URL = "redis://localhost:6379";
 
 // Runs once per integration run. Creates a fresh Postgres database for this run and migrates it, points the
 // tests at it and at the test Redis index, and drops the database when the run ends.
 export default async function setup(): Promise<() => Promise<void>> {
-	const serverUrl = process.env.DATABASE_URL ?? DEFAULT_DATABASE_URL;
+	const serverUrl = process.env.DATABASE_URL ?? localDefaults.databaseUrl;
 	const databaseName = `flash_it_${randomUUID().replaceAll("-", "_")}`;
 
 	const admin = new pg.Client({ connectionString: serverUrl });
@@ -31,7 +30,7 @@ export default async function setup(): Promise<() => Promise<void>> {
 	await db.destroy();
 	if (error) throw error;
 
-	const redisUrl = new URL(process.env.REDIS_URL ?? DEFAULT_REDIS_URL);
+	const redisUrl = new URL(process.env.REDIS_URL ?? localDefaults.redisUrl);
 	redisUrl.pathname = `/${TEST_REDIS_DB}`;
 
 	const redis = createClient({ url: redisUrl.toString() });

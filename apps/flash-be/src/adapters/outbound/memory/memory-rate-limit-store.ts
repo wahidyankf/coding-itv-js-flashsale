@@ -1,7 +1,9 @@
+// The rate-limit counter kept in this process. Outbound adapter for the RateLimitStore port. It is the fallback when Redis
+// is down: the application counts here instead (see decision 003), so the limit never switches off.
 import type { RateLimitStore } from "../../../application/ports/rate-limit-store.js";
 
-// Hits counted inside this process. It is the fallback when Redis is down: each instance then counts alone, so the
-// limit is looser across instances, but it still protects every instance.
+// Hits counted inside this process. Each instance counts alone while Redis is down, so the limit is looser across
+// instances, but it still protects every instance.
 export function createMemoryRateLimitStore(): RateLimitStore {
 	const windows = new Map<string, { count: number; endsAt: number }>();
 

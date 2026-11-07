@@ -1,9 +1,10 @@
+// The password hasher, with scrypt from Node itself, so there is no package to keep up to date. Outbound adapter for the
+// PasswordHasher port. The cost is the default of Node (N = 16384): it takes tens of milliseconds, which is the point of
+// it. The text stored is `scrypt$<salt>$<key>`, both parts in base64.
 import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import type { PasswordHasher } from "../../../application/ports/password-hasher.js";
 
-// scrypt from Node itself, so there is no package to keep up to date. The cost is the default of Node (N = 16384); it
-// takes tens of milliseconds, which is the point of it. The text stored is `scrypt$<salt>$<key>`, both parts in base64.
 const SALT_BYTES = 16;
 const KEY_BYTES = 64;
 const SCHEME = "scrypt";
@@ -12,6 +13,8 @@ const scryptAsync = promisify<string, Buffer, number, Buffer>(scrypt);
 const derive = (password: string, salt: Buffer): Promise<Buffer> =>
 	scryptAsync(password, salt, KEY_BYTES);
 
+// The hasher the app uses. `hash` salts and derives a new text. `verify` derives the key again and compares the two keys
+// in constant time, so the answer does not leak through timing.
 export function createScryptHasher(): PasswordHasher {
 	return {
 		async hash(password) {

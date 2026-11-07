@@ -1,6 +1,7 @@
+// Migration 0001: a placeholder table that proves the migration flow. Migration 0002 drops it for the real schema.
 import { type Kysely, sql } from "kysely";
 
-// Placeholder table to prove the migration flow. Replace it once the real domain is known.
+// Creates the placeholder `products` table. It is replaced once the real domain is known.
 export async function up(db: Kysely<unknown>): Promise<void> {
 	await db.schema
 		.createTable("products")
@@ -18,6 +19,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 		.execute();
 }
 
+// Drops the placeholder table again.
 export async function down(db: Kysely<unknown>): Promise<void> {
 	await db.schema.dropTable("products").execute();
 }

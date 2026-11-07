@@ -4,9 +4,8 @@ import { afterEach, expect } from "vitest";
 import type { Sale } from "../domain/sale.js";
 import { appWithSales, fakeSale } from "./support/fake-sales.js";
 import { specFile } from "./support/paths.js";
+import type { Response } from "./support/response.js";
 import { relativeTime } from "./support/time.js";
-
-type Response = Awaited<ReturnType<FastifyInstance["inject"]>>;
 
 // A fixed moment for every scenario, so "in 1 hour" always means the same thing.
 const NOW = new Date("2026-06-01T12:00:00Z");

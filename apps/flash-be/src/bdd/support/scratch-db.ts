@@ -2,15 +2,14 @@
 // ends.
 import { randomUUID } from "node:crypto";
 import pg from "pg";
-
-const DEFAULT_DATABASE_URL = "postgres://flash:flash@localhost:5432/flash";
+import { localDefaults } from "../../local-defaults.js";
 
 // Creates an empty database for one scenario, for steps that must start with no tables.
 export async function createScratchDatabase(): Promise<{
 	url: string;
 	drop: () => Promise<void>;
 }> {
-	const serverUrl = process.env.DATABASE_URL ?? DEFAULT_DATABASE_URL;
+	const serverUrl = process.env.DATABASE_URL ?? localDefaults.databaseUrl;
 	const name = `flash_scratch_${randomUUID().replaceAll("-", "_")}`;
 
 	const admin = new pg.Client({ connectionString: serverUrl });

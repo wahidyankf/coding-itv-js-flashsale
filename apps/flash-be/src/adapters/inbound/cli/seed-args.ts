@@ -1,3 +1,6 @@
+// Reads the options of the seed command (seed-sale.ts) as the CLI sees them: the text becomes a NewSale, with the defaults
+// the domain names. It is an inbound adapter, so it reads the command line and nothing of the database. The seed command
+// checks no overlap with another sale; only an operator's create does.
 import { parseArgs } from "node:util";
 import type { NewSale } from "../../../domain/sale-window.js";
 import {

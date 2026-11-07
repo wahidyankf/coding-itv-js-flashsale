@@ -1,3 +1,5 @@
+// Migration 0003: users, products and the audit columns. It adds the operator and system stand-in users, and moves the
+// text user ids of the old tables to user rows. Nothing is erased.
 import { type Kysely, sql } from "kysely";
 
 // Frozen here, as a migration never reads live code. `domain/actors.ts` repeats the names; a test keeps them equal.
@@ -57,6 +59,7 @@ async function dropAuditColumns(
 	}
 }
 
+// Creates users and products, adds the audit columns to the sale tables, and links every row to a user.
 export async function up(db: Kysely<unknown>): Promise<void> {
 	// users. `created_by` points at users, so the first two rows are their own authors.
 	await db.schema
@@ -170,6 +173,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 	);
 }
 
+// Puts the text user ids and the schema of migration 0002 back. Rows that were deleted are dropped here, and only here.
 export async function down(db: Kysely<unknown>): Promise<void> {
 	// An older schema has no history, so rows that were deleted are dropped here, and only here.
 	await sql`delete from reservations where deleted_at is not null`.execute(db);

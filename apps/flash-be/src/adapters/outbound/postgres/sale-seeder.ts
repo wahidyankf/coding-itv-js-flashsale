@@ -1,5 +1,6 @@
-// Inserts a sale and, when the sale names none, its product. The seed command and the operator's create both write
-// through `seedSale`; the operator's create checks the overlap first, the seed command does not (see SaleSeeder).
+// Inserts a sale and, when the sale names none, its product. Outbound Postgres adapter, used by the seed command (through
+// the SaleSeeder port) and by the operator's create. The seed command does not check the overlap, the create does (see
+// SaleSeeder).
 import { randomUUID } from "node:crypto";
 import type { Kysely } from "kysely";
 import type { SaleSeeder } from "../../../application/ports/sale-seeder.js";

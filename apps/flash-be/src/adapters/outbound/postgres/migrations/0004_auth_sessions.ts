@@ -1,3 +1,5 @@
+// Migration 0004: accounts with passwords and roles, and the sessions that hold the two login tokens. It retires the
+// operator stand-in that migration 0003 made.
 import { type Kysely, sql } from "kysely";
 
 const OPERATOR_USERNAME = "$operator";
@@ -60,12 +62,13 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 	);
 	await sql`create index sessions_user on sessions (user_id)`.execute(db);
 
-	// The operator is now a real account with a login, so the stand-in the first migration made is retired. A user is
+	// The operator is now a real account with a login, so the stand-in that migration 0003 made is retired. A user is
 	// never erased: it is marked deleted by the system.
 	await sql`update users set deleted_at = now(), deleted_by = (select id from users where username = ${SYSTEM_USERNAME})
 		where username = ${OPERATOR_USERNAME}`.execute(db);
 }
 
+// Drops the sessions and the login columns, and brings the operator stand-in back.
 export async function down(db: Kysely<unknown>): Promise<void> {
 	await sql`update users set deleted_at = null, deleted_by = null where username = ${OPERATOR_USERNAME}`.execute(
 		db,

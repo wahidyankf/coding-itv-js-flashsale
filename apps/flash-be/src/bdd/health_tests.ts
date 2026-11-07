@@ -5,8 +5,7 @@ import { buildApp } from "../adapters/inbound/http/app.js";
 import type { Dependencies } from "../application/dependencies.js";
 import { healthyDeps } from "./support/deps.js";
 import { specFile } from "./support/paths.js";
-
-type Response = Awaited<ReturnType<FastifyInstance["inject"]>>;
+import type { Response } from "./support/response.js";
 
 const apps: FastifyInstance[] = [];
 

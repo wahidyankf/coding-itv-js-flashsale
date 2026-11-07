@@ -1,3 +1,5 @@
+// The user rows that other writes point at: finding or making a user by name, and finding the system or the operator
+// stand-in. Outbound Postgres adapter; a user is never erased (see decision 011).
 import { randomUUID } from "node:crypto";
 import type { Kysely } from "kysely";
 import type { Database } from "./database.js";
@@ -35,7 +37,8 @@ export async function ensureUser(
 	return created.id;
 }
 
-// The id of a user the migration made, found by name: the system or the operator.
+// The id of a user the migration made, found by name: the system or the operator. The lookup throws when the migration
+// has not run, because the commands cannot work without these rows.
 export async function actorId(
 	db: Kysely<Database>,
 	username: string,

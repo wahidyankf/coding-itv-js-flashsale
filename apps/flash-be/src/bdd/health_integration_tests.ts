@@ -14,8 +14,7 @@ import {
 import { dependenciesFrom } from "../composition.js";
 import { config } from "../config.js";
 import { specFile } from "./support/paths.js";
-
-type Response = Awaited<ReturnType<FastifyInstance["inject"]>>;
+import type { Response } from "./support/response.js";
 
 // vitest-cucumber runs every step as its own test, so cleanup waits for the whole file.
 const cleanups: Array<() => Promise<unknown>> = [];

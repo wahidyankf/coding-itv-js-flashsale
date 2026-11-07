@@ -1,19 +1,28 @@
-import { attemptAsync } from "@flash/typekit";
+// The login cache in Redis, placed in front of the session store. It answers an access token without a Postgres read,
+// for a minute at most. Postgres stays the truth: a miss, a failing Redis or an entry that cannot be read all fall back
+// to it (see decision 007 for why logins are kept in Postgres at all).
+import { attempt, attemptAsync } from "@flash/typekit";
 import type { SessionStore } from "../../../application/ports/session-store.js";
+import type { Principal } from "../../../domain/auth.js";
 import { MS_PER_SECOND } from "../../../domain/time.js";
 import type { RedisClient } from "./redis-client.js";
 
 // How long an answer is kept, at most. A short time keeps a deleted user or a changed role from lingering.
 const CACHE_SECONDS = 60;
 
+// What is kept for one token: who it belongs to, and when the login ends, as ISO text because JSON has no dates.
 type Cached = {
-	principal: { userId: string; username: string; role: "shopper" | "operator" };
+	principal: Principal;
 	expiresAt: string;
 };
 
+// The cached text read back as a login. A broken entry is a failure to read, not a crash.
+const readCached = (text: string) =>
+	attempt(() => JSON.parse(text) as Cached, SyntaxError);
+
 // Remembers who an access token belongs to, so a request does not read Postgres to be recognised. Postgres is the truth:
 // a miss reads it, and so does a failing Redis. Logging out forgets the token here at once.
-export function createCachedSessionStore(
+export function createRedisSessionCache(
 	inner: SessionStore,
 	redis: RedisClient,
 ): SessionStore {
@@ -35,11 +44,13 @@ export function createCachedSessionStore(
 		async findByAccess(accessHash, now) {
 			const hit = await attemptAsync(() => redis.get(keyOf(accessHash)), Error);
 			if (hit.isOk() && hit.value !== null) {
-				const cached = JSON.parse(hit.value) as Cached;
-				return {
-					principal: cached.principal,
-					expiresAt: new Date(cached.expiresAt),
-				};
+				const cached = readCached(hit.value);
+				if (cached.isOk()) {
+					return {
+						principal: cached.value.principal,
+						expiresAt: new Date(cached.value.expiresAt),
+					};
+				}
 			}
 			const found = await inner.findByAccess(accessHash, now);
 			if (found === undefined) return undefined;

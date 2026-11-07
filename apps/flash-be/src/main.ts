@@ -1,5 +1,6 @@
-// Entry point: the server. It builds the dependencies from the configuration, starts the HTTP app, and runs the admission
-// timer on every instance; the queue store lets one of them win each tick.
+// Entry point (the outermost layer): the server. It reads the configuration, opens Postgres and Redis, builds the
+// dependencies, starts the HTTP app, and runs the admission timer on every instance. The queue store lets one of them win
+// each tick.
 import { attemptAsync } from "@flash/typekit";
 import { buildApp } from "./adapters/inbound/http/app.js";
 import { DEFAULT_STREAM_OPTIONS } from "./adapters/inbound/http/event-stream.js";

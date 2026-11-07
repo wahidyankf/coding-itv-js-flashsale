@@ -1,5 +1,4 @@
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
-import type { FastifyInstance } from "fastify";
 import { afterAll, expect } from "vitest";
 import { buildApp } from "../adapters/inbound/http/app.js";
 import { createDb } from "../adapters/outbound/postgres/database.js";
@@ -7,10 +6,9 @@ import { createRedis } from "../adapters/outbound/redis/redis-client.js";
 import { dependenciesFrom } from "../composition.js";
 import { config } from "../config.js";
 import { specFile } from "./support/paths.js";
+import type { Response } from "./support/response.js";
 import { insertSale, resetSales } from "./support/seed.js";
 import { relativeTime } from "./support/time.js";
-
-type Response = Awaited<ReturnType<FastifyInstance["inject"]>>;
 
 // The run database is migrated once by the global setup. Each scenario empties the sales table first.
 const db = createDb(config.databaseUrl);

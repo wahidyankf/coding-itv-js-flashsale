@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { SessionStore } from "../../../application/ports/session-store.js";
 import type { Principal } from "../../../domain/auth.js";
 import type { RedisClient } from "./redis-client.js";
-import { createCachedSessionStore } from "./redis-session-cache.js";
+import { createRedisSessionCache } from "./redis-session-cache.js";
 
 const NOW = new Date("2026-06-01T12:00:00Z");
 const ANA: Principal = { userId: "user-1", username: "ana", role: "shopper" };
@@ -56,7 +56,7 @@ describe("the cache of logins", () => {
 	it("reads Postgres on a miss, remembers the answer, and then answers without it", async () => {
 		const redis = fakeRedis();
 		const { store, calls } = innerStore();
-		const cached = createCachedSessionStore(store, redis.client);
+		const cached = createRedisSessionCache(store, redis.client);
 		const first = await cached.findByAccess("hash", NOW);
 		const second = await cached.findByAccess("hash", NOW);
 		expect(first?.principal).toEqual(ANA);
@@ -66,7 +66,7 @@ describe("the cache of logins", () => {
 
 	it("keeps an answer for a minute at most, and never past the end of the token", async () => {
 		const redis = fakeRedis();
-		const cached = createCachedSessionStore(innerStore().store, redis.client);
+		const cached = createRedisSessionCache(innerStore().store, redis.client);
 		await cached.findByAccess("long", NOW);
 		expect(redis.ttl.get("session:long")).toBe(60);
 		const soon = {
@@ -76,10 +76,7 @@ describe("the cache of logins", () => {
 				expiresAt: new Date(NOW.getTime() + 20_000),
 			}),
 		};
-		await createCachedSessionStore(soon, redis.client).findByAccess(
-			"soon",
-			NOW,
-		);
+		await createRedisSessionCache(soon, redis.client).findByAccess("soon", NOW);
 		expect(redis.ttl.get("session:soon")).toBe(20);
 	});
 
@@ -92,8 +89,17 @@ describe("the cache of logins", () => {
 				expiresAt: new Date(NOW.getTime() + 500),
 			}),
 		};
-		await createCachedSessionStore(ending, redis.client).findByAccess("x", NOW);
+		await createRedisSessionCache(ending, redis.client).findByAccess("x", NOW);
 		expect(redis.values.size).toBe(0);
+	});
+
+	it("reads Postgres when the remembered entry is not readable, instead of failing the login", async () => {
+		const redis = fakeRedis();
+		redis.values.set("session:hash", "not json");
+		const { store, calls } = innerStore();
+		const cached = createRedisSessionCache(store, redis.client);
+		expect((await cached.findByAccess("hash", NOW))?.principal).toEqual(ANA);
+		expect(calls.find).toBe(1);
 	});
 
 	it("does not remember an unknown token", async () => {
@@ -102,7 +108,7 @@ describe("the cache of logins", () => {
 			...innerStore().store,
 			findByAccess: async () => undefined,
 		};
-		const found = await createCachedSessionStore(
+		const found = await createRedisSessionCache(
 			unknown,
 			redis.client,
 		).findByAccess("x", NOW);
@@ -112,7 +118,7 @@ describe("the cache of logins", () => {
 
 	it("falls back to Postgres while Redis is down", async () => {
 		const { store, calls } = innerStore();
-		const cached = createCachedSessionStore(store, fakeRedis(true).client);
+		const cached = createRedisSessionCache(store, fakeRedis(true).client);
 		expect((await cached.findByAccess("hash", NOW))?.principal).toEqual(ANA);
 		expect((await cached.findByAccess("hash", NOW))?.principal).toEqual(ANA);
 		expect(calls.find).toBe(2);
@@ -121,7 +127,7 @@ describe("the cache of logins", () => {
 	it("forgets the tokens that a logout ends, the one sent and the ones Postgres names", async () => {
 		const redis = fakeRedis();
 		const { store } = innerStore();
-		const cached = createCachedSessionStore(store, redis.client);
+		const cached = createRedisSessionCache(store, redis.client);
 		redis.values.set("session:sent", "{}");
 		redis.values.set("session:other-hash", "{}");
 		const ended = await cached.revoke({ accessHash: "sent" });
@@ -132,7 +138,7 @@ describe("the cache of logins", () => {
 	it("forgets the access token that a refresh replaces", async () => {
 		const redis = fakeRedis();
 		const { store } = innerStore();
-		const cached = createCachedSessionStore(store, redis.client);
+		const cached = createRedisSessionCache(store, redis.client);
 		redis.values.set("session:old-hash", "{}");
 		const rotated = await cached.rotate({
 			presentedRefreshHash: "r",
@@ -148,7 +154,7 @@ describe("the cache of logins", () => {
 
 	it("still logs out and refreshes while Redis is down", async () => {
 		const { store, calls } = innerStore();
-		const cached = createCachedSessionStore(store, fakeRedis(true).client);
+		const cached = createRedisSessionCache(store, fakeRedis(true).client);
 		await cached.revoke({ refreshHash: "r" });
 		await cached.rotate({
 			presentedRefreshHash: "r",
@@ -165,7 +171,7 @@ describe("the cache of logins", () => {
 	it("passes a new login on to Postgres", async () => {
 		let created = 0;
 		const { store } = innerStore();
-		const cached = createCachedSessionStore(
+		const cached = createRedisSessionCache(
 			{
 				...store,
 				create: async () => {

@@ -1,8 +1,11 @@
+// The sale reads over Postgres, and the row-to-sale mapping that the admin and the seeder also use. Outbound Postgres
+// adapter for the SaleRepository port.
 import { type Kysely, type Selectable, sql } from "kysely";
 import type { SaleRepository } from "../../../application/ports/sale-repository.js";
 import type { Sale } from "../../../domain/sale.js";
 import type { Database } from "./database.js";
 
+// A sale row, as the domain knows a sale. The column names are the database's; the fields are the domain's.
 export function toSale(row: Selectable<Database["sales"]>): Sale {
 	return {
 		id: row.id,
@@ -17,6 +20,7 @@ export function toSale(row: Selectable<Database["sales"]>): Sale {
 	};
 }
 
+// The sale reads: one sale by id, and the sale the shoppers see now. A deleted sale is never returned.
 export function createSaleRepository(db: Kysely<Database>): SaleRepository {
 	return {
 		findById: async (id) => {

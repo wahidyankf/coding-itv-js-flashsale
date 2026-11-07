@@ -1,9 +1,12 @@
+// The accounts that can log in, kept in Postgres. Outbound Postgres adapter for the AccountStore port. The system user has
+// no password, so it is not an account and cannot log in.
 import { randomUUID } from "node:crypto";
 import { Err, Ok } from "@flash/typekit";
 import type { Kysely } from "kysely";
 import type { AccountStore } from "../../../application/ports/account-store.js";
 import type { Database } from "./database.js";
 
+// The accounts of the app over Postgres. A name is taken once by a live account; the unique index decides a race.
 export function createAccountStore(db: Kysely<Database>): AccountStore {
 	return {
 		async register(account) {

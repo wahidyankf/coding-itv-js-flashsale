@@ -1,6 +1,6 @@
 // The hold gate with a memory of trouble. When a call to Redis fails, Postgres may have decided something Redis did not
 // see: a hold taken without it, or a purchase it was not told about. Such a sale is marked stale, and the next
-// reservation on it first rebuilds Redis from Postgres.
+// reservation on it first rebuilds Redis from Postgres. This is the choice of decision 003 (selling without Redis).
 import { attemptAsync } from "@flash/typekit";
 import type { HoldGate } from "./ports/hold-gate.js";
 

@@ -1,5 +1,5 @@
-// Entry point: applies the database migrations, in order, and prints each one's status. The migrations are the only way
-// the schema changes.
+// Entry point (the outermost layer): applies the database migrations, in order, and prints each one's status. The
+// migrations are the only way the schema changes.
 import { createDb } from "./adapters/outbound/postgres/database.js";
 import { createMigrator } from "./adapters/outbound/postgres/migrator.js";
 import { config } from "./config.js";
