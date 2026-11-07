@@ -54,7 +54,7 @@ sale keeps moving, and the later sale starts to admit when it becomes current. A
 
 ## The ticket
 
-The ticket is a signature (HMAC) of the sale id and the user id, made with `TICKET_SECRET`. Any instance can issue and
+The ticket is a signature (HMAC) of the sale id and the user name, made with `TICKET_SECRET`. Any instance can issue and
 check it, so it needs no storage and it stays valid after a Redis restart. It proves that the holder asked the server
 for a place for that user. It does not prove who the holder is. The login does: every queue route also needs the session
 cookie, and the ticket is checked against the user of that session, so a ticket of another shopper is refused with

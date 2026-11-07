@@ -24,10 +24,9 @@ traffic when the place did not move.
 
 ## Why polling inside, and not pub/sub
 
-The server could publish a message when stock changes and let the streams subscribe. It does not, for two reasons.
-The stock changes in Postgres from several processes, and a publish after commit can be lost, so a subscriber would
-still need a periodic read as a safety net. And a read every second from a cache is cheap enough that the extra moving
-part buys nothing at this size. If the interval had to drop to tens of milliseconds, pub/sub would be the next step.
+A publish after commit can be lost, so a subscriber would still need a periodic read, and a read every second from the
+cache is cheap at this size. [Decision 008](decisions/008-server-sent-events.md) weighs pub/sub, WebSockets and polling
+from the page. If the interval had to drop to tens of milliseconds, pub/sub would be the next step.
 
 ## Errors and shutdown
 
@@ -39,14 +38,10 @@ server closes, it drops open streams so it does not wait for them.
 
 The browser never talks to this API. It opens the streams on its own web server, which passes them on (see
 [the web server in front of the API](web-server-proxy.md)). An `EventSource` cannot send the ticket header, so the page
-reads the stream with `fetch` and sets `x-queue-ticket` itself. When a stream ends or cannot be
-reached, the reader opens it again with exponential backoff and full jitter: a wait of up to 1 second, then 2, 4 and so
-on up to 30 seconds, for at most 8 tries. A stream that opens resets the count, so each outage gets its own 8 tries. After
-the last one the page stops and says "Live updates stopped. Reload the page to see the latest sale.", so a shopper does
-not trust words that may be old. A thousand pages that lost the server at the same moment do not all come back at the
-same moment either, because each wait is random. Each event is decoded before the page uses it
-([decision 018](decisions/018-decode-payloads-at-the-edge.md)): an event the page cannot read is dropped and does not
-count as a live frame, so a stream that sends nothing readable gives up like one that never opens. The reader stops for
-good on a `401` or `404`, since asking again will
-not change the answer. The policy is in [flash-commons](../reference/flash-commons.md), and
-[decision 017](decisions/017-retry-backoff-jitter.md) says why.
+reads the stream with `fetch` and sets `x-queue-ticket` itself. A stream that ends or cannot be
+reached is opened again with backoff and jitter, for a limited number of tries
+([the retry policies](../reference/retry-policies.md), [decision 017](decisions/017-retry-backoff-jitter.md)).
+After the last try the page says "Live updates stopped. Reload the page to see the latest sale.", so a shopper does not
+trust words that may be old. A `401` or `404` stops the reader at once, since asking again will not change the answer.
+An event the page cannot decode is dropped and does not count as a live frame
+([decision 018](decisions/018-decode-payloads-at-the-edge.md)).

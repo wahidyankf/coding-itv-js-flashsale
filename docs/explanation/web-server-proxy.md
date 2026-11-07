@@ -46,16 +46,11 @@ is stateless, so more copies can run behind a load balancer.
 
 ## What the page does
 
-The page renders on the server from the current sale, so the first paint already shows the status and the items left.
-After that it follows the sale stream and updates by itself. A shopper logs in (or signs up) and presses **Buy Now**:
+The page renders on the server from the current sale, then follows the sale stream. What it does for a shopper, step by
+step, is in its [behaviour scenarios](../../specs/apps/flash/web/behaviours/README.md) and the
+[tutorial](../tutorials/run-flash-sale-locally.md#8-sign-up-and-buy-an-item).
 
-1. The page joins the queue. If the line is moving, it shows the place and follows the place stream.
-2. When the queue admits the shopper, the page reserves an item and shows a countdown for the hold.
-3. **Confirm purchase** pays for the held item. A declined payment keeps the hold, so the shopper can try again.
-4. **Check my status** answers "did I get it" for a shopper who closed the page.
-
-A waiting shopper is told when the sale ends or sells out. The queue stops admitting then, so without this the page
-would show the last place forever.
+## What the page checks itself
 
 Names are checked in the page with the same pattern the API uses, so a bad name never leaves the browser. The web app
 keeps its own copy of that rule and of the `not_found` reply; `same_as_be_tests.ts` fails if a copy drifts from

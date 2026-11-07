@@ -16,7 +16,7 @@ flowchart LR
   pg[("Postgres 18<br/>data store")]
   redis[("Redis 8<br/>data store")]
   operator -->|/admin/sales| lb
-  web -->|sale routes, /health| lb
+  web -->|sale, auth, /health| lb
   lb -->|least connections| be
   be -->|SQL queries over TCP| pg
   be -->|queue, gate, counters| redis

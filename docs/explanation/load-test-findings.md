@@ -1,6 +1,6 @@
 # What the load runs found
 
-The limits in [reference: load test](../reference/load-test.md) were fixed before the first run. This page records what
+The limits in [specification: limits](../../specs/apps/flash/load/limits.md) were fixed before the first run. This page records what
 the runs showed and what was changed because of them. A limit was never changed to make a run pass.
 
 ## The invariants held every time
@@ -21,13 +21,13 @@ are in `profiles.ts` and were written before they ran. The limits are the same a
 that runs the load generator, not a result about the system. The herd was cut to 700, close to the 670 users that `full`
 starts. The runner now reports a missing k6 summary as a load-generator failure and removes the stack.
 
-**The invariants held.** In four runs (two of each profile) `sales.sold` equalled the number of purchase rows and never
+**The invariants held.** In six runs (three of each profile) `sales.sold` equalled the number of purchase rows and never
 passed the stock (100 of 100 in `burst`, 50 of 50 in `contention`), no shopper bought twice, k6, Postgres and Redis agreed,
 the flooding users got `429`, and there were no server errors. Postgres never had a session waiting for a lock. The
 `contention` profile is the first one that sends hundreds of reserves for 50 items in the same moment, and the Lua gate
 and `UPDATE ... WHERE sold < stock` held.
 
-**The speed limits failed, as k6 measures them.**
+**The speed limits failed in five of the six runs, as k6 measures them.**
 
 | Run          | Reserve p95 | Purchase p95 | Dropped | Note                                   |
 | ------------ | ----------- | ------------ | ------- | -------------------------------------- |
@@ -48,8 +48,8 @@ the noisy part.
 **What this does not show.** The API logs time a request from when Node hands it to the server. They do not include the
 time a request waits before that, in nginx, in the network or in a busy event loop. So the logs lower the suspicion on the
 handlers, but they do not prove that a real client would see 5 ms. A faithful speed result needs the load generator on
-another machine. Until then the two profiles are judged on speed with the fixed limits, and they fail on this machine; a
-limit was not changed or switched off to make them pass.
+another machine. Until then the two profiles are judged on speed with the fixed limits. After the refactor `contention` passed
+and `burst` still failed on purchase (521 ms against 500 ms).
 
 ## Paying during a Redis outage was slow
 

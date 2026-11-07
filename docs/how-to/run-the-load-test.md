@@ -20,11 +20,13 @@ The other profiles are `load:full`, `load:chaos`, `load:burst` and `load:content
 ## 2. Read the result
 
 The runner prints a table and writes it to `generated-reports/load/<profile>.md`. Each row is one check with what was
-expected and what was found. The row `requests per instance` shows how the three instances shared the work.
+expected and what was found. The `Informational:` line under the table gives the requests per instance, so you can see how the three
+instances shared the work.
 
 ## If a check fails
 
 Read the k6 log in the same folder first. A failed limit is a finding: record the real numbers, find the cause, and fix
 the system. Do not change a limit in [`profiles.ts`](../../apps/flash-load/k6/profiles.ts) to make a run pass.
 
-See [reference: load test](../reference/load-test.md) for the profiles, limits and checks.
+The numbers of each profile are in [reference: load test](../reference/load-test.md), and the limits and checks in
+[the load specification](../../specs/apps/flash/load/README.md).

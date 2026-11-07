@@ -16,8 +16,9 @@ only when the process stops answering.
 
 ## Why readiness checks both stores
 
-Readiness answers a different question: should traffic reach this instance? The API cannot serve a request without
-Postgres and Redis, so `/ready` checks both. It returns `503` with the result of each check, so an operator can see
+Readiness answers a different question: should traffic reach this instance? Without Postgres the API cannot serve a
+request; without Redis it still sells, but slower and less fairly ([serving without Redis](serving-without-redis.md)).
+So `/ready` checks both, and a balancer can prefer the instances that have both. It returns `503` with the result of each check, so an operator can see
 which store failed. For example, `{"status":"unavailable","checks":{"database":"error","redis":"ok"}}`.
 
 Readiness is for operators and load balancers. The Docker health check does not use it.

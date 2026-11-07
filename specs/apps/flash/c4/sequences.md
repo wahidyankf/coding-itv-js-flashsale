@@ -23,7 +23,7 @@ sequenceDiagram
   A->>R: read the session
   R-->>A: miss
   A->>P: read the session by token hash
-  A->>R: keep the session until the token ends
+  A->>R: keep the session for up to 60 s
   S->>A: POST /auth/refresh (refresh_token)
   A->>P: lock the session, swap the pair, keep the old refresh hash
   A->>R: forget the old access token
@@ -67,7 +67,7 @@ UPDATE "sessions" SET "deleted_at" = now(), "deleted_by" = "user_id" WHERE "id" 
 ```
 
 ```text
-GET session:<access hash>        -- the session cache; SET with EX until the access token ends
+GET session:<access hash>        -- the session cache; SET with EX of at most 60 s, never past the token's end
 DEL session:<access hash>        -- on a refresh, a replay and a logout
 ```
 
@@ -163,11 +163,15 @@ ON CONFLICT ("sale_id", "user_id") WHERE "deleted_at" IS NULL
 DO UPDATE SET "id" = $5, "expires_at" = $6, "updated_at" = now(), "updated_by" = $3;
 
 -- lock, count, insert: one transaction
-SELECT "id" FROM "sales" WHERE "id" = $1 FOR UPDATE;
+SELECT * FROM "sales" WHERE "id" = $1 AND "deleted_at" IS NULL FOR UPDATE;
 SELECT "purchases".*, "users"."username" FROM "purchases"
 INNER JOIN "users" ON "users"."id" = "purchases"."user_id"
-WHERE "purchases"."deleted_at" IS NULL AND "purchases"."reservation_id" = $1;
-SELECT "id" FROM "purchases" WHERE "sale_id" = $1 AND "user_id" = $2 AND "deleted_at" IS NULL;
+WHERE "purchases"."deleted_at" IS NULL AND "users"."deleted_at" IS NULL AND "purchases"."reservation_id" = $1;
+SELECT "id" FROM "users" WHERE "username" = $1 AND "deleted_at" IS NULL;  -- the buyer's id
+SELECT "purchases".*, "users"."username" FROM "purchases"
+INNER JOIN "users" ON "users"."id" = "purchases"."user_id"
+WHERE "purchases"."deleted_at" IS NULL AND "users"."deleted_at" IS NULL
+AND "purchases"."sale_id" = $1 AND "users"."username" = $2;
 UPDATE "sales" SET "sold" = sold + 1, "updated_at" = now(), "updated_by" = $2
 WHERE "id" = $1 AND "deleted_at" IS NULL AND sold < stock;
 INSERT INTO "purchases" ("sale_id", "user_id", "reservation_id", "payment_ref", "created_by")
@@ -256,9 +260,14 @@ sequenceDiagram
 The calls, in full. _gate script_ is the `RESERVE` script of the first flow.
 
 ```sql
--- lock the sale row, then count sold and holds: one transaction, no Redis
-SELECT "sold" FROM "sales" WHERE "id" = $1 AND "deleted_at" IS NULL FOR UPDATE;
-SELECT "id" FROM "purchases" WHERE "sale_id" = $1 AND "user_id" = $2 AND "deleted_at" IS NULL;
+-- lock the sale row, then count sold and holds: one transaction
+SELECT * FROM "sales" WHERE "id" = $1 AND "deleted_at" IS NULL FOR UPDATE;
+-- EXISTS sale:<saleId>:ready in Redis: if another instance rebuilt the gate, the request goes back to the gate
+SELECT "id" FROM "users" WHERE "username" = $1 AND "deleted_at" IS NULL;  -- the shopper's id
+SELECT "purchases".*, "users"."username" FROM "purchases"
+INNER JOIN "users" ON "users"."id" = "purchases"."user_id"
+WHERE "purchases"."deleted_at" IS NULL AND "users"."deleted_at" IS NULL
+AND "purchases"."sale_id" = $1 AND "users"."username" = $2;
 SELECT "id", "expires_at" FROM "reservations"
 WHERE "sale_id" = $1 AND "user_id" = $2 AND "deleted_at" IS NULL;
 SELECT COUNT(*) AS "count" FROM "reservations"
@@ -270,7 +279,7 @@ ON CONFLICT ("sale_id", "user_id") WHERE "deleted_at" IS NULL
 DO UPDATE SET "id" = $5, "expires_at" = $6, "updated_at" = now(), "updated_by" = $3;
 
 -- rebuild buyers and holds: one transaction, under the same lock
-SELECT "id" FROM "sales" WHERE "id" = $1 FOR UPDATE;
+SELECT * FROM "sales" WHERE "id" = $1 AND "deleted_at" IS NULL FOR UPDATE;
 SELECT "users"."username" FROM "purchases"
 INNER JOIN "users" ON "users"."id" = "purchases"."user_id"
 WHERE "purchases"."sale_id" = $1 AND "purchases"."deleted_at" IS NULL;
@@ -282,5 +291,5 @@ WHERE "reservations"."sale_id" = $1 AND "reservations"."deleted_at" IS NULL AND 
 - The `sold` of the locked row plus the count is compared with the stock. A shopper who already holds or bought gets
   that answer instead.
 - _mark not ready_ is `DEL sale:<saleId>:ready`.
-- _restore and mark ready_ is one `MULTI`: `DEL` of `buyers`, `holds` and `ids`, then `SADD` of the buyers, `ZADD` and
+- _restore and mark ready_ is one script (`RESTORE`): `DEL` of `buyers`, `holds` and `ids`, then `SADD` of the buyers, `ZADD` and
   `HSET` for each live hold, and `SET sale:<saleId>:ready 1`.

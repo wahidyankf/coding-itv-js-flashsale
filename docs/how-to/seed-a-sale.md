@@ -88,15 +88,8 @@ curl -s -b cookies.txt -X PATCH http://localhost:8080/admin/sales/<id> \
 curl -s -b cookies.txt -X DELETE http://localhost:8080/admin/sales/<id>
 ```
 
-The rules, in short:
-
-- A sale that has not started can change in every field.
-- A running sale keeps its start and can only get more stock; its end, name, hold time and admission rate can change.
-  A change that does not follow this is refused with `409` `sale_locked`.
-- A sale that is over cannot change (`409` `sale_locked`).
-- A window that would overlap another sale is refused with `409` `sale_overlaps`.
-- A sale that has a purchase is not removed (`409` `sale_has_purchases`). Any other sale is marked deleted with its holds (the rows stay).
-
-The bodies and every error are in [HTTP endpoints](../reference/http-endpoints.md#changing-a-sale-operator). The scenarios
+What each state of a sale lets you change, the bodies and every error are in
+[HTTP endpoints](../reference/http-endpoints.md#changing-a-sale-operator); why is in
+[admin and sale windows](../explanation/admin-and-sale-windows.md). The scenarios
 are in
 [`specs/apps/flash/be/behaviours/sale/operating.feature`](../../specs/apps/flash/be/behaviours/sale/operating.feature).

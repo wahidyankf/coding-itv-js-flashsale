@@ -33,7 +33,7 @@ flowchart LR
 ## 1. Write the scenario
 
 Add it to a feature file under `specs/apps/flash/be/behaviours/`. Put it in the folder for its area, for example
-`health/` or `config/`. If the folder has no feature file for this behaviour yet, create one and link it from the
+`health/` or `queue/`. If the folder has no feature file for this behaviour yet, create one and link it from the
 folder's `README.md`:
 
 ```markdown

@@ -10,7 +10,7 @@ server, which passes a fixed list of routes on to `flash-be`
 ```text
 src/
   routes/            TanStack routes: the page (index.tsx), the document (__root.tsx), and the server routes under
-                     /api that hand every request to the proxy
+                     /api: health.ts answers by itself, auth.$.ts and sales.$.ts hand every request to the proxy
   proxy.ts           the allow-list of method and path pairs passed on to flash-be, and the headers kept
   api.ts             what the app knows about the API: header names, the error shape, and callApi, which decodes
                      every reply with the decoder its caller names (the decoders sit next to the view types)
@@ -26,6 +26,8 @@ src/
     use-shopper.ts     the hook that makes the requests and runs the effects
     messages.ts        the sale's words (TEXT) and its error sentences
     client.ts, sse.ts  the sale's calls and the live streams
+    load.ts            the sale the server reads for the first render
+    types.ts           the view types and their decoders
     *.tsx              the cards: status, stock meter, buy actions
   auth/              everything about the account: the form, its checks, its words, the account hook and client
   components/        look and parts shared by sale/ and auth/ (ui.ts holds the Tailwind class lists)

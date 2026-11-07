@@ -158,17 +158,17 @@ Every table has these six columns, and nothing is ever hard-deleted: a row that 
 | `deleted_by` | `uuid`        | Foreign key to `users.id`. Empty while the row is live.                     |
 
 `$system` (the migration, the seed command and `create-operator`) is a user that is its own
-author. `$operator` was a stand-in for the operator before logins; `0004` marks it deleted.
+author. A deleted `$operator` row is also there: migration `0004` marked it deleted, and nothing uses it.
 
 ## Tables in Prose
 
 - `users` has one row per account: a shopper who signed up, an operator made with `create-operator`, and `$system`.
   Everything else points to it to say who did something.
-- `products` has one row per thing for sale. A sale that is made without a product gets one named like the sale.
-- `sales` has one row per sale. `stock` is the number of items and `sold` is how many are bought. A sale is
-  running while `starts_at <= now < ends_at`. `reservation_ttl_seconds` is how long a hold lasts and
-  `admit_per_second` is how many shoppers the queue lets in each second. The defaults are 120 and 50.
-- `purchases` has one row per confirmed item. `reservation_id` is the key that makes a repeated confirm do nothing.
+- `products` has one row per thing for sale. A sale that is made without a product gets the live product of
+  that name, which is made when there is none.
+- `sales` has one row per sale of one product: its stock, its window, how many are sold, the hold time and the
+  admission rate. A sale is running while `starts_at <= now < ends_at`.
+- `purchases` has one row per confirmed item, tied to the user and to the hold it paid for.
 - `reservations` has one row per hold. A row past `expires_at` counts as free, so no sweep job runs. A hold that is
   paid for or removed is marked deleted.
 - `sessions` has one row per login. A logout, a replayed refresh token or a refresh that comes too late marks it deleted.
@@ -195,5 +195,5 @@ author. `$operator` was a stand-in for the operator before logins; `0004` marks 
 ## Not in the database
 
 Redis holds the waiting queue, the hold gate, the rate counters and a short-lived copy of each live session (so a request
-does not read Postgres to check a login), under keys that start with `sale:<saleId>:` or `session:`. It holds nothing
+does not read Postgres to check a login), under keys that start with `sale:<saleId>:`, `session:` or `ratelimit:`. It holds nothing
 that Postgres cannot rebuild, so it has no place in this diagram.

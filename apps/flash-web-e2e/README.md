@@ -33,5 +33,5 @@ locator here too.
 
 ```bash
 npx nx test:quick flash-web-e2e   # typecheck and lint
-npx nx test:e2e flash-web-e2e     # builds both apps, needs Docker
+npx nx test:e2e flash-web-e2e     # builds both apps; needs the dev stack up (npx nx db:up flash-be)
 ```

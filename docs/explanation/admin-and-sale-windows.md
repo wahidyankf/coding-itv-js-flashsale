@@ -9,7 +9,8 @@ the sales, why a started sale is limited, and where the rules stop.
 The brief sells one type of product in limited quantity, and each user may buy one unit. In the code:
 
 - A sale sells one product, a row of the `products` table, with `stock` units. A product can have many sales over time
-  (`sales.product_id`). `POST /admin/sales` takes an optional `productId`; without it, a product is made from `name`.
+  (`sales.product_id`). `POST /admin/sales` takes an optional `productId`; without it, the sale gets the product of that
+  `name`, which is made when there is none.
   There is no product CRUD and no price: the brief needs neither.
 - One user gets one unit and holds one item at a time in a sale. The tables keep it with `UNIQUE(sale_id, user_id)` on
   reservations and on purchases, and Redis keeps a set of buyers in front of them.
@@ -20,13 +21,9 @@ The brief sells one type of product in limited quantity, and each user may buy o
 ## Changing and removing a sale
 
 The routes are `PATCH /admin/sales/:saleId` and `DELETE /admin/sales/:saleId`. A sale that has queues, holds or purchases
-is data that other rules depend on, so the rules follow how far the sale has gone:
-
-| The sale is     | Change                                                                                | Remove                |
-| --------------- | ------------------------------------------------------------------------------------- | --------------------- |
-| not started yet | every field                                                                           | yes                   |
-| running         | more `stock`, a new `endsAt`, `name`, `holdSeconds`, `admitPerSecond`; not `startsAt` | yes, if nobody bought |
-| over            | nothing (`sale_locked`)                                                               | yes, if nobody bought |
+is data that other rules depend on, so what may change follows how far the sale has gone: every field before it starts,
+less once it runs, nothing once it is over. The exact fields and errors are in
+[HTTP endpoints](../reference/http-endpoints.md#changing-a-sale-operator).
 
 Why a running sale keeps its start and cannot lose stock:
 
@@ -93,7 +90,5 @@ create the same window at once get one sale".
 
 ### Where the rule stops
 
-The rule lives in the admin routes only. The seed command and the test fixtures insert rows directly, and many tests rely
-on creating several sales that overlap in time. A database constraint would make the rule absolute, but it would also
-break those tests, so it was left out. If you need the rule everywhere, add an exclusion constraint on the window and
-change the fixtures first.
+The rule lives in the admin routes only: the seed command and the test fixtures insert rows directly, and many tests
+create sales that overlap. Why no database constraint holds it is in [decision 010](decisions/010-one-sale-at-a-time.md).

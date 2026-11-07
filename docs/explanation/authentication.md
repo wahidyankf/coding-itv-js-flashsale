@@ -7,11 +7,10 @@ lives in two cookies. This page gives the reasons for the design. The routes and
 
 ## Why accounts
 
-Before accounts, a user was a name that anyone could type. Anyone could read the place, the hold or the purchase of
-another shopper by typing their name, and the operator routes were guarded by one shared token. Accounts fix both: a
-request says who it is from by its cookie, so no route takes a user id, and the operator routes need an account with the
-role `operator`. Every row also says who made it, who changed it and who deleted it (the audit columns in the
-[data model](../../specs/apps/flash/c4/data-model.md)), which needs real users to point at.
+A request says who it is from by its cookie, so no route takes a user id, and the operator routes need an account with
+the role `operator`. Every row also says who made it, changed it and deleted it (the audit columns in the
+[data model](../../specs/apps/flash/c4/data-model.md)), which needs real users to point at. Why a password and not a
+plain name, and the other options weighed, are in [decision 007](decisions/007-accounts-and-cookie-sessions.md).
 
 ## Two tokens
 
@@ -33,7 +32,7 @@ sequenceDiagram
 ```
 
 - The **access token** is short (15 minutes) because it goes with every request and a copy of it is worth little for long.
-  It is checked against a Redis cache first (`session:<hash>`, kept until the token ends) and against Postgres on a miss.
+  It is checked against a Redis cache first (`session:<hash>`, kept for at most one minute and never past the token's end) and against Postgres on a miss.
 - The **refresh token** is long (7 days) and only goes to `/auth`, so it travels in far fewer requests. Each use replaces
   it. A token that was already replaced is a sign of a copy, so the whole session ends, and the real owner logs in again.
   A week without a visit also ends the login; every use starts a new week.

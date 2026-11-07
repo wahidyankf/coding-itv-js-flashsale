@@ -63,9 +63,10 @@ All bodies are JSON. Dates are ISO strings.
 | `DELETE /admin/sales/:saleId`                                                   | `{ "id" }`                                                                                                                                   |
 
 `"userId"` in a reply is the user name of the account. Request bodies: the queue and reservation routes take none; a
-purchase takes `{ "reservationId" }`; `register` and `login` take `{ "username", "password" }`. A body field that is
-missing or not a string is refused with `400` and the code of that field (`invalid_user`, `invalid_password` or
-`invalid_reservation`) before anything else is looked at. The ticket goes in the `x-queue-ticket` header.
+purchase takes `{ "reservationId" }`; `register` and `login` take `{ "username", "password" }`. `register` refuses a
+missing or wrong field with `400` and the code of that field (`invalid_user`, `invalid_password`); `login` answers any
+body it cannot read with `401` `invalid_credentials`, so it never says which part was wrong. A purchase body without a
+string `reservationId` is `400` `invalid_reservation`, after the rate limit and the login check. The ticket goes in the `x-queue-ticket` header.
 
 `/ready` returns `503` when a check fails. Each failing check is `"error"`, and `status` is `"unavailable"`. For
 example, with Postgres stopped:
@@ -97,7 +98,7 @@ address and the user agent of the login. Why it is built this way is in [authent
 
 | Status | `errorCode`             | When                                                                                      |
 | ------ | ----------------------- | ----------------------------------------------------------------------------------------- |
-| `400`  | `invalid_user`          | the user name is missing or does not match the rule above                                 |
+| `400`  | `invalid_user`          | sign-up only: the user name is missing or does not match the rule above                   |
 | `400`  | `invalid_password`      | the password is missing or has fewer than 8 or more than 128 characters                   |
 | `401`  | `invalid_credentials`   | the name or the password is wrong (the same answer for both, so a name cannot be guessed) |
 | `401`  | `invalid_refresh_token` | the refresh cookie is missing, expired or already used; the cookies are cleared           |
@@ -149,10 +150,8 @@ The scenarios are in [`specs/apps/flash/be/behaviours/sale/caching.feature`](../
 
 ## Creating a sale (operator)
 
-`POST /admin/sales` creates a sale from a stock and a window, so an operator needs no shell on the server. The three
-operator routes (create, change and remove, plus the list) are never passed on by the web server, so they are reached on
-the API port only. They need a login as an operator and give the same two errors for it: `401` `not_authenticated` when
-there is no login, and `403` `forbidden` when the account is a shopper.
+`POST /admin/sales` creates a sale from a stock and a window, so an operator needs no shell on the server. The web
+server never passes the operator routes on, so they are reached on the API port only.
 
 ```json
 {
@@ -166,14 +165,14 @@ there is no login, and `403` `forbidden` when the account is a shopper.
 `holdSeconds` (default `120`) and `admitPerSecond` (default `50`) are optional. The reply is `201` with the new sale
 (`SaleView`).
 
-| Status | `errorCode`         | When                                                                                     |
-| ------ | ------------------- | ---------------------------------------------------------------------------------------- |
-| `401`  | `not_authenticated` | there is no login, or the access cookie has ended                                        |
-| `403`  | `forbidden`         | the account is a shopper                                                                 |
-| `400`  | `invalid_sale`      | the stock, hold or admission rate is not a positive whole number, or the window is empty |
-| `404`  | `product_not_found` | `productId` names no product                                                             |
-| `409`  | `sale_overlaps`     | the window overlaps the window of another sale (a window may open when another closes)   |
-| `429`  | `rate_limited`      | too many tries from one address; the login is checked after the count                    |
+| Status | `errorCode`         | When                                                                                                                                                          |
+| ------ | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `401`  | `not_authenticated` | there is no login, or the access cookie has ended                                                                                                             |
+| `403`  | `forbidden`         | the account is a shopper                                                                                                                                      |
+| `400`  | `invalid_sale`      | the stock, hold or admission rate is not a positive whole number, the window is empty, the name is empty or over 120 characters, or `productId` is not a UUID |
+| `404`  | `product_not_found` | `productId` names no product                                                                                                                                  |
+| `409`  | `sale_overlaps`     | the window overlaps the window of another sale (a window may open when another closes)                                                                        |
+| `429`  | `rate_limited`      | too many tries from one address; the login is checked after the count                                                                                         |
 
 The login is checked before the body is read. The scenarios are in
 [`specs/apps/flash/be/behaviours/sale/admin.feature`](../../specs/apps/flash/be/behaviours/sale/admin.feature). See
@@ -201,6 +200,7 @@ A new `stock` or `holdSeconds` applies to the next reservation at once. Holds th
 | `404`  | `sale_not_found`    | no sale has this id, or the id is not a UUID                                         |
 | `409`  | `sale_locked`       | the sale is over, or it is running and the change moves `startsAt` or lowers `stock` |
 | `409`  | `sale_overlaps`     | the new window overlaps another sale                                                 |
+| `429`  | `rate_limited`      | too many tries from one address; the login is checked after the count                |
 
 The scenarios are in
 [`specs/apps/flash/be/behaviours/sale/operating.feature`](../../specs/apps/flash/be/behaviours/sale/operating.feature).
@@ -210,7 +210,7 @@ The scenarios are in
 `DELETE /admin/sales/:saleId` removes a sale, with the holds on it. The reply is `200` with `{ "id": "<saleId>" }`. Nothing
 is deleted from the database: the sale and its holds get `deleted_at` and `deleted_by` (the operator), and no read
 returns them any more. A sale that has a purchase is never removed, because the shopper has paid: the answer is `409`
-`sale_has_purchases`. The other errors are the login errors above and `404` `sale_not_found`.
+`sale_has_purchases`. The other errors are the login errors above, `404` `sale_not_found` and `429` `rate_limited`.
 
 ## Listing sales (operator)
 
@@ -230,14 +230,15 @@ Shoppers join a queue before they can reserve. The queue admits them in order, a
 
 Joining again returns the same place and the same ticket.
 
-| Status | `errorCode`         | When                                                                     |
-| ------ | ------------------- | ------------------------------------------------------------------------ |
-| `401`  | `not_authenticated` | there is no login                                                        |
-| `401`  | `invalid_ticket`    | the ticket is missing or is not the one issued for this sale and user    |
-| `404`  | `sale_not_found`    | the sale id is unknown or malformed                                      |
-| `404`  | `not_in_queue`      | the ticket is right but the queue has no place for the user (join again) |
-| `409`  | `sale_ended`        | the window has closed; the queue takes no new shoppers                   |
-| `409`  | `sold_out`          | no item remains; the queue takes no new shoppers                         |
+| Status | `errorCode`         | When                                                                                    |
+| ------ | ------------------- | --------------------------------------------------------------------------------------- |
+| `401`  | `not_authenticated` | there is no login                                                                       |
+| `401`  | `invalid_ticket`    | the ticket is missing or is not the one issued for this sale and user                   |
+| `404`  | `sale_not_found`    | the sale id is unknown or malformed                                                     |
+| `404`  | `not_in_queue`      | the ticket is right but the queue has no place for the user (join again)                |
+| `409`  | `sale_ended`        | the window has closed; the queue takes no new shoppers                                  |
+| `409`  | `sold_out`          | no item remains; the queue takes no new shoppers                                        |
+| `429`  | `rate_limited`      | the join was sent too often (see the rate limits); `Retry-After` says when to try again |
 
 The scenarios are in [`specs/apps/flash/be/behaviours/queue/`](../../specs/apps/flash/be/behaviours/queue/README.md).
 
@@ -357,12 +358,12 @@ The scenarios are in [`specs/apps/flash/be/behaviours/degraded/`](../../specs/ap
 
 ## flash-web (port 3000)
 
-| Method | Path           | Response                                                                                                                                       |
-| ------ | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| GET    | `/`            | HTML page. It shows the current sale, a login form or Buy Now, and `Backend: ok` when `flash-be` answers `GET /health` with `{"status":"ok"}`. |
-| GET    | `/api/health`  | `200` `{"status":"ok"}`                                                                                                                        |
-| any    | `/api/sales/*` | The routes below, passed on to `flash-be`. Anything else under this path answers `404` with `errorCode` `not_found`.                           |
-| any    | `/api/auth/*`  | The login routes below, passed on to `flash-be`, with the cookies.                                                                             |
+| Method    | Path           | Response                                                                                                                                       |
+| --------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET       | `/`            | HTML page. It shows the current sale, a login form or Buy Now, and `Backend: ok` when `flash-be` answers `GET /health` with `{"status":"ok"}`. |
+| GET       | `/api/health`  | `200` `{"status":"ok"}`                                                                                                                        |
+| GET, POST | `/api/sales/*` | The routes below, passed on to `flash-be`. Anything else under this path answers `404` with `errorCode` `not_found`.                           |
+| GET, POST | `/api/auth/*`  | The login routes below, passed on to `flash-be`, with the cookies.                                                                             |
 
 ### The sale routes
 

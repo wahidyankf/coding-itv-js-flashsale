@@ -1,8 +1,7 @@
 # Failures as values
 
 `flash-be` and `flash-web` return failures instead of throwing, and they return `undefined` for a value that may be
-missing. The library is [`@flash/typekit`](../reference/typekit.md), a port of
-[py-typekit](https://github.com/wahidyankf/py-typekit).
+missing. The library is [`@flash/typekit`](../../libs/typekit/README.md).
 
 ## Why not exceptions
 
@@ -56,11 +55,11 @@ Biome's `useExhaustiveSwitchCases` turns a forgotten case into an error at build
   `src/bdd` and the library's own `boundary.ts` are exempt.
 - **Exhaustive switches.** `useExhaustiveSwitchCases` is an error.
 - **Inner layers may use it.** The domain and application layers import `@flash/typekit`, because it has no dependency and
-  no I/O. `architecture_tests.ts` allows that one package and no other.
+  no I/O. `architecture_tests.ts` allows it and the main entry of `@flash/flash-commons` (not `/timers`), and no other
+  package.
 - **The rules have tests.** `npm run lint:rules:test` runs the real linter on sample code. It runs in the pre-push hook.
 
 ## What it costs
 
-A `Result` is an object, so a hot path allocates a little more. The load test shows no change in its limits. `await` and
-`Result` do not chain by themselves: steps check each result and return early. The
-library is small, and its types are the part that matters.
+A few more allocations on the hot path, and steps that check each result and return early. The trade-off and the
+options weighed are in [decision 005](decisions/005-failures-as-values.md).

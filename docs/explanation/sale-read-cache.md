@@ -35,22 +35,19 @@ flowchart LR
 
 ## What may be old
 
-`GET /sales/current` is kept as one entry, apart from the rows kept by id. So the answer to "which sale is current" can be
-up to the cache time old too: after an operator creates, changes or removes a sale, or when a window opens or closes
-and another sale becomes current, readers may see the old sale for at most `SALE_CACHE_MS`. Each process has its own
-cache, so two instances may differ for that long. The `status` of the sale they show is still computed from the clock.
-
-Only `remaining`, the count of items sold, can be up to one second old. The `status` is computed on each request from
-the cached row and the clock, so a sale still opens and closes on time. A shopper who sees `3 remaining` may find out
-on the next step that the last item is gone. That is acceptable for a display and it is why the display never decides
+A sale read may be up to `SALE_CACHE_MS` old (one second by default), and each process has its own cache, so two
+instances may differ for that long. This also applies to `GET /sales/current`, which is cached as its own entry.
+After an operator changes a sale, or when a window opens or closes, readers may see the old sale for up to that time. In practice the field that moves is `remaining`: a shopper who sees `3 remaining` may find on the next
+step that the last item is gone. The `status` is not cached; it is computed on each request from the row and the clock,
+so a sale still opens and closes on time. That is acceptable for a display, and it is why the display never decides
 anything.
 
 ## Why writes skip it
 
 Joining the queue, reserving and paying read the sale through a separate call (`details`) that always goes to Postgres.
-A decision to take or refuse an item must not rest on a number that could be a second old. Postgres still has the last
-word on the stock, so a stale read can never sell an item twice; the rule for writes is stricter for a different
-reason: a shopper should not be told "you may buy" and then "sold out" one second later because of the cache.
+A decision to take or refuse an item must not rest on a number that could be a second old. Postgres has the last word on
+the stock either way, so a stale read could never sell an item twice; the rule is there so that a shopper is not told
+"you may buy" and then "sold out" a second later.
 
 ## What is left out
 

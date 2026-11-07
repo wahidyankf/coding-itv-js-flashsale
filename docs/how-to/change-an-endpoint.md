@@ -8,7 +8,7 @@ The API is plain code. There is no shared contract library, so a change goes to 
    `routes/index.ts`). A new error code goes in
    `adapters/inbound/http/errors.ts`, in `ERROR_STATUS` and in `ERROR_MESSAGE` (one sentence; the compiler asks for it), and
    in the error type of the service that can answer it.
-3. **Fix the callers** by searching for the path: `apps/flash-web` (the client in `src/sale/client.ts`, and the allow-list of
+3. **Fix the callers** by searching for the path: `apps/flash-web` (the clients in `src/sale/client.ts` and `src/auth/client.ts`, and the allow-list of
    the proxy in `src/proxy.ts` if the route should pass through the web server), the e2e steps, `apps/flash-load/k6/shop.ts`
    and `scripts/smoke/prod.mjs`. If the web page shows a new error code, add its text to `apps/flash-web/src/error-text.ts`
    (`sale/messages.ts` and `auth/messages.ts` hold the text of each area).

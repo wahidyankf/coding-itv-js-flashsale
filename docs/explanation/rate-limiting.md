@@ -9,17 +9,17 @@ The three write routes (join the queue, reserve and confirm) and, apart, the aut
 A rejected request gets status `429`, the body `{"errorCode":"rate_limited","errorMessage":"...","retryAfterSeconds":n}` and a
 `Retry-After` header, so a well-behaved client knows when to come back.
 
-## Two counters, not one
+## The counters
 
 - **Per user** (30 requests in 10 seconds by default). It stops one shopper who presses the button in a loop. It does not
   harm a user who is behind a shared address.
 - **Per address** (600 in 10 seconds by default). It stops one machine that sends many different accounts, which the
   per-user counter cannot see. It is higher because an office or a school may share one address.
-
 - **Auth routes** (20 requests per address in 10 seconds by default, `AUTH_RATE_LIMIT_PER_IP`). Sign-up, login, refresh and
   logout have a count of their own, so a crowd that arrives for a sale cannot lock itself out of the login, and a password
   cannot be guessed at speed. It is by address only, because a request that is not logged in has no user yet. The
-  `/admin` routes are counted by address in the same way, under their own key.
+  `/admin` routes are counted by address too, under their own key (`admin`) and with the per-address limit of the sale
+  routes (`RATE_LIMIT_PER_IP`).
 
 A request is refused when either counter is over its limit. A refused request still counts, so a client that keeps
 retrying does not get through earlier.
@@ -27,17 +27,18 @@ retrying does not get through earlier.
 ```mermaid
 flowchart LR
   accTitle: How a write request is limited
-  accDescr: A write request is counted against the user and against the address. If either count is over its limit, the API answers 429 with Retry-After. Otherwise the request goes on to the queue, the gate or the payment. If Redis fails, the counts are kept in the memory of the process.
+  accDescr: A write request is counted against the address, then against the user when there is a login. If either count is over its limit, the API answers 429 with Retry-After. Otherwise the request goes on to the queue, the gate or the payment. If Redis fails, the counts are kept in the memory of the process.
   request["Write request"]
   user["Count per user"]
   address["Count per address"]
   refused["429 rate_limited<br/>Retry-After"]
   work["Queue, gate<br/>or payment"]
   memory["Count in process<br/>memory"]
-  request --> user
-  user --> address
-  address -->|over a limit| refused
-  address -->|within limits| work
+  request --> address
+  address --> user
+  user -->|over a limit| refused
+  user -->|within limits| work
+  address -.->|Redis fails| memory
   user -.->|Redis fails| memory
   classDef step fill:#0173B2,stroke:#000000,color:#FFFFFF
   classDef gate fill:#029E73,stroke:#000000,color:#000000

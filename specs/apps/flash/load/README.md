@@ -13,15 +13,7 @@ Its rules are written here, and the code reads the same numbers from `apps/flash
 
 ## Commands
 
-| Command                  | Profile    |
-| ------------------------ | ---------- |
-| `npx nx load:smoke`      | smoke      |
-| `npx nx load:full`       | full       |
-| `npx nx load:chaos`      | chaos      |
-| `npx nx load:burst`      | burst      |
-| `npx nx load:contention` | contention |
-
-Each command is run as `npx nx <target> flash-load`.
+Each profile runs as `npx nx load:<profile> flash-load`, for example `npx nx load:smoke flash-load`.
 
 ## Directory Map
 

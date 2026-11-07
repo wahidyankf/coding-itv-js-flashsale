@@ -80,10 +80,8 @@ itself: if the item is still free, the commit sells it. If another shopper took 
 
 ## Trade-offs
 
-- **The mock keeps its memory in the process.** Two instances do not share charges, so idempotency across instances rests
-  on the commit and the unique constraint. A real provider would offer an idempotency key of its own.
-- **A refund can fail.** The mock cannot fail a refund. A real system would queue refunds and retry them.
-- **No price.** The sale has one product and no amount; the charge carries only the reservation id.
+The mock keeps its charges in the process, cannot fail a refund, and has no price. What that costs, and what a real
+provider would change, are in [decision 009](decisions/009-in-process-mock-payment.md).
 
 ## Where to read more
 

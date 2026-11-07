@@ -4,23 +4,14 @@
 hold whatever sits behind them. Redis can be empty or down, and the payment provider is a mock. A rule that does not
 know about Redis or Fastify cannot break when they change.
 
-```text
-src/
-  domain/          rules and values; imports only Node built-ins, @flash/typekit and @flash/flash-commons (not /timers)
-  application/     services (use cases) and ports/
-  adapters/
-    inbound/       http (routes/ one file per area, errors, cookies, SSE), cli (seed and create-operator options)
-    outbound/      postgres, redis, crypto (scrypt, tokens), memory, payment, system (clock)
-  composition.ts   the one place that picks an adapter for a port
-  main.ts          entry points: main, migrate, seed-sale, create-operator
-```
+The folder tree, file by file, is in the [flash-be README](../../apps/flash-be/README.md).
 
 ## The three layers
 
 - **Domain.** Plain types and functions: the status of a sale, who may queue or reserve, how long a hold lives, whether
   a hold is still live, how many shoppers one tick admits, a user id and a ticket. They take values and return values.
   There is no I/O and no clock read, so a unit test needs no fake.
-- **Application.** One service per use case (sale status, queue, reserve, pay, rate limit). A service orders the steps
+- **Application.** One service per use case (sale status, queue, reserve, pay, rate limit, login, operator changes, seed). A service orders the steps
   and calls ports. It decides nothing that a domain function can decide. Ports are small types in
   `application/ports/`, named in the language of the sale: `HoldGate`, `QueueStore`, `PurchaseRepository`. The suffix says what a port is: a
   **Repository** is the Postgres record of a thing, a **Store** holds keyed state, and a **Gate** is the fast check in
@@ -71,10 +62,10 @@ flowchart LR
 ## The rule and how it is kept
 
 Dependencies point inward: adapters know the application and the domain, the application knows the domain, and the
-domain knows nothing. The only packages the inner layers may import are [`@flash/typekit`](../reference/typekit.md)
-(see [failures as values](failures-as-values.md)) and [`@flash/flash-commons`](../reference/flash-commons.md). Both are
+domain knows nothing. The only packages the inner layers may import are [`@flash/typekit`](../../libs/typekit/README.md)
+(see [failures as values](failures-as-values.md)) and [`@flash/flash-commons`](../../libs/flash-commons/README.md). Both are
 pure: no I/O, no timer and no randomness of their own. The one timer helper, `@flash/flash-commons/timers`, is refused
-in the domain; the application uses it only as the default of a wait that a test replaces. The HTTP words (error codes, statuses, sentences, cookies) live in
+in the domain and the application; `composition.ts` passes the real `sleep` in, and a test passes its own. The HTTP words (error codes, statuses, sentences, cookies) live in
 the inbound HTTP adapter, and the rules the domain needs, such as the user id rule, live in the domain.
 Inbound adapters never import outbound adapters, and outbound adapters import only ports and the
 domain. Only `composition.ts` and the entry points see both sides.
@@ -92,7 +83,7 @@ it must not know. It runs with the unit tests, so the pre-push hook enforces it.
   one day. They keep a service from naming Redis or Postgres, and they let a scenario run the same service against an
   in-memory copy (`src/bdd/support/memory-*.ts`). The two ports with a real second life are the payment (a mock now) and
   the clock (a fixed one in tests).
-- It costs more files and one place of wiring. A change to a port touches the port, its adapters and its memory copy.
+- What it costs, and the options weighed against it, are in [decision 004](decisions/004-hexagon-in-the-api-only.md).
 
 ## Where the ports bend
 

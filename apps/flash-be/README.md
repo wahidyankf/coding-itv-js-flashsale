@@ -12,7 +12,7 @@ crosses a layer it must not know.
 src/
   domain/                rules and values, no I/O, no clock read: sale.ts (status, reserve and confirm rules),
                          sale-window.ts (a new sale and a change), reservation.ts (holds), purchase.ts, queue.ts,
-                         ticket.ts, auth.ts (password and token rules), user.ts (Username, UserId), rate-limit.ts, time.ts
+                         ticket.ts, auth.ts (password and token rules), user.ts (Username, UserId), actors.ts (the `$system` user that acts when no person does), rate-limit.ts, time.ts
   application/           one service per use case (sale, queue, reservation, purchase, auth, rate limit, admin, seed),
                          and the steps they share (admission, guarded-gate, sale-cache)
     ports/               the stores and services a use case needs, named in the words of the sale
@@ -40,8 +40,8 @@ src/
                          auth-steps.ts, operator-steps.ts) and one bind-<area>.ts per feature that both layers run
 ```
 
-Port names follow one rule: a **Repository** is the Postgres record of a thing, a **Store** holds keyed state, and a
-**Gate** is the fast check in front of Postgres. `SaleAdmin` has no suffix: it writes sale rows, but `SaleRepository`
+Port names follow the suffix rule (Repository, Store, Gate) in
+[hexagonal architecture](../../docs/explanation/hexagonal-architecture.md#the-three-layers). `SaleAdmin` has no suffix: it writes sale rows, but `SaleRepository`
 already names the reads. Each port file starts with a `Kind:` line that says which one it is.
 
 ## To add something

@@ -12,7 +12,7 @@ the folder tree and a table that answers "I want to add X, where does it go?".
 | [`apps/flash-be-e2e`](../../apps/flash-be-e2e/README.md)   | Playwright tests of the running API                                                                                  | a step, a shared helper, a wait                                   |
 | [`apps/flash-web-e2e`](../../apps/flash-web-e2e/README.md) | Playwright tests of the page in a browser                                                                            | a step, a helper only the page needs                              |
 | [`apps/flash-load`](../../apps/flash-load/README.md)       | the k6 stress test and the runner that judges it from the data                                                       | a profile, a check, a step of a shopper, a command on the stack   |
-| [`libs/typekit`](../../libs/typekit/README.md)             | `@flash/typekit`: `Result` and `attempt`, types only                                                                 | nothing new unless it is a type every app needs                   |
+| [`libs/typekit`](../../libs/typekit/README.md)             | `@flash/typekit`: `Result` and `attempt`, and nothing else                                                           | nothing new unless it is a type every app needs                   |
 | [`libs/flash-commons`](../../libs/flash-commons/README.md) | `@flash/flash-commons`: retry, time units, statuses, decoders, `isUuid`, cookies, time phrases; `sleep` on `/timers` | a value or a pure helper used in 3 or more places across the apps |
 
 ## Outside the apps
@@ -21,7 +21,7 @@ the folder tree and a table that answers "I want to add X, where does it go?".
 | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | [`specs/apps/flash/be`](../../specs/apps/flash/be/README.md)     | the API's behaviour scenarios (Gherkin), the contract                                                      |
 | [`specs/apps/flash/web`](../../specs/apps/flash/web/README.md)   | the page's behaviour scenarios                                                                             |
-| [`specs/apps/flash/c4`](../../specs/apps/flash/README.md)        | the C4 model: context, containers, components                                                              |
+| [`specs/apps/flash/c4`](../../specs/apps/flash/c4/README.md)     | the C4 model: context, containers, components, the data model and the sequences                            |
 | [`specs/apps/flash/load`](../../specs/apps/flash/load/README.md) | the load test's profiles, limits and checks                                                                |
 | [`docs/`](../README.md)                                          | these docs, by Diátaxis mode; [decisions](../explanation/decisions/README.md) holds the why of each choice |
 | `scripts/bdd/`                                                   | `npm run bdd:check`, the check that every scenario is bound at each level                                  |
@@ -40,5 +40,7 @@ the folder tree and a table that answers "I want to add X, where does it go?".
   ([decision 016](../explanation/decisions/016-dry-rule-of-three.md)). The e2e and k6 tests write the API's paths,
   headers and statuses themselves, so they stay an independent check.
 - **A retry** uses `retry` or `retryAsync` from `@flash/flash-commons`, with backoff, a max attempt count and jitter
-  ([decision 017](../explanation/decisions/017-retry-backoff-jitter.md), [policies](flash-commons.md)).
+  ([decision 017](../explanation/decisions/017-retry-backoff-jitter.md), [policies](retry-policies.md)).
 - **A new kind of file** updates the README of its app, so this map stays true.
+
+Next: pick a task in the [how-to guides](../how-to/README.md).

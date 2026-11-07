@@ -2,14 +2,11 @@
 
 ## Layers
 
-| Layer       | Where the tests are                                                      | Needs                                   | Runs in                                       |
-| ----------- | ------------------------------------------------------------------------ | --------------------------------------- | --------------------------------------------- |
-| Unit        | `apps/<app>/src/**/*_tests.ts(x)` and `apps/<app>/src/bdd/*_tests.ts(x)` | nothing                                 | `test:unit`, `test:quick`, pre-push           |
-| Integration | `apps/<app>/src/**/*_integration_tests.ts(x)`                            | the dev stack (`npx nx db:up flash-be`) | `test:integration`, `test:coverage`, pre-push |
-| End-to-end  | `apps/<app>-e2e/steps/*.steps.ts` and the Playwright specs               | the dev stack and the apps              | `test:e2e`                                    |
-
-The pre-push hook runs the combined coverage gate, so integration tests run there too. `test:coverage` starts the dev
-stack itself. End-to-end tests are never part of the hooks.
+| Layer       | Where the tests are                                                      | Needs                                                                                                            | Runs in                                       |
+| ----------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| Unit        | `apps/<app>/src/**/*_tests.ts(x)` and `apps/<app>/src/bdd/*_tests.ts(x)` | nothing                                                                                                          | `test:unit`, `test:quick`, pre-push           |
+| Integration | `apps/<app>/src/**/*_integration_tests.ts(x)`                            | `flash-be`: the dev stack (`npx nx db:up flash-be`); `flash-web`: nothing, it serves a fake `flash-be` over HTTP | `test:integration`, `test:coverage`, pre-push |
+| End-to-end  | `apps/<app>-e2e/steps/*.steps.ts` and the Playwright specs               | the dev stack and the apps                                                                                       | `test:e2e`                                    |
 
 Only the apps use Gherkin. In an app, a **scenario binding** (`src/bdd/*_tests.ts(x)`) runs a scenario from `specs/apps/flash/`.
 Everything else is a **plain test** next to the code (`*_tests.ts(x)`): it guards a branch, a rule of structure or an
@@ -19,19 +16,20 @@ code as `*_integration_tests.ts(x)`; they are not scanned by the behaviour check
 
 ## Nx targets
 
-The library `typekit` (`libs/typekit`) has `build`, `typecheck`, `lint`, `test:unit`, `test:coverage` and `test:quick`. Its
-tests are plain Vitest files, `libs/typekit/src/**/*_tests.ts`. It needs no Docker. The apps' targets build it first.
+The libraries `typekit` and `flash-commons` (`libs/`) have `build`, `typecheck`, `lint`, `test:unit`, `test:coverage` and
+`test:quick`. Their tests are plain Vitest files, `libs/*/src/**/*_tests.ts`. They need no Docker. The apps' targets
+build both first.
 
-| Target             | App                             | What it runs                                                 |
-| ------------------ | ------------------------------- | ------------------------------------------------------------ |
-| `typecheck`        | every app                       | `tsc --noEmit` with the strict flags in each `tsconfig.json` |
-| `lint`             | every app                       | Biome, and warnings fail the run                             |
-| `test:unit`        | `flash-be`, `flash-web`         | unit tests with a coverage report (no floor)                 |
-| `test:unit:watch`  | `flash-be`, `flash-web`         | unit tests in watch mode, no coverage                        |
-| `test:integration` | `flash-be`, `flash-web`         | integration tests                                            |
-| `test:coverage`    | `flash-be`, `flash-web`         | unit and integration together, with the 99% floor            |
-| `test:quick`       | every app                       | `typecheck`, `lint`, and `test:unit`                         |
-| `test:e2e`         | `flash-be-e2e`, `flash-web-e2e` | Playwright, built from the feature files                     |
+| Target             | App                                   | What it runs                                                                   |
+| ------------------ | ------------------------------------- | ------------------------------------------------------------------------------ |
+| `typecheck`        | every app                             | `tsc --noEmit` with the strict flags in each `tsconfig.json`                   |
+| `lint`             | every app                             | Biome, and warnings fail the run                                               |
+| `test:unit`        | `flash-be`, `flash-web`, `flash-load` | unit tests; `flash-be` and `flash-web` also print a coverage report (no floor) |
+| `test:unit:watch`  | `flash-be`, `flash-web`, `flash-load` | unit tests in watch mode, no coverage                                          |
+| `test:integration` | `flash-be`, `flash-web`               | integration tests                                                              |
+| `test:coverage`    | `flash-be`, `flash-web`               | unit and integration together, with the 99% floor                              |
+| `test:quick`       | every app                             | `typecheck`, `lint`, and `test:unit` (only the first two for the e2e apps)     |
+| `test:e2e`         | `flash-be-e2e`, `flash-web-e2e`       | Playwright, built from the feature files                                       |
 
 Run a target with `npx nx <target> <app>`, for example `npx nx test:coverage flash-be`.
 
@@ -46,13 +44,14 @@ Unit tests alone do not reach 99% for `flash-be`, because the database code is c
 
 Excluded from the coverage denominator:
 
-| Path                                                       | Reason                                                               |
-| ---------------------------------------------------------- | -------------------------------------------------------------------- |
-| `*_tests.ts(x)`, `*_integration_tests.ts(x)`, `src/bdd/**` | test code is not product code                                        |
-| `src/routeTree.gen.ts` (`flash-web`)                       | generated by TanStack Router                                         |
-| `src/main.ts` (`flash-be`)                                 | process entry point; the end-to-end suite starts and calls it        |
-| `src/migrate.ts` (`flash-be`)                              | process entry point; the migrator it calls is covered by integration |
-| `src/seed-sale.ts` (`flash-be`)                            | reads the command line only; the parser and the insert are tested    |
+| Path                                                       | Reason                                                                   |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `*_tests.ts(x)`, `*_integration_tests.ts(x)`, `src/bdd/**` | test code is not product code                                            |
+| `src/routeTree.gen.ts` (`flash-web`)                       | generated by TanStack Router                                             |
+| `src/main.ts` (`flash-be`)                                 | process entry point; the end-to-end suite starts and calls it            |
+| `src/migrate.ts` (`flash-be`)                              | process entry point; the migrator it calls is covered by integration     |
+| `src/seed-sale.ts` (`flash-be`)                            | reads the command line only; the parser and the insert are tested        |
+| `src/create-operator.ts` (`flash-be`)                      | reads the command line only; the parser and the account write are tested |
 
 ## Behaviour coverage
 
@@ -108,24 +107,6 @@ Each tag needs the comment described in [how-to: add a behaviour](../how-to/add-
 6. `npx nx affected -t test:quick --base=origin/main`
 7. `npx nx affected -t test:coverage --base=origin/main` (unit and integration, the 99% floor)
 
-```mermaid
-flowchart LR
-  accTitle: The pre-push hook
-  accDescr: The hook runs seven checks in order and stops at the first one that fails. First the Biome check, the docs check, the behaviour check tests, the lint rule tests and the behaviour check. Then, for the affected projects only, the quick tests and the coverage gate, which needs Docker.
-  lint["1 lint<br/>Biome"]
-  docs["2 docs:check"]
-  bddt["3 bdd:check:test"]
-  rules["4 lint:rules:test"]
-  bdd["5 bdd:check"]
-  quick["6 test:quick<br/>affected"]
-  cov["7 test:coverage<br/>affected, Docker"]
-  lint --> docs --> bddt --> rules --> bdd --> quick --> cov
-  classDef repo fill:#0173B2,stroke:#000000,color:#FFFFFF
-  classDef affected fill:#029E73,stroke:#000000,color:#000000
-  classDef default fill:#808080,stroke:#000000,color:#000000
-  class lint,docs,bddt,rules,bdd repo
-  class quick,cov affected
-```
-
-Steps 1 to 5 look at the whole repository. Steps 6 and 7 run only for the projects the change touches. End-to-end tests
-are not in the hook. Run them yourself before you finish a change.
+It stops at the first check that fails. Steps 1 to 5 look at the whole repository; steps 6 and 7 run only for the
+projects the change touches, and step 7 needs Docker. End-to-end tests are not in the hook: run them yourself before you
+finish a change.

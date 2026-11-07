@@ -42,9 +42,7 @@ the question below applies to the apps only.
 3. Do not write a scenario for a detail just to give it a binding. `npm run bdd:check` only counts scenarios; it does not
    forbid plain tests.
 4. A scenario that needs both `@integration-exempt` and `@e2e-exempt` is proved at the unit layer only. Ask whether it
-   is behaviour or a detail. In `flash-be` and `flash-web` it was a detail every time, and those scenarios are plain tests
-   now. The library `typekit` and the lint rules had such scenarios too. They are plain tests now, because only the apps
-   use Gherkin.
+   is behaviour or a detail. So far it has been a detail every time.
 
 Both kinds of test run in `test:unit` and count towards the 99% floor in the same way. See
 [test layers and coverage](../reference/test-layers-and-coverage.md).

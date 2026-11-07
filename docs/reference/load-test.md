@@ -48,23 +48,9 @@ which is why each shopper has an address.
 | contention | 50    | 700      | all in 1 s   | 100  | 10 s | 700 a sec | Everyone is admitted at once and reserves together |
 
 The numbers live in [`apps/flash-load/k6/profiles.ts`](../../apps/flash-load/k6/profiles.ts), which both k6 and the
-runner read. Shoppers arrive at a fixed rate, one new shopper per iteration, so the load does not slow down when the
-system does. Each shopper joins the queue, waits to be admitted, reserves once, usually confirms, and asks "did I get
-it". A waiting shopper also reads the sale and gives up when it is sold out or ended. One shopper in twenty walks away
-with a hold. One in five of those who bought presses confirm and reserve again. "Late" shoppers arrive ten a second,
-once every hold has lapsed, and take the items that abandoned holds gave back. Ten to twenty extra users flood the queue
-to show that they get `429`, not an error.
-
-`smoke`, `full` and `chaos` spread their shoppers over many seconds, so the queue smooths the load first. `burst` and
-`contention` send all 700 shoppers inside one second. `burst` tests the queue under a herd. `contention` admits everyone
-at once, so 700 shoppers reserve for 50 items in the same moment, which the other runs never reach.
-
-A visit lasts at least two seconds, so the virtual users needed equal the shoppers. The herd is 700 because that is what
-the client machine could start; the reason is in
-[what the load runs found](../explanation/load-test-findings.md#a-herd-of-700-in-one-second).
-
-The chaos stock is 1,000 so that Redis is stopped while items are still for sale. With a small stock the sale is over
-before the stop and the run proves nothing.
+runner read. "Late" shoppers arrive ten a second once every hold has lapsed, and ten to twenty extra users flood the
+queue. What a shopper does and the question each profile answers are in
+[specification: profiles](../../specs/apps/flash/load/profiles.md).
 
 ## Limits and checks
 

@@ -22,5 +22,4 @@ A failed check is a finding about the system and is investigated. The invariant 
 are never acceptable to fail. A failure there is a bug in the sale path, and a scenario must be added for it before the
 fix.
 
-Results are written to `generated-reports/load/` (ignored by Git): `<profile>.md` with the verdict table,
-`<profile>-k6.json` with the k6 summary, and `<profile>-k6.log` with the k6 output.
+Where a run writes its results is in [reference: load test](../../../../docs/reference/load-test.md#output).
