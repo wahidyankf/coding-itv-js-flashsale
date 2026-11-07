@@ -21,6 +21,7 @@
 		"test:integration": "vitest run --config vitest.integration.config.ts"
 	},
 	"dependencies": {
+		"@flash/flash-commons": "*",
 		"@flash/typekit": "*",
 		"fastify": "^5.12.8",
 		"kysely": "^0.29.8",

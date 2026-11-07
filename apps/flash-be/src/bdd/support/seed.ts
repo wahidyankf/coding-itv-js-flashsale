@@ -1,6 +1,8 @@
 // Test data written straight to Postgres, past the API: products, sales, purchases and logins. Only tests use these
 // helpers, because the API never deletes a row.
+
 import { randomUUID } from "node:crypto";
+import { MS_PER_HOUR } from "@flash/flash-commons";
 import { type Kysely, sql } from "kysely";
 import { ACCESS_COOKIE } from "../../adapters/inbound/http/cookies.js";
 import { randomTokenSource } from "../../adapters/outbound/crypto/token-source.js";
@@ -8,7 +10,6 @@ import type { Database } from "../../adapters/outbound/postgres/database.js";
 import { actorId, ensureUser } from "../../adapters/outbound/postgres/users.js";
 import { SYSTEM_USERNAME } from "../../domain/actors.js";
 import { hashToken, type Role } from "../../domain/auth.js";
-import { HOUR_MS } from "./time.js";
 
 export type SaleSeed = {
 	name?: string | undefined;
@@ -96,7 +97,7 @@ export async function loginAs(
 			.execute();
 	}
 	const token = randomTokenSource();
-	const hour = HOUR_MS;
+	const hour = MS_PER_HOUR;
 	await db
 		.insertInto("sessions")
 		.values({

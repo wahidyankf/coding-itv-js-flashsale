@@ -1,6 +1,7 @@
 // Entry point: the seed command. It stores one sale for the demo and the tests, through the seed use case, and it does
 // not check for overlap: that check belongs to an operator's create.
 import { attemptAsync } from "@flash/typekit";
+import { failureMessage } from "./adapters/inbound/cli/failure-message.js";
 import { parseSeedArgs } from "./adapters/inbound/cli/seed-args.js";
 import { createDb } from "./adapters/outbound/postgres/database.js";
 import { createSaleSeeder } from "./adapters/outbound/postgres/sale-seeder.js";
@@ -26,6 +27,6 @@ const seeded = await attemptAsync(async () => {
 	}
 }, Error);
 if (seeded.isErr()) {
-	console.error(seeded.error.message);
+	console.error(failureMessage(seeded.error));
 	process.exitCode = 1;
 }

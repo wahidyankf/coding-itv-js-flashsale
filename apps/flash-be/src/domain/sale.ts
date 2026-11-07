@@ -1,6 +1,6 @@
 // A sale as the rules see it: its window, its stock and what has been bought. Each function takes the sale and the
 // moment `now`, and returns a value. Services decide on the Sale with these functions, never on the public view.
-import { MS_PER_SECOND } from "./time.js";
+import { MS_PER_SECOND } from "@flash/flash-commons";
 
 export type Sale = {
 	id: string;

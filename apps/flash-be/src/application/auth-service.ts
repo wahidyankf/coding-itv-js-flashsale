@@ -1,6 +1,8 @@
 // The accounts and logins use case: sign-up, login, refresh, logout, who a request is from, and the operator check. The
 // rules (password length, token lifetimes, who may manage sales) are in the domain. The stores, the hasher, the clock
 // and the token source are ports, so this service names no database.
+
+import { MS_PER_SECOND } from "@flash/flash-commons";
 import { Err, Ok, type Result } from "@flash/typekit";
 import {
 	ACCESS_TTL_SECONDS,
@@ -11,7 +13,7 @@ import {
 	type Role,
 	usablePassword,
 } from "../domain/auth.js";
-import { isLive, MS_PER_SECOND } from "../domain/time.js";
+import { isLive } from "../domain/time.js";
 import { normalizeUser, type UserId } from "../domain/user.js";
 import type { AccountStore } from "./ports/account-store.js";
 import type { Clock } from "./ports/clock.js";

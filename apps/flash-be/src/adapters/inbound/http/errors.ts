@@ -1,15 +1,10 @@
-// The words of the HTTP side of the API: header names, statuses, and the error codes with their sentences. Inbound HTTP
-// adapter. The rules that raise these errors are in the domain and the application, not here.
+// The words of the HTTP side of the API: the header that carries the queue ticket, and the error codes with their statuses
+// and sentences. Inbound HTTP adapter. The rules that raise these errors are in the domain and the application, not here.
+// The standard status numbers (200, 404, 500 and the rest) come from @flash/flash-commons; this file owns only which
+// code answers with which status.
 
 // The header that carries the queue ticket. A ticket is sent in it, and nowhere else.
 export const TICKET_HEADER = "x-queue-ticket";
-
-// The success statuses the routes use: 200 for a read or a change, 201 for something new.
-export const HTTP_STATUS = { ok: 200, created: 201 } as const;
-// The first status of the client-error range (4xx): a request the client got wrong.
-export const FIRST_CLIENT_ERROR_STATUS = 400;
-// The first status of the server-error range (5xx): our fault, logged and answered as `internal`.
-export const FIRST_SERVER_ERROR_STATUS = 500;
 
 // Every error code of the API and the HTTP status that answers it. A code has one status everywhere.
 export const ERROR_STATUS = {

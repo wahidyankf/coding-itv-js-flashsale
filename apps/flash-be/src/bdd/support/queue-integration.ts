@@ -2,6 +2,7 @@
 // Scenarios share the connections, but each one has its own sale, so their queues and holds never meet. The steps
 // are the same as the unit layer's (queue-world.ts), done over the stores instead of in memory.
 
+import { MS_PER_HOUR, MS_PER_SECOND } from "@flash/flash-commons";
 import type { FastifyInstance } from "fastify";
 import { type Kysely, sql } from "kysely";
 import { buildApp } from "../../adapters/inbound/http/app.js";
@@ -35,7 +36,6 @@ import type { ReservationService } from "../../application/reservation-service.j
 import { createReservationService } from "../../application/reservation-service.js";
 import { dependenciesFrom } from "../../composition.js";
 import { config } from "../../config.js";
-import { MS_PER_SECOND } from "../../domain/time.js";
 import { normalizeUser } from "../../domain/user.js";
 import { eventRequests } from "./queue-events.js";
 import {
@@ -54,7 +54,6 @@ import {
 import { QUEUE_OPTIONS } from "./queue-world.js";
 import { insertPurchase, insertSale, loginAs } from "./seed.js";
 import { switchable } from "./switchable.js";
-import { HOUR_MS } from "./time.js";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -156,8 +155,8 @@ function saleRowActions(
 			const saleId = await insertSale(db, {
 				stock: overrides.stock,
 				sold: overrides.sold,
-				startsAt: overrides.startsAt ?? new Date(now.getTime() - HOUR_MS),
-				endsAt: overrides.endsAt ?? new Date(now.getTime() + HOUR_MS),
+				startsAt: overrides.startsAt ?? new Date(now.getTime() - MS_PER_HOUR),
+				endsAt: overrides.endsAt ?? new Date(now.getTime() + MS_PER_HOUR),
 			});
 			current().saleId = saleId;
 			return saleId;
@@ -221,7 +220,7 @@ function saleRowActions(
 		async openSale() {
 			await db
 				.updateTable("sales")
-				.set({ starts_at: new Date(Date.now() - HOUR_MS) })
+				.set({ starts_at: new Date(Date.now() - MS_PER_HOUR) })
 				.where("id", "=", current().saleId)
 				.execute();
 			await parts.base.queue.admitTick(current().saleId);

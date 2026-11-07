@@ -143,6 +143,38 @@ describe("the event stream", () => {
 		expect(calls).toBeGreaterThan(2);
 	});
 
+	it("sends nothing for a read of a sale that is gone, and keeps reading until it is back", async () => {
+		let calls = 0;
+		const view = { id: "s", status: "active", remaining: 4 } as never;
+		const back = { id: "s", status: "active", remaining: 5 } as never;
+		const app = buildApp(
+			{
+				...healthyDeps,
+				sales: {
+					...healthyDeps.sales,
+					byId: async () => {
+						calls++;
+						// Call 1 is the check before the stream opens. Call 2 is a read of a sale that is gone; then it is back.
+						if (calls === 1) return view;
+						if (calls === 2) return undefined;
+						return back;
+					},
+				},
+			},
+			{ events: fast },
+		);
+		apps.push(app);
+		const origin = await app.listen({ host: "127.0.0.1", port: 0 });
+		const seen = await readUntil(
+			`${origin}/sales/s/events`,
+			{},
+			'"remaining":5',
+		);
+		expect(seen.match(/event: sale/g)).toHaveLength(1);
+		expect(seen).not.toContain("undefined");
+		expect(calls).toBeGreaterThan(2);
+	});
+
 	it("tells a watcher whose place was lost that it is absent", async () => {
 		let calls = 0;
 		const app = buildApp(

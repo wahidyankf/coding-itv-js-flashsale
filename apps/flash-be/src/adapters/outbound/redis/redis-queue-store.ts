@@ -1,8 +1,9 @@
 // The line of shoppers for a sale in Redis, and who the queue has admitted. Every instance sees one line, and a lost line
 // lets shoppers through (see queue-service). Outbound Redis adapter for the QueueStore port.
+
+import { MS_PER_SECOND } from "@flash/flash-commons";
 import type { QueueStore } from "../../../application/ports/queue-store.js";
 import type { QueuePlace } from "../../../domain/queue.js";
-import { MS_PER_SECOND } from "../../../domain/time.js";
 import type { RedisClient } from "./redis-client.js";
 import { saleKey } from "./redis-keys.js";
 

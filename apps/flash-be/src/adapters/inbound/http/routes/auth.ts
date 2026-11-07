@@ -1,5 +1,7 @@
 // The auth routes: sign-up, login, refresh, logout, and who the access cookie belongs to. A login sets the two cookies and
 // the refusal of a refresh clears them. How a cookie is written is in ../cookies.ts. Inbound HTTP adapter.
+
+import { HTTP_STATUS } from "@flash/flash-commons";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { Login } from "../../../../application/auth-service.js";
 import type { Dependencies } from "../../../../application/dependencies.js";
@@ -16,7 +18,6 @@ import {
 	REFRESH_COOKIE_PATH,
 	setCookie,
 } from "../cookies.js";
-import { HTTP_STATUS } from "../errors.js";
 import { fieldOf } from "./bodies.js";
 import { createGuards, principalOf } from "./guards.js";
 import { sendError, sendResult } from "./reply.js";

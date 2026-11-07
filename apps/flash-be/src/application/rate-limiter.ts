@@ -1,8 +1,9 @@
 // The rate limit use case: how many write requests one shopper, one address, or one login address may make in a window.
 // The counts live in a shared store (Redis). When it fails, a local store counts instead, so an outage never switches
 // the limit off.
+
+import { MS_PER_SECOND } from "@flash/flash-commons";
 import { attemptAsync } from "@flash/typekit";
-import { MS_PER_SECOND } from "../domain/time.js";
 import { normalizeUser } from "../domain/user.js";
 import type { Clock } from "./ports/clock.js";
 import type { RateLimitStore } from "./ports/rate-limit-store.js";

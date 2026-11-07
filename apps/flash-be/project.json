@@ -6,7 +6,9 @@
 	"targets": {
 		"dev": {
 			"executor": "nx:run-commands",
-			"dependsOn": ["^build"],
+			"dependsOn": [
+				{ "projects": ["typekit", "flash-commons"], "target": "build" }
+			],
 			"options": {
 				"command": "npm run dev",
 				"cwd": "apps/flash-be"
@@ -14,7 +16,9 @@
 		},
 		"build": {
 			"executor": "nx:run-commands",
-			"dependsOn": ["^build"],
+			"dependsOn": [
+				{ "projects": ["typekit", "flash-commons"], "target": "build" }
+			],
 			"outputs": ["{projectRoot}/dist"],
 			"options": {
 				"command": "npm run build",
@@ -31,7 +35,9 @@
 		},
 		"typecheck": {
 			"executor": "nx:run-commands",
-			"dependsOn": ["^build"],
+			"dependsOn": [
+				{ "projects": ["typekit", "flash-commons"], "target": "build" }
+			],
 			"options": {
 				"command": "npm run typecheck",
 				"cwd": "apps/flash-be"
@@ -39,7 +45,9 @@
 		},
 		"lint": {
 			"executor": "nx:run-commands",
-			"dependsOn": ["^build"],
+			"dependsOn": [
+				{ "projects": ["typekit", "flash-commons"], "target": "build" }
+			],
 			"options": {
 				"command": "npm run lint",
 				"cwd": "apps/flash-be"
@@ -47,7 +55,9 @@
 		},
 		"test:unit": {
 			"executor": "nx:run-commands",
-			"dependsOn": ["^build"],
+			"dependsOn": [
+				{ "projects": ["typekit", "flash-commons"], "target": "build" }
+			],
 			"options": {
 				"command": "npm run test:unit",
 				"cwd": "apps/flash-be"
@@ -55,7 +65,9 @@
 		},
 		"test:unit:watch": {
 			"executor": "nx:run-commands",
-			"dependsOn": ["^build"],
+			"dependsOn": [
+				{ "projects": ["typekit", "flash-commons"], "target": "build" }
+			],
 			"options": {
 				"command": "npm run test:unit:watch",
 				"cwd": "apps/flash-be"
@@ -63,7 +75,9 @@
 		},
 		"test:integration": {
 			"executor": "nx:run-commands",
-			"dependsOn": ["^build"],
+			"dependsOn": [
+				{ "projects": ["typekit", "flash-commons"], "target": "build" }
+			],
 			"options": {
 				"command": "npm run test:integration",
 				"cwd": "apps/flash-be"
@@ -71,7 +85,9 @@
 		},
 		"test:coverage": {
 			"executor": "nx:run-commands",
-			"dependsOn": ["^build"],
+			"dependsOn": [
+				{ "projects": ["typekit", "flash-commons"], "target": "build" }
+			],
 			"options": {
 				"commands": [
 					"npx nx db:up flash-be",

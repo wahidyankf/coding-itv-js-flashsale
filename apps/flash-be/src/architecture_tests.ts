@@ -58,9 +58,16 @@ function importsOf(file: string): Import[] {
 const files = walk(SRC).filter((file) => file.endsWith(".ts"));
 const product = files.filter((file) => layerOf(file) !== "test");
 
+// A declaration of a value that @flash/flash-commons owns: a millisecond unit or an HTTP status number.
+const COPIED_SHARED_VALUE =
+	/\bconst\s+(MS_PER_\w+|MINUTE_MS|HOUR_MS|HTTP_STATUS|FIRST_CLIENT_ERROR_STATUS|FIRST_SERVER_ERROR_STATUS)\b/;
+
 const isNode = (target: string) => target.startsWith("node:");
-// The typekit library has no dependencies of its own and no I/O, so the inner layers may use it.
-const isKernel = (target: string) => target === "@flash/typekit";
+// The shared libraries have no I/O of their own, so the inner layers may use them: typekit for types and `Result`, and
+// flash-commons for pure behaviour and values (retry, the time units, the HTTP status numbers). Exact names only, so a
+// look-alike package such as `@flash/flash-commons-extras` is still refused.
+const KERNEL_PACKAGES = ["@flash/typekit", "@flash/flash-commons"];
+const isKernel = (target: string) => KERNEL_PACKAGES.includes(target);
 const isDomain = (target: string) => target.startsWith("domain/");
 const isPort = (target: string) => target.startsWith("application/ports/");
 const isWiring = (target: string) =>
@@ -129,6 +136,16 @@ describe("hexagonal architecture", () => {
 		expect(violations("outbound")).toEqual([]);
 	});
 
+	// The time units and the standard HTTP status numbers have one definition, in @flash/flash-commons. A local copy
+	// would drift from it, so none may be declared here. The contract words (ERROR_STATUS, TICKET_HEADER) are not copies.
+	it("takes the time units and the HTTP status numbers from @flash/flash-commons, with no copy of its own", () => {
+		const copies = files
+			.filter((file) => !file.endsWith("architecture_tests.ts"))
+			.filter((file) => COPIED_SHARED_VALUE.test(readFileSync(file, "utf8")))
+			.map((file) => path.relative(SRC, file));
+		expect(copies).toEqual([]);
+	});
+
 	it("never erases a row: the product code has no `deleteFrom(`", () => {
 		const erasing = product
 			.filter((file) => /\bdeleteFrom\(/.test(readFileSync(file, "utf8")))
@@ -144,6 +161,8 @@ describe("hexagonal architecture", () => {
 		).toBe(false);
 		expect(allowed("application", "fastify")).toBe(false);
 		expect(allowed("domain", "@flash/typekit-extras")).toBe(false);
+		expect(allowed("domain", "@flash/flash-commons-extras")).toBe(false);
+		expect(allowed("application", "@flash/flash-commons-extras")).toBe(false);
 		expect(allowed("domain", "zod")).toBe(false);
 		expect(allowed("application", "zod")).toBe(false);
 		expect(allowed("inbound", "adapters/outbound/postgres/database.ts")).toBe(
@@ -157,6 +176,8 @@ describe("hexagonal architecture", () => {
 		expect(allowed("domain", "node:crypto")).toBe(true);
 		expect(allowed("domain", "@flash/typekit")).toBe(true);
 		expect(allowed("application", "@flash/typekit")).toBe(true);
+		expect(allowed("domain", "@flash/flash-commons")).toBe(true);
+		expect(allowed("application", "@flash/flash-commons")).toBe(true);
 		expect(allowed("inbound", "fastify")).toBe(true);
 		expect(allowed("application", "application/ports/clock.ts")).toBe(true);
 		expect(allowed("outbound", "application/ports/clock.ts")).toBe(true);

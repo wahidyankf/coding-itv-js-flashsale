@@ -1,6 +1,11 @@
 // The reserve use case: an admitted shopper asks for one item of a sale. The sale must be selling and the queue must have
 // admitted the shopper. Then the fast gate decides, and when the gate is down the reservation repository decides alone.
 import { randomUUID } from "node:crypto";
+import {
+	type BackoffPolicy,
+	backoffDelayMs,
+	retryAsync,
+} from "@flash/flash-commons";
 import { attemptAsync, Err, Ok, type Result } from "@flash/typekit";
 import {
 	type GateAnswer,
@@ -39,23 +44,54 @@ export type ReserveResult = Result<Reserved, ReserveError>;
 
 // How a request waits for another instance that is rebuilding the sale's reservation state.
 export type ReservationOptions = {
-	// How long to wait before the request gives up with `unavailable`.
+	// The longest a request waits for that rebuild before it gives up with `unavailable`.
 	rebuildWaitMs: number;
 	// How to wait; tests replace it so no real time passes.
 	wait: (ms: number) => Promise<void>;
+	// The random draw that full jitter scales each wait by, in [0, 1). Injected so tests can fix it and know each wait.
+	random: () => number;
 };
 
 // Long enough for a rebuild of one sale's holds, and short enough that a shopper is not left hanging.
 const DEFAULT_REBUILD_WAIT_MS = 3000;
 // The rebuild lock outlives a normal rebuild, and expires by itself if the instance that holds it dies.
 const REBUILD_LOCK_MS = 10_000;
-// How often a waiting request checks whether the rebuild has finished.
-const POLL_MS = 25;
+// A waiting request polls the rebuild with backoff (decision 017): the first wait is at most 25 ms, each later bound
+// doubles, and no bound passes 500 ms. Full jitter draws each wait below its bound.
+const REBUILD_POLL: BackoffPolicy = { baseMs: 25, capMs: 500 };
+// Tries are counted from one: the first try has no wait before it, so n tries mean n - 1 waits.
+const ONE_TRY = 1;
+const NO_WAIT = 0;
+// A draw at the top of its range, so each wait takes its whole bound: the longest a wait can be.
+const WHOLE_BOUND = 1;
+const topOfRange = () => WHOLE_BOUND;
 
+// The options a service uses when `ReservationDeps.options` is left out. `wait` and `random` are the two seams of the
+// polling: tests replace both, so the jitter is pinned and no real time passes.
 export const defaultReservationOptions: ReservationOptions = {
 	rebuildWaitMs: DEFAULT_REBUILD_WAIT_MS,
 	wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+	random: Math.random,
 };
+
+// The longest the wait with this 0-based index can be: its bound under the rebuild policy.
+function bound(wait: number): number {
+	return backoffDelayMs(wait, REBUILD_POLL, topOfRange);
+}
+
+// The most tries whose waits, each at its bound, add up to no more than `budgetMs`. The sum of the bounds is the
+// longest the polling can wait, so it never runs past the rebuild wait, even when every draw is at its top.
+function pollTries(budgetMs: number): number {
+	let tries = ONE_TRY;
+	let spent = NO_WAIT;
+	let next = bound(NO_WAIT);
+	while (spent + next <= budgetMs) {
+		spent += next;
+		tries += ONE_TRY;
+		next = bound(tries - ONE_TRY);
+	}
+	return tries;
+}
 
 // What the reservation service is built from. `options` may be left out; the defaults then apply.
 export type ReservationDeps = {
@@ -64,6 +100,7 @@ export type ReservationDeps = {
 	sales: SaleService;
 	queue: QueueService;
 	clock: Clock;
+	// Replaces the defaults. composition.ts may pass its own; tests pass a fixed `random` and a `wait` that does not sleep.
 	options?: ReservationOptions;
 };
 
@@ -102,37 +139,57 @@ function replyFor(answer: GateAnswer, user: Username): ReserveResult {
 	}
 }
 
+// What a rebuild of a sale's reservation state needs: the gate it rebuilds, the Postgres rows it rebuilds from, the clock,
+// and how long a request waits for another instance to do it.
+type RebuildDeps = Pick<ReservationDeps, "gate" | "repository" | "clock"> & {
+	options: ReservationOptions;
+};
+
+// Rebuilds the sale's reservation state in Redis from Postgres. One instance does it. The others poll the gate with
+// backoff, for at most the rebuild wait, and then give up with `not ready`.
+async function ensureReady(
+	deps: RebuildDeps,
+	saleId: string,
+): Promise<boolean> {
+	const { gate, repository, clock, options } = deps;
+	if (await gate.isReady(saleId)) return true;
+	if (await gate.lockRebuild(saleId, REBUILD_LOCK_MS)) {
+		try {
+			await repository.rebuild(saleId, clock(), (snapshot) =>
+				gate.restore(saleId, snapshot),
+			);
+		} finally {
+			await gate.unlockRebuild(saleId);
+		}
+		return true;
+	}
+	const polled = await retryAsync(
+		async (): Promise<Result<true, "not_ready">> =>
+			(await gate.isReady(saleId)) ? new Ok(true) : new Err("not_ready"),
+		{
+			...REBUILD_POLL,
+			maxAttempts: pollTries(options.rebuildWaitMs),
+			sleep: options.wait,
+			random: options.random,
+		},
+	);
+	return polled.isOk();
+}
+
 export function createReservationService(
 	deps: ReservationDeps,
 ): ReservationService {
 	const { gate, repository, sales, queue, clock } = deps;
 	const options = deps.options ?? defaultReservationOptions;
-
-	// Rebuilds the sale's reservation state in Redis from Postgres. One instance does it; the others wait for it.
-	async function ensureReady(saleId: string): Promise<boolean> {
-		if (await gate.isReady(saleId)) return true;
-		if (await gate.lockRebuild(saleId, REBUILD_LOCK_MS)) {
-			try {
-				await repository.rebuild(saleId, clock(), (snapshot) =>
-					gate.restore(saleId, snapshot),
-				);
-			} finally {
-				await gate.unlockRebuild(saleId);
-			}
-			return true;
-		}
-		for (let waited = 0; waited < options.rebuildWaitMs; waited += POLL_MS) {
-			await options.wait(POLL_MS);
-			if (await gate.isReady(saleId)) return true;
-		}
-		return false;
-	}
+	const rebuild: RebuildDeps = { gate, repository, clock, options };
 
 	// The fast path: ask the gate, and rebuild its state first when it has none.
 	async function viaGate(request: ReserveRequest): Promise<GateAnswer> {
 		const answer = await gate.reserve(request);
 		if (answer.kind !== "not_ready") return answer;
-		if (!(await ensureReady(request.saleId))) return { kind: "not_ready" };
+		if (!(await ensureReady(rebuild, request.saleId))) {
+			return { kind: "not_ready" };
+		}
 		return gate.reserve(request);
 	}
 

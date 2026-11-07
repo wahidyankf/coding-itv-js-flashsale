@@ -3,6 +3,7 @@
 // bad option is reported as a usage error even when the database is down. Then it asks the auth use case to make the
 // account, with the system user as its author.
 import { attemptAsync } from "@flash/typekit";
+import { failureMessage } from "./adapters/inbound/cli/failure-message.js";
 import {
 	operatorArgsRefusal,
 	parseOperatorArgs,
@@ -37,6 +38,6 @@ const created = await attemptAsync(async () => {
 	}
 }, Error);
 if (created.isErr()) {
-	console.error(created.error.message);
+	console.error(failureMessage(created.error));
 	process.exitCode = 1;
 }

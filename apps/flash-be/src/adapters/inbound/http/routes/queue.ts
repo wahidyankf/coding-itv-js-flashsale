@@ -1,9 +1,10 @@
 // The queue routes: a shopper joins the line of a sale, reads the place they hold with their ticket, and may follow that
 // place on a live stream. The ticket is the proof of the join. Inbound HTTP adapter.
+
+import { HTTP_STATUS } from "@flash/flash-commons";
 import type { FastifyInstance } from "fastify";
 import type { Dependencies } from "../../../../application/dependencies.js";
 import type { QueuePlace } from "../../../../domain/queue.js";
-import { HTTP_STATUS } from "../errors.js";
 import { type StreamOptions, serveEvents } from "../event-stream.js";
 import {
 	createGuards,

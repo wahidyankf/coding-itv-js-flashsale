@@ -1,10 +1,11 @@
 // The login cache in Redis, placed in front of the session store. It answers an access token without a Postgres read,
 // for a minute at most. Postgres stays the truth: a miss, a failing Redis or an entry that cannot be read all fall back
 // to it (see decision 007 for why logins are kept in Postgres at all).
+
+import { MS_PER_SECOND } from "@flash/flash-commons";
 import { attempt, attemptAsync } from "@flash/typekit";
 import type { SessionStore } from "../../../application/ports/session-store.js";
 import type { Principal } from "../../../domain/auth.js";
-import { MS_PER_SECOND } from "../../../domain/time.js";
 import type { RedisClient } from "./redis-client.js";
 
 // How long an answer is kept, at most. A short time keeps a deleted user or a changed role from lingering.

@@ -6,7 +6,10 @@ import { relativeTime } from "../bdd/support/time.js";
 import type { GateAnswer } from "../domain/reservation.js";
 import { createGuardedGate } from "./guarded-gate.js";
 import type { HoldGate } from "./ports/hold-gate.js";
-import { createReservationService } from "./reservation-service.js";
+import {
+	createReservationService,
+	type ReservationOptions,
+} from "./reservation-service.js";
 
 // Paths that a scenario cannot reach with the in-memory gate: a gate that answers in a fixed way, and a rebuild
 // that another instance is doing.
@@ -47,7 +50,10 @@ function gateWith(answers: GateAnswer[], overrides: Partial<HoldGate> = {}) {
 	return { gate, calls };
 }
 
-async function reserveWith(gate: HoldGate) {
+async function reserveWith(
+	gate: HoldGate,
+	options: Partial<ReservationOptions> = {},
+) {
 	const guarded = createGuardedGate(gate);
 	const { world, saleId, ticket } = await admittedAna();
 	const service = createReservationService({
@@ -56,7 +62,12 @@ async function reserveWith(gate: HoldGate) {
 		sales: world.saleService,
 		queue: world.queue,
 		clock,
-		options: { rebuildWaitMs: 100, wait: async () => {} },
+		options: {
+			rebuildWaitMs: 100,
+			wait: async () => {},
+			random: () => 0.5,
+			...options,
+		},
 	});
 	return service.reserve(saleId, "ana", ticket);
 }
@@ -92,6 +103,44 @@ describe("the reservation service", () => {
 		);
 		expect(await reserveWith(gate)).toEqual(new Err("sold_out"));
 		expect(calls.restore).toBe(0);
+	});
+
+	// Decision 017: the wait doubles from 25 ms, capped at 500 ms, with full jitter (random() scales each wait).
+	it("waits between polls with backoff, scaled by the random draw", async () => {
+		const waits: number[] = [];
+		const { gate } = gateWith([{ kind: "not_ready" }], {
+			lockRebuild: async () => false,
+		});
+		expect(
+			await reserveWith(gate, {
+				rebuildWaitMs: 100,
+				wait: async (ms) => {
+					waits.push(ms);
+				},
+				random: () => 0.5,
+			}),
+		).toEqual(new Err("unavailable"));
+		// The bounds are 25 ms then 50 ms; a draw of 0.5 takes half of each.
+		expect(waits).toEqual([12.5, 25]);
+	});
+
+	it("never waits longer in all than the rebuild wait, even when every draw is at its top", async () => {
+		const waits: number[] = [];
+		const { gate } = gateWith([{ kind: "not_ready" }], {
+			lockRebuild: async () => false,
+		});
+		await reserveWith(gate, {
+			rebuildWaitMs: 3000,
+			wait: async (ms) => {
+				waits.push(ms);
+			},
+			random: () => 0.999,
+		});
+		// The bounds are 25, 50, 100, 200, 400, then 500 each: nine waits add up to 2775 ms, and a tenth would pass 3000.
+		expect(waits).toHaveLength(9);
+		expect(waits.reduce((total, ms) => total + ms, 0)).toBeLessThanOrEqual(
+			3000,
+		);
 	});
 
 	it("answers unavailable when the other rebuild never finishes", async () => {

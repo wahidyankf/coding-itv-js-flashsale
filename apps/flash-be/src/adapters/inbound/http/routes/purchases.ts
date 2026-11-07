@@ -1,9 +1,10 @@
 // The purchase routes: a shopper pays for the item their hold keeps, and asks "did I get it?". Inbound HTTP adapter.
+
+import { HTTP_STATUS } from "@flash/flash-commons";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import type { Dependencies } from "../../../../application/dependencies.js";
 import type { Outcome, Purchase } from "../../../../domain/purchase.js";
 import type { Username } from "../../../../domain/user.js";
-import { HTTP_STATUS } from "../errors.js";
 import { fieldOf, missingFieldError } from "./bodies.js";
 import { createGuards, type SaleParams, shopperOf } from "./guards.js";
 import { createdOrOk, sendError, sendResult } from "./reply.js";

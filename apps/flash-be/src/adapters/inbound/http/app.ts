@@ -1,14 +1,13 @@
 // The HTTP server of flash-be, built on Fastify. It is an inbound adapter: it turns a request into a call on the
 // application and a result into a reply. The routes are in ./routes, the error replies in ./errors.ts.
+
+import {
+	FIRST_ERROR_STATUS,
+	FIRST_SERVER_ERROR_STATUS,
+} from "@flash/flash-commons";
 import Fastify, { type FastifyInstance } from "fastify";
 import type { Dependencies } from "../../../application/dependencies.js";
-import {
-	ERROR_STATUS,
-	type ErrorCode,
-	errorPayload,
-	FIRST_CLIENT_ERROR_STATUS,
-	FIRST_SERVER_ERROR_STATUS,
-} from "./errors.js";
+import { ERROR_STATUS, type ErrorCode, errorPayload } from "./errors.js";
 import { DEFAULT_STREAM_OPTIONS, type StreamOptions } from "./event-stream.js";
 import { registerRoutes } from "./routes/index.js";
 
@@ -54,7 +53,7 @@ export function answerErrors(app: FastifyInstance): void {
 		const status = (error as { statusCode?: unknown }).statusCode;
 		const code =
 			typeof status === "number" &&
-			status >= FIRST_CLIENT_ERROR_STATUS &&
+			status >= FIRST_ERROR_STATUS &&
 			status < FIRST_SERVER_ERROR_STATUS
 				? "invalid_request"
 				: "internal";

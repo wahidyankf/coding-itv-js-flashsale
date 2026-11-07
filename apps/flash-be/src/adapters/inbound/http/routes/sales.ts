@@ -1,10 +1,10 @@
 // The sale routes: the sale a shopper sees now, one sale by its id, and the live stream of one sale. The public reads may
 // be kept for the cache time, by this server and by the client. Inbound HTTP adapter.
+
+import { HTTP_STATUS, MS_PER_SECOND } from "@flash/flash-commons";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import type { Dependencies } from "../../../../application/dependencies.js";
 import type { SaleView } from "../../../../application/sale-view.js";
-import { MS_PER_SECOND } from "../../../../domain/time.js";
-import { HTTP_STATUS } from "../errors.js";
 import { type StreamOptions, serveEvents } from "../event-stream.js";
 import type { SaleParams } from "./guards.js";
 import { sendError } from "./reply.js";

@@ -1,6 +1,8 @@
 // The unit layer of a queue scenario: the app over in-memory stores, a clock that moves only when a scenario says so,
 // and payment timers that fire only as that clock moves. The integration layer runs the same steps over Postgres and
 // Redis (queue-integration.ts). The steps themselves are the request helpers in queue-requests.ts.
+
+import { MS_PER_HOUR, MS_PER_SECOND } from "@flash/flash-commons";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../../adapters/inbound/http/app.js";
 import { createMemoryRateLimitStore } from "../../adapters/outbound/memory/memory-rate-limit-store.js";
@@ -22,7 +24,6 @@ import { createReservationService } from "../../application/reservation-service.
 import type { SaleService } from "../../application/sale-service.js";
 import { createSaleService } from "../../application/sale-service.js";
 import type { Sale } from "../../domain/sale.js";
-import { MS_PER_SECOND } from "../../domain/time.js";
 import { normalizeUser } from "../../domain/user.js";
 import { healthyDeps } from "./deps.js";
 import { fakeRepository, fakeSale } from "./fake-sales.js";
@@ -55,7 +56,6 @@ import {
 	type ShopScenario,
 } from "./queue-scenario.js";
 import { switchable } from "./switchable.js";
-import { HOUR_MS } from "./time.js";
 
 export type {
 	EventWatcher,
@@ -149,7 +149,7 @@ function unitParts(start: Date): UnitParts {
 		sales: saleService,
 		queue,
 		clock,
-		options: { rebuildWaitMs: 100, wait: async () => {} },
+		options: { rebuildWaitMs: 100, wait: async () => {}, random: () => 0.5 },
 	});
 	const purchases = createPurchaseService(
 		purchased,
@@ -287,7 +287,7 @@ function saleActions(parts: UnitParts, current: () => UnitQueueScenario) {
 		},
 		async openSale() {
 			for (const sale of parts.sales) {
-				sale.startsAt = new Date(parts.time.now.getTime() - HOUR_MS);
+				sale.startsAt = new Date(parts.time.now.getTime() - MS_PER_HOUR);
 			}
 			await parts.queue.admitTick(current().saleId);
 		},

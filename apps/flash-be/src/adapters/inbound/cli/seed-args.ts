@@ -1,7 +1,9 @@
 // Reads the options of the seed command (seed-sale.ts) as the CLI sees them: the text becomes a NewSale, with the defaults
 // the domain names. It is an inbound adapter, so it reads the command line and nothing of the database. The seed command
 // checks no overlap with another sale; only an operator's create does.
+
 import { parseArgs } from "node:util";
+import { MS_PER_MINUTE } from "@flash/flash-commons";
 import type { NewSale } from "../../../domain/sale-window.js";
 import {
 	DEFAULT_ADMIT_PER_SECOND,
@@ -9,8 +11,6 @@ import {
 	DEFAULT_SALE_DURATION_MINUTES,
 	DEFAULT_SALE_NAME,
 } from "../../../domain/sale-window.js";
-
-const MINUTE_MS = 60_000;
 
 function integer(
 	option: string,
@@ -56,13 +56,13 @@ export function parseSeedArgs(argv: string[], now: Date): NewSale {
 		DEFAULT_SALE_DURATION_MINUTES,
 		1,
 	);
-	const startsAt = new Date(now.getTime() + startsIn * MINUTE_MS);
+	const startsAt = new Date(now.getTime() + startsIn * MS_PER_MINUTE);
 
 	return {
 		name: values.name ?? DEFAULT_SALE_NAME,
 		stock,
 		startsAt,
-		endsAt: new Date(startsAt.getTime() + duration * MINUTE_MS),
+		endsAt: new Date(startsAt.getTime() + duration * MS_PER_MINUTE),
 		holdSeconds: integer(
 			"hold-seconds",
 			values["hold-seconds"],

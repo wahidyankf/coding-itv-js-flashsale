@@ -1,13 +1,12 @@
 // The operator's steps for the scenarios: the requests an operator sends (create, change, move, remove, list) and the
 // logins they send them with. The unit and the integration layer each supply an OperatingLayer, so the same steps
 // run in both.
+import { MS_PER_MINUTE } from "@flash/flash-commons";
 import type { FastifyInstance } from "fastify";
 import type { Role } from "../../domain/auth.js";
 import type { Response } from "./response.js";
 
 export type { Response };
-
-const MINUTE_MS = 60_000;
 
 // Who sends a request: the operator who is logged in, a shopper who is logged in, or someone who is not.
 export type Sender = "operator" | "shopper" | "nobody";
@@ -82,10 +81,12 @@ function send(
 
 // When a sale starts and ends, counted in minutes from `now`, as the API reads the times.
 function windowAt(now: Date, startsInMinutes: number, minutes: number) {
-	const startsAt = new Date(now.getTime() + startsInMinutes * MINUTE_MS);
+	const startsAt = new Date(now.getTime() + startsInMinutes * MS_PER_MINUTE);
 	return {
 		startsAt: startsAt.toISOString(),
-		endsAt: new Date(startsAt.getTime() + minutes * MINUTE_MS).toISOString(),
+		endsAt: new Date(
+			startsAt.getTime() + minutes * MS_PER_MINUTE,
+		).toISOString(),
 	};
 }
 

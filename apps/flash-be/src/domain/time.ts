@@ -1,8 +1,5 @@
-// Time as the rules use it: the unit conversion, and when a thing with an end time still counts. The rules never read
-// the clock; the caller passes `now`.
-
-// The thousand that turns seconds into milliseconds, so no file writes it by hand.
-export const MS_PER_SECOND = 1000;
+// Time as the rules use it: when a thing with an end time still counts. The rules never read the clock; the caller passes
+// `now`. The unit conversions live in @flash/flash-commons, so this file holds only the rule.
 
 // Whether something with an end time still counts at `now`. A hold, a login and a queue admission all end this way, so
 // none of them needs a job to clear it: an old one stops counting on its own.

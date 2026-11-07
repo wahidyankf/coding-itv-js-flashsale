@@ -1,7 +1,8 @@
 // A hold: one shopper's claim on one item of a sale, and the answers the fast gate and the source of truth give when
 // asked for one. The rules here are the shapes; the sale and the store decide which answer comes back.
+
+import { MS_PER_SECOND } from "@flash/flash-commons";
 import type { Sale } from "./sale.js";
-import { MS_PER_SECOND } from "./time.js";
 import type { Username } from "./user.js";
 
 // The hold one shopper has on one item of a sale.

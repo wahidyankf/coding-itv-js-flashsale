@@ -1,8 +1,9 @@
 // Server-Sent Events for the HTTP adapter: a loop that reads the state every interval and writes an event to the client
 // only when the state changed. It belongs to the inbound layer, so it knows about the HTTP reply and nothing of the rules.
+
+import { HTTP_STATUS } from "@flash/flash-commons";
 import { attemptAsync } from "@flash/typekit";
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { HTTP_STATUS } from "./errors.js";
 
 // A comment line, which a client skips.
 const KEEP_ALIVE_FRAME = ": keep-alive\n\n";

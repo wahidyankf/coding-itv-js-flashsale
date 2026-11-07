@@ -1,13 +1,10 @@
 // The replies that every route shares: an error, a result, and a success that may have created something. A route answers
 // through these, so the status of each error code is chosen in one place (errors.ts). Inbound HTTP adapter.
+
+import { HTTP_STATUS } from "@flash/flash-commons";
 import type { Result } from "@flash/typekit";
 import type { FastifyReply } from "fastify";
-import {
-	ERROR_STATUS,
-	type ErrorCode,
-	errorPayload,
-	HTTP_STATUS,
-} from "../errors.js";
+import { ERROR_STATUS, type ErrorCode, errorPayload } from "../errors.js";
 
 // The error reply: its status, and the `{ errorCode, errorMessage }` body. The status is `ERROR_STATUS[code]`.
 export function sendError(reply: FastifyReply, code: ErrorCode): FastifyReply {

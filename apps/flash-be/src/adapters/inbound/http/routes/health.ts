@@ -1,9 +1,11 @@
 // The health routes. `/health` says the process is up. `/ready` says that Postgres and Redis both answer, which a load
 // balancer checks before it sends traffic. Inbound HTTP adapter.
+
+import { HTTP_STATUS } from "@flash/flash-commons";
 import { attemptAsync, type Result } from "@flash/typekit";
 import type { FastifyInstance } from "fastify";
 import type { Dependencies } from "../../../../application/dependencies.js";
-import { ERROR_STATUS, HTTP_STATUS } from "../errors.js";
+import { ERROR_STATUS } from "../errors.js";
 
 // The word a readiness check reports: "ok" when the store answered, "error" when it did not.
 const checkWord = (check: Result<void, Error>): "ok" | "error" =>

@@ -1,4 +1,5 @@
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
+import { MS_PER_MINUTE } from "@flash/flash-commons";
 import type { FastifyInstance } from "fastify";
 import { afterAll, expect } from "vitest";
 import { buildApp } from "../adapters/inbound/http/app.js";
@@ -8,9 +9,8 @@ import { healthyDeps } from "./support/deps.js";
 import { memoryAuth } from "./support/memory-auth.js";
 import { specFile } from "./support/paths.js";
 
-const MINUTE_MS = 60_000;
 // Past the 15 minutes of an access token.
-const PAST_ACCESS_MS = 16 * MINUTE_MS;
+const PAST_ACCESS_MS = 16 * MS_PER_MINUTE;
 
 const apps: FastifyInstance[] = [];
 afterAll(async () => {
