@@ -123,5 +123,6 @@ npm run docker:dev:down
 
 ## Next steps
 
+- To learn the tools and patterns the code is built with, read the [crash courses](crash-courses/README.md).
 - To add a behaviour, read [how-to: add a behaviour](../how-to/add-a-behaviour.md).
 - To see every endpoint, read [reference: HTTP endpoints](../reference/http-endpoints.md).
