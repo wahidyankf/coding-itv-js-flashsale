@@ -11,7 +11,7 @@ server passes it on. This page gives the reasons and what it costs.
 - **One origin.** The browser makes same-origin requests, so no CORS rules are needed and none can be got wrong.
 - **One place to narrow the surface.** The server passes on a short list of method and path pairs (the `ALLOWED` list in
   `apps/flash-web/src/proxy.ts`) and nothing else, so a path such as `../ready` cannot be used to reach other routes. The
-  operator route `POST /admin/sales` is not on the list. A sale id must be a UUID and a name must fit the name pattern,
+  operator routes (`/admin/sales` with POST, GET, PATCH and DELETE) are not on the list. A sale id must be a UUID and a name must fit the name pattern,
   or the answer is `404 not_found`. The server also sends on only the headers the API needs.
 
 ```mermaid

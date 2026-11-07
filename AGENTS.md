@@ -105,8 +105,9 @@ Flash sale monorepo with five apps in `apps/` and one library in `libs/`: `flash
   `compose.dev.yaml`. In production, a missing required URL must fail fast.
 - Env vars are listed in `.env.example`. Never commit `.env`. Do not use the example passwords outside local
   development.
-- `POST /admin/sales` creates a sale and is the only operator route. It needs `ADMIN_TOKEN` and is never passed on by `flash-web`. Keep it
-  off the allow-list of the `flash-web` proxy; a test there fails if it is on it. Overlap is refused there only, not in the seed command.
+- The operator routes are `POST`, `GET` (list), `PATCH` and `DELETE` under `/admin/sales`. They need `ADMIN_TOKEN` and are never passed on by `flash-web`. Keep them
+  off the allow-list of the `flash-web` proxy; a test there fails if one is on it. Overlap is refused there only, not in the seed command. A started sale keeps its start and cannot lose stock, a sale that is over cannot change, and a sale with a purchase cannot be removed.
+- `GET /sales/current` and the admission timer use one rule (`pickCurrent`, `admitCurrentSale`): the running sale, else the next to open, else none. Do not use "the sale that opens last".
 - `api-flash-be.http` and `api-flash-web.http` hold manual requests, one file per app. Update them when an endpoint changes. It does not replace tests.
 
 ## Code style

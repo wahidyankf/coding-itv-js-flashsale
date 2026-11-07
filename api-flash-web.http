@@ -46,7 +46,7 @@ GET {{web}}/api/sales/00000000-0000-4000-8000-000000000000/purchases/ana
 ### Web: a path that is not allowed answers 404 not_found
 GET {{web}}/api/sales/current/secret
 
-### Web: the operator route is never passed on, so it answers 404 not_found (create sales on the API, see api-flash-be.http)
+### Web: the operator routes are never passed on, so they answer 404 not_found (manage sales on the API, see api-flash-be.http)
 POST {{web}}/api/admin/sales
 Content-Type: application/json
 

@@ -35,6 +35,11 @@ flowchart LR
 
 ## What may be old
 
+`GET /sales/current` is kept as one entry, apart from the rows kept by id. So the answer to "which sale is current" can be
+up to the cache time old too: after an operator creates, changes or removes a sale, or when a window opens or closes
+and another sale becomes current, readers may see the old sale for at most `SALE_CACHE_MS`. Each process has its own
+cache, so two instances may differ for that long. The `status` of the sale they show is still computed from the clock.
+
 Only `remaining`, the count of items sold, can be up to one second old. The `status` is computed on each request from
 the cached row and the clock, so a sale still opens and closes on time. A shopper who sees `3 remaining` may find out
 on the next step that the last item is gone. That is acceptable for a display and it is why the display never decides

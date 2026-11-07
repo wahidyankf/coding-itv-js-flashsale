@@ -83,8 +83,8 @@ Run this in a third terminal and leave it running:
 npx nx dev flash-web
 ```
 
-Open <http://localhost:3000>. The page shows **Flash Sale**, the status **On sale**, **Items left: 3** and the line
-**Backend: ok**.
+Open <http://localhost:3000>. The page shows **Flash Sale**, the status **On sale**, the times the sale **Opens** and
+**Closes**, **Items left: 3** and the line **Backend: ok**.
 
 ## 8. Buy an item
 
@@ -101,6 +101,9 @@ by itself, so you do not need to reload it.
 
 If more shoppers arrive than the queue lets in each second, the page shows the place in line instead, and moves on when
 the shopper is admitted. See [explanation: the waiting queue](../explanation/waiting-queue.md).
+
+When the window of the sale closes, a page that is open shows **Ended**. After that, a reload shows the next sale if one is
+scheduled, and says that no sale is open if none is. The page shows only the running sale, or else the next one to open.
 
 The page follows your system color scheme, light or dark.
 

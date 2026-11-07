@@ -56,3 +56,33 @@ curl -s -X POST http://localhost:8080/admin/sales \
 The reply is `201` with the sale. A window that overlaps another sale is refused with `409` `sale_overlaps`. The seed
 command above does not check this, so it can still create overlapping sales; the API is the safe way to set up a real
 sale. See [admin and sale windows](../explanation/admin-and-sale-windows.md).
+
+## Change, list or remove a sale
+
+The same token works for three more routes. `<id>` is the `id` of the sale.
+
+```bash
+# every sale, the one that opens last first
+curl -s http://localhost:8080/admin/sales -H "Authorization: Bearer $ADMIN_TOKEN"
+
+# change a sale: send only the fields that change
+curl -s -X PATCH http://localhost:8080/admin/sales/<id> \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" \
+  -d '{"stock":150}'
+
+# remove a sale
+curl -s -X DELETE http://localhost:8080/admin/sales/<id> -H "Authorization: Bearer $ADMIN_TOKEN"
+```
+
+The rules, in short:
+
+- A sale that has not started can change in every field.
+- A running sale keeps its start and can only get more stock; its end, name, hold time and admission rate can change.
+  A change that does not follow this is refused with `409` `sale_locked`.
+- A sale that is over cannot change (`409` `sale_locked`).
+- A window that would overlap another sale is refused with `409` `sale_overlaps`.
+- A sale that has a purchase is not removed (`409` `sale_has_purchases`). Any other sale is removed with its holds.
+
+The bodies and every error are in [HTTP endpoints](../reference/http-endpoints.md#changing-a-sale-operator). The scenarios
+are in
+[`specs/apps/flash/be/behaviours/sale/operating.feature`](../../specs/apps/flash/be/behaviours/sale/operating.feature).

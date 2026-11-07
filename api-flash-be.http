@@ -10,7 +10,7 @@ GET {{backend}}/health
 ### Backend: readiness (checks Postgres and Redis, needs `npx nx db:up flash-be`)
 GET {{backend}}/ready
 
-### Backend: the current sale (the sale that opens last, up to SALE_CACHE_MS old; seed one with `npx nx db:seed-sale flash-be --stock=100`)
+### Backend: the current sale (the running sale, else the next one to open, else 404; up to SALE_CACHE_MS old; seed one with `npx nx db:seed-sale flash-be --stock=100`)
 GET {{backend}}/sales/current
 
 ### Backend: one sale by id (replace the id with the one the seed command printed)
@@ -23,6 +23,21 @@ Content-Type: application/json
 Authorization: Bearer {{adminToken}}
 
 { "stock": 100, "startsAt": "2030-01-01T12:00:00Z", "endsAt": "2030-01-01T13:00:00Z" }
+
+### Backend: list every sale (operator; the one that opens last first, with sold, holdSeconds and admitPerSecond)
+GET {{backend}}/admin/sales
+Authorization: Bearer {{adminToken}}
+
+### Backend: change a sale (operator; send only the fields to change: name, stock, startsAt, endsAt, holdSeconds, admitPerSecond; 409 sale_locked once it has started and the change moves the start or lowers the stock)
+PATCH {{backend}}/admin/sales/00000000-0000-4000-8000-000000000000
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{ "stock": 150 }
+
+### Backend: remove a sale (operator; 409 sale_has_purchases when someone bought; replace the id)
+DELETE {{backend}}/admin/sales/00000000-0000-4000-8000-000000000000
+Authorization: Bearer {{adminToken}}
 
 ### Backend: join the queue (replace the sale id; the reply holds your ticket; write requests can answer 429 with Retry-After)
 POST {{backend}}/sales/00000000-0000-4000-8000-000000000000/queue

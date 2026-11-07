@@ -7,7 +7,7 @@ Postgres, and it gives everyone a fair order.
 ## How it works
 
 - A shopper joins with a user id and gets a place and a **ticket**.
-- Every second, one instance moves the first `admit_per_second` shoppers of the sale from "waiting" to "admitted". An
+- Every second, one instance moves the first `admit_per_second` shoppers of the current sale from "waiting" to "admitted". An
   admission stays valid for ten minutes by default.
 - Only an admitted shopper can reserve an item. This keeps the queue from being skipped by calling the reserve route
   directly.
@@ -47,6 +47,10 @@ millisecond still keep their order.
 Every `flash-be` instance runs the same timer. Each tick, an instance tries to take a short lease on the sale
 (`SET ... NX PX`, a little shorter than one tick). Only the instance that gets the lease admits. No instance is the
 permanent leader, so a crashed instance never stops the queue; the next tick another instance takes over.
+
+The timer admits for the **current sale** only (`admitCurrentSale` in `application/admission.ts`): the sale that is running, or
+else the one that opens next. So when an operator schedules a later sale while one is running, the line of the running
+sale keeps moving, and the later sale starts to admit when it becomes current. A sale that is over has no line to move.
 
 ## The ticket
 

@@ -58,6 +58,14 @@ written to `purchases`. The database has the last word: a sale cannot sell more 
 can buy once per sale (a unique constraint). If the write to Postgres fails, the hold is removed from Redis again, so a
 hold never exists only in Redis.
 
+## When an operator changes the sale
+
+A reservation reads the sale from Postgres each time (the `details` call, not the cache). The stock is sent to the Redis
+script with every reserve, and the hold time is read for each new hold. So when an operator raises the stock or changes
+`holdSeconds`, the next reservation uses the new number at once. Holds that already exist keep the time they were given.
+Nothing in Redis needs to be reset, and nothing is invalidated. A removed sale takes its rows with it; its Redis keys are
+never read again, because sale ids are unique. See [admin and sale windows](admin-and-sale-windows.md).
+
 ## When Redis loses its state
 
 If Redis restarts empty, the `ready` flag is gone. The next reservation sees this, and one instance rebuilds the state

@@ -19,7 +19,7 @@ code, for a developer. A `500` never says what failed; the cause goes to the log
 | ------ | ------------------------------------- | ------------------ | ---------------------------------------------------------- |
 | GET    | `/health`                             | none; no I/O       | always `200`                                               |
 | GET    | `/ready`                              | Postgres and Redis | `200`, or `503` when a check fails                         |
-| GET    | `/sales/current`                      | Postgres           | `404` `sale_not_found` when no sale exists                 |
+| GET    | `/sales/current`                      | Postgres           | `404` `sale_not_found` when no sale is running or ahead    |
 | GET    | `/sales/:saleId`                      | Postgres           | `404` `sale_not_found` for an unknown or malformed id      |
 | GET    | `/sales/:saleId/events`               | Postgres           | event stream of the sale (see Live updates)                |
 | POST   | `/sales/:saleId/queue`                | Postgres, Redis    | `201` on a new place, `200` when the user already has one  |
@@ -29,22 +29,27 @@ code, for a developer. A `500` never says what failed; the cause goes to the log
 | POST   | `/sales/:saleId/purchases`            | Postgres, Redis    | `201` on a new purchase, `200` when it was already paid    |
 | GET    | `/sales/:saleId/purchases/:userId`    | Postgres           | "did I get it?": a purchase, a live hold, or nothing       |
 | POST   | `/admin/sales`                        | Postgres           | operator only; needs `Authorization: Bearer <token>`       |
+| GET    | `/admin/sales`                        | Postgres           | operator only; every sale, the one that opens last first   |
+| PATCH  | `/admin/sales/:saleId`                | Postgres           | operator only; changes a sale (see the rules below)        |
+| DELETE | `/admin/sales/:saleId`                | Postgres           | operator only; removes a sale that has no purchase         |
 
 ### Reply bodies
 
 All bodies are JSON. Dates are ISO strings.
 
-| Route                                      | Success body                                                                                                                                 |
-| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /health`                              | `{ "status": "ok" }`                                                                                                                         |
-| `GET /ready`                               | `{ "status": "ok" \| "unavailable", "checks": { "database": "ok" \| "error", "redis": "ok" \| "error" } }`                                   |
-| `GET /sales/current`, `GET /sales/:saleId` | `{ "id", "name", "status", "startsAt", "endsAt", "stock", "remaining" }` (a `SaleView`)                                                      |
-| `POST /sales/:saleId/queue`                | `{ "userId", "ticket", "state": "waiting", "place" }` or `{ "userId", "ticket", "state": "admitted" }`                                       |
-| `GET /sales/:saleId/queue/:userId`         | `{ "userId", "state": "waiting", "place" }`, `{ "userId", "state": "admitted" }` or `{ "userId", "state": "absent" }`                        |
-| `POST /sales/:saleId/reservations`         | `{ "userId", "reservationId", "expiresAt" }`                                                                                                 |
-| `POST /sales/:saleId/purchases`            | `{ "userId", "purchaseId", "reservationId", "purchasedAt" }`                                                                                 |
-| `GET /sales/:saleId/purchases/:userId`     | `{ ...purchase, "state": "purchased" }`, `{ "userId", "state": "holding", "reservationId", "expiresAt" }` or `{ "userId", "state": "none" }` |
-| `POST /admin/sales`                        | a `SaleView`                                                                                                                                 |
+| Route                                             | Success body                                                                                                                                 |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /health`                                     | `{ "status": "ok" }`                                                                                                                         |
+| `GET /ready`                                      | `{ "status": "ok" \| "unavailable", "checks": { "database": "ok" \| "error", "redis": "ok" \| "error" } }`                                   |
+| `GET /sales/current`, `GET /sales/:saleId`        | `{ "id", "name", "status", "startsAt", "endsAt", "stock", "remaining" }` (a `SaleView`)                                                      |
+| `POST /sales/:saleId/queue`                       | `{ "userId", "ticket", "state": "waiting", "place" }` or `{ "userId", "ticket", "state": "admitted" }`                                       |
+| `GET /sales/:saleId/queue/:userId`                | `{ "userId", "state": "waiting", "place" }`, `{ "userId", "state": "admitted" }` or `{ "userId", "state": "absent" }`                        |
+| `POST /sales/:saleId/reservations`                | `{ "userId", "reservationId", "expiresAt" }`                                                                                                 |
+| `POST /sales/:saleId/purchases`                   | `{ "userId", "purchaseId", "reservationId", "purchasedAt" }`                                                                                 |
+| `GET /sales/:saleId/purchases/:userId`            | `{ ...purchase, "state": "purchased" }`, `{ "userId", "state": "holding", "reservationId", "expiresAt" }` or `{ "userId", "state": "none" }` |
+| `POST /admin/sales`, `PATCH /admin/sales/:saleId` | a `SaleView`                                                                                                                                 |
+| `GET /admin/sales`                                | `{ "sales": [...] }`: each sale is a `SaleView` with `"sold"`, `"holdSeconds"` and `"admitPerSecond"` added                                  |
+| `DELETE /admin/sales/:saleId`                     | `{ "id" }`                                                                                                                                   |
 
 Request bodies: the queue, reservation and purchase routes take `{ "userId": "<name>" }`; a purchase also takes
 `"reservationId"`. A body field that is missing or not a string is refused with `400` and the code of that field
@@ -61,7 +66,9 @@ example, with Postgres stopped:
 
 `GET /sales/current` and `GET /sales/:saleId` answer with the same body (`SaleView`).
 
-The current sale is the one that opens last. `remaining` is `stock` minus the items already sold, never below `0`.
+The current sale is the sale whose window holds the present moment. When none is running, it is the one that opens next.
+When none is running or ahead, `GET /sales/current` answers `404` `sale_not_found`. A sale that has ended is not current
+any more, but `GET /sales/:saleId` still reads it, with `status` `ended`. `remaining` is `stock` minus the items already sold, never below `0`.
 
 | `status`   | When                                                     |
 | ---------- | -------------------------------------------------------- |
@@ -94,8 +101,9 @@ The scenarios are in [`specs/apps/flash/be/behaviours/sale/caching.feature`](../
 
 ## Creating a sale (operator)
 
-`POST /admin/sales` creates a sale from a stock and a window, so an operator needs no shell on the server. It is the
-only operator route. The web server never passes it on, so it is reached on the API port only.
+`POST /admin/sales` creates a sale from a stock and a window, so an operator needs no shell on the server. The three
+operator routes (create, change and remove, plus the list) are never passed on by the web server, so they are reached on
+the API port only. They all use the same token and the same errors for it.
 
 ```json
 {
@@ -118,8 +126,44 @@ is `201` with the new sale (`SaleView`).
 
 The token is checked before the body is read. The scenarios are in
 [`specs/apps/flash/be/behaviours/sale/admin.feature`](../../specs/apps/flash/be/behaviours/sale/admin.feature). See
-[admin and sale windows](../explanation/admin-and-sale-windows.md) for why it only creates and where the overlap rule
-stops.
+[admin and sale windows](../explanation/admin-and-sale-windows.md) for where the overlap rule stops.
+
+## Changing a sale (operator)
+
+`PATCH /admin/sales/:saleId` changes the fields that are in the body and keeps the others. Every field is optional, but
+at least one must be there: `name`, `stock`, `startsAt`, `endsAt`, `holdSeconds` and `admitPerSecond`, with the same types
+and limits as when the sale is created. The reply is `200` with the changed sale (`SaleView`).
+
+| When the sale is | What may change                                                                                    |
+| ---------------- | -------------------------------------------------------------------------------------------------- |
+| not started yet  | every field                                                                                        |
+| running          | `stock` (only up, never below the stock it has), `endsAt`, `name`, `holdSeconds`, `admitPerSecond` |
+| over             | nothing                                                                                            |
+
+A new `stock` or `holdSeconds` applies to the next reservation at once. Holds that exist keep the time they were given.
+
+| Status | `errorCode`           | When                                                                                 |
+| ------ | --------------------- | ------------------------------------------------------------------------------------ |
+| `404`  | `not_found`           | `ADMIN_TOKEN` is not set                                                             |
+| `401`  | `invalid_admin_token` | the token is missing or wrong                                                        |
+| `400`  | `invalid_sale`        | the body has no field, a field has the wrong type, or the sale would not be valid    |
+| `404`  | `sale_not_found`      | no sale has this id, or the id is not a UUID                                         |
+| `409`  | `sale_locked`         | the sale is over, or it is running and the change moves `startsAt` or lowers `stock` |
+| `409`  | `sale_overlaps`       | the new window overlaps another sale                                                 |
+
+The scenarios are in
+[`specs/apps/flash/be/behaviours/sale/operating.feature`](../../specs/apps/flash/be/behaviours/sale/operating.feature).
+
+## Removing a sale (operator)
+
+`DELETE /admin/sales/:saleId` removes a sale, with the holds on it. The reply is `200` with `{ "id": "<saleId>" }`. A sale
+that has a purchase is never removed, because the shopper has paid: the answer is `409` `sale_has_purchases`. The other
+errors are the token errors above and `404` `sale_not_found`.
+
+## Listing sales (operator)
+
+`GET /admin/sales` answers `200` with `{ "sales": [...] }`: every sale, the one that opens last first, with the numbers
+that only an operator needs (`sold`, `holdSeconds`, `admitPerSecond`). It has no paging.
 
 ## The waiting queue
 
@@ -239,7 +283,7 @@ The scenarios are in [`specs/apps/flash/be/behaviours/events/`](../../specs/apps
 ## Rate limits
 
 The three write routes (`POST .../queue`, `POST .../reservations` and `POST .../purchases`) count each request against
-the user id in the body and against the client address. Reads are not limited. `POST /admin/sales` is counted by address only, before its token is read, so a wrong guess is
+the user id in the body and against the client address. Reads are not limited. The `/admin` routes are counted by address only, before the token is read, so a wrong guess is
 counted too. When either count passes its limit in
 the current window, the answer is `429` `rate_limited`, with `retryAfterSeconds` in the body and a `Retry-After` header that
 holds the same number of seconds (at least 1). The window starts at
@@ -323,8 +367,8 @@ local development are there too. `apps/flash-be/src/config.ts` builds the API co
 the API stops at start-up when `DATABASE_URL`, `REDIS_URL` or `TICKET_SECRET` is missing. `PAYMENT_LATENCY_MS` (150) and
 `PAYMENT_FAILURE_RATE` (0.02) tune the mock payment provider. The `RATE_LIMIT_*` and `TRUST_PROXY` variables tune the
 rate limits. `SALE_CACHE_MS` (1000) sets the sale read cache. `EVENTS_INTERVAL_MS` (1000) sets how often an event stream reads. `ADMIN_TOKEN` (at least 16 characters) turns on
-`POST /admin/sales`; without it the route answers `404`.
+the `/admin` routes; without it they answer `404`.
 
 ## Manual requests
 
-[`api-flash-be.http`](../../api-flash-be.http) and [`api-flash-web.http`](../../api-flash-web.http) hold the requests above in the kulala.nvim format, one file per app. Every route of the API is in the first file, and every route the web server passes on is in the second. The create-sale request reads `ADMIN_TOKEN` from `.env` with `$dotenv`, so set it there first (see [`.env.example`](../../.env.example)).
+[`api-flash-be.http`](../../api-flash-be.http) and [`api-flash-web.http`](../../api-flash-web.http) hold the requests above in the kulala.nvim format, one file per app. Every route of the API is in the first file, and every route the web server passes on is in the second. The operator requests read `ADMIN_TOKEN` from `.env` with `$dotenv`, so set it there first (see [`.env.example`](../../.env.example)).

@@ -25,7 +25,7 @@ it to understand the system; it only matters when you change the code.
 
 | The brief asks for                | Where it is                                                                                                                                                                                                                             |
 | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A configurable start and end time | `sales.starts_at` and `ends_at`. Set them with `POST /admin/sales` (absolute times, needs `ADMIN_TOKEN`) or with the seed command (minutes from now)                                                                                    |
+| A configurable start and end time | `sales.starts_at` and `ends_at`. Set them with `POST /admin/sales` (absolute times, needs `ADMIN_TOKEN`) or with the seed command (minutes from now). `PATCH` and `DELETE /admin/sales/:saleId` change and remove a sale                |
 | One product, limited stock        | `sales.stock`, with `UPDATE ... WHERE sold < stock` and `CHECK (sold <= stock)` in Postgres                                                                                                                                             |
 | One item per user                 | `UNIQUE(sale_id, user_id)` on purchases and on reservations; a Redis set of buyers in front of it                                                                                                                                       |
 | An endpoint for the sale status   | `GET /sales/current` and `GET /sales/:saleId`, plus a live stream at `.../events`                                                                                                                                                       |
@@ -135,7 +135,7 @@ This is the production stack (`compose.prod.yaml`) and the shape the load test r
 ```mermaid
 flowchart LR
   accTitle: Flash sale under load
-  accDescr: Shoppers reach the web app, which passes sale requests to nginx. An operator creates sales through nginx too. Nginx spreads requests over three identical API instances. The instances share one Postgres, which holds the truth, and one Redis, which holds the queue, the holds, the rate counters and the lease that lets one instance admit shoppers each second. If Redis is down the instances keep selling from Postgres under a row lock, and the readiness check reports it.
+  accDescr: Shoppers reach the web app, which passes sale requests to nginx. An operator manages sales through nginx too. Nginx spreads requests over three identical API instances. The instances share one Postgres, which holds the truth, and one Redis, which holds the queue, the holds, the rate counters and the lease that lets one instance admit shoppers each second. If Redis is down the instances keep selling from Postgres under a row lock, and the readiness check reports it.
   browser["Shoppers' browsers"]
   operator["Operator"]
   web["flash-web<br/>page + /api pass-through"]
@@ -145,7 +145,7 @@ flowchart LR
   redis[("Redis 8<br/>Lua gate, queue,<br/>admit lease, counters")]
   browser -->|page, events, /api/sales| web
   web -->|sale routes| lb
-  operator -->|POST /admin/sales| lb
+  operator -->|/admin/sales| lb
   lb -->|one instance per request| be
   be -->|SQL, last word| pg
   be -->|one script per hold| redis
@@ -178,8 +178,9 @@ any request, so adding capacity is adding instances.
 | Names, not accounts                     | A queue ticket binds a name to a request. No sign-up is needed                                                                                             | A name can be taken by anyone; this is not authentication          |
 
 Longer explanations are in [docs/explanation](docs/explanation/README.md), and the architecture diagrams are in
-[specs/apps/flash/c4](specs/apps/flash/c4/README.md). One sale runs at a time. `POST /admin/sales` refuses a
-window that overlaps another sale; the seed command does not check. There is no admin page.
+[specs/apps/flash/c4](specs/apps/flash/c4/README.md). One sale runs at a time, and each sale is one type of product with a stock of units. `GET /sales/current` is the sale that
+is running, or else the next one to open. The admin routes refuse a window that overlaps another sale; the seed command
+does not check. There is no admin page: an operator uses the API with the token.
 
 ## How it scales, and where it stops
 
@@ -231,7 +232,9 @@ npm run docker:dev:down        # stop Postgres + Redis
 ```
 
 To create the sale through the API instead of the seed command, set `ADMIN_TOKEN` in `.env` (16 characters or more) and
-restart the API. Send an absolute window. A window that overlaps another sale gets `409`:
+restart the API. Send an absolute window. A window that overlaps another sale gets `409`. The same token lists
+(`GET /admin/sales`), changes (`PATCH /admin/sales/:saleId`) and removes (`DELETE /admin/sales/:saleId`) sales; the rules
+are in [seed a sale](docs/how-to/seed-a-sale.md#change-list-or-remove-a-sale):
 
 ```bash
 curl -s -X POST http://localhost:8080/admin/sales \
