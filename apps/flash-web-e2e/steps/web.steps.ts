@@ -12,6 +12,7 @@ import {
 } from "../../flash-be-e2e/steps/support/response.js";
 import { FORWARDER_URL } from "./support/forwarder.js";
 import {
+	ADMISSION_WAIT_MS,
 	answerWith,
 	cleanup,
 	connectWebServer,
@@ -91,7 +92,9 @@ Then('the page heading is "Flash Sale"', async ({ page }) => {
 
 Then(/^the page says "(.+)"$/, async ({ page }, text: string) => {
 	// A shopper may wait for the queue to admit them, so this waits longer than the default.
-	await expect(page.locator("body")).toContainText(text, { timeout: 20_000 });
+	await expect(page.locator("body")).toContainText(text, {
+		timeout: ADMISSION_WAIT_MS,
+	});
 });
 
 When(/^a client sends GET (\/.+)$/, async ({ request }, path: string) => {

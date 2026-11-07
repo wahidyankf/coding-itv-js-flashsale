@@ -2,15 +2,15 @@
 // carries. Binds sale/status.feature. The sale's window is set with the operator's routes (admin.steps.ts) or with SQL when
 // the state is one real traffic cannot reach.
 
-import type { APIRequestContext } from "@playwright/test";
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { bodyOf, routes, send } from "./support/api.js";
 import { ensureDatabase, insertSale } from "./support/database.js";
 import { createSale } from "./support/operator.js";
 import { currentResponse, setResponse } from "./support/response.js";
+import { saleNow } from "./support/sale.js";
 import { relativeTime } from "./support/time.js";
-import { currentSaleId, world } from "./support/world.js";
+import { world } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
 
@@ -67,11 +67,7 @@ Given("no sale exists", async ({ request: _request }) => {
 });
 
 When("a client asks for that sale", async ({ request }) => {
-	setResponse(
-		await send(request, routes.sale, {
-			params: { saleId: currentSaleId() },
-		}),
-	);
+	setResponse(await saleNow(request));
 });
 
 When("a client asks for the current sale", async ({ request }) => {
@@ -85,18 +81,9 @@ When(
 	},
 );
 
-// Reads the sale again, so the answer is the state now and not the body of the last response.
-async function saleNow(request: APIRequestContext) {
-	return bodyOf(
-		routes.sale,
-		await send(request, routes.sale, {
-			params: { saleId: currentSaleId() },
-		}),
-	);
-}
-
 Then(/^the sale status is "([^"]+)"$/, async ({ request }, status: string) => {
-	expect((await saleNow(request))?.status).toBe(status);
+	const sale = await bodyOf(routes.sale, await saleNow(request));
+	expect(sale?.status).toBe(status);
 });
 
 Then(
@@ -113,7 +100,8 @@ Then(
 );
 
 Then(/^(\d+) items remain$/, async ({ request }, remaining: string) => {
-	expect((await saleNow(request))?.remaining).toBe(Number(remaining));
+	const sale = await bodyOf(routes.sale, await saleNow(request));
+	expect(sale?.remaining).toBe(Number(remaining));
 });
 
 Then(

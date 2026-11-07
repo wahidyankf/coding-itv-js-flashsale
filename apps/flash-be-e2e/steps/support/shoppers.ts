@@ -10,7 +10,7 @@ import { pollUntil } from "./time.js";
 import { currentSaleId, type ShopperState, world } from "./world.js";
 
 // How long the whole group of shoppers may take to be admitted, counted from the first check.
-const ADMISSION_WAIT_MS = 8000;
+const GROUP_ADMISSION_WAIT_MS = 8000;
 
 // The shoppers' state of this scenario, made on first use.
 export function shoppers(): ShopperState {
@@ -27,6 +27,18 @@ export function shoppers(): ShopperState {
 // The hold of a shopper, as the API last gave it, or undefined when the shopper holds nothing.
 export function holdOf(user: string) {
 	return shoppers().holds.get(usernameKey(user));
+}
+
+// The ticket the shopper was issued in this scenario, or undefined when the shopper has not joined. Tickets are kept by
+// usernameKey, so the lookup applies it too: a name typed in another case finds the same ticket.
+export function ticketOf(user: string): string | undefined {
+	return shoppers().tickets.get(usernameKey(user));
+}
+
+// The names of the first `count` shoppers, shopper0 up to shopper{count - 1}. A step that queues or holds a crowd names
+// them with this, so every scenario's crowd is the same set of shoppers.
+export function shopperNames(count: number): string[] {
+	return Array.from({ length: count }, (_, i) => `shopper${i}`);
 }
 
 // Joins the queue of the sale (the running one by default). The ticket is kept the first time only.
@@ -74,7 +86,7 @@ export async function postReserve(
 	user: string,
 	options: { ticket?: string; saleId?: string } = {},
 ) {
-	const ticket = options.ticket ?? shoppers().tickets.get(usernameKey(user));
+	const ticket = options.ticket ?? ticketOf(user);
 	return send(request, routes.reserve, {
 		params: { saleId: options.saleId ?? currentSaleId() },
 		headers: {
@@ -97,19 +109,26 @@ export async function reserve(
 	if (held && !shoppers().holds.has(key)) shoppers().holds.set(key, held);
 }
 
+// Waits until the queue admits a shopper. `readState` reads the state of the shopper's place (such as "waiting" or
+// "admitted") each time it is called. Fails with `failure` when the time runs out. Every admission wait of the e2e apps
+// goes through here, so they all wait for the same state.
+export function pollUntilAdmitted(
+	readState: () => Promise<string | undefined>,
+	options: { withinMs: number; everyMs: number; failure: string },
+): Promise<void> {
+	return pollUntil(async () => (await readState()) === "admitted", options);
+}
+
 // The admission runs on the API's own timer, so a shopper who joined is admitted within a tick or two. Waits until every
 // shopper is admitted, and fails the step when one is still waiting after the time limit.
 export async function waitUntilAdmitted(
 	request: APIRequestContext,
 	users: string[],
 ) {
-	const deadline = Date.now() + ADMISSION_WAIT_MS;
+	const deadline = Date.now() + GROUP_ADMISSION_WAIT_MS;
 	for (const user of users) {
-		const key = usernameKey(user);
-		await pollUntil(
-			async () =>
-				(await checkPlace(request, key, shoppers().tickets.get(key)))?.state ===
-				"admitted",
+		await pollUntilAdmitted(
+			async () => (await checkPlace(request, user, ticketOf(user)))?.state,
 			{
 				withinMs: deadline - Date.now(),
 				everyMs: 50,

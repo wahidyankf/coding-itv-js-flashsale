@@ -7,9 +7,12 @@ import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { TICKET_HEADER } from "../../flash-be-e2e/steps/support/api.js";
 import { E2E_PASSWORD } from "../../flash-be-e2e/steps/support/auth.js";
+import { pollUntilAdmitted } from "../../flash-be-e2e/steps/support/shoppers.js";
 import { currentSaleId } from "../../flash-be-e2e/steps/support/world.js";
 import { getJson, postJson, salePath } from "./support/api.js";
 import {
+	ADMISSION_POLL_MS,
+	ADMISSION_WAIT_MS,
 	connectWebServer,
 	createAccount,
 	loginOrSignUp,
@@ -29,18 +32,20 @@ async function joinAndWait(
 	const sale = `${api}${salePath(currentSaleId())}`;
 	const joined = await postJson(request, `${sale}/queue`, {}, { cookie });
 	const ticket: string = (await joined.json()).ticket ?? "";
-	await expect
-		.poll(
-			async () => {
-				const place = await getJson(request, `${sale}/queue/me`, {
-					cookie,
-					[TICKET_HEADER]: ticket,
-				});
-				return (await place.json()).state;
-			},
-			{ timeout: 20_000 },
-		)
-		.toBe("admitted");
+	await pollUntilAdmitted(
+		async () => {
+			const place = await getJson(request, `${sale}/queue/me`, {
+				cookie,
+				[TICKET_HEADER]: ticket,
+			});
+			return ((await place.json()) as { state: string }).state;
+		},
+		{
+			withinMs: ADMISSION_WAIT_MS,
+			everyMs: ADMISSION_POLL_MS,
+			failure: `${user} was not admitted`,
+		},
+	);
 	return { api, ticket, cookie };
 }
 

@@ -9,9 +9,16 @@ import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { bodyOf, routes, send, TICKET_HEADER } from "./support/api.js";
 import { shopperCookie, usernameKey } from "./support/auth.js";
-import { query, SYSTEM_USER } from "./support/database.js";
+import { query, SYSTEM_USER, sellOut } from "./support/database.js";
 import { currentResponse, setResponse } from "./support/response.js";
-import { confirm, holdOf, postConfirm, shoppers } from "./support/shoppers.js";
+import {
+	confirm,
+	holdOf,
+	postConfirm,
+	shopperNames,
+	shoppers,
+	ticketOf,
+} from "./support/shoppers.js";
 import { pollUntil } from "./support/time.js";
 import { currentSaleId, setApiEnv, world } from "./support/world.js";
 
@@ -55,10 +62,7 @@ Given(
 Given(
 	/^all (\d+) shoppers have tried to reserve an item$/,
 	async ({ request }, count: string) => {
-		const users = Array.from(
-			{ length: Number(count) },
-			(_, i) => `shopper${i}`,
-		);
+		const users = shopperNames(Number(count));
 		const replies = await Promise.all(
 			users.map(async (user) => ({
 				user,
@@ -66,7 +70,7 @@ Given(
 					params: { saleId: currentSaleId() },
 					headers: {
 						cookie: await shopperCookie(request, user),
-						[TICKET_HEADER]: shoppers().tickets.get(user) ?? "",
+						[TICKET_HEADER]: ticketOf(user) ?? "",
 					},
 				}),
 			})),
@@ -133,7 +137,7 @@ When(
 			 select $1, buyer.id, gen_random_uuid(), $3, buyer.id from buyer`,
 			[world.saleId, user, `pay-${user}`],
 		);
-		await query("update sales set sold = stock where id = $1", [world.saleId]);
+		await sellOut(currentSaleId());
 	},
 );
 

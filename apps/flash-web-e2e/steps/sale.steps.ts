@@ -6,9 +6,12 @@ import { MS_PER_SECOND } from "@flash/flash-commons";
 import { createBdd } from "playwright-bdd";
 import {
 	ensureDatabase,
-	query,
+	setSold,
 } from "../../flash-be-e2e/steps/support/database.js";
-import { setApiEnv, world } from "../../flash-be-e2e/steps/support/world.js";
+import {
+	currentSaleId,
+	setApiEnv,
+} from "../../flash-be-e2e/steps/support/world.js";
 import { cutWebServerOff, planSale, reviseSale } from "./support/shop.js";
 
 const { Given, When } = createBdd();
@@ -69,10 +72,7 @@ Given(
 When(
 	/^the sold count changes to (\d+)$/,
 	async ({ request: _request }, sold: string) => {
-		await query("update sales set sold = $1 where id = $2", [
-			Number(sold),
-			world.saleId,
-		]);
+		await setSold(currentSaleId(), Number(sold));
 	},
 );
 

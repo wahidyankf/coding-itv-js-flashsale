@@ -6,10 +6,10 @@ import type { APIRequestContext } from "@playwright/test";
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { build, routes, send, TICKET_HEADER } from "./support/api.js";
-import { shopperCookie, usernameKey } from "./support/auth.js";
+import { shopperCookie } from "./support/auth.js";
 import { patchSale } from "./support/operator.js";
 import { setResponse } from "./support/response.js";
-import { shoppers } from "./support/shoppers.js";
+import { ticketOf } from "./support/shoppers.js";
 import { openStream, type Stream } from "./support/stream.js";
 import { currentSaleId, world } from "./support/world.js";
 
@@ -33,7 +33,7 @@ async function watchPlace(request: APIRequestContext, user: string) {
 		params: { saleId: currentSaleId() },
 		headers: {
 			cookie: await shopperCookie(request, user),
-			[TICKET_HEADER]: shoppers().tickets.get(usernameKey(user)),
+			[TICKET_HEADER]: ticketOf(user),
 		},
 	});
 	await watch(built.url, built.headers);

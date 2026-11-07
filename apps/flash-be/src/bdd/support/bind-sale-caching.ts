@@ -1,5 +1,6 @@
 // The steps of specs/apps/flash/be/behaviours/sale/caching.feature, as both layers bind them. Each scenario gets the world
 // its layer makes; the titles stay in the layer's test file, where the behaviour checker reads them.
+import { MS_PER_SECOND } from "@flash/flash-commons";
 import { expect } from "vitest";
 import type { ShopScenario } from "./queue-scenario.js";
 import { responseOf } from "./response.js";
@@ -17,7 +18,7 @@ const SALE_WITH_3 =
 // "the sale reads are cached for {int} seconds": the cache keeps a read for that long.
 function cachedFor(world: ShopScenario) {
 	return async (_ctx: unknown, seconds: number) => {
-		await world.setSaleCache(seconds * 1000);
+		await world.setSaleCache(seconds * MS_PER_SECOND);
 	};
 }
 

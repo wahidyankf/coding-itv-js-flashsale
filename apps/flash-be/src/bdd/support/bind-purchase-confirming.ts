@@ -15,6 +15,7 @@ import {
 	secondsPass,
 } from "./shop-steps.js";
 import { errorIs, type ScenarioBinder, statusIs } from "./steps.js";
+import { shopperNames } from "./users.js";
 
 // The sale of the given stock, open from an hour ago until an hour from now, with nothing sold yet.
 const saleWithStock = (stock: number) =>
@@ -254,7 +255,7 @@ function refundsLatePayment(layer: ShopLayer): ScenarioBinder {
 function sellsExactlyStock(layer: ShopLayer): ScenarioBinder {
 	return ({ Given, And, When, Then }) => {
 		const world = layer.newWorld();
-		const users = Array.from({ length: 30 }, (_, i) => `shopper${i}`);
+		const users = shopperNames(30);
 		let replies: Response[] = [];
 
 		Given(OPEN_SALE, async () =>

@@ -13,6 +13,7 @@ import {
 	userLimitIs,
 } from "./shop-steps.js";
 import { errorIs, type ScenarioBinder, statusIs } from "./steps.js";
+import { shopperNames } from "./users.js";
 
 const SALE_OF_2 =
 	"a sale with stock 2 and 0 sold that opens 1 hour ago and closes in 1 hour";
@@ -114,7 +115,7 @@ function reservesAgainWithoutRedis(layer: ShopLayer): ScenarioBinder {
 function manyReserveWithoutRedis(layer: ShopLayer): ScenarioBinder {
 	return ({ Given, And, When, Then }) => {
 		const world = layer.newWorld();
-		const users = Array.from({ length: 30 }, (_, i) => `shopper${i}`);
+		const users = shopperNames(30);
 		let replies: Response[] = [];
 
 		Given(OPEN_SALE, async () =>

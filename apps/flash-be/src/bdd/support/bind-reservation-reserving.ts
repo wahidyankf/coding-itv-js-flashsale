@@ -21,6 +21,7 @@ import {
 	statusIs,
 } from "./steps.js";
 import { relativeTime } from "./time.js";
+import { shopperNames } from "./users.js";
 
 function reservesItem(layer: ShopLayer): ScenarioBinder {
 	return ({ Given, And, When, Then }) => {
@@ -254,7 +255,7 @@ function expiredHoldGivesBack(layer: ShopLayer): ScenarioBinder {
 function manyReserveAtOnce(layer: ShopLayer): ScenarioBinder {
 	return ({ Given, And, When, Then }) => {
 		const world = layer.newWorld();
-		const users = Array.from({ length: 30 }, (_, i) => `shopper${i}`);
+		const users = shopperNames(30);
 		let replies: Response[] = [];
 
 		Given(OPEN_SALE, async () =>

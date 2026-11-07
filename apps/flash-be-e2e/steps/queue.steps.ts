@@ -5,12 +5,19 @@
 import { sleep } from "@flash/flash-commons/timers";
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
-import { bodyOf, routes, send } from "./support/api.js";
+import { bodyOf, routes } from "./support/api.js";
 import { createSale, patchSale } from "./support/operator.js";
 import { E2E_REDIS_URL, withRedis } from "./support/processes.js";
 import { currentResponse } from "./support/response.js";
-import { checkPlace, join, shoppers } from "./support/shoppers.js";
-import { pollUntil, relativeTime } from "./support/time.js";
+import { saleNow } from "./support/sale.js";
+import {
+	checkPlace,
+	join,
+	pollUntilAdmitted,
+	shoppers,
+	ticketOf,
+} from "./support/shoppers.js";
+import { relativeTime } from "./support/time.js";
 import { currentSaleId } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
@@ -70,21 +77,14 @@ Given("the queue is lost", async ({ request: _request }) => {
 // The private API admits on its own timer. A sale that is open admits its first shopper within one tick, so wait for that.
 // A sale that is not open admits nobody, so wait out a tick and a half instead.
 When("admission runs once", async ({ request }) => {
-	const sale = await bodyOf(
-		routes.sale,
-		await send(request, routes.sale, {
-			params: { saleId: currentSaleId() },
-		}),
-	);
+	const sale = await bodyOf(routes.sale, await saleNow(request));
 	const first = shoppers().joined[0];
 	if (sale?.status !== "active" || !first) {
 		await sleep(1500);
 		return;
 	}
-	await pollUntil(
-		async () =>
-			(await checkPlace(request, first, shoppers().tickets.get(first)))
-				?.state === "admitted",
+	await pollUntilAdmitted(
+		async () => (await checkPlace(request, first, ticketOf(first)))?.state,
 		{
 			withinMs: 5000,
 			everyMs: 25,
@@ -96,7 +96,7 @@ When("admission runs once", async ({ request }) => {
 When(
 	/^"([^"]+)" checks the queue with their ticket$/,
 	async ({ request }, user: string) => {
-		await checkPlace(request, user, shoppers().tickets.get(user));
+		await checkPlace(request, user, ticketOf(user));
 	},
 );
 
@@ -125,7 +125,7 @@ Then(
 Then(
 	/^the place in line of "([^"]+)" is (\d+)$/,
 	async ({ request }, user: string, place: string) => {
-		const body = await checkPlace(request, user, shoppers().tickets.get(user));
+		const body = await checkPlace(request, user, ticketOf(user));
 		expect(body?.state === "waiting" ? body.place : undefined).toBe(
 			Number(place),
 		);
@@ -135,21 +135,19 @@ Then(
 Then(
 	/^the ticket is the one "([^"]+)" had before$/,
 	async ({ request: _request }, user: string) => {
-		expect((await currentResponse().json()).ticket).toBe(
-			shoppers().tickets.get(user),
-		);
+		expect((await currentResponse().json()).ticket).toBe(ticketOf(user));
 	},
 );
 
 Then(/^"([^"]+)" is admitted$/, async ({ request }, user: string) => {
-	const body = await checkPlace(request, user, shoppers().tickets.get(user));
+	const body = await checkPlace(request, user, ticketOf(user));
 	expect(body?.state).toBe("admitted");
 });
 
 Then(
 	/^"([^"]+)" is waiting at place (\d+)$/,
 	async ({ request }, user: string, place: string) => {
-		const body = await checkPlace(request, user, shoppers().tickets.get(user));
+		const body = await checkPlace(request, user, ticketOf(user));
 		expect(body).toMatchObject({ state: "waiting", place: Number(place) });
 	},
 );

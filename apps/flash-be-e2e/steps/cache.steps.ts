@@ -5,9 +5,10 @@ import { MS_PER_SECOND } from "@flash/flash-commons";
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { routes, send } from "./support/api.js";
-import { query } from "./support/database.js";
+import { setSold } from "./support/database.js";
 import { currentResponse, setResponse } from "./support/response.js";
-import { currentSaleId, setApiEnv, world } from "./support/world.js";
+import { saleNow } from "./support/sale.js";
+import { currentSaleId, setApiEnv } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
 
@@ -23,11 +24,7 @@ Given("the sale reads are not cached", async ({ request: _request }) => {
 });
 
 Given("a client has asked for that sale", async ({ request }) => {
-	setResponse(
-		await send(request, routes.sale, {
-			params: { saleId: currentSaleId() },
-		}),
-	);
+	setResponse(await saleNow(request));
 });
 
 // Nothing exists yet, so this read is the "not found" the cache must not keep.
@@ -41,19 +38,12 @@ Given("a client has asked for the current sale", async ({ request }) => {
 When(
 	/^the sold count changes to (\d+)$/,
 	async ({ request: _request }, sold: string) => {
-		await query("update sales set sold = $1 where id = $2", [
-			Number(sold),
-			world.saleId,
-		]);
+		await setSold(currentSaleId(), Number(sold));
 	},
 );
 
 When("a client asks for that sale again", async ({ request }) => {
-	setResponse(
-		await send(request, routes.sale, {
-			params: { saleId: currentSaleId() },
-		}),
-	);
+	setResponse(await saleNow(request));
 });
 
 Then(

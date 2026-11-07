@@ -82,6 +82,17 @@ export function query<T>(sql: string, params: unknown[] = []): Promise<T[]> {
 	return runSql<T>(world.databaseUrl, sql, params);
 }
 
+// Sets the sold count of a sale with SQL, as another instance of the API would write it. For a count no route can reach
+// in a scenario, such as a sale that changed behind the API's back.
+export async function setSold(saleId: string, sold: number): Promise<void> {
+	await query("update sales set sold = $1 where id = $2", [sold, saleId]);
+}
+
+// Sells every item of a sale with SQL, so its sold count equals its stock, as another instance of the API would write it.
+export async function sellOut(saleId: string): Promise<void> {
+	await query("update sales set sold = stock where id = $1", [saleId]);
+}
+
 // Inserts a sale with a product of its own, with SQL. Only for states real traffic cannot reach: more items sold than
 // stock, or items sold before the sale opens. Returns the sale's id.
 export async function insertSale(sale: {

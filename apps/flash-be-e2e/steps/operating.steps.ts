@@ -15,6 +15,7 @@ import {
 	senderHeaders,
 } from "./support/operator.js";
 import { currentResponse, setResponse } from "./support/response.js";
+import { saleNow } from "./support/sale.js";
 import {
 	confirm,
 	join,
@@ -134,12 +135,7 @@ When(
 Then(
 	/^the sale has stock (\d+) with (\d+) items remaining$/,
 	async ({ request }, stock: string, remaining: string) => {
-		const sale = await bodyOf(
-			routes.sale,
-			await send(request, routes.sale, {
-				params: { saleId: currentSaleId() },
-			}),
-		);
+		const sale = await bodyOf(routes.sale, await saleNow(request));
 		expect(sale).toMatchObject({
 			stock: Number(stock),
 			remaining: Number(remaining),

@@ -3,7 +3,7 @@
 // flash-be the first time the page needs the API, through the operator route. Steps that come after the plan may still
 // change it, so it is made late. Shoppers are logged in directly, as other clients would be.
 
-import { MS_PER_HOUR } from "@flash/flash-commons";
+import { HTTP_STATUS, MS_PER_HOUR } from "@flash/flash-commons";
 import {
 	givenFields,
 	TICKET_HEADER,
@@ -18,13 +18,11 @@ import {
 import { cleanup as cleanupBackend } from "../../../flash-be-e2e/steps/support/cleanup.js";
 import {
 	ensureDatabase,
-	query,
+	setSold,
 } from "../../../flash-be-e2e/steps/support/database.js";
 import { startApi } from "../../../flash-be-e2e/steps/support/processes.js";
-import {
-	pollUntil,
-	relativeTime,
-} from "../../../flash-be-e2e/steps/support/time.js";
+import { pollUntilAdmitted } from "../../../flash-be-e2e/steps/support/shoppers.js";
+import { relativeTime } from "../../../flash-be-e2e/steps/support/time.js";
 import {
 	currentSaleId,
 	world,
@@ -32,11 +30,11 @@ import {
 import { fetchJson, salePath } from "./api.js";
 import { forwarder } from "./forwarder.js";
 
-const UNAUTHORIZED = 401;
-const CREATED = 201;
-// How long a shopper waits to be admitted, and how often the place is read meanwhile.
-const ADMISSION_WAIT_MS = 20_000;
-const POLL_MS = 100;
+// How long a shopper waits to be admitted: the page's waits and the shoppers' polls both use it, so one number says how long
+// a queue may take.
+export const ADMISSION_WAIT_MS = 20_000;
+// How often a shopper's place is read while the shopper waits to be admitted.
+export const ADMISSION_POLL_MS = 100;
 
 // True when a step has already chosen where the web server's API address leads.
 const target: { chosen: boolean } = { chosen: false };
@@ -106,7 +104,7 @@ export async function loginOrSignUp(
 		const api = apiUrl ?? (await privateApi());
 		const body = { username: key, password };
 		let reply = await fetchJson("POST", `${api}/auth/login`, body);
-		if (reply.status === UNAUTHORIZED) {
+		if (reply.status === HTTP_STATUS.unauthorized) {
 			reply = await fetchJson("POST", `${api}/auth/register`, body);
 		}
 		if (!reply.ok) {
@@ -128,7 +126,7 @@ export async function createAccount(
 		username: usernameKey(username),
 		password,
 	});
-	if (reply.status !== CREATED) {
+	if (reply.status !== HTTP_STATUS.created) {
 		throw new Error(`${username} was not made: ${reply.status}`);
 	}
 }
@@ -187,11 +185,11 @@ async function buyItem(api: string, saleId: string, user: string) {
 	const headers = { [TICKET_HEADER]: ticket };
 	await waitForAdmission(sale, cookie, headers, user);
 	const held = await postAs(cookie, `${sale}/reservations`, {}, headers);
-	if (held.status !== CREATED)
+	if (held.status !== HTTP_STATUS.created)
 		throw new Error(`${user} got no hold: ${held.status}`);
 	const { reservationId } = (await held.json()) as { reservationId: string };
 	const bought = await postAs(cookie, `${sale}/purchases`, { reservationId });
-	if (bought.status !== CREATED)
+	if (bought.status !== HTTP_STATUS.created)
 		throw new Error(`${user} bought nothing: ${bought.status}`);
 }
 
@@ -202,16 +200,16 @@ async function waitForAdmission(
 	headers: Record<string, string>,
 	user: string,
 ): Promise<void> {
-	await pollUntil(
+	await pollUntilAdmitted(
 		async () => {
 			const place = await fetch(`${sale}/queue/me`, {
 				headers: { cookie, ...headers },
 			});
-			return ((await place.json()) as { state: string }).state === "admitted";
+			return ((await place.json()) as { state: string }).state;
 		},
 		{
 			withinMs: ADMISSION_WAIT_MS,
-			everyMs: POLL_MS,
+			everyMs: ADMISSION_POLL_MS,
 			failure: `${user} was not admitted`,
 		},
 	);
@@ -243,10 +241,7 @@ async function makePlannedSale(api: string): Promise<void> {
 	if (plan.sold === 0) return;
 	if (!opened) {
 		// No route sells before the sale opens, so this one count is written to the table.
-		await query("update sales set sold = $1 where id = $2", [
-			plan.sold,
-			created.id,
-		]);
+		await setSold(created.id, plan.sold);
 		return;
 	}
 	await buyItems(api, created.id, plan.sold);

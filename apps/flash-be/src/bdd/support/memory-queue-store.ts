@@ -1,6 +1,7 @@
 // The queue store in memory for the unit layer (test support): the waiting line, the admitted shoppers with the time each
 // admission ends, and the lease one instance takes to admit. It follows the Redis queue store, and it answers with the
 // same Results, which never fail here.
+import { MS_PER_SECOND } from "@flash/flash-commons";
 import { Ok } from "@flash/typekit";
 import type { Clock } from "../../application/ports/clock.js";
 import type { QueueStore } from "../../application/ports/queue-store.js";
@@ -63,7 +64,10 @@ export function memoryQueueStore(clock: Clock): MemoryQueueStore {
 		async admit(saleId, count, now, ttlSeconds) {
 			const next = line(saleId).splice(0, count);
 			for (const user of next) {
-				admissions(saleId).set(user, now.getTime() + ttlSeconds * 1000);
+				admissions(saleId).set(
+					user,
+					now.getTime() + ttlSeconds * MS_PER_SECOND,
+				);
 			}
 			return new Ok(next);
 		},

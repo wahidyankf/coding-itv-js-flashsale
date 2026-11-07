@@ -15,6 +15,7 @@ import {
 	join,
 	postReserve,
 	reserve,
+	shopperNames,
 	shoppers,
 	waitUntilAdmitted,
 } from "./support/shoppers.js";
@@ -46,10 +47,7 @@ Given(/^"([^"]+)" has been admitted$/, async ({ request }, user: string) => {
 Given(
 	/^(\d+) shoppers have been admitted$/,
 	async ({ request }, count: string) => {
-		const users = Array.from(
-			{ length: Number(count) },
-			(_, i) => `shopper${i}`,
-		);
+		const users = shopperNames(Number(count));
 		for (const user of users) await join(request, user);
 		await waitUntilAdmitted(request, users);
 	},
@@ -115,10 +113,7 @@ When(
 When(
 	/^all (\d+) shoppers reserve an item at the same time$/,
 	async ({ request }, count: string) => {
-		const users = Array.from(
-			{ length: Number(count) },
-			(_, i) => `shopper${i}`,
-		);
+		const users = shopperNames(Number(count));
 		const replies = await Promise.all(
 			users.map((user) => postReserve(request, user)),
 		);

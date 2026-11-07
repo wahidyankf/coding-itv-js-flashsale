@@ -13,14 +13,15 @@ steps/
   support/           everything steps share; a step never imports another step file
     world.ts           the state of the running scenario, and currentSaleId() for the sale it made
     processes.ts       the API process and the Redis proxy
-    database.ts        the scratch database, migrations, seed and queries
+    database.ts        the scratch database, migrations, seed and queries, and setSold/sellOut
     cleanup.ts         the teardown of a scenario
     api.ts, views.ts   the routes and request builder; the reply bodies as the steps read them
     auth.ts            the accounts and their login cookies
-    shoppers.ts        a shopper's calls on the way to a purchase
+    shoppers.ts        a shopper's calls on the way to a purchase: ticketOf, shopperNames, pollUntilAdmitted
+    sale.ts            saleNow, the current sale as the API shows it
     operator.ts        the operator's calls
     stream.ts          reading a Server-Sent Events stream
-    time.ts            time units, "in 2 hours" phrases, and pollUntil
+    time.ts            pollUntil, and the "in 2 hours" phrases (from @flash/flash-commons)
     response.ts        the reply to the last request
     relay.ts           the TCP relay used by the proxies
 ```
@@ -29,11 +30,12 @@ steps/
 
 ## To add something
 
-| To add …                         | Put it in …                               | Also update …                                                     |
-| -------------------------------- | ----------------------------------------- | ----------------------------------------------------------------- |
-| a step                           | the `<area>.steps.ts` of its feature file | `npm run bdd:check`                                               |
-| a helper two step files need     | `steps/support/`                          | its doc comment                                                   |
-| a wait for something to be ready | `pollUntil` in `support/time.ts`          | nothing: it already backs off with jitter and a max attempt count |
+| To add …                         | Put it in …                                  | Also update …                                                     |
+| -------------------------------- | -------------------------------------------- | ----------------------------------------------------------------- |
+| a step                           | the `<area>.steps.ts` of its feature file    | `npm run bdd:check`                                               |
+| a helper two step files need     | `steps/support/`                             | its doc comment                                                   |
+| a wait for something to be ready | `pollUntil` in `support/time.ts`             | nothing: it already backs off with jitter and a max attempt count |
+| a wait for a shopper's admission | `pollUntilAdmitted` in `support/shoppers.ts` | name its wait (`ADMISSION_WAIT_MS` in web-e2e's `shop.ts`)        |
 
 The steps write the API's paths, headers, error codes and expected statuses themselves. They do not import them from
 `flash-be`, so a renamed route or header fails here before a real client sees it
