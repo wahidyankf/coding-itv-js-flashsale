@@ -1,6 +1,8 @@
 // The rate limits: the in-process store, and the limiter that checks each user and each address.
+import { Ok } from "@flash/typekit";
 import { describe, expect, it } from "vitest";
 import { createMemoryRateLimitStore } from "../adapters/outbound/memory/memory-rate-limit-store.js";
+import { sharedCounter } from "../bdd/support/shared-counter.js";
 import type { RateLimitStore } from "./ports/rate-limit-store.js";
 import { createRateLimiter } from "./rate-limiter.js";
 
@@ -53,7 +55,7 @@ describe("the rate limiter", () => {
 
 	it("counts a request with no usable user id against its address only", async () => {
 		const limiter = createRateLimiter(
-			createMemoryRateLimitStore(),
+			sharedCounter(createMemoryRateLimitStore()),
 			createMemoryRateLimitStore(),
 			() => START,
 			{ windowSeconds: 10, perUser: 1, perIp: 2, authPerIp: 100 },
@@ -66,15 +68,18 @@ describe("the rate limiter", () => {
 	});
 
 	it("asks the client to wait at least one second", async () => {
-		const store: RateLimitStore = {
-			hit: async () => ({ count: 99, resetInMs: 200 }),
-		};
-		const limiter = createRateLimiter(store, store, () => START, {
-			windowSeconds: 1,
-			perUser: 1,
-			perIp: 1,
-			authPerIp: 1,
-		});
+		const counted = { count: 99, resetInMs: 200 };
+		const limiter = createRateLimiter(
+			{ hit: async () => new Ok(counted) },
+			{ hit: async () => counted },
+			() => START,
+			{
+				windowSeconds: 1,
+				perUser: 1,
+				perIp: 1,
+				authPerIp: 1,
+			},
+		);
 		expect(
 			await limiter.check({ saleId: "s", user: "ana", ip: "1.1.1.1" }),
 		).toEqual({ limited: true, retryAfterSeconds: 1 });
@@ -82,7 +87,7 @@ describe("the rate limiter", () => {
 
 	it("limits the auth routes by address with a limit of their own, apart from any sale", async () => {
 		const limiter = createRateLimiter(
-			createMemoryRateLimitStore(),
+			sharedCounter(createMemoryRateLimitStore()),
 			createMemoryRateLimitStore(),
 			() => START,
 			{ windowSeconds: 10, perUser: 100, perIp: 100, authPerIp: 2 },

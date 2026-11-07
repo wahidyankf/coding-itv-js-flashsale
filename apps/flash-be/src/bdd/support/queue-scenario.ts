@@ -19,13 +19,18 @@ export type { Response };
 
 // What a queue scenario does, whatever the layer. Unit tests answer it in memory; integration tests use
 // Postgres and Redis.
+// The sale fields a scenario sets when it makes a sale. Both layers honour exactly these four, so nothing else is passed.
+export type SaleOverrides = Partial<
+	Pick<Sale, "stock" | "sold" | "startsAt" | "endsAt">
+>;
+
 export type QueueScenario = {
 	saleId: string;
 	response: Response | undefined;
 	tickets: Map<string, string>;
 	// The cookie header of a shopper who is logged in (an account is made the first time).
 	login: (user: string) => Promise<string>;
-	addSale: (overrides: Partial<Sale>) => Promise<string>;
+	addSale: (overrides: SaleOverrides) => Promise<string>;
 	setAdmitRate: (perSecond: number) => Promise<void>;
 	join: (user: string, saleId?: string) => Promise<Response>;
 	check: (user: string, ticket?: string) => Promise<Response>;

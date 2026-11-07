@@ -1,13 +1,17 @@
 // The rate limit use case: how many write requests one shopper, one address, or one login address may make in a window.
 // The counts live in a shared store (Redis). When it fails, a local store counts instead, so an outage never switches
-// the limit off.
+// the limit off. Application layer.
 
 import { MS_PER_SECOND } from "@flash/flash-commons";
 import { attemptAsync } from "@flash/typekit";
 import { normalizeUser } from "../domain/user.js";
 import type { Clock } from "./ports/clock.js";
-import type { RateLimitStore } from "./ports/rate-limit-store.js";
+import type {
+	LocalRateLimitStore,
+	RateLimitStore,
+} from "./ports/rate-limit-store.js";
 
+// The limits from configuration, with one window for all of them. A test copies and changes them in place to reach a limit.
 export type RateLimits = {
 	windowSeconds: number;
 	// Requests per shopper, per sale, in one window.
@@ -18,10 +22,12 @@ export type RateLimits = {
 	authPerIp: number;
 };
 
+// The answer to one limit check: allowed, or refused with the seconds to wait.
 export type RateLimitVerdict =
 	| { limited: false }
 	| { limited: true; retryAfterSeconds: number };
 
+// The check the HTTP adapter runs before a write. The auth routes and the sale routes are counted apart.
 export type RateLimiter = {
 	// The auth routes: counted by address alone, with a limit of their own, apart from any sale.
 	checkAuth: (request: { ip: string }) => Promise<RateLimitVerdict>;
@@ -39,19 +45,21 @@ type Counted = { count: number; resetInMs: number };
 // A client told to retry is never told to retry at once: the wait is at least one second.
 const MIN_RETRY_AFTER_SECONDS = 1;
 
+// Wires the limiter over a shared store and a local one. The clock comes in, so a window can be moved in tests.
 export function createRateLimiter(
 	shared: RateLimitStore,
-	local: RateLimitStore,
+	local: LocalRateLimitStore,
 	clock: Clock,
 	limits: RateLimits,
 ): RateLimiter {
-	// Counts one hit in the shared store, or in the local one when the shared store fails.
+	// Counts one hit in the shared store, or in the local one when the shared store fails or cannot be read.
 	async function hit(key: string, windowMs: number): Promise<Counted> {
 		const counted = await attemptAsync(
 			() => shared.hit(key, windowMs, clock()),
 			Error,
 		);
-		return counted.isOk() ? counted.value : local.hit(key, windowMs, clock());
+		if (counted.isOk() && counted.value.isOk()) return counted.value.value;
+		return local.hit(key, windowMs, clock());
 	}
 
 	// The limits are read on every call, so a change applies to the next request.

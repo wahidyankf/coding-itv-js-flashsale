@@ -12,7 +12,7 @@ import type { SaleService } from "./sale-service.js";
 // reach into a store themselves.
 export type Dependencies = {
 	checkDatabase: () => Promise<void>;
-	checkRedis: () => Promise<void>;
+	checkGate: () => Promise<void>;
 	auth: AuthService;
 	sales: SaleService;
 	admin: SaleAdminService;

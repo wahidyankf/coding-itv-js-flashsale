@@ -1,14 +1,15 @@
-// The purchase use case: a shopper pays for the item their hold keeps, and asks whether they got it. The charge goes to
-// the payment port. The commit is a transaction in Postgres, which has the last word on the stock; Redis is told after.
+// The purchase use case (application layer): a shopper pays for the item their hold keeps, and asks whether they got it.
+// The charge goes to the payment port. The commit is a transaction in Postgres, which has the last word on the stock;
+// Redis is told after.
 import { attemptAsync, Err, Ok, type Result } from "@flash/typekit";
 import {
+	holdRefusalOf,
 	isPurchaseOf,
 	type Outcome,
 	outcomeOf,
 	type Purchase,
 } from "../domain/purchase.js";
 import { confirmBlock, isSaleId, type Sale } from "../domain/sale.js";
-import { isLive } from "../domain/time.js";
 import type { Username } from "../domain/user.js";
 import type { Clock } from "./ports/clock.js";
 import type { HoldGate } from "./ports/hold-gate.js";
@@ -33,15 +34,19 @@ export type ConfirmError =
 // `created` is false when the same reservation was already paid for: the shopper gets the same purchase back.
 export type Confirmed = { created: boolean; purchase: Purchase };
 
+// A purchase, or the reason it was refused. A refusal is a value, so the route can map it to its status.
 export type ConfirmResult = Result<Confirmed, ConfirmError>;
 
+// Only a missing sale is an error here. A shopper with no purchase or hold has an answer, not a failure.
 export type OutcomeError = "sale_not_found";
 
+// The shopper's outcome in the sale, or the reason there is none to give.
 export type OutcomeResult = Result<
 	{ user: Username; outcome: Outcome },
 	OutcomeError
 >;
 
+// The purchase use case as the HTTP adapter calls it. A refusal is a value; a failing store throws, and the route answers 500.
 export type PurchaseService = {
 	// Pays for a held item. The reservation id is the idempotency key: confirming again returns the same purchase.
 	confirm: (
@@ -66,6 +71,7 @@ function wellFormed(
 	return new Ok({ sale: found, reservationId });
 }
 
+// Wires the purchase use case over its ports, so a test can put a fake payment or gate behind it.
 export function createPurchaseService(
 	repository: PurchaseRepository,
 	payment: Payment,
@@ -87,45 +93,44 @@ export function createPurchaseService(
 			: new Err("reservation_not_found");
 	}
 
-	// Why the hold cannot be paid for now, or nothing when it is this shopper's hold and it is still live.
-	async function holdRefusal(
-		saleId: string,
-		user: Username,
-		reservationId: string,
-	): Promise<ConfirmError | undefined> {
-		const hold = await repository.findReservation(saleId, user);
-		if (!hold || hold.reservationId !== reservationId) {
-			return "reservation_not_found";
-		}
-		return isLive(hold, clock()) ? undefined : "hold_expired";
-	}
-
 	// Charges the hold, then writes the purchase in the database. A declined charge ends here. A commit that finds the sale
-	// sold out, or the shopper already bought, refunds the charge.
+	// sold out, or the shopper already bought, refunds the charge. A commit that fails after the charge refunds it too, and
+	// the failure goes on to the caller as before.
 	async function chargeAndCommit(
 		saleId: string,
 		user: Username,
 		reservationId: string,
 	): Promise<ConfirmResult> {
-		// The hold was checked before the charge. If it runs out during the charge, the commit decides.
+		// The hold is checked before the charge and not again after it. A hold that runs out while the provider works is
+		// not a failure: an item still free is sold. See docs/explanation/payment-and-refunds.md, "When the hold ends during
+		// the payment".
 		const charge = await payment.charge(reservationId);
 		if (charge.isErr()) return new Err("payment_failed");
 		const { ref } = charge.value;
 
-		const committed: CommitResult = await repository.commit({
-			saleId,
-			user,
-			reservationId,
-			paymentRef: ref,
-		});
-		if (committed.kind !== "purchased") {
+		const committed = await attemptAsync(
+			() =>
+				repository.commit({
+					saleId,
+					user,
+					reservationId,
+					paymentRef: ref,
+				}),
+			Error,
+		);
+		if (committed.isErr()) {
 			await payment.refund(ref);
-			return new Err(committed.kind);
+			throw committed.error;
+		}
+		const result: CommitResult = committed.value;
+		if (result.kind !== "purchased") {
+			await payment.refund(ref);
+			return new Err(result.kind);
 		}
 
 		// Redis learns about the purchase after the commit. If this fails, a rebuild from Postgres fixes it.
 		await attemptAsync(() => gate.confirm(saleId, user), Error);
-		return new Ok({ created: committed.created, purchase: committed.purchase });
+		return new Ok({ created: result.created, purchase: result.purchase });
 	}
 
 	return {
@@ -141,7 +146,8 @@ export function createPurchaseService(
 			}
 			const ended = confirmBlock(request.value.sale, clock());
 			if (ended !== undefined) return new Err(ended);
-			const refused = await holdRefusal(saleId, user, held);
+			const hold = await repository.findReservation(saleId, user);
+			const refused = holdRefusalOf(hold, held, clock());
 			if (refused !== undefined) return new Err(refused);
 
 			return chargeAndCommit(saleId, user, held);

@@ -2,6 +2,7 @@
 // and payment timers that fire only as that clock moves. The integration layer runs the same steps over Postgres and
 // Redis (queue-integration.ts). The steps themselves are the request helpers in queue-requests.ts.
 
+import { randomUUID } from "node:crypto";
 import { MS_PER_HOUR, MS_PER_SECOND } from "@flash/flash-commons";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../../adapters/inbound/http/app.js";
@@ -53,8 +54,10 @@ import {
 	ADMIT_EVERYONE_WAITING,
 	LIMITS_OUT_OF_REACH,
 	notWired,
+	type SaleOverrides,
 	type ShopScenario,
 } from "./queue-scenario.js";
+import { sharedCounter } from "./shared-counter.js";
 import { switchable } from "./switchable.js";
 
 export type {
@@ -76,6 +79,9 @@ export type UnitQueueScenario = ShopScenario & {
 	store: MemoryQueueStore;
 	gate: MemoryHoldGate;
 	repository: MemoryReservationRepository;
+	// The purchase rows and the payment, so a test can make a commit fail and read the refunds.
+	purchaseRepository: MemoryPurchaseRepository;
+	payment: ReturnType<typeof createMockPayment>;
 	queue: QueueService;
 	reservations: ReservationService;
 	saleService: SaleService;
@@ -149,6 +155,7 @@ function unitParts(start: Date): UnitParts {
 		sales: saleService,
 		queue,
 		clock,
+		newId: randomUUID,
 		options: { rebuildWaitMs: 100, wait: async () => {}, random: () => 0.5 },
 	});
 	const purchases = createPurchaseService(
@@ -161,7 +168,7 @@ function unitParts(start: Date): UnitParts {
 	// Limits start far out of reach, so only the rate limit scenarios ever meet them.
 	const limits: RateLimits = { ...LIMITS_OUT_OF_REACH };
 	const rateLimiter = createRateLimiter(
-		switchable(createMemoryRateLimitStore(), isDown),
+		sharedCounter(switchable(createMemoryRateLimitStore(), isDown)),
 		createMemoryRateLimitStore(),
 		clock,
 		limits,
@@ -196,7 +203,7 @@ function unitApp(parts: UnitParts): FastifyInstance {
 		{
 			...healthyDeps,
 			auth: parts.auth.service,
-			checkRedis: async () => {
+			checkGate: async () => {
 				if (parts.redis.down) throw new Error("redis is down");
 			},
 			sales: parts.saleService,
@@ -235,7 +242,7 @@ function placeholders() {
 // an action can use the requests that are added after it.
 function saleActions(parts: UnitParts, current: () => UnitQueueScenario) {
 	return {
-		async addSale(overrides: Partial<Sale>) {
+		async addSale(overrides: SaleOverrides) {
 			const sale = fakeSale(overrides);
 			parts.sales.push(sale);
 			current().saleId = sale.id;
@@ -366,6 +373,8 @@ export function queueWorld(start: Date): UnitQueueScenario {
 		store: parts.store,
 		gate: parts.memoryGate,
 		repository: parts.repository,
+		purchaseRepository: parts.purchased,
+		payment: parts.payment,
 		queue: parts.queue,
 		reservations: parts.reservations,
 		saleService: parts.saleService,

@@ -2,6 +2,7 @@
 // Scenarios share the connections, but each one has its own sale, so their queues and holds never meet. The steps
 // are the same as the unit layer's (queue-world.ts), done over the stores instead of in memory.
 
+import { randomUUID } from "node:crypto";
 import { MS_PER_HOUR, MS_PER_SECOND } from "@flash/flash-commons";
 import { sleep } from "@flash/flash-commons/timers";
 import type { FastifyInstance } from "fastify";
@@ -35,7 +36,7 @@ import type {
 import { createRateLimiter } from "../../application/rate-limiter.js";
 import type { ReservationService } from "../../application/reservation-service.js";
 import { createReservationService } from "../../application/reservation-service.js";
-import { dependenciesFrom } from "../../composition.js";
+import { dependenciesFrom, REBUILD_WAIT_MS } from "../../composition.js";
 import { config } from "../../config.js";
 import { normalizeUser } from "../../domain/user.js";
 import { eventRequests } from "./queue-events.js";
@@ -95,19 +96,26 @@ function integrationParts(
 		hasPurchase: (saleId, user) => working.hasPurchase(saleId, user),
 		save: (row) => (writes.broken ? failing : working).save(row),
 		rebuild: (saleId, now, restore) => working.rebuild(saleId, now, restore),
-		reserveWithoutRedis: (request, ready) =>
-			working.reserveWithoutRedis(request, ready),
+		reserveWithoutGate: (request, gateReady) =>
+			working.reserveWithoutGate(request, gateReady),
 	};
+	// One gate for the reservations and the purchases, as the app wires them: a sale one of them marks stale is stale for both.
+	const gate = createGuardedGate(createRedisHoldGate(flaky));
 	const reservations: ReservationService = createReservationService({
-		gate: createGuardedGate(createRedisHoldGate(flaky)),
+		gate,
 		repository: reservationRepository,
 		sales: base.sales,
 		queue: base.queue,
 		clock: systemClock,
+		newId: randomUUID,
+		options: {
+			rebuildWaitMs: REBUILD_WAIT_MS,
+			wait: sleep,
+			random: Math.random,
+		},
 	});
 	// Latency and declines are zero until a scenario asks for them, so the default 2 percent never decides a result.
 	const payment = createMockPayment({ latencyMs: 0, failureRate: 0 });
-	const gate = createGuardedGate(createRedisHoldGate(flaky));
 	const purchases: PurchaseService = createPurchaseService(
 		createPurchaseRepository(db),
 		payment,

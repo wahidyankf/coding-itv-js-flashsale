@@ -8,7 +8,7 @@ const noSale = async () => undefined;
 // Dependencies that always answer, for scenarios that do not test a failure. There is no sale.
 export const healthyDeps: Dependencies = {
 	checkDatabase: async () => {},
-	checkRedis: async () => {},
+	checkGate: async () => {},
 	sales: { cacheMs: () => 0, current: noSale, byId: noSale, details: noSale },
 	auth: {
 		register: async () => new Err("invalid_user"),

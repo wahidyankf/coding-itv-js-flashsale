@@ -1,9 +1,9 @@
 // The login cache in Redis, placed in front of the session store. It answers an access token without a Postgres read,
 // for a minute at most. Postgres stays the truth: a miss, a failing Redis or an entry that cannot be read all fall back
-// to it (see decision 007 for why logins are kept in Postgres at all).
+// to it (see decision 007 for why logins are kept in Postgres at all). Outbound Redis adapter for the SessionStore port.
 
 import { MS_PER_SECOND } from "@flash/flash-commons";
-import { attempt, attemptAsync } from "@flash/typekit";
+import { attempt, attemptAsync, Err, Ok, type Result } from "@flash/typekit";
 import type { SessionStore } from "../../../application/ports/session-store.js";
 import type { Principal } from "../../../domain/auth.js";
 import type { RedisClient } from "./redis-client.js";
@@ -17,9 +17,46 @@ type Cached = {
 	expiresAt: string;
 };
 
-// The cached text read back as a login. A broken entry is a failure to read, not a crash.
-const readCached = (text: string) =>
-	attempt(() => JSON.parse(text) as Cached, SyntaxError);
+// The failure of an entry that is not a login the cache wrote.
+const UNREADABLE_ENTRY = "unreadable_entry";
+
+const isText = (value: unknown): value is string => typeof value === "string";
+
+// Whether a parsed value is a principal: an id, a name and a role the rules know.
+function isPrincipal(value: unknown): value is Principal {
+	if (typeof value !== "object" || value === null) return false;
+	return (
+		"userId" in value &&
+		"username" in value &&
+		"role" in value &&
+		isText(value.userId) &&
+		isText(value.username) &&
+		(value.role === "shopper" || value.role === "operator")
+	);
+}
+
+// Whether a parsed value is a login the cache wrote. Anything else is a broken entry, and a login is read from Postgres.
+function isCached(value: unknown): value is Cached {
+	if (typeof value !== "object" || value === null) return false;
+	return (
+		"principal" in value &&
+		"expiresAt" in value &&
+		isPrincipal(value.principal) &&
+		isText(value.expiresAt)
+	);
+}
+
+// The cached text read back as a login. Text that is not JSON, and JSON that is not a login, are both a failure to read.
+function readCached(text: string): Result<Cached, typeof UNREADABLE_ENTRY> {
+	const parsed = attempt(() => {
+		const value: unknown = JSON.parse(text);
+		return value;
+	}, SyntaxError);
+	if (parsed.isErr()) return new Err(UNREADABLE_ENTRY);
+	return isCached(parsed.value)
+		? new Ok(parsed.value)
+		: new Err(UNREADABLE_ENTRY);
+}
 
 // Remembers who an access token belongs to, so a request does not read Postgres to be recognised. Postgres is the truth:
 // a miss reads it, and so does a failing Redis. Logging out forgets the token here at once.

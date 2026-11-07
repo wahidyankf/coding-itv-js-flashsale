@@ -1,6 +1,11 @@
 // The purchase rules: which purchase belongs to a sale and a shopper, and what a shopper sees (purchased, held, or nothing).
 import { describe, expect, it } from "vitest";
-import { isPurchaseOf, outcomeOf, type Purchase } from "./purchase.js";
+import {
+	holdRefusalOf,
+	isPurchaseOf,
+	outcomeOf,
+	type Purchase,
+} from "./purchase.js";
 
 const purchase: Purchase = {
 	id: "p-1",
@@ -42,5 +47,15 @@ describe("purchase rules", () => {
 	it("does not show a hold that has run out", () => {
 		const late = new Date("2026-01-01T10:02:00Z");
 		expect(outcomeOf(undefined, hold, late)).toEqual({ state: "none" });
+	});
+
+	// The paying step checks the hold the same way for every shopper: it must be theirs, under this reservation id, and
+	// still live. Anything else is refused with the reason, and nothing is charged.
+	it("refuses a hold that is not the shopper's, or not this reservation, or not live", () => {
+		const ours = { ...hold, reservationId: "r-2" };
+		expect(holdRefusalOf(undefined, "r-2", NOW)).toBe("reservation_not_found");
+		expect(holdRefusalOf(ours, "r-other", NOW)).toBe("reservation_not_found");
+		expect(holdRefusalOf(ours, "r-2", hold.expiresAt)).toBe("hold_expired");
+		expect(holdRefusalOf(ours, "r-2", NOW)).toBeUndefined();
 	});
 });

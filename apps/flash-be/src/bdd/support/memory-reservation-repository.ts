@@ -1,8 +1,12 @@
-// The reservation rows in memory for the unit layer. The rules are the ones the SQL keeps: a purchase, a live hold, the
-// stock, and a failed write when Postgres is down.
+// The reservation rows in memory for the unit layer (test support). The decision is the domain's, as the SQL adapter asks
+// it; the rows and the failed write when Postgres is down are what this double adds.
+import { attemptAsync } from "@flash/typekit";
 import type { ReservationRepository } from "../../application/ports/reservation-repository.js";
-import type { HoldSnapshot, Reservation } from "../../domain/reservation.js";
-import { hasRoom } from "../../domain/sale.js";
+import {
+	decideReservation,
+	type HoldSnapshot,
+	type Reservation,
+} from "../../domain/reservation.js";
 import { isLive } from "../../domain/time.js";
 
 export type MemoryReservationRepository = ReservationRepository & {
@@ -28,40 +32,38 @@ export function memoryReservationRepository(
 			repository.rows.set(`${row.saleId}:${row.user}`, row);
 		},
 
-		// The same rules as the SQL: sold items and live holds of other users count against the stock.
-		async reserveWithoutRedis(request, redisReady) {
-			if (await redisReady().catch(() => false)) {
-				return { kind: "redis_ready" };
-			}
+		// The same decision as the SQL: the domain's rule over the sold items and the live holds of the others.
+		async reserveWithoutGate(request, gateReady) {
+			const ready = await attemptAsync(gateReady, Error);
+			if (ready.isOk() && ready.value) return { kind: "gate_ready" };
 			const buyers = buyersOf(request.saleId);
-			if (buyers.includes(request.user)) return { kind: "purchased" };
 			const own = repository.rows.get(`${request.saleId}:${request.user}`);
-			if (own && isLive({ expiresAt: own.expiresAt }, request.now)) {
-				return {
-					kind: "held",
-					reservationId: own.reservationId,
-					expiresAt: own.expiresAt,
-				};
-			}
-			const live = [...repository.rows.values()].filter(
+			const others = [...repository.rows.values()].filter(
 				(row) =>
 					row.saleId === request.saleId &&
 					row.user !== request.user &&
 					isLive(row, request.now),
 			).length;
-			if (!hasRoom(buyers.length, live, request.stock))
-				return { kind: "sold_out" };
-			repository.rows.set(`${request.saleId}:${request.user}`, {
-				saleId: request.saleId,
-				user: request.user,
-				reservationId: request.reservationId,
-				expiresAt: request.expiresAt,
-			});
-			return {
-				kind: "reserved",
-				reservationId: request.reservationId,
-				expiresAt: request.expiresAt,
-			};
+			const decision = decideReservation(
+				{
+					sold: buyers.length,
+					purchased: buyers.includes(request.user),
+					ownHold: own
+						? { reservationId: own.reservationId, expiresAt: own.expiresAt }
+						: undefined,
+					othersHolding: others,
+				},
+				request,
+			);
+			if (decision.kind === "reserved") {
+				repository.rows.set(`${request.saleId}:${request.user}`, {
+					saleId: request.saleId,
+					user: request.user,
+					reservationId: request.reservationId,
+					expiresAt: request.expiresAt,
+				});
+			}
+			return decision;
 		},
 
 		async rebuild(saleId, now, restore) {

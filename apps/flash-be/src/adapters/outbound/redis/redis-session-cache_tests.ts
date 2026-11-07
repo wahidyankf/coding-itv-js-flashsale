@@ -1,3 +1,4 @@
+// Unit tests for the Redis session cache (adapter layer, outbound). An entry that cannot be read is refused, never guessed.
 import { describe, expect, it } from "vitest";
 import type { SessionStore } from "../../../application/ports/session-store.js";
 import type { Principal } from "../../../domain/auth.js";
@@ -96,6 +97,30 @@ describe("the cache of logins", () => {
 	it("reads Postgres when the remembered entry is not readable, instead of failing the login", async () => {
 		const redis = fakeRedis();
 		redis.values.set("session:hash", "not json");
+		const { store, calls } = innerStore();
+		const cached = createRedisSessionCache(store, redis.client);
+		expect((await cached.findByAccess("hash", NOW))?.principal).toEqual(ANA);
+		expect(calls.find).toBe(1);
+	});
+
+	// JSON that parses but is not a login is unreadable too: it must not crash the login or name the wrong person.
+	it.each([
+		["null", "null"],
+		["a number", "42"],
+		[
+			"an entry with no principal",
+			JSON.stringify({ expiresAt: ENDS.toISOString() }),
+		],
+		[
+			"a principal with no name",
+			JSON.stringify({
+				principal: { userId: "user-1" },
+				expiresAt: ENDS.toISOString(),
+			}),
+		],
+	])("reads Postgres when the remembered entry is %s", async (_name, text) => {
+		const redis = fakeRedis();
+		redis.values.set("session:hash", text);
 		const { store, calls } = innerStore();
 		const cached = createRedisSessionCache(store, redis.client);
 		expect((await cached.findByAccess("hash", NOW))?.principal).toEqual(ANA);

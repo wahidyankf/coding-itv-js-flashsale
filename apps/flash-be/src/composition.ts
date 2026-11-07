@@ -1,6 +1,8 @@
 // The composition root: the one place that picks an adapter for each port, and that wires the services together. Only this
 // file and the entry points see both the adapters and the application. The choice of the hexagon for the API is recorded
 // in decision 004. The Redis gate with Postgres as the last word is in decision 002.
+import { randomUUID } from "node:crypto";
+import { sleep } from "@flash/flash-commons/timers";
 import { type Kysely, sql } from "kysely";
 import { createScryptHasher } from "./adapters/outbound/crypto/scrypt-hasher.js";
 import { randomTokenSource } from "./adapters/outbound/crypto/token-source.js";
@@ -39,6 +41,11 @@ import { createReservationService } from "./application/reservation-service.js";
 import { createSaleAdminService } from "./application/sale-admin-service.js";
 import type { SaleCacheSettings } from "./application/sale-cache.js";
 import { createSaleService } from "./application/sale-service.js";
+
+// How long a request waits for another instance to rebuild a sale's reservation state. Long enough for a rebuild of one
+// sale's holds, short enough that a shopper is not left hanging. The wait and the random draw of the polling are the
+// real timer and Math.random here; the application takes both in and never reads them itself.
+export const REBUILD_WAIT_MS = 3000;
 
 // The rate-limit settings, as the configuration names them.
 export type RateLimitSettings = {
@@ -82,7 +89,7 @@ export function dependenciesFrom(
 		checkDatabase: async () => {
 			await sql`select 1`.execute(db);
 		},
-		checkRedis: async () => {
+		checkGate: async () => {
 			await redis.ping();
 		},
 		auth: createAuthService(
@@ -102,6 +109,12 @@ export function dependenciesFrom(
 			sales,
 			queue,
 			clock,
+			newId: randomUUID,
+			options: {
+				rebuildWaitMs: REBUILD_WAIT_MS,
+				wait: sleep,
+				random: Math.random,
+			},
 		}),
 		purchases: createPurchaseService(
 			createPurchaseRepository(db),

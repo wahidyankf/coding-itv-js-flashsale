@@ -1,7 +1,9 @@
 // The hold gate in Redis: the fast answer to "who holds or bought an item of this sale". Redis decides first, and Postgres
 // has the last word (decision 002). Outbound Redis adapter for the HoldGate port.
+import { Err, Ok, type Result } from "@flash/typekit";
 import type { HoldGate } from "../../../application/ports/hold-gate.js";
-import type { GateAnswer } from "../../../domain/reservation.js";
+import type { UnreadableReply } from "../../../application/ports/reply.js";
+import type { GateAnswer, HoldSnapshot } from "../../../domain/reservation.js";
 import type { RedisClient } from "./redis-client.js";
 import { saleKey } from "./redis-keys.js";
 
@@ -14,9 +16,13 @@ const GATE_CODE = {
 	notReady: 4,
 } as const;
 
+// The failure of a reply that the scripts below do not write. Named once, so every reader says the same thing.
+const UNREADABLE: UnreadableReply = "unreadable_reply";
+
 // Every script below runs as one Redis call, so no other command can run between its read and its write. Do not use
 // MULTI for them: while Redis is down, node-redis holds a MULTI until its own timeout, which slowed every payment during
-// an outage (decision 003). A script fails at once instead.
+// an outage (decision 003). A script fails at once instead. The rebuild's restore is a script too, so it never waits
+// for the connection either.
 
 // KEYS: ready, buyers, holds, ids. ARGV: user, now, expiresAt, stock, reservationId.
 // Replies: {0} sold out, {1, id, expiresAt} reserved, {2} bought, {3, id, expiresAt} already holding, {4} not ready.
@@ -27,6 +33,8 @@ const GATE_CODE = {
 // The count below takes a hold that expires exactly now as live (`>=`). Postgres and the domain's isLive do not (`>`).
 // The one millisecond difference errs on the safe side: Redis may refuse, but it never oversells.
 // An expired hold has a score in the past, so it stops counting by itself: no sweep job and no counter to drift.
+// The same decision is in `decideReservation` (domain/reservation.ts), which the Postgres fallback and the memory
+// reservation repository use. Keep the two in step: the order of the checks is the rule.
 const RESERVE = `
 if redis.call('EXISTS', KEYS[1]) == 0 then return {4} end
 if redis.call('SISMEMBER', KEYS[2], ARGV[1]) == 1 then return {2} end
@@ -57,11 +65,86 @@ redis.call('HDEL', KEYS[3], ARGV[1])
 return 1
 `;
 
+// KEYS: buyers, holds, ids, ready. ARGV: the buyer count, the buyers, the hold count, then for each hold its user, its
+// reservation id and its expiry score (see restoreArguments). Replaces the state of a sale with a snapshot and marks it
+// ready, in one call, so no reservation sees a half-restored sale.
+const RESTORE = `
+redis.call('DEL', KEYS[1], KEYS[2], KEYS[3])
+local at = 1
+local buyers = tonumber(ARGV[at])
+at = at + 1
+for _ = 1, buyers do
+  redis.call('SADD', KEYS[1], ARGV[at])
+  at = at + 1
+end
+local holds = tonumber(ARGV[at])
+at = at + 1
+for _ = 1, holds do
+  redis.call('ZADD', KEYS[2], ARGV[at + 2], ARGV[at])
+  redis.call('HSET', KEYS[3], ARGV[at], ARGV[at + 1])
+  at = at + 3
+end
+redis.call('SET', KEYS[4], '1')
+return 1
+`;
+
+// KEYS: rebuild-lock. ARGV: owner. Deletes the lock only while this owner still holds it, so a rebuild that ran past its
+// lock time cannot free the lock of the instance that took over.
+const UNLOCK_REBUILD = `
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+  return redis.call('DEL', KEYS[1])
+end
+return 0
+`;
+
+// The ARGV of RESTORE: the buyer count and the buyers, then the hold count and each hold as user, reservation id and
+// expiry. A count tells the script how many values follow, so no separator can clash with a name.
+export function restoreArguments(snapshot: HoldSnapshot): string[] {
+	const holds = snapshot.holds.flatMap((hold) => [
+		hold.user,
+		hold.reservationId,
+		String(hold.expiresAt.getTime()),
+	]);
+	return [
+		String(snapshot.buyers.length),
+		...snapshot.buyers,
+		String(snapshot.holds.length),
+		...holds,
+	];
+}
+
+// Reads the reply of RESERVE as the domain's answer. A reply the script does not write is a failure value, never a
+// guess, so the caller can treat the gate as down.
+export function gateAnswerOf(
+	reply: unknown,
+): Result<GateAnswer, UnreadableReply> {
+	const parts: unknown[] = Array.isArray(reply) ? reply : [];
+	const [code, id, until] = parts;
+	if (typeof code !== "number") return new Err(UNREADABLE);
+	if (code === GATE_CODE.soldOut) return new Ok({ kind: "sold_out" });
+	if (code === GATE_CODE.purchased) return new Ok({ kind: "purchased" });
+	if (code === GATE_CODE.notReady) return new Ok({ kind: "not_ready" });
+	if (code !== GATE_CODE.reserved && code !== GATE_CODE.held) {
+		return new Err(UNREADABLE);
+	}
+	// A hold answer names its reservation id and its expiry. The expiry is the score the script wrote, as text.
+	if (typeof id !== "string" || typeof until !== "string") {
+		return new Err(UNREADABLE);
+	}
+	const expiresAt = new Date(Number(until));
+	if (Number.isNaN(expiresAt.getTime())) return new Err(UNREADABLE);
+	return new Ok(
+		code === GATE_CODE.reserved
+			? { kind: "reserved", reservationId: id, expiresAt }
+			: { kind: "held", reservationId: id, expiresAt },
+	);
+}
+
 // The gate over Redis. Each method is one script or one plain command, and the answers are the domain's GateAnswer.
 export function createRedisHoldGate(redis: RedisClient): HoldGate {
 	return {
 		async reserve(request) {
-			const reply = (await redis.eval(RESERVE, {
+			const reply = await redis.eval(RESERVE, {
 				keys: [
 					saleKey(request.saleId, "ready"),
 					saleKey(request.saleId, "buyers"),
@@ -75,20 +158,8 @@ export function createRedisHoldGate(redis: RedisClient): HoldGate {
 					String(request.stock),
 					request.reservationId,
 				],
-			})) as Array<number | string>;
-			const [code, id, until] = reply;
-			const answer = {
-				reservationId: String(id),
-				expiresAt: new Date(Number(until)),
-			};
-			const answers: Record<number, GateAnswer> = {
-				[GATE_CODE.soldOut]: { kind: "sold_out" },
-				[GATE_CODE.reserved]: { kind: "reserved", ...answer },
-				[GATE_CODE.purchased]: { kind: "purchased" },
-				[GATE_CODE.held]: { kind: "held", ...answer },
-				[GATE_CODE.notReady]: { kind: "not_ready" },
-			};
-			return answers[Number(code)] as GateAnswer;
+			});
+			return gateAnswerOf(reply);
 		},
 
 		async release(saleId, user) {
@@ -117,41 +188,35 @@ export function createRedisHoldGate(redis: RedisClient): HoldGate {
 			await redis.del(saleKey(saleId, "ready"));
 		},
 
-		// MULTI is allowed here, and only here. A rebuild runs after its rebuild lock is taken, off the sale path, so a
-		// pipeline that waits for the connection cannot hold up a payment or a reservation. The scripts above stay single.
+		// The rebuild runs after its rebuild lock is taken, and it is one script, so it waits for the connection no more
+		// than a reservation does.
 		async restore(saleId, snapshot) {
-			const pipeline = redis
-				.multi()
-				.del([
+			await redis.eval(RESTORE, {
+				keys: [
 					saleKey(saleId, "buyers"),
 					saleKey(saleId, "holds"),
 					saleKey(saleId, "ids"),
-				]);
-			if (snapshot.buyers.length > 0) {
-				pipeline.sAdd(saleKey(saleId, "buyers"), snapshot.buyers);
-			}
-			for (const hold of snapshot.holds) {
-				pipeline.zAdd(saleKey(saleId, "holds"), {
-					score: hold.expiresAt.getTime(),
-					value: hold.user,
-				});
-				pipeline.hSet(saleKey(saleId, "ids"), hold.user, hold.reservationId);
-			}
-			pipeline.set(saleKey(saleId, "ready"), "1");
-			await pipeline.exec();
+					saleKey(saleId, "ready"),
+				],
+				arguments: restoreArguments(snapshot),
+			});
 		},
 
-		// One instance rebuilds a sale at a time. The lock expires by itself, so a dead instance does not hold it.
-		async lockRebuild(saleId, ms) {
-			const reply = await redis.set(saleKey(saleId, "rebuild-lock"), "1", {
+		// One instance rebuilds a sale at a time. The lock expires by itself, so a dead instance does not hold it, and it
+		// carries the owner's token so that only the owner can release it.
+		async lockRebuild(saleId, ms, owner) {
+			const reply = await redis.set(saleKey(saleId, "rebuild-lock"), owner, {
 				condition: "NX",
 				expiration: { type: "PX", value: ms },
 			});
 			return reply === "OK";
 		},
 
-		async unlockRebuild(saleId) {
-			await redis.del(saleKey(saleId, "rebuild-lock"));
+		async unlockRebuild(saleId, owner) {
+			await redis.eval(UNLOCK_REBUILD, {
+				keys: [saleKey(saleId, "rebuild-lock")],
+				arguments: [owner],
+			});
 		},
 	};
 }

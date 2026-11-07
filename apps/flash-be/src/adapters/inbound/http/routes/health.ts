@@ -28,7 +28,7 @@ export function registerHealthRoutes(
 		url: "/ready",
 		handler: async (_request, reply) => {
 			const database = await attemptAsync(() => deps.checkDatabase(), Error);
-			const redis = await attemptAsync(() => deps.checkRedis(), Error);
+			const redis = await attemptAsync(() => deps.checkGate(), Error);
 			const checks = {
 				database: checkWord(database),
 				redis: checkWord(redis),

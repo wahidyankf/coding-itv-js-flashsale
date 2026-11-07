@@ -1,3 +1,4 @@
+// Scenario bindings for the health checks (test layer, bdd). /health says the process is up; /ready says the stores answer.
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import type { FastifyInstance } from "fastify";
 import { afterEach, expect } from "vitest";
@@ -35,7 +36,7 @@ describeFeature(
 					const app = appWith({
 						...healthyDeps,
 						checkDatabase: failing,
-						checkRedis: failing,
+						checkGate: failing,
 					});
 					response = await app.inject({ method: "GET", url: "/health" });
 				});
@@ -120,7 +121,7 @@ describeFeature(
 				let response: Response;
 
 				Given("Redis does not answer", () => {
-					deps = { ...healthyDeps, checkRedis: failing };
+					deps = { ...healthyDeps, checkGate: failing };
 				});
 
 				When("a client sends GET /ready", async () => {
@@ -166,10 +167,10 @@ describeFeature(
 				});
 
 				And("a client sends GET /ready", async () => {
-					const checkRedis = async () => {
+					const checkGate = async () => {
 						if (!redisUp) throw new Error("connection dropped");
 					};
-					response = await appWith({ ...healthyDeps, checkRedis }).inject({
+					response = await appWith({ ...healthyDeps, checkGate }).inject({
 						method: "GET",
 						url: "/ready",
 					});

@@ -1,17 +1,16 @@
-// Holds in Postgres, the source of truth for who holds an item. Redis decides fast; this repository keeps the copy that a
-// rebuild reads, and it decides alone when Redis is down (decision 003). Outbound Postgres adapter for the
+// Holds in Postgres, the source of truth for who holds an item. The Redis gate decides fast; this repository keeps the copy
+// that a rebuild reads, and it decides alone when Redis is down (decision 003). Outbound Postgres adapter for the
 // ReservationRepository port.
 import { attemptAsync } from "@flash/typekit";
 import { type Kysely, sql } from "kysely";
 import type { ReservationRepository } from "../../../application/ports/reservation-repository.js";
-import type {
-	FallbackAnswer,
-	HoldSnapshot,
-	Reservation,
-	ReserveRequest,
+import {
+	decideReservation,
+	type FallbackAnswer,
+	type HoldSnapshot,
+	type Reservation,
+	type ReserveRequest,
 } from "../../../domain/reservation.js";
-import { hasRoom } from "../../../domain/sale.js";
-import { isLive } from "../../../domain/time.js";
 import type { Database } from "./database.js";
 import {
 	livePurchaseOf,
@@ -69,7 +68,7 @@ async function saveHold(
 	});
 }
 
-// The shopper's own hold in the sale, live or not. The caller decides whether it is still live.
+// The shopper's own hold in the sale, live or not. The domain decides whether it is still live.
 async function ownHoldOf(
 	trx: Kysely<Database>,
 	saleId: string,
@@ -105,11 +104,12 @@ async function countHoldsOfOthers(
 }
 
 // The Postgres fallback, under the sale's row lock. The steps run in this order, and the order is the rule: the lock
-// first, then the rebuild check, then the shopper's purchase and hold, and only then the count of the stock.
+// first, then the rebuild check, then the state the decision needs, then the decision, and only then the write. A sale
+// that is gone answers `sale_not_found`, so a removal during a request is a value, not a failure.
 async function reserveUnderLock(
 	trx: Kysely<Database>,
 	request: ReserveRequest,
-	redisReady: () => Promise<boolean>,
+	gateReady: () => Promise<boolean>,
 ): Promise<FallbackAnswer> {
 	// The sale row lock. The rebuild takes the same lock, so after it Redis is ready and holds everything written so far.
 	const sale = await trx
@@ -118,40 +118,39 @@ async function reserveUnderLock(
 		.where("id", "=", request.saleId)
 		.where("deleted_at", "is", null)
 		.forUpdate()
-		.executeTakeFirstOrThrow();
-	const ready = await attemptAsync(redisReady, Error);
-	if (ready.isOk() && ready.value) return { kind: "redis_ready" };
+		.executeTakeFirst();
+	if (sale === undefined) return { kind: "sale_not_found" };
+	const ready = await attemptAsync(gateReady, Error);
+	if (ready.isOk() && ready.value) return { kind: "gate_ready" };
 
 	const userId = await ensureUser(trx, request.user);
-	// The one-item rule. A shopper who already bought gets no hold: the purchases table has one live row per shopper and
-	// sale (the partial unique index), and this check reads that row under the lock.
-	if (await livePurchaseOf(trx, request.saleId, request.user)) {
-		return { kind: "purchased" };
-	}
 	const own = await ownHoldOf(trx, request.saleId, userId);
-	if (own && isLive({ expiresAt: own.expires_at }, request.now)) {
-		return { kind: "held", reservationId: own.id, expiresAt: own.expires_at };
-	}
-
-	const others = await countHoldsOfOthers(
-		trx,
-		request.saleId,
-		userId,
-		request.now,
+	const decision = decideReservation(
+		{
+			sold: sale.sold,
+			purchased:
+				(await livePurchaseOf(trx, request.saleId, request.user)) !== undefined,
+			ownHold: own
+				? { reservationId: own.id, expiresAt: own.expires_at }
+				: undefined,
+			othersHolding: await countHoldsOfOthers(
+				trx,
+				request.saleId,
+				userId,
+				request.now,
+			),
+		},
+		request,
 	);
-	if (!hasRoom(sale.sold, others, request.stock)) return { kind: "sold_out" };
-
-	await upsertHold(trx, {
-		id: request.reservationId,
-		saleId: request.saleId,
-		userId,
-		expiresAt: request.expiresAt,
-	});
-	return {
-		kind: "reserved",
-		reservationId: request.reservationId,
-		expiresAt: request.expiresAt,
-	};
+	if (decision.kind === "reserved") {
+		await upsertHold(trx, {
+			id: request.reservationId,
+			saleId: request.saleId,
+			userId,
+			expiresAt: request.expiresAt,
+		});
+	}
+	return decision;
 }
 
 // The buyers and the live holds of a sale, read for a rebuild of Redis. The caller holds the sale lock.
@@ -189,10 +188,10 @@ export function createReservationRepository(
 
 		save: (reservation) => saveHold(db, reservation),
 
-		reserveWithoutRedis: (request, redisReady) =>
+		reserveWithoutGate: (request, gateReady) =>
 			db
 				.transaction()
-				.execute((trx) => reserveUnderLock(trx, request, redisReady)),
+				.execute((trx) => reserveUnderLock(trx, request, gateReady)),
 
 		rebuild: (saleId, now, restore) =>
 			db.transaction().execute(async (trx) => {

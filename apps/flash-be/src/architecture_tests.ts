@@ -1,9 +1,11 @@
+// Architecture tests (test layer). They read the source and fail on a wrong import, so the layers of the hexagon hold.
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 // The hexagon: the domain knows nothing, the application knows the domain, and adapters know both but never each
-// other. Only the entry points (main, composition, migrate, seed-sale) wire adapters to ports.
+// other. Only the entry points (main, composition, migrate, seed-sale) wire adapters to ports. Test file: it reads the
+// source and checks the layers, so it is the one place that scans imports.
 const SRC = import.meta.dirname;
 
 type Layer =
@@ -34,25 +36,38 @@ function layerOf(file: string): Layer {
 // `typeOnly` is an `import type`, which is erased and loads nothing at run time.
 type Import = { from: string; target: string; typeOnly: boolean };
 
-// Every import and re-export, as written. Relative targets are resolved to a path under src.
-function importsOf(file: string): Import[] {
-	const text = readFileSync(file, "utf8");
-	const found = [
-		...text.matchAll(
-			/\b(?:import|export)(\s+type)?\b[^;"]*?\bfrom\s+"([^"]+)"/g,
-		),
-	];
-	return found.flatMap((match) => {
-		const spec = match[2];
-		const typeOnly = match[1] !== undefined;
-		if (spec === undefined) return [];
-		if (!spec.startsWith(".")) return [{ from: file, target: spec, typeOnly }];
+// The three ways a module is named in source: `import ... from "x"` and `export ... from "x"`, the bare `import "x"`, and
+// the dynamic `import("x")`. Each one loads the module, so each one is checked.
+const FROM_CLAUSE = /\b(?:import|export)(\s+type)?\b[^;"]*?\bfrom\s+"([^"]+)"/g;
+const BARE_IMPORT = /\bimport\s+"([^"]+)"/g;
+const DYNAMIC_IMPORT = /\bimport\(\s*"([^"]+)"\s*\)/g;
+
+// Every import, re-export, bare import and dynamic import in `text`, as written. A relative target is resolved to a path
+// under src, so the layer of the target can be told. Exported so the scan can be tested on sample source.
+export function importsIn(file: string, text: string): Import[] {
+	const clauses = [...text.matchAll(FROM_CLAUSE)].flatMap((match) =>
+		match[2] === undefined
+			? []
+			: [{ spec: match[2], typeOnly: match[1] !== undefined }],
+	);
+	const bare = [...text.matchAll(BARE_IMPORT)].flatMap((match) =>
+		match[1] === undefined ? [] : [{ spec: match[1], typeOnly: false }],
+	);
+	const dynamic = [...text.matchAll(DYNAMIC_IMPORT)].flatMap((match) =>
+		match[1] === undefined ? [] : [{ spec: match[1], typeOnly: false }],
+	);
+	return [...clauses, ...bare, ...dynamic].map(({ spec, typeOnly }) => {
+		if (!spec.startsWith(".")) return { from: file, target: spec, typeOnly };
 		const resolved = path.resolve(
 			path.dirname(file),
 			spec.replace(/\.js$/, ".ts"),
 		);
-		return [{ from: file, target: path.relative(SRC, resolved), typeOnly }];
+		return { from: file, target: path.relative(SRC, resolved), typeOnly };
 	});
+}
+
+function importsOf(file: string): Import[] {
+	return importsIn(file, readFileSync(file, "utf8"));
 }
 
 const files = walk(SRC).filter((file) => file.endsWith(".ts"));
@@ -62,17 +77,19 @@ const product = files.filter((file) => layerOf(file) !== "test");
 const COPIED_SHARED_VALUE =
 	/\bconst\s+(MS_PER_\w+|MINUTE_MS|HOUR_MS|HTTP_STATUS|FIRST_CLIENT_ERROR_STATUS|FIRST_SERVER_ERROR_STATUS)\b/;
 
-const isNode = (target: string) => target.startsWith("node:");
+// The Node built-ins the domain may use: the hash and the signature of a ticket and a token, and nothing else. The
+// application takes none: the wiring passes in every id, clock and random draw, so no service reads them itself.
+const DOMAIN_NODE_MODULES = ["node:crypto"];
 // The shared libraries have no I/O of their own, so the inner layers may use them: typekit for types and `Result`, and
 // flash-commons for pure behaviour and values (retry, the time units, the HTTP status numbers). Exact names only, so a
 // look-alike package such as `@flash/flash-commons-extras` is still refused.
 const KERNEL_PACKAGES = ["@flash/typekit", "@flash/flash-commons"];
+// The timer helper is the one part of flash-commons that starts a timer, so it is not in the kernel. Neither the domain
+// nor the application may take it: a service that needs a wait gets one passed in by the wiring. The adapters may.
 const isKernel = (target: string) => KERNEL_PACKAGES.includes(target);
-// The timer helper is the one part of flash-commons that starts a timer, so it is not in the kernel. The domain refuses
-// it. The application may take it only as an injectable default (reservation-service.ts), which no rule here can check.
-const TIMERS_PACKAGE = "@flash/flash-commons/timers";
-const isTimers = (target: string) => target === TIMERS_PACKAGE;
 const isDomain = (target: string) => target.startsWith("domain/");
+const isNodeModule = (target: string, allowedNames: string[]) =>
+	allowedNames.includes(target);
 const isPort = (target: string) => target.startsWith("application/ports/");
 const isWiring = (target: string) =>
 	target.startsWith("composition") || target.startsWith("config");
@@ -81,12 +98,14 @@ const isWiring = (target: string) =>
 function allowed(layer: Layer, target: string): boolean {
 	switch (layer) {
 		case "domain":
-			return isNode(target) || isKernel(target) || isDomain(target);
+			return (
+				isNodeModule(target, DOMAIN_NODE_MODULES) ||
+				isKernel(target) ||
+				isDomain(target)
+			);
 		case "application":
 			return (
-				isNode(target) ||
 				isKernel(target) ||
-				isTimers(target) ||
 				isDomain(target) ||
 				target.startsWith("application/")
 			);
@@ -192,6 +211,41 @@ describe("hexagonal architecture", () => {
 		expect(allowed("application", "@flash/flash-commons/timers-extras")).toBe(
 			false,
 		);
+		// The application reads no clock, no randomness and no timer of its own: the wiring passes them in.
+		expect(allowed("application", "@flash/flash-commons/timers")).toBe(false);
+		expect(allowed("application", "node:crypto")).toBe(false);
+		expect(allowed("application", "node:fs")).toBe(false);
+		// The domain takes from node only what it really uses: the hash and the signature of the ticket and the token.
+		expect(allowed("domain", "node:fs")).toBe(false);
+		expect(allowed("domain", "node:crypto")).toBe(true);
+	});
+
+	// The scan finds every way a module can be loaded: `import ... from`, the bare `import "x"` that runs for its side
+	// effects, and the dynamic `import("x")`. A rule that misses one of them is no rule.
+	describe("the import scan", () => {
+		const file = path.join(SRC, "application/example.ts");
+		const targets = (text: string) =>
+			importsIn(file, text).map((imp) => imp.target);
+
+		it("sees an import from a package or a file", () => {
+			expect(targets('import { x } from "node:fs";')).toEqual(["node:fs"]);
+		});
+
+		it("sees a bare import, which loads a module for its side effects", () => {
+			expect(targets('import "node:fs";')).toEqual(["node:fs"]);
+		});
+
+		it("sees a dynamic import, which loads a module when it runs", () => {
+			expect(targets('const fs = await import("node:fs");')).toEqual([
+				"node:fs",
+			]);
+		});
+
+		it("still tells a type-only import, which loads nothing, from a value import", () => {
+			expect(importsIn(file, 'import type { X } from "node:fs";')).toEqual([
+				{ from: file, target: "node:fs", typeOnly: true },
+			]);
+		});
 	});
 
 	it("accepts the imports the rules allow", () => {
@@ -200,8 +254,6 @@ describe("hexagonal architecture", () => {
 		expect(allowed("application", "@flash/typekit")).toBe(true);
 		expect(allowed("domain", "@flash/flash-commons")).toBe(true);
 		expect(allowed("application", "@flash/flash-commons")).toBe(true);
-		// The application may take the timer helper, but only as an injectable default (see reservation-service.ts).
-		expect(allowed("application", "@flash/flash-commons/timers")).toBe(true);
 		expect(allowed("inbound", "fastify")).toBe(true);
 		expect(allowed("application", "application/ports/clock.ts")).toBe(true);
 		expect(allowed("outbound", "application/ports/clock.ts")).toBe(true);

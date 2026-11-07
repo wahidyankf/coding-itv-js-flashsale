@@ -1,6 +1,13 @@
-// The hold request: the time a hold ends, counted from the hold time the sale sets.
+// Unit tests for the reservation rules of the domain: the hold request, and the one decision every store follows
+// (the precedence table). The tests run without I/O, so the order of the checks is pinned here, not in a store.
 import { describe, expect, it } from "vitest";
-import { holdRequest } from "./reservation.js";
+import {
+	decideReservation,
+	type GateAnswer,
+	holdRequest,
+	type ReservationState,
+	type ReserveRequest,
+} from "./reservation.js";
 import type { Sale } from "./sale.js";
 
 const sale: Sale = {
@@ -27,5 +34,80 @@ describe("reservation rules", () => {
 			expiresAt: new Date("2026-01-01T10:01:30Z"),
 			stock: 3,
 		});
+	});
+});
+
+// One reserve request at a fixed moment. The hold it asks for ends one minute later.
+const NOW = new Date("2026-01-01T10:00:00Z");
+const LATER = new Date("2026-01-01T10:01:00Z");
+const request: ReserveRequest = {
+	saleId: sale.id,
+	user: "ana",
+	reservationId: "r-new",
+	now: NOW,
+	expiresAt: LATER,
+	stock: 3,
+};
+
+// A state with nothing in it, so each case sets only what it is about.
+function stateWith(over: Partial<ReservationState>): ReservationState {
+	return {
+		sold: 0,
+		purchased: false,
+		ownHold: undefined,
+		othersHolding: 0,
+		...over,
+	};
+}
+
+const LIVE_OWN = { reservationId: "r-own", expiresAt: LATER };
+// A hold whose end is this very moment: it no longer counts, as `isLive` says.
+const ENDING_NOW = { reservationId: "r-old", expiresAt: NOW };
+const RESERVED: GateAnswer = {
+	kind: "reserved",
+	reservationId: "r-new",
+	expiresAt: LATER,
+};
+
+// The order of the checks, as one table: a purchase first, then the shopper's own live hold, then the stock with the
+// live holds of the others. Each row names the rule it pins.
+const precedence: Array<[string, Partial<ReservationState>, GateAnswer]> = [
+	[
+		"a purchase refuses a new hold, even with a free item",
+		{ purchased: true },
+		{ kind: "purchased" },
+	],
+	[
+		"a purchase beats the shopper's live hold",
+		{ purchased: true, ownHold: LIVE_OWN },
+		{ kind: "purchased" },
+	],
+	[
+		"a live hold of the shopper answers held, even when the sale is sold out",
+		{ sold: 3, ownHold: LIVE_OWN },
+		{ kind: "held", reservationId: "r-own", expiresAt: LATER },
+	],
+	[
+		"a hold that ends at this moment does not count, so the shopper may hold again",
+		{ ownHold: ENDING_NOW },
+		RESERVED,
+	],
+	["the last free item goes to the shopper", { sold: 2 }, RESERVED],
+	[
+		"an item taken by a live hold of another shopper is gone",
+		{ sold: 1, othersHolding: 2 },
+		{ kind: "sold_out" },
+	],
+	["a sold out sale gives no hold", { sold: 3 }, { kind: "sold_out" }],
+	[
+		"a sold out sale refuses a shopper whose old hold has ended",
+		{ sold: 3, ownHold: ENDING_NOW },
+		{ kind: "sold_out" },
+	],
+];
+
+describe("the reservation decision", () => {
+	it.each(precedence)("%s", (_name, over, expected) => {
+		expect(decideReservation(stateWith(over), request)).toEqual(expected);
 	});
 });

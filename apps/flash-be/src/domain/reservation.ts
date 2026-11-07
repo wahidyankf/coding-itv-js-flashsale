@@ -1,8 +1,10 @@
 // A hold: one shopper's claim on one item of a sale, and the answers the fast gate and the source of truth give when
-// asked for one. The rules here are the shapes; the sale and the store decide which answer comes back.
+// asked for one. Domain layer: no I/O. The rules here decide what a reservation answers, and the stores only read the
+// state the rules need and write what they decide.
 
 import { MS_PER_SECOND } from "@flash/flash-commons";
-import type { Sale } from "./sale.js";
+import { hasRoom, type Sale } from "./sale.js";
+import { isLive } from "./time.js";
 import type { Username } from "./user.js";
 
 // The hold one shopper has on one item of a sale.
@@ -36,15 +38,61 @@ export type GateAnswer =
 	// source of truth.
 	| { kind: "not_ready" };
 
-// The answer when the fast store is down and the source of truth decides alone. `redis_ready` means the fast store
-// is ready again, so the caller should use the gate instead.
-export type FallbackAnswer = GateAnswer | { kind: "redis_ready" };
+// The answer when the fast store is down and the source of truth decides alone. `gate_ready` means the fast store is
+// ready again, so the caller should use the gate instead. `sale_not_found` means the sale was removed while the request
+// ran, so nothing is decided.
+export type FallbackAnswer =
+	| GateAnswer
+	| { kind: "gate_ready" }
+	| { kind: "sale_not_found" };
 
 // The state a rebuild copies into the fast store: who bought, and who holds an item right now.
 export type HoldSnapshot = {
 	buyers: Username[];
 	holds: Array<{ user: Username; reservationId: string; expiresAt: Date }>;
 };
+
+// What the stores know about one shopper and one sale when a reservation is decided. The store reads it under the sale's
+// lock, so no other reservation can change it in between.
+export type ReservationState = {
+	// Items sold in the sale.
+	sold: number;
+	// Whether this shopper bought in the sale.
+	purchased: boolean;
+	// This shopper's own hold in the sale, live or not: the rule decides whether it still counts.
+	ownHold: { reservationId: string; expiresAt: Date } | undefined;
+	// Live holds of the other shoppers in the sale.
+	othersHolding: number;
+};
+
+// The answers a decision can give. `not_ready` is left out: only the fast store can have no state.
+export type ReserveDecision = Exclude<GateAnswer, { kind: "not_ready" }>;
+
+// The one order of the checks that every store follows: a purchase first, then the shopper's own live hold, then the
+// stock that the live holds of the others and the sold items take. The Redis script (RESERVE in redis-hold-gate.ts)
+// makes the same decision in Lua, because it runs in one call, so keep the two in step. The Postgres fallback and the
+// memory reservation repository call this function.
+export function decideReservation(
+	state: ReservationState,
+	request: ReserveRequest,
+): ReserveDecision {
+	if (state.purchased) return { kind: "purchased" };
+	if (state.ownHold && isLive(state.ownHold, request.now)) {
+		return {
+			kind: "held",
+			reservationId: state.ownHold.reservationId,
+			expiresAt: state.ownHold.expiresAt,
+		};
+	}
+	if (!hasRoom(state.sold, state.othersHolding, request.stock)) {
+		return { kind: "sold_out" };
+	}
+	return {
+		kind: "reserved",
+		reservationId: request.reservationId,
+		expiresAt: request.expiresAt,
+	};
+}
 
 // What a shopper asks for when they reserve: one item, held for the time the sale sets.
 export function holdRequest(

@@ -1,4 +1,5 @@
 // A purchase is a hold that was paid for, and the "did I get it?" answer is a purchase, a live hold, or nothing.
+// Domain layer: no I/O. The rules say which hold may be paid for and what a shopper sees; the services ask them.
 import type { Reservation } from "./reservation.js";
 import { isLive } from "./time.js";
 import type { Username } from "./user.js";
@@ -45,4 +46,20 @@ export function outcomeOf(
 		};
 	}
 	return { state: "none" };
+}
+
+// Why a hold cannot be paid for now. The hold must be the one this reservation id names, and it must still be live.
+export type HoldRefusal = "reservation_not_found" | "hold_expired";
+
+// The reason a hold cannot be paid for, or nothing when it can. `hold` is the shopper's live-or-not hold in the sale;
+// a hold that is someone else's or another reservation's is not found, so an id reveals nothing about another hold.
+export function holdRefusalOf(
+	hold: Reservation | undefined,
+	reservationId: string,
+	now: Date,
+): HoldRefusal | undefined {
+	if (!hold || hold.reservationId !== reservationId) {
+		return "reservation_not_found";
+	}
+	return isLive(hold, now) ? undefined : "hold_expired";
 }

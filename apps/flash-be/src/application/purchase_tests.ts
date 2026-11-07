@@ -81,3 +81,27 @@ describe("confirming a purchase", () => {
 		expect((await world.confirm("ana")).statusCode).toBe(201);
 	});
 });
+
+// A charge that went through is given back when the commit fails, so a shopper is never charged for nothing. The reply
+// stays what it was for an unexpected failure: the shopper gets the generic 500, not a purchase.
+describe("a commit that fails after the charge", () => {
+	it("refunds the charge once and answers the generic internal failure", async () => {
+		const world = queueWorld(NOW);
+		await world.addSale({
+			stock: 5,
+			startsAt: relativeTime("1 hour ago", NOW),
+			endsAt: relativeTime("in 1 hour", NOW),
+		});
+		await world.admitted("ana");
+		await world.reserve("ana");
+		const reservationId = world.holds.get("ana")?.reservationId;
+		world.purchaseRepository.commit = async () => {
+			throw new Error("postgres is unreachable");
+		};
+
+		const reply = await world.confirm("ana");
+		expect(reply.statusCode).toBe(500);
+		expect(reply.json().errorCode).toBe("internal");
+		expect(world.payment.refunded).toEqual([`mock-${reservationId}`]);
+	});
+});

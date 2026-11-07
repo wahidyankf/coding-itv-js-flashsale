@@ -1,5 +1,7 @@
-// The queue store in memory for the unit layer: the waiting line, the admitted shoppers with the time each admission
-// ends, and the lease one instance takes to admit. It follows the Redis queue store.
+// The queue store in memory for the unit layer (test support): the waiting line, the admitted shoppers with the time each
+// admission ends, and the lease one instance takes to admit. It follows the Redis queue store, and it answers with the
+// same Results, which never fail here.
+import { Ok } from "@flash/typekit";
 import type { Clock } from "../../application/ports/clock.js";
 import type { QueueStore } from "../../application/ports/queue-store.js";
 import type { QueuePlace } from "../../domain/queue.js";
@@ -47,19 +49,21 @@ export function memoryQueueStore(clock: Clock): MemoryQueueStore {
 		},
 		async join(saleId, user, now) {
 			const place = placeOf(saleId, user, now);
-			if (place.state !== "absent") return { place, created: false };
+			if (place.state !== "absent") {
+				return new Ok({ place, created: false });
+			}
 			line(saleId).push(user);
-			return { place: placeOf(saleId, user, now), created: true };
+			return new Ok({ place: placeOf(saleId, user, now), created: true });
 		},
 		async place(saleId, user, now) {
-			return placeOf(saleId, user, now);
+			return new Ok(placeOf(saleId, user, now));
 		},
 		async admit(saleId, count, now, ttlSeconds) {
 			const next = line(saleId).splice(0, count);
 			for (const user of next) {
 				admissions(saleId).set(user, now.getTime() + ttlSeconds * 1000);
 			}
-			return next;
+			return new Ok(next);
 		},
 		async tryLead(saleId, ms) {
 			const now = clock().getTime();

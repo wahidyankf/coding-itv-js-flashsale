@@ -2,13 +2,16 @@
 // lets shoppers through (see queue-service). Outbound Redis adapter for the QueueStore port.
 
 import { MS_PER_SECOND } from "@flash/flash-commons";
+import { Err, Ok, type Result } from "@flash/typekit";
 import type { QueueStore } from "../../../application/ports/queue-store.js";
+import type { UnreadableReply } from "../../../application/ports/reply.js";
 import type { QueuePlace } from "../../../domain/queue.js";
+import type { Username } from "../../../domain/user.js";
 import type { RedisClient } from "./redis-client.js";
 import { saleKey } from "./redis-keys.js";
 
 // KEYS: queue (waiting shoppers, scored by arrival), admitted (scored by when the admission ends), queue-seq (the arrival
-// counter). ARGV: user, now. Replies {code, place}: 0 a new place, 1 already waiting, 2 admitted, see the codes below.
+// counter). ARGV: user, now. Replies {code, value}: 0 a new place, 1 already waiting, 2 admitted, see the codes below.
 // One script means no other command runs between the check and the add, so a shopper is never both waiting and admitted.
 // The arrival number comes from a counter, so shoppers who join in the same millisecond keep their order. An admission
 // counts while its end is after now, so a lapsed one no longer keeps the shopper out of the line.
@@ -44,20 +47,67 @@ end
 return users
 `;
 
-// The codes the scripts above answer with, by name, for the two outcomes that carry no place.
-const PLACE_CODE = { admitted: 2, absent: 3 } as const;
-// The code JOIN answers with when the shopper takes a new place in the line (the first reply value, 0).
-const JOIN_CODE = { newPlace: 0 } as const;
+// The codes the scripts answer with, by name. A place is the number that goes with a waiting code.
+const CODE = { newPlace: 0, waiting: 1, admitted: 2, absent: 3 } as const;
 
-// Reads the reply of a script: its code, and the place that goes with the code.
-function toPlace(reply: unknown): QueuePlace {
-	const [code, place] = reply as [number, number];
-	if (code === PLACE_CODE.admitted) return { state: "admitted" };
-	if (code === PLACE_CODE.absent) return { state: "absent" };
-	return { state: "waiting", place };
+// The failure of a reply that the scripts below do not write.
+const UNREADABLE: UnreadableReply = "unreadable_reply";
+
+// A `[code, value]` reply, read as numbers. Anything else is not a reply the scripts write.
+function codeAndValue(
+	reply: unknown,
+): Result<[number, number], UnreadableReply> {
+	if (!Array.isArray(reply)) return new Err(UNREADABLE);
+	const parts: unknown[] = reply;
+	const [code, value] = parts;
+	return typeof code === "number" && typeof value === "number"
+		? new Ok([code, value])
+		: new Err(UNREADABLE);
 }
 
-// The queue over Redis. Each method is one script or one plain command, and each returns what the domain needs.
+// The place a PLACE reply names. The place script never adds a shopper, so the code of a new place is not one it writes.
+export function placeReplyOf(
+	reply: unknown,
+): Result<QueuePlace, UnreadableReply> {
+	const read = codeAndValue(reply);
+	if (read.isErr()) return new Err(read.error);
+	const [code, value] = read.value;
+	if (code === CODE.waiting) return new Ok({ state: "waiting", place: value });
+	if (code === CODE.admitted) return new Ok({ state: "admitted" });
+	if (code === CODE.absent) return new Ok({ state: "absent" });
+	return new Err(UNREADABLE);
+}
+
+// The place and whether it is new, from a JOIN reply: a new place or a place already waiting, or an admitted shopper.
+export function joinReplyOf(
+	reply: unknown,
+): Result<{ place: QueuePlace; created: boolean }, UnreadableReply> {
+	const read = codeAndValue(reply);
+	if (read.isErr()) return new Err(read.error);
+	const [code, value] = read.value;
+	if (code === CODE.newPlace || code === CODE.waiting) {
+		return new Ok({
+			place: { state: "waiting", place: value },
+			created: code === CODE.newPlace,
+		});
+	}
+	if (code === CODE.admitted) {
+		return new Ok({ place: { state: "admitted" }, created: false });
+	}
+	return new Err(UNREADABLE);
+}
+
+const isName = (value: unknown): value is Username => typeof value === "string";
+
+// The names the admit script returns: a list of text, one name per admitted shopper.
+export function usersOf(reply: unknown): Result<Username[], UnreadableReply> {
+	if (!Array.isArray(reply)) return new Err(UNREADABLE);
+	const names: unknown[] = reply;
+	return names.every(isName) ? new Ok(names) : new Err(UNREADABLE);
+}
+
+// The queue over Redis. Each method is one script or one plain command, and each returns what the domain needs, or a
+// failure value when the reply cannot be read.
 export function createRedisQueueStore(redis: RedisClient): QueueStore {
 	return {
 		async join(saleId, user, now) {
@@ -69,10 +119,7 @@ export function createRedisQueueStore(redis: RedisClient): QueueStore {
 				],
 				arguments: [user, String(now.getTime())],
 			});
-			return {
-				place: toPlace(reply),
-				created: (reply as number[])[0] === JOIN_CODE.newPlace,
-			};
+			return joinReplyOf(reply);
 		},
 
 		async place(saleId, user, now) {
@@ -80,7 +127,7 @@ export function createRedisQueueStore(redis: RedisClient): QueueStore {
 				keys: [saleKey(saleId, "queue"), saleKey(saleId, "admitted")],
 				arguments: [user, String(now.getTime())],
 			});
-			return toPlace(reply);
+			return placeReplyOf(reply);
 		},
 
 		async admit(saleId, count, now, ttlSeconds) {
@@ -89,7 +136,7 @@ export function createRedisQueueStore(redis: RedisClient): QueueStore {
 				keys: [saleKey(saleId, "queue"), saleKey(saleId, "admitted")],
 				arguments: [String(count), String(expiresAt), String(now.getTime())],
 			});
-			return users as string[];
+			return usersOf(users);
 		},
 
 		// Only one instance admits in a tick, so the line moves at the sale's rate. The lead lasts one millisecond less than a
