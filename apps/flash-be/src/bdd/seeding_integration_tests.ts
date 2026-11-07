@@ -5,6 +5,8 @@ import { parseSeedArgs } from "../adapters/inbound/cli/seed-args.js";
 import { createDb } from "../adapters/outbound/postgres/database.js";
 import { createMigrator } from "../adapters/outbound/postgres/migrator.js";
 import { seedSale } from "../adapters/outbound/postgres/sale-seeder.js";
+import { actorId } from "../adapters/outbound/postgres/users.js";
+import { SYSTEM_USERNAME } from "../domain/actors.js";
 import { specFile } from "./support/paths.js";
 import { createScratchDatabase } from "./support/scratch-db.js";
 
@@ -50,6 +52,7 @@ describeFeature(
 						await seedSale(
 							scratch,
 							parseSeedArgs(args(stock, startsIn, duration), new Date()),
+							await actorId(scratch, SYSTEM_USERNAME),
 						);
 					},
 				);
@@ -97,6 +100,7 @@ describeFeature(
 							await seedSale(
 								scratch,
 								parseSeedArgs(args(stock, startsIn, duration), new Date()),
+								await actorId(scratch, SYSTEM_USERNAME),
 							);
 						} catch (error) {
 							failure = error;

@@ -10,6 +10,8 @@
 		"migrate": "node --env-file-if-exists=../../.env --import tsx src/migrate.ts",
 		"migrate:dist": "node --env-file-if-exists=../../.env dist/migrate.js",
 		"seed-sale": "node --env-file-if-exists=../../.env --import tsx src/seed-sale.ts",
+		"create-operator": "node --env-file-if-exists=../../.env --import tsx src/create-operator.ts",
+		"create-operator:dist": "node --env-file-if-exists=../../.env dist/create-operator.js",
 		"seed-sale:dist": "node --env-file-if-exists=../../.env dist/seed-sale.js",
 		"typecheck": "tsc --noEmit -p tsconfig.json",
 		"lint": "biome lint --error-on-warnings .",

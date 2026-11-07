@@ -22,6 +22,7 @@ async function clashes(
 	let query = trx
 		.selectFrom("sales")
 		.select("id")
+		.where("deleted_at", "is", null)
 		.where("starts_at", "<", window.endsAt)
 		.where("ends_at", ">", window.startsAt);
 	if (except !== undefined) query = query.where("id", "<>", except);
@@ -30,16 +31,27 @@ async function clashes(
 
 export function createPostgresSaleAdmin(db: Kysely<Database>): SaleAdmin {
 	return {
-		create: (input) =>
+		create: (input, actor) =>
 			db.transaction().execute(async (trx) => {
 				await sql`select pg_advisory_xact_lock(${sql.lit(CREATE_LOCK)})`.execute(
 					trx,
 				);
 				if (await clashes(trx, input)) return new Err("sale_overlaps" as const);
-				return new Ok(await seedSale(trx, input));
+				if (input.productId !== undefined) {
+					const product = await trx
+						.selectFrom("products")
+						.select("id")
+						.where("id", "=", input.productId)
+						.where("deleted_at", "is", null)
+						.executeTakeFirst();
+					if (product === undefined) {
+						return new Err("product_not_found" as const);
+					}
+				}
+				return new Ok(await seedSale(trx, input, actor));
 			}),
 
-		update: (id, decide) =>
+		update: (id, decide, actor) =>
 			db
 				.transaction()
 				.execute(async (trx): Promise<Result<Sale, UpdateSaleError>> => {
@@ -51,6 +63,7 @@ export function createPostgresSaleAdmin(db: Kysely<Database>): SaleAdmin {
 						.selectFrom("sales")
 						.selectAll()
 						.where("id", "=", id)
+						.where("deleted_at", "is", null)
 						.forUpdate()
 						.executeTakeFirst();
 					if (row === undefined) return new Err("sale_not_found");
@@ -68,13 +81,20 @@ export function createPostgresSaleAdmin(db: Kysely<Database>): SaleAdmin {
 							stock: next.value.stock,
 							reservation_ttl_seconds: next.value.reservationTtlSeconds,
 							admit_per_second: next.value.admitPerSecond,
+							updated_at: sql<Date>`now()`,
+							updated_by: actor,
 						})
 						.where("id", "=", id)
 						.execute();
-					return new Ok({ ...next.value, id, sold: current.sold });
+					return new Ok({
+						...next.value,
+						id,
+						productId: current.productId,
+						sold: current.sold,
+					});
 				}),
 
-		remove: (id) =>
+		remove: (id, actor) =>
 			db
 				.transaction()
 				.execute(async (trx): Promise<Result<true, RemoveSaleError>> => {
@@ -83,6 +103,7 @@ export function createPostgresSaleAdmin(db: Kysely<Database>): SaleAdmin {
 						.selectFrom("sales")
 						.select("id")
 						.where("id", "=", id)
+						.where("deleted_at", "is", null)
 						.forUpdate()
 						.executeTakeFirst();
 					if (row === undefined) return new Err("sale_not_found");
@@ -90,11 +111,26 @@ export function createPostgresSaleAdmin(db: Kysely<Database>): SaleAdmin {
 						.selectFrom("purchases")
 						.select("id")
 						.where("sale_id", "=", id)
+						.where("deleted_at", "is", null)
 						.limit(1)
 						.executeTakeFirst();
 					if (bought !== undefined) return new Err("sale_has_purchases");
-					// The holds go with the sale (ON DELETE CASCADE).
-					await trx.deleteFrom("sales").where("id", "=", id).execute();
+					// Nothing is erased. The holds are marked deleted with the sale, so a rebuild of Redis no longer sees them.
+					const deletion = {
+						deleted_at: sql<Date>`now()`,
+						deleted_by: actor,
+					};
+					await trx
+						.updateTable("reservations")
+						.set(deletion)
+						.where("sale_id", "=", id)
+						.where("deleted_at", "is", null)
+						.execute();
+					await trx
+						.updateTable("sales")
+						.set(deletion)
+						.where("id", "=", id)
+						.execute();
 					return new Ok(true as const);
 				}),
 
@@ -102,6 +138,7 @@ export function createPostgresSaleAdmin(db: Kysely<Database>): SaleAdmin {
 			const rows = await db
 				.selectFrom("sales")
 				.selectAll()
+				.where("deleted_at", "is", null)
 				.orderBy("starts_at", "desc")
 				.execute();
 			return rows.map(toSale);

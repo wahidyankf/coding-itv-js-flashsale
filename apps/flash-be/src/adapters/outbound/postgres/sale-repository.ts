@@ -6,6 +6,7 @@ import type { Database } from "./database.js";
 export function toSale(row: Selectable<Database["sales"]>): Sale {
 	return {
 		id: row.id,
+		productId: row.product_id,
 		name: row.name,
 		startsAt: row.starts_at,
 		endsAt: row.ends_at,
@@ -23,6 +24,7 @@ export function createSaleRepository(db: Kysely<Database>): SaleRepository {
 				.selectFrom("sales")
 				.selectAll()
 				.where("id", "=", id)
+				.where("deleted_at", "is", null)
 				.executeTakeFirst();
 			return row === undefined ? undefined : toSale(row);
 		},
@@ -32,6 +34,7 @@ export function createSaleRepository(db: Kysely<Database>): SaleRepository {
 				.selectFrom("sales")
 				.selectAll()
 				.where("ends_at", ">", now)
+				.where("deleted_at", "is", null)
 				.orderBy(sql<boolean>`starts_at <= ${now}`, "desc")
 				.orderBy("starts_at", "asc")
 				.limit(1)

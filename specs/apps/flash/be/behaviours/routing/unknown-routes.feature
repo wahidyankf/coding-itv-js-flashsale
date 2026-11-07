@@ -25,8 +25,8 @@ Feature: Requests the API cannot serve
     And the error is "<error>"
 
     Examples:
-      | path                                                 | body                               | error               |
-      | /sales/00000000-0000-4000-8000-000000000000/queue     | {}                                 | invalid_user        |
-      | /sales/00000000-0000-4000-8000-000000000000/queue     | {"userId":5}                       | invalid_user        |
-      | /sales/00000000-0000-4000-8000-000000000000/purchases | {"userId":"ana"}                   | invalid_reservation |
-      | /sales/00000000-0000-4000-8000-000000000000/purchases | {"userId":"ana","reservationId":7} | invalid_reservation |
+      | path           | body                                          | error            |
+      | /auth/register | {}                                            | invalid_user     |
+      | /auth/register | {"username":5,"password":"a long password"}  | invalid_user     |
+      | /auth/register | {"username":"ana"}                            | invalid_password |
+      | /auth/register | {"username":"ana","password":7}              | invalid_password |

@@ -15,17 +15,17 @@ export type Config = {
 	rateLimitWindowSeconds: number;
 	rateLimitPerUser: number;
 	rateLimitPerIp: number;
+	authRateLimitPerIp: number;
 	// How long a sale read may be served from memory. 0 turns the cache off. See sales/sale-cache.ts.
 	saleCacheMs: number;
 	// How often an open event stream reads the sale or the place, in milliseconds.
 	eventsIntervalMs: number;
 	// True only behind a proxy you control, so request.ip comes from X-Forwarded-For.
 	trustProxy: boolean;
-	// The operator's token for the admin routes. Without it they are off.
-	adminToken: string | undefined;
+	// Whether the login cookies are sent over HTTPS only. On in production; turn it off only for plain HTTP.
+	cookieSecure: boolean;
 };
 
-const ADMIN_TOKEN_MIN_LENGTH = 16;
 const MAX_PORT = 65535;
 
 const localDefaults = {
@@ -45,6 +45,7 @@ const settingDefaults = {
 	rateLimitWindowSeconds: 10,
 	rateLimitPerUser: 30,
 	rateLimitPerIp: 600,
+	authRateLimitPerIp: 20,
 	saleCacheMs: 1000,
 	eventsIntervalMs: 1000,
 } as const;
@@ -98,17 +99,6 @@ export function buildConfig(env: NodeJS.ProcessEnv): Config {
 		return value;
 	};
 
-	const adminToken = ((): string | undefined => {
-		const value = env.ADMIN_TOKEN;
-		if (value === undefined || value === "") return undefined;
-		if (value.length < ADMIN_TOKEN_MIN_LENGTH) {
-			throw new Error(
-				`ADMIN_TOKEN must be at least ${ADMIN_TOKEN_MIN_LENGTH} characters`,
-			);
-		}
-		return value;
-	})();
-
 	return {
 		host: env.FLASH_BE_HOST ?? localDefaults.host,
 		port,
@@ -143,13 +133,17 @@ export function buildConfig(env: NodeJS.ProcessEnv): Config {
 			"RATE_LIMIT_PER_IP",
 			settingDefaults.rateLimitPerIp,
 		),
+		authRateLimitPerIp: positive(
+			"AUTH_RATE_LIMIT_PER_IP",
+			settingDefaults.authRateLimitPerIp,
+		),
 		saleCacheMs: latency("SALE_CACHE_MS", settingDefaults.saleCacheMs),
 		eventsIntervalMs: positive(
 			"EVENTS_INTERVAL_MS",
 			settingDefaults.eventsIntervalMs,
 		),
 		trustProxy: flag("TRUST_PROXY", false),
-		adminToken,
+		cookieSecure: flag("COOKIE_SECURE", isProduction),
 	};
 }
 
@@ -159,7 +153,7 @@ export function describeConfig(config: Config): string {
 		const parsed = new URL(url);
 		return `${parsed.hostname}:${parsed.port}`;
 	};
-	return `flash-be config: port=${config.port} database=${endpoint(config.databaseUrl)} redis=${endpoint(config.redisUrl)} payment=${config.paymentLatencyMs}ms/${config.paymentFailureRate} limit=${config.rateLimitPerUser}/${config.rateLimitPerIp}/${config.rateLimitWindowSeconds}s cache=${config.saleCacheMs}ms events=${config.eventsIntervalMs}ms proxy=${config.trustProxy} admin=${config.adminToken === undefined ? "off" : "on"}`;
+	return `flash-be config: port=${config.port} database=${endpoint(config.databaseUrl)} redis=${endpoint(config.redisUrl)} payment=${config.paymentLatencyMs}ms/${config.paymentFailureRate} limit=${config.rateLimitPerUser}/${config.rateLimitPerIp}/${config.rateLimitWindowSeconds}s cache=${config.saleCacheMs}ms events=${config.eventsIntervalMs}ms proxy=${config.trustProxy} secureCookies=${config.cookieSecure}`;
 }
 
 export const config = buildConfig(process.env);

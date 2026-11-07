@@ -8,8 +8,14 @@ export const healthyDeps: Dependencies = {
 	checkDatabase: async () => {},
 	checkRedis: async () => {},
 	sales: { cacheMs: () => 0, current: noSale, byId: noSale, details: noSale },
+	auth: {
+		register: async () => new Err("invalid_user"),
+		login: async () => new Err("invalid_credentials"),
+		refresh: async () => new Err("invalid_refresh_token"),
+		logout: async () => {},
+		authenticate: async () => new Err("not_authenticated"),
+	},
 	admin: {
-		authorize: () => new Err("not_found"),
 		create: async () => new Err("sale_overlaps"),
 		update: async () => new Err("sale_not_found"),
 		remove: async () => new Err("sale_not_found"),
@@ -23,7 +29,10 @@ export const healthyDeps: Dependencies = {
 	reservations: {
 		reserve: async () => new Err("sale_not_found"),
 	},
-	rateLimiter: { check: async () => ({ limited: false }) },
+	rateLimiter: {
+		check: async () => ({ limited: false }),
+		checkAuth: async () => ({ limited: false }),
+	},
 	purchases: {
 		confirm: async () => new Err("sale_not_found"),
 		outcome: async () => new Err("sale_not_found"),

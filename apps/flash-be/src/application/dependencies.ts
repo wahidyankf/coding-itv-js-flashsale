@@ -1,3 +1,4 @@
+import type { AuthService } from "./auth-service.js";
 import type { PurchaseService } from "./purchase-service.js";
 import type { QueueService } from "./queue-service.js";
 import type { RateLimiter } from "./rate-limiter.js";
@@ -10,6 +11,7 @@ import type { SaleService } from "./sale-service.js";
 export type Dependencies = {
 	checkDatabase: () => Promise<void>;
 	checkRedis: () => Promise<void>;
+	auth: AuthService;
 	sales: SaleService;
 	admin: SaleAdminService;
 	queue: QueueService;

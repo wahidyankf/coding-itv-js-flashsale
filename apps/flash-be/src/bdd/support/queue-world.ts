@@ -11,8 +11,10 @@ import { createRateLimiter } from "../../application/rate-limiter.js";
 import { createReservationService } from "../../application/reservation-service.js";
 import { createSaleService } from "../../application/sale-service.js";
 import type { Sale } from "../../domain/sale.js";
+import { normalizeUser } from "../../domain/user.js";
 import { healthyDeps } from "./deps.js";
 import { fakeRepository, fakeSale } from "./fake-sales.js";
+import { memoryAuth } from "./memory-auth.js";
 import { type MemoryHoldGate, memoryHoldGate } from "./memory-hold-gate.js";
 import {
 	type MemoryPurchaseRepository,
@@ -45,6 +47,8 @@ export type QueueScenario = {
 	saleId: string;
 	response: Response | undefined;
 	tickets: Map<string, string>;
+	// The cookie header of a shopper who is logged in (an account is made the first time).
+	login: (user: string) => Promise<string>;
 	addSale: (overrides: Partial<Sale>) => Promise<string>;
 	setAdmitRate: (perSecond: number) => Promise<void>;
 	join: (user: string, saleId?: string) => Promise<Response>;
@@ -121,7 +125,7 @@ export function queueRequests(app: FastifyInstance, scenario: QueueScenario) {
 			const reply = await app.inject({
 				method: "POST",
 				url: `/sales/${saleId}/queue`,
-				payload: { userId: user },
+				headers: { cookie: await scenario.login(user) },
 			});
 			scenario.response = reply;
 			const ticket = reply.json().ticket;
@@ -134,8 +138,11 @@ export function queueRequests(app: FastifyInstance, scenario: QueueScenario) {
 		async check(user: string, ticket?: string): Promise<Response> {
 			scenario.response = await app.inject({
 				method: "GET",
-				url: `/sales/${scenario.saleId}/queue/${user}`,
-				headers: ticket === undefined ? {} : { "x-queue-ticket": ticket },
+				url: `/sales/${scenario.saleId}/queue/me`,
+				headers: {
+					cookie: await scenario.login(user),
+					...(ticket === undefined ? {} : { "x-queue-ticket": ticket }),
+				},
 			});
 			return scenario.response;
 		},
@@ -153,8 +160,10 @@ export function reserveRequests(app: FastifyInstance, scenario: ShopScenario) {
 		const reply = await app.inject({
 			method: "POST",
 			url: `/sales/${options.saleId ?? scenario.saleId}/reservations`,
-			payload: { userId: user },
-			headers: ticket === undefined ? {} : { "x-queue-ticket": ticket },
+			headers: {
+				cookie: await scenario.login(user),
+				...(ticket === undefined ? {} : { "x-queue-ticket": ticket }),
+			},
 		});
 		scenario.response = reply;
 		if (
@@ -186,7 +195,8 @@ export function purchaseRequests(app: FastifyInstance, scenario: ShopScenario) {
 		const reply = await app.inject({
 			method: "POST",
 			url: `/sales/${options.saleId ?? scenario.saleId}/purchases`,
-			payload: { userId: user, reservationId },
+			headers: { cookie: await scenario.login(user) },
+			payload: { reservationId },
 		});
 		scenario.response = reply;
 		if (
@@ -215,7 +225,8 @@ export function purchaseRequests(app: FastifyInstance, scenario: ShopScenario) {
 		async outcome(user: string, saleId = scenario.saleId) {
 			scenario.response = await app.inject({
 				method: "GET",
-				url: `/sales/${saleId}/purchases/${encodeURIComponent(user)}`,
+				url: `/sales/${saleId}/purchases/me`,
+				headers: { cookie: await scenario.login(user) },
 			});
 			return scenario.response;
 		},
@@ -322,12 +333,12 @@ export function eventRequests(app: FastifyInstance, scenario: ShopScenario) {
 	};
 	return {
 		watchSale: (saleId = scenario.saleId) => watch(`/sales/${saleId}/events`),
-		watchPlace: (user: string, ticket?: string) => {
+		watchPlace: async (user: string, ticket?: string) => {
 			const given = ticket ?? scenario.tickets.get(user.trim().toLowerCase());
-			return watch(
-				`/sales/${scenario.saleId}/queue/${encodeURIComponent(user)}/events`,
-				given === undefined ? {} : { "x-queue-ticket": given },
-			);
+			return watch(`/sales/${scenario.saleId}/queue/me/events`, {
+				cookie: await scenario.login(user),
+				...(given === undefined ? {} : { "x-queue-ticket": given }),
+			});
 		},
 	};
 }
@@ -424,16 +435,24 @@ export function queueWorld(start: Date): UnitQueueScenario {
 		clock,
 	);
 	// Limits start far out of reach, so only the rate limit scenarios ever meet them.
-	const limits = { windowSeconds: 60, perUser: 100_000, perIp: 100_000 };
+	const limits = {
+		windowSeconds: 60,
+		perUser: 100_000,
+		perIp: 100_000,
+		authPerIp: 100_000,
+	};
 	const rateLimiter = createRateLimiter(
 		switchable(createMemoryRateLimitStore(), isDown),
 		createMemoryRateLimitStore(),
 		clock,
 		limits,
 	);
+	// Logins keep their own clock, so a scenario that moves time does not end them.
+	const auth = memoryAuth(() => start);
 	const app = buildApp(
 		{
 			...healthyDeps,
+			auth: auth.service,
 			checkRedis: async () => {
 				if (redisState.down) throw new Error("redis is down");
 			},
@@ -461,6 +480,7 @@ export function queueWorld(start: Date): UnitQueueScenario {
 		tickets: new Map(),
 		holds: new Map(),
 		purchases: new Map(),
+		login: (user) => auth.login(normalizeUser(user) ?? user),
 		async addSale(overrides) {
 			const sale = fakeSale(overrides);
 			sales.push(sale);

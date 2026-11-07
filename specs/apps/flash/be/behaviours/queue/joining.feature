@@ -1,7 +1,7 @@
 Feature: Joining the queue
 
   As a shopper
-  I want to join the waiting queue with my user id
+  I want to join the waiting queue after I log in
   So that I get a place in line and a ticket that proves it
 
   Scenario: Joining the queue returns a ticket and a place
@@ -30,7 +30,7 @@ Feature: Joining the queue
     And the place in line is 1
     And the ticket is the one "ana" had before
 
-  Scenario: A user id is trimmed and lowercased
+  Scenario: A user name is trimmed and lowercased
     Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
     When "ANA" joins the queue
     Then the user is "ana"
@@ -45,18 +45,6 @@ Feature: Joining the queue
       | sold | closes     | error      |
       | 3    | 1 hour ago | sale_ended |
       | 10   | in 1 hour  | sold_out   |
-
-  Scenario Outline: A user id that cannot be used is refused
-    Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
-    When the user id "<userId>" joins the queue
-    Then the response status is 400
-    And the error is "invalid_user"
-
-    Examples:
-      | userId                                                            |
-      | has space                                                         |
-      | semi;colon                                                        |
-      | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa |
 
   Scenario: Joining the queue of an unknown sale is refused
     Given no sale exists

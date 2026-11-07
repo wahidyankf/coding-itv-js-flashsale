@@ -198,29 +198,5 @@ describeFeature(
 				});
 			},
 		);
-
-		Scenario(
-			"The outcome of a bad user id is refused",
-			({ Given, When, Then, And }) => {
-				const world = newWorld();
-
-				Given(SALE, async () => openSale(world));
-
-				When(
-					"a client asks for the outcome of {string}",
-					async (_ctx, user: string) => {
-						await world.outcome(user);
-					},
-				);
-
-				Then("the response status is {int}", (_ctx, status: number) => {
-					expect(response(world).statusCode).toBe(status);
-				});
-
-				And("the error is {string}", (_ctx, error: string) => {
-					expect(response(world).json().errorCode).toBe(error);
-				});
-			},
-		);
 	},
 );

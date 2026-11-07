@@ -1,5 +1,6 @@
 import { Err, Ok } from "@flash/typekit";
 import { afterEach, describe, expect, it } from "vitest";
+import type { Dependencies } from "../../../application/dependencies.js";
 import { healthyDeps } from "../../../bdd/support/deps.js";
 import { fakeSale } from "../../../bdd/support/fake-sales.js";
 import { buildApp } from "./app.js";
@@ -8,6 +9,16 @@ import { formatEvent } from "./event-stream.js";
 // Edges of the stream that the scenarios do not reach: a keep-alive, a sale that vanishes, a place that was lost.
 const fast = { intervalMs: 10, heartbeatMs: 0 };
 const apps: Array<{ close: () => Promise<void> }> = [];
+
+// A shopper who is logged in: the place stream is for a login.
+const SHOPPER_COOKIE = "access_token=shopper-token";
+const auth: Dependencies["auth"] = {
+	...healthyDeps.auth,
+	authenticate: async (token) =>
+		token === "shopper-token"
+			? new Ok({ userId: "user-1", username: "ana", role: "shopper" as const })
+			: new Err("not_authenticated" as const),
+};
 
 afterEach(async () => {
 	await Promise.all(apps.splice(0).map((app) => app.close()));
@@ -100,6 +111,7 @@ describe("the event stream", () => {
 		const app = buildApp(
 			{
 				...healthyDeps,
+				auth,
 				queue: {
 					...healthyDeps.queue,
 					check: async () => {
@@ -118,8 +130,8 @@ describe("the event stream", () => {
 		apps.push(app);
 		const origin = await app.listen({ host: "127.0.0.1", port: 0 });
 		const seen = await readUntil(
-			`${origin}/sales/s/queue/ana/events`,
-			{ "x-queue-ticket": "t" },
+			`${origin}/sales/s/queue/me/events`,
+			{ "x-queue-ticket": "t", cookie: SHOPPER_COOKIE },
 			'"state":"absent"',
 		);
 		expect(seen).toContain('"state":"waiting"');
@@ -130,6 +142,7 @@ describe("the event stream", () => {
 		const app = buildApp(
 			{
 				...healthyDeps,
+				auth,
 				queue: {
 					...healthyDeps.queue,
 					check: async () => new Err("invalid_ticket"),
@@ -139,7 +152,9 @@ describe("the event stream", () => {
 		);
 		apps.push(app);
 		const origin = await app.listen({ host: "127.0.0.1", port: 0 });
-		const reply = await fetch(`${origin}/sales/s/queue/ana/events`);
+		const reply = await fetch(`${origin}/sales/s/queue/me/events`, {
+			headers: { cookie: SHOPPER_COOKIE },
+		});
 		expect(reply.status).toBe(401);
 	});
 
@@ -148,6 +163,7 @@ describe("the event stream", () => {
 		const app = buildApp(
 			{
 				...healthyDeps,
+				auth,
 				queue: {
 					...healthyDeps.queue,
 					check: async () => {
@@ -165,8 +181,8 @@ describe("the event stream", () => {
 		apps.push(app);
 		const origin = await app.listen({ host: "127.0.0.1", port: 0 });
 		const seen = await readUntil(
-			`${origin}/sales/s/queue/ana/events`,
-			{ "x-queue-ticket": "t" },
+			`${origin}/sales/s/queue/me/events`,
+			{ "x-queue-ticket": "t", cookie: SHOPPER_COOKIE },
 			'"state":"admitted"',
 		);
 		expect(seen).toContain('"state":"admitted"');

@@ -2,7 +2,6 @@ import { attemptAsync, Err, Ok, type Result } from "@flash/typekit";
 import { isPurchaseOf, type Purchase } from "../domain/purchase.js";
 import { isLive } from "../domain/reservation.js";
 import { isSaleId } from "../domain/sale.js";
-import { normalizeUser } from "../domain/user.js";
 import type { Clock } from "./ports/clock.js";
 import type { HoldGate } from "./ports/hold-gate.js";
 import type { Payment } from "./ports/payment.js";
@@ -11,7 +10,6 @@ import type { SaleDetails, SaleService } from "./sale-service.js";
 
 export type ConfirmError =
 	| "sale_not_found"
-	| "invalid_user"
 	| "invalid_reservation"
 	| "reservation_not_found"
 	| "hold_expired"
@@ -29,7 +27,7 @@ export type Outcome =
 	| { state: "holding"; reservationId: string; expiresAt: Date }
 	| { state: "none" };
 
-export type OutcomeError = "sale_not_found" | "invalid_user";
+export type OutcomeError = "sale_not_found";
 
 export type OutcomeResult = Result<
 	{ user: string; outcome: Outcome },
@@ -38,15 +36,14 @@ export type OutcomeResult = Result<
 
 type Request = { details: SaleDetails; user: string; reservationId: string };
 
-// What a confirmation must be before any store is asked: a known sale, a usable name and a well-formed reservation id.
+// What a confirmation must be before any store is asked: a known sale and a well-formed reservation id. The user is the
+// name of the account that is logged in, so it is already a valid name.
 function wellFormed(
 	found: SaleDetails | undefined,
-	rawUser: unknown,
+	user: string,
 	reservationId: unknown,
 ): Result<Request, ConfirmError> {
 	if (found === undefined) return new Err("sale_not_found");
-	const user = normalizeUser(rawUser);
-	if (user === undefined) return new Err("invalid_user");
 	if (typeof reservationId !== "string" || !isSaleId(reservationId)) {
 		return new Err("invalid_reservation");
 	}
@@ -66,16 +63,16 @@ export function createPurchaseService(
 		// Pays for a held item. The reservation id is the idempotency key: confirming again returns the same purchase.
 		async confirm(
 			saleId: string,
-			rawUser: unknown,
+			user: string,
 			reservationId: unknown,
 		): Promise<ConfirmResult> {
 			const request = wellFormed(
 				await sales.details(saleId),
-				rawUser,
+				user,
 				reservationId,
 			);
 			if (request.isErr()) return new Err(request.error);
-			const { details, user, reservationId: held } = request.value;
+			const { details, reservationId: held } = request.value;
 
 			const same = await repository.findByReservation(held);
 			if (same) {
@@ -119,12 +116,10 @@ export function createPurchaseService(
 		},
 
 		// "Did I get it?": a purchase, a live hold, or nothing.
-		async outcome(saleId: string, rawUser: unknown): Promise<OutcomeResult> {
+		async outcome(saleId: string, user: string): Promise<OutcomeResult> {
 			if ((await sales.byId(saleId)) === undefined) {
 				return new Err("sale_not_found");
 			}
-			const user = normalizeUser(rawUser);
-			if (user === undefined) return new Err("invalid_user");
 
 			const purchase = await repository.findByUser(saleId, user);
 			if (purchase) {

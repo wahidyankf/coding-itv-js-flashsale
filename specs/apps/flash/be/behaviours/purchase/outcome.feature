@@ -41,9 +41,3 @@ Feature: The outcome of a shopper
     When a client asks for the outcome of "ana" in the sale with id "00000000-0000-4000-8000-000000000000"
     Then the response status is 404
     And the error is "sale_not_found"
-
-  Scenario: The outcome of a bad user id is refused
-    Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
-    When a client asks for the outcome of "has space"
-    Then the response status is 400
-    And the error is "invalid_user"

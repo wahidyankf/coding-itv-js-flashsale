@@ -15,6 +15,7 @@ const deps = dependenciesFrom(db, redis, config);
 const app = buildApp(deps, {
 	logger: true,
 	trustProxy: config.trustProxy,
+	cookieSecure: config.cookieSecure,
 	events: { ...DEFAULT_STREAM_OPTIONS, intervalMs: config.eventsIntervalMs },
 });
 

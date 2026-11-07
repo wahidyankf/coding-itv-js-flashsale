@@ -6,7 +6,6 @@ import {
 	type ReserveRequest,
 } from "../domain/reservation.js";
 import { reserveBlock } from "../domain/sale.js";
-import { normalizeUser } from "../domain/user.js";
 import type { GuardedGate } from "./guarded-gate.js";
 import type { Clock } from "./ports/clock.js";
 import type { ReservationRepository } from "./ports/reservation-repository.js";
@@ -15,7 +14,6 @@ import type { SaleDetails, SaleService } from "./sale-service.js";
 
 export type ReserveError =
 	| "sale_not_found"
-	| "invalid_user"
 	| "invalid_ticket"
 	| "not_admitted"
 	| "sale_not_started"
@@ -47,13 +45,11 @@ export const defaultReservationOptions: ReservationOptions = {
 const REBUILD_LOCK_MS = 10_000;
 const POLL_MS = 25;
 
-// What must hold before the queue or a store is asked: the sale exists, the name is usable and the sale is selling.
+// What must hold before the queue or a store is asked: the sale exists and is selling.
 function selling(
 	found: SaleDetails | undefined,
-	rawUser: unknown,
 ): Result<SaleDetails, ReserveError> {
 	if (found === undefined) return new Err("sale_not_found");
-	if (normalizeUser(rawUser) === undefined) return new Err("invalid_user");
 	// A sale that is not selling answers first, so a shopper learns it without a valid ticket.
 	const block = reserveBlock(found.view.status);
 	return block === undefined ? new Ok(found) : new Err(block);
@@ -140,23 +136,21 @@ export function createReservationService(
 	return {
 		async reserve(
 			saleId: string,
-			rawUser: unknown,
+			user: string,
 			ticket: string | undefined,
 		): Promise<ReserveResult> {
-			const open = selling(await sales.details(saleId), rawUser);
+			const open = selling(await sales.details(saleId));
 			if (open.isErr()) return new Err(open.error);
 			const { sale } = open.value;
 
-			const entry = await queue.check(saleId, rawUser, ticket);
+			const entry = await queue.check(saleId, user, ticket);
 			if (entry.isErr()) {
 				if (entry.error !== "not_in_queue") return new Err(entry.error);
 				// The queue is only in Redis and can be lost. A shopper who already bought is told so, not sent back.
-				const user = normalizeUser(rawUser);
-				const bought =
-					user !== undefined && (await repository.hasPurchase(saleId, user));
+				const bought = await repository.hasPurchase(saleId, user);
 				return new Err(bought ? "already_purchased" : "not_admitted");
 			}
-			const { user, place } = entry.value;
+			const { place } = entry.value;
 			if (place.state !== "admitted") return new Err("not_admitted");
 
 			const request = holdRequest(sale, user, randomUUID(), clock());

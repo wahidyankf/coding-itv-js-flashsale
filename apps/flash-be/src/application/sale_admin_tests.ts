@@ -7,7 +7,8 @@ import type { SaleAdmin } from "./ports/sale-admin.js";
 import { createSaleAdminService } from "./sale-admin-service.js";
 
 const NOW = new Date("2026-06-01T12:00:00Z");
-const TOKEN = "operator-secret-0001";
+const PRODUCT_ID = "00000000-0000-4000-8000-0000000000aa";
+const ACTOR = "00000000-0000-4000-8000-0000000000bb";
 const draft = {
 	stock: 5,
 	startsAt: "2026-06-01T13:00:00.000Z",
@@ -22,46 +23,26 @@ const creating = (create: SaleAdmin["create"]): SaleAdmin => ({
 	list: async () => [],
 });
 
-function serviceWith(token: string | undefined, store?: SaleAdmin) {
+function serviceWith(store?: SaleAdmin) {
 	return createSaleAdminService(
-		token,
-		store ?? creating(async () => new Ok("sale-1")),
+		store ??
+			creating(async () => new Ok({ id: "sale-1", productId: PRODUCT_ID })),
 		() => NOW,
 	);
 }
-
-describe("authorize", () => {
-	it("is off when no token is set, whatever is sent", () => {
-		const result = serviceWith(undefined).authorize(`Bearer ${TOKEN}`);
-		expect(result.isErr() && result.error).toBe("not_found");
-	});
-
-	it.each([
-		["no header", undefined],
-		["another scheme", `Basic ${TOKEN}`],
-		["the wrong token", "Bearer another-secret-0002"],
-	])("refuses %s", (_why, header) => {
-		const result = serviceWith(TOKEN).authorize(header);
-		expect(result.isErr() && result.error).toBe("invalid_admin_token");
-	});
-
-	it("accepts the token", () => {
-		expect(serviceWith(TOKEN).authorize(`Bearer ${TOKEN}`).isOk()).toBe(true);
-	});
-});
 
 describe("create", () => {
 	it("stores the sale and describes it as an upcoming sale with all its stock", async () => {
 		const stored: unknown[] = [];
 		const created = await serviceWith(
-			TOKEN,
 			creating(async (sale) => {
 				stored.push(sale);
-				return new Ok("sale-9");
+				return new Ok({ id: "sale-9", productId: PRODUCT_ID });
 			}),
-		).create(draft);
+		).create(draft, ACTOR);
 		expect(created.isOk() && created.value).toEqual({
 			id: "sale-9",
+			productId: PRODUCT_ID,
 			name: "Flash sale",
 			status: "upcoming",
 			startsAt: draft.startsAt,
@@ -75,21 +56,19 @@ describe("create", () => {
 	it("does not ask the store when the sale cannot work", async () => {
 		let asked = 0;
 		const created = await serviceWith(
-			TOKEN,
 			creating(async () => {
 				asked += 1;
-				return new Ok("sale-1");
+				return new Ok({ id: "sale-1", productId: PRODUCT_ID });
 			}),
-		).create({ ...draft, stock: 0 });
+		).create({ ...draft, stock: 0 }, ACTOR);
 		expect(created.isErr() && created.error).toBe("invalid_sale");
 		expect(asked).toBe(0);
 	});
 
 	it("passes on the refusal of the store", async () => {
 		const created = await serviceWith(
-			TOKEN,
 			creating(async () => new Err("sale_overlaps")),
-		).create(draft);
+		).create(draft, ACTOR);
 		expect(created.isErr() && created.error).toBe("sale_overlaps");
 	});
 });
@@ -109,12 +88,14 @@ describe("changing, removing and listing", () => {
 		sold: 2,
 	});
 	const serviceOver = (sales: Sale[]) =>
-		createSaleAdminService(TOKEN, memorySaleAdmin(sales), () => NOW);
+		createSaleAdminService(memorySaleAdmin(sales), () => NOW);
 
 	it("changes a sale and describes it as it is now", async () => {
-		const changed = await serviceOver([{ ...upcoming }]).update(upcoming.id, {
-			stock: 9,
-		});
+		const changed = await serviceOver([{ ...upcoming }]).update(
+			upcoming.id,
+			{ stock: 9 },
+			ACTOR,
+		);
 		expect(changed.isOk() && changed.value).toMatchObject({
 			id: upcoming.id,
 			status: "upcoming",
@@ -125,8 +106,8 @@ describe("changing, removing and listing", () => {
 
 	it("never asks the store about an id that cannot exist", async () => {
 		const service = serviceOver([]);
-		const changed = await service.update("not-a-uuid", { stock: 9 });
-		const removed = await service.remove("not-a-uuid");
+		const changed = await service.update("not-a-uuid", { stock: 9 }, ACTOR);
+		const removed = await service.remove("not-a-uuid", ACTOR);
 		expect(changed.isErr() && changed.error).toBe("sale_not_found");
 		expect(removed.isErr() && removed.error).toBe("sale_not_found");
 	});
@@ -134,17 +115,22 @@ describe("changing, removing and listing", () => {
 	it("passes on the refusals of the rules and of the store", async () => {
 		const sales = [{ ...upcoming }, { ...running }];
 		const service = serviceOver(sales);
-		const locked = await service.update(running.id, {
-			startsAt: "2026-06-01T11:30:00.000Z",
-		});
+		const locked = await service.update(
+			running.id,
+			{ startsAt: "2026-06-01T11:30:00.000Z" },
+			ACTOR,
+		);
 		expect(locked.isErr() && locked.error).toBe("sale_locked");
-		const overlapping = await service.update(upcoming.id, {
-			startsAt: "2026-06-01T12:00:00.000Z",
-		});
+		const overlapping = await service.update(
+			upcoming.id,
+			{ startsAt: "2026-06-01T12:00:00.000Z" },
+			ACTOR,
+		);
 		expect(overlapping.isErr() && overlapping.error).toBe("sale_overlaps");
 		const unknown = await service.update(
 			"00000000-0000-4000-8000-000000000003",
 			{ stock: 9 },
+			ACTOR,
 		);
 		expect(unknown.isErr() && unknown.error).toBe("sale_not_found");
 	});
@@ -152,9 +138,9 @@ describe("changing, removing and listing", () => {
 	it("removes a sale nobody bought from and refuses one that was", async () => {
 		const sales = [{ ...upcoming }, { ...running }];
 		const service = serviceOver(sales);
-		const refused = await service.remove(running.id);
+		const refused = await service.remove(running.id, ACTOR);
 		expect(refused.isErr() && refused.error).toBe("sale_has_purchases");
-		const removed = await service.remove(upcoming.id);
+		const removed = await service.remove(upcoming.id, ACTOR);
 		expect(removed.isOk()).toBe(true);
 		expect(sales.map((sale) => sale.id)).toEqual([running.id]);
 	});

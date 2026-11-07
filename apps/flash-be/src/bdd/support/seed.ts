@@ -1,14 +1,37 @@
 import { randomUUID } from "node:crypto";
-import type { Kysely } from "kysely";
+import { type Kysely, sql } from "kysely";
 import type { Database } from "../../adapters/outbound/postgres/database.js";
+import { actorId, ensureUser } from "../../adapters/outbound/postgres/users.js";
+import { SYSTEM_USERNAME } from "../../domain/actors.js";
+import {
+	ACCESS_COOKIE,
+	hashToken,
+	newToken,
+	type Role,
+} from "../../domain/auth.js";
 
 export type SaleSeed = {
 	name?: string | undefined;
 	stock?: number | undefined;
 	sold?: number | undefined;
+	// A product the scenario made earlier. Left out, the sale gets a product of its own.
+	productId?: string | undefined;
 	startsAt: Date;
 	endsAt: Date;
 };
+
+// Inserts a product and returns its id.
+export async function insertProduct(
+	db: Kysely<Database>,
+	name = "Flash sale",
+): Promise<string> {
+	const id = randomUUID();
+	await db
+		.insertInto("products")
+		.values({ id, name, created_by: await actorId(db, SYSTEM_USERNAME) })
+		.execute();
+	return id;
+}
 
 // Inserts the sale one scenario needs and returns its id.
 export async function insertSale(
@@ -16,21 +39,83 @@ export async function insertSale(
 	seed: SaleSeed,
 ): Promise<string> {
 	const id = randomUUID();
+	const name = seed.name ?? "Flash sale";
+	const productId = seed.productId ?? (await insertProduct(db, name));
 	await db
 		.insertInto("sales")
 		.values({
 			id,
-			name: seed.name ?? "Flash sale",
+			product_id: productId,
+			name,
 			starts_at: seed.startsAt,
 			ends_at: seed.endsAt,
 			stock: seed.stock ?? 10,
 			sold: seed.sold ?? 0,
+			created_by: await actorId(db, SYSTEM_USERNAME),
 		})
 		.execute();
 	return id;
 }
 
-// Removes every sale. Purchases and reservations go with them (ON DELETE CASCADE), so each scenario starts empty.
+// Inserts a purchase row, as a shopper's purchase would leave it. It does not count the item as sold.
+export async function insertPurchase(
+	db: Kysely<Database>,
+	purchase: {
+		saleId: string;
+		user: string;
+		reservationId?: string | undefined;
+		paymentRef?: string | undefined;
+	},
+): Promise<void> {
+	const userId = await ensureUser(db, purchase.user);
+	await db
+		.insertInto("purchases")
+		.values({
+			sale_id: purchase.saleId,
+			user_id: userId,
+			reservation_id: purchase.reservationId ?? randomUUID(),
+			payment_ref: purchase.paymentRef ?? `pay-${purchase.user}`,
+			created_by: userId,
+		})
+		.execute();
+}
+
+// Logs a user in without a password, as the database would hold it, and returns the cookie header. The user is made
+// on the way, as a shopper unless the role says otherwise.
+export async function loginAs(
+	db: Kysely<Database>,
+	username: string,
+	role: Role = "shopper",
+): Promise<string> {
+	const userId = await ensureUser(db, username);
+	if (role !== "shopper") {
+		await db
+			.updateTable("users")
+			.set({ role })
+			.where("id", "=", userId)
+			.execute();
+	}
+	const token = newToken();
+	const hour = 3_600_000;
+	await db
+		.insertInto("sessions")
+		.values({
+			user_id: userId,
+			access_hash: hashToken(token),
+			access_expires_at: new Date(Date.now() + hour),
+			refresh_hash: hashToken(newToken()),
+			refresh_expires_at: new Date(Date.now() + 24 * hour),
+			created_by: userId,
+		})
+		.execute();
+	return `${ACCESS_COOKIE}=${token}`;
+}
+
+// Empties the tables, so each scenario starts with no sale. Only tests do this: the product never erases a row. The two
+// users the migration made stay, and so does every table that nothing here refers to.
 export async function resetSales(db: Kysely<Database>): Promise<void> {
-	await db.deleteFrom("sales").execute();
+	await sql`truncate table sessions, sales, purchases, reservations, products cascade`.execute(
+		db,
+	);
+	await sql`delete from users where username <> ${SYSTEM_USERNAME}`.execute(db);
 }

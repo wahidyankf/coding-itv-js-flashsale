@@ -1,8 +1,10 @@
 import { Err, Ok, type Result } from "@flash/typekit";
-import type { Sale } from "./sale.js";
+import { isSaleId, type Sale } from "./sale.js";
 
 // A sale to create. The window is absolute; the seed command works it out from minutes.
 export type NewSale = {
+	// The product to sell. Left out, the store finds the product of this name or makes it.
+	productId?: string | undefined;
 	name: string;
 	stock: number;
 	startsAt: Date;
@@ -19,6 +21,7 @@ const NAME_MAX_LENGTH = 120;
 
 // What an operator sends, before any rule has looked at it.
 export type SaleDraft = {
+	productId?: string | undefined;
 	name?: string | undefined;
 	stock: number;
 	startsAt: string;
@@ -40,6 +43,7 @@ export function newSaleFrom(draft: SaleDraft): Result<NewSale, "invalid_sale"> {
 	const admitPerSecond = draft.admitPerSecond ?? DEFAULT_ADMIT_PER_SECOND;
 
 	const usable =
+		(draft.productId === undefined || isSaleId(draft.productId)) &&
 		name.length >= 1 &&
 		name.length <= NAME_MAX_LENGTH &&
 		positiveInteger(draft.stock) &&
@@ -50,6 +54,7 @@ export function newSaleFrom(draft: SaleDraft): Result<NewSale, "invalid_sale"> {
 		endsAt > startsAt;
 	return usable
 		? new Ok({
+				productId: draft.productId,
 				name,
 				stock: draft.stock,
 				startsAt,
@@ -61,8 +66,11 @@ export function newSaleFrom(draft: SaleDraft): Result<NewSale, "invalid_sale"> {
 }
 
 // What an operator sends to change a sale. A field that is left out stays as it is.
+// The product is chosen when the sale is made and never changes.
 export type SalePatch = {
-	[Field in keyof SaleDraft]?: SaleDraft[Field] | undefined;
+	[Field in Exclude<keyof SaleDraft, "productId">]?:
+		| SaleDraft[Field]
+		| undefined;
 };
 
 export type ChangeSaleError = "invalid_sale" | "sale_locked";

@@ -1,77 +1,19 @@
+import { randomUUID } from "node:crypto";
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import type { FastifyInstance } from "fastify";
 import { afterAll, expect } from "vitest";
-import { buildApp } from "../adapters/inbound/http/app.js";
-import { createSaleAdminService } from "../application/sale-admin-service.js";
-import { createSaleService } from "../application/sale-service.js";
-import type { Sale } from "../domain/sale.js";
-import { healthyDeps } from "./support/deps.js";
-import { fakeRepository } from "./support/fake-sales.js";
-import { memorySaleAdmin } from "./support/memory-sale-admin.js";
+import type { Response } from "./support/operating.js";
+import { unitOperatingWorld } from "./support/operating-unit.js";
 import { specFile } from "./support/paths.js";
-
-type Response = Awaited<ReturnType<FastifyInstance["inject"]>>;
-
-const NOW = new Date("2026-06-01T12:00:00Z");
-const MINUTE_MS = 60_000;
-const clock = () => NOW;
 
 const apps: FastifyInstance[] = [];
 afterAll(async () => {
 	await Promise.all(apps.splice(0).map((app) => app.close()));
 });
 
-// One scenario: the sales in memory, the app over them, and the token the operator was given.
-function scenario() {
-	const sales: Sale[] = [];
-	let token: string | undefined;
-	let app: FastifyInstance | undefined;
-	const appNow = (): FastifyInstance => {
-		if (app) return app;
-		app = buildApp({
-			...healthyDeps,
-			sales: createSaleService(fakeRepository(sales), clock),
-			admin: createSaleAdminService(token, memorySaleAdmin(sales), clock),
-		});
-		apps.push(app);
-		return app;
-	};
-	return {
-		sales,
-		useToken: (value: string | undefined) => {
-			token = value;
-		},
-		get token() {
-			return token;
-		},
-		create: (
-			stock: number,
-			startsIn: number,
-			minutes: number,
-			authorization: string | undefined,
-		): Promise<Response> => {
-			const startsAt = new Date(NOW.getTime() + startsIn * MINUTE_MS);
-			return appNow().inject({
-				method: "POST",
-				url: "/admin/sales",
-				headers: {
-					"content-type": "application/json",
-					...(authorization === undefined ? {} : { authorization }),
-				},
-				payload: JSON.stringify({
-					stock,
-					startsAt: startsAt.toISOString(),
-					endsAt: new Date(
-						startsAt.getTime() + minutes * MINUTE_MS,
-					).toISOString(),
-				}),
-			});
-		},
-		current: () => appNow().inject({ method: "GET", url: "/sales/current" }),
-	};
-}
+const newWorld = () => unitOperatingWorld(apps);
 
-const bearer = (token: string) => `Bearer ${token}`;
+const startOf = "opening in {int} minutes for {int} minutes";
 
 describeFeature(
 	await loadFeature(specFile("flash/be/behaviours/sale/admin.feature")),
@@ -79,28 +21,15 @@ describeFeature(
 		Scenario(
 			"An operator creates a sale and shoppers see it",
 			({ Given, When, Then, And }) => {
-				const world = scenario();
+				const world = newWorld();
 				let response: Response;
 
-				Given("the admin token is {string}", (_ctx, token: string) => {
-					world.useToken(token);
-				});
+				Given("an operator is logged in", () => world.loginOperator());
 
 				When(
-					"the operator creates a sale with stock {int}, opening in {int} minutes for {int} minutes, using the token {string}",
-					async (
-						_ctx,
-						stock: number,
-						startsIn: number,
-						minutes: number,
-						token: string,
-					) => {
-						response = await world.create(
-							stock,
-							startsIn,
-							minutes,
-							bearer(token),
-						);
+					`the operator creates a sale with stock {int}, ${startOf}`,
+					async (_ctx, stock: number, startsIn: number, minutes: number) => {
+						response = await world.createSale(stock, startsIn, minutes);
 					},
 				);
 
@@ -116,66 +45,27 @@ describeFeature(
 				);
 
 				And("the current sale is the new sale", async () => {
-					expect((await world.current()).json().id).toBe(response.json().id);
+					expect((await world.readCurrentSale()).json().id).toBe(
+						response.json().id,
+					);
 				});
 			},
 		);
 
 		Scenario(
-			"A request without a token is refused",
-			({ Given, When, Then, And }) => {
-				const world = scenario();
+			"A request from someone who is not logged in is refused",
+			({ When, Then, And }) => {
+				const world = newWorld();
 				let response: Response;
 
-				Given("the admin token is {string}", (_ctx, token: string) => {
-					world.useToken(token);
-				});
-
 				When(
-					"the operator creates a sale with stock {int}, opening in {int} minutes for {int} minutes, without a token",
+					`someone who is not logged in creates a sale with stock {int}, ${startOf}`,
 					async (_ctx, stock: number, startsIn: number, minutes: number) => {
-						response = await world.create(stock, startsIn, minutes, undefined);
-					},
-				);
-
-				Then("the response status is {int}", (_ctx, status: number) => {
-					expect(response.statusCode).toBe(status);
-				});
-
-				And("the error is {string}", (_ctx, error: string) => {
-					expect(response.json().errorCode).toBe(error);
-				});
-
-				And("the number of sales is {int}", (_ctx, count: number) => {
-					expect(world.sales).toHaveLength(count);
-				});
-			},
-		);
-
-		Scenario(
-			"A request with the wrong token is refused",
-			({ Given, When, Then, And }) => {
-				const world = scenario();
-				let response: Response;
-
-				Given("the admin token is {string}", (_ctx, token: string) => {
-					world.useToken(token);
-				});
-
-				When(
-					"the operator creates a sale with stock {int}, opening in {int} minutes for {int} minutes, using the token {string}",
-					async (
-						_ctx,
-						stock: number,
-						startsIn: number,
-						minutes: number,
-						token: string,
-					) => {
-						response = await world.create(
+						response = await world.createSale(
 							stock,
 							startsIn,
 							minutes,
-							bearer(token),
+							"nobody",
 						);
 					},
 				);
@@ -188,72 +78,58 @@ describeFeature(
 					expect(response.json().errorCode).toBe(error);
 				});
 
-				And("the number of sales is {int}", (_ctx, count: number) => {
-					expect(world.sales).toHaveLength(count);
+				And("the number of sales is {int}", async (_ctx, count: number) => {
+					expect(await world.salesCount()).toBe(count);
 				});
 			},
 		);
 
-		Scenario(
-			"The admin route does not exist when no token is set",
-			({ Given, When, Then, And }) => {
-				const world = scenario();
-				let response: Response;
+		Scenario("A shopper cannot create a sale", ({ Given, When, Then, And }) => {
+			const world = newWorld();
+			let response: Response;
 
-				Given("no admin token is set", () => {
-					world.useToken(undefined);
-				});
+			Given("a shopper is logged in", () => world.loginShopper("ana"));
 
-				When(
-					"the operator creates a sale with stock {int}, opening in {int} minutes for {int} minutes, using the token {string}",
-					async (
-						_ctx,
-						stock: number,
-						startsIn: number,
-						minutes: number,
-						token: string,
-					) => {
-						response = await world.create(
-							stock,
-							startsIn,
-							minutes,
-							bearer(token),
-						);
-					},
-				);
+			When(
+				`the shopper creates a sale with stock {int}, ${startOf}`,
+				async (_ctx, stock: number, startsIn: number, minutes: number) => {
+					response = await world.createSale(
+						stock,
+						startsIn,
+						minutes,
+						"shopper",
+					);
+				},
+			);
 
-				Then("the response status is {int}", (_ctx, status: number) => {
-					expect(response.statusCode).toBe(status);
-				});
+			Then("the response status is {int}", (_ctx, status: number) => {
+				expect(response.statusCode).toBe(status);
+			});
 
-				And("the error is {string}", (_ctx, error: string) => {
-					expect(response.json().errorCode).toBe(error);
-				});
+			And("the error is {string}", (_ctx, error: string) => {
+				expect(response.json().errorCode).toBe(error);
+			});
 
-				And("the number of sales is {int}", (_ctx, count: number) => {
-					expect(world.sales).toHaveLength(count);
-				});
-			},
-		);
+			And("the number of sales is {int}", async (_ctx, count: number) => {
+				expect(await world.salesCount()).toBe(count);
+			});
+		});
 
 		ScenarioOutline(
 			"A sale that cannot work is refused",
 			({ Given, When, Then, And }, examples) => {
-				const world = scenario();
+				const world = newWorld();
 				let response: Response;
 
-				Given("the admin token is {string}", (_ctx, token: string) => {
-					world.useToken(token);
-				});
+				Given("an operator is logged in", () => world.loginOperator());
 
 				When(
-					'the operator creates a sale with stock <stock>, opening in 10 minutes for <duration> minutes, using the token "operator-secret-0001"',
+					"the operator creates a sale with stock <stock>, opening in 10 minutes for <duration> minutes",
 					async () => {
-						response = await world.create(
+						response = await world.createSale(
 							Number(examples.stock),
 							10,
 							Number(examples.duration),
-							bearer("operator-secret-0001"),
 						);
 					},
 				);
@@ -266,8 +142,8 @@ describeFeature(
 					expect(response.json().errorCode).toBe(error);
 				});
 
-				And("the number of sales is {int}", (_ctx, count: number) => {
-					expect(world.sales).toHaveLength(count);
+				And("the number of sales is {int}", async (_ctx, count: number) => {
+					expect(await world.salesCount()).toBe(count);
 				});
 			},
 		);
@@ -275,41 +151,24 @@ describeFeature(
 		Scenario(
 			"A sale whose window overlaps another sale is refused",
 			({ Given, And, When, Then }) => {
-				const world = scenario();
+				const world = newWorld();
 				let response: Response;
 
-				Given("the admin token is {string}", (_ctx, token: string) => {
-					world.useToken(token);
-				});
+				Given("an operator is logged in", () => world.loginOperator());
 
 				And(
-					"a sale was created with stock {int}, opening in {int} minutes for {int} minutes",
+					`a sale was created with stock {int}, ${startOf}`,
 					async (_ctx, stock: number, startsIn: number, minutes: number) => {
-						const first = await world.create(
-							stock,
-							startsIn,
-							minutes,
-							bearer(world.token ?? ""),
-						);
-						expect(first.statusCode).toBe(201);
+						expect(
+							(await world.createSale(stock, startsIn, minutes)).statusCode,
+						).toBe(201);
 					},
 				);
 
 				When(
-					"the operator creates a sale with stock {int}, opening in {int} minutes for {int} minutes, using the token {string}",
-					async (
-						_ctx,
-						stock: number,
-						startsIn: number,
-						minutes: number,
-						token: string,
-					) => {
-						response = await world.create(
-							stock,
-							startsIn,
-							minutes,
-							bearer(token),
-						);
+					`the operator creates a sale with stock {int}, ${startOf}`,
+					async (_ctx, stock: number, startsIn: number, minutes: number) => {
+						response = await world.createSale(stock, startsIn, minutes);
 					},
 				);
 
@@ -321,8 +180,8 @@ describeFeature(
 					expect(response.json().errorCode).toBe(error);
 				});
 
-				And("the number of sales is {int}", (_ctx, count: number) => {
-					expect(world.sales).toHaveLength(count);
+				And("the number of sales is {int}", async (_ctx, count: number) => {
+					expect(await world.salesCount()).toBe(count);
 				});
 			},
 		);
@@ -330,40 +189,24 @@ describeFeature(
 		Scenario(
 			"A sale that opens when another one closes is accepted",
 			({ Given, And, When, Then }) => {
-				const world = scenario();
+				const world = newWorld();
 				let response: Response;
 
-				Given("the admin token is {string}", (_ctx, token: string) => {
-					world.useToken(token);
-				});
+				Given("an operator is logged in", () => world.loginOperator());
 
 				And(
-					"a sale was created with stock {int}, opening in {int} minutes for {int} minutes",
+					`a sale was created with stock {int}, ${startOf}`,
 					async (_ctx, stock: number, startsIn: number, minutes: number) => {
-						await world.create(
-							stock,
-							startsIn,
-							minutes,
-							bearer(world.token ?? ""),
-						);
+						expect(
+							(await world.createSale(stock, startsIn, minutes)).statusCode,
+						).toBe(201);
 					},
 				);
 
 				When(
-					"the operator creates a sale with stock {int}, opening in {int} minutes for {int} minutes, using the token {string}",
-					async (
-						_ctx,
-						stock: number,
-						startsIn: number,
-						minutes: number,
-						token: string,
-					) => {
-						response = await world.create(
-							stock,
-							startsIn,
-							minutes,
-							bearer(token),
-						);
+					`the operator creates a sale with stock {int}, ${startOf}`,
+					async (_ctx, stock: number, startsIn: number, minutes: number) => {
+						response = await world.createSale(stock, startsIn, minutes);
 					},
 				);
 
@@ -371,8 +214,8 @@ describeFeature(
 					expect(response.statusCode).toBe(status);
 				});
 
-				And("the number of sales is {int}", (_ctx, count: number) => {
-					expect(world.sales).toHaveLength(count);
+				And("the number of sales is {int}", async (_ctx, count: number) => {
+					expect(await world.salesCount()).toBe(count);
 				});
 			},
 		);
@@ -380,15 +223,13 @@ describeFeature(
 		Scenario(
 			"Operators who create the same window at once get one sale",
 			({ Given, When, Then, And }) => {
-				const world = scenario();
+				const world = newWorld();
 				let responses: Response[] = [];
 
-				Given("the admin token is {string}", (_ctx, token: string) => {
-					world.useToken(token);
-				});
+				Given("an operator is logged in", () => world.loginOperator());
 
 				When(
-					"{int} operators create a sale with stock {int}, opening in {int} minutes for {int} minutes, at the same moment",
+					`{int} operators create a sale with stock {int}, ${startOf}, at the same moment`,
 					async (
 						_ctx,
 						operators: number,
@@ -398,12 +239,7 @@ describeFeature(
 					) => {
 						responses = await Promise.all(
 							Array.from({ length: operators }, () =>
-								world.create(
-									stock,
-									startsIn,
-									minutes,
-									bearer(world.token ?? ""),
-								),
+								world.createSale(stock, startsIn, minutes),
 							),
 						);
 					},
@@ -430,8 +266,110 @@ describeFeature(
 					},
 				);
 
-				And("the number of sales is {int}", (_ctx, count: number) => {
-					expect(world.sales).toHaveLength(count);
+				And("the number of sales is {int}", async (_ctx, count: number) => {
+					expect(await world.salesCount()).toBe(count);
+				});
+			},
+		);
+
+		Scenario(
+			"An operator creates a sale for a product that exists",
+			({ Given, And, When, Then }) => {
+				const world = newWorld();
+				let response: Response;
+
+				Given("an operator is logged in", () => world.loginOperator());
+
+				And("a product named {string} exists", async (_ctx, name: string) => {
+					await world.makeProduct(name);
+				});
+
+				When(
+					`the operator creates a sale of that product with stock {int}, ${startOf}`,
+					async (_ctx, stock: number, startsIn: number, minutes: number) => {
+						response = await world.createSale(stock, startsIn, minutes);
+					},
+				);
+
+				Then("the response status is {int}", (_ctx, status: number) => {
+					expect(response.statusCode).toBe(status);
+				});
+
+				And("the new sale sells that product", async () => {
+					expect(response.json().productId).toBe(world.lastProductId);
+					expect(await world.productsOfSales()).toEqual([world.lastProductId]);
+				});
+			},
+		);
+
+		Scenario(
+			"A sale for a product that does not exist is refused",
+			({ Given, When, Then, And }) => {
+				const world = newWorld();
+				let response: Response;
+
+				Given("an operator is logged in", () => world.loginOperator());
+
+				When(
+					`the operator creates a sale of a product that does not exist with stock {int}, ${startOf}`,
+					async (_ctx, stock: number, startsIn: number, minutes: number) => {
+						response = await world.createSaleFor(
+							stock,
+							startsIn,
+							minutes,
+							randomUUID(),
+						);
+					},
+				);
+
+				Then("the response status is {int}", (_ctx, status: number) => {
+					expect(response.statusCode).toBe(status);
+				});
+
+				And("the error is {string}", (_ctx, error: string) => {
+					expect(response.json().errorCode).toBe(error);
+				});
+
+				And("the number of sales is {int}", async (_ctx, count: number) => {
+					expect(await world.salesCount()).toBe(count);
+				});
+			},
+		);
+
+		Scenario(
+			"Sales created without a product share one product",
+			({ Given, And, When, Then }) => {
+				const world = newWorld();
+				let response: Response;
+
+				Given("an operator is logged in", () => world.loginOperator());
+
+				And(
+					`a sale was created with stock {int}, ${startOf}`,
+					async (_ctx, stock: number, startsIn: number, minutes: number) => {
+						expect(
+							(await world.createSale(stock, startsIn, minutes)).statusCode,
+						).toBe(201);
+					},
+				);
+
+				When(
+					`the operator creates a sale with stock {int}, ${startOf}`,
+					async (_ctx, stock: number, startsIn: number, minutes: number) => {
+						response = await world.createSale(stock, startsIn, minutes);
+					},
+				);
+
+				Then("the response status is {int}", (_ctx, status: number) => {
+					expect(response.statusCode).toBe(status);
+				});
+
+				And("the number of sales is {int}", async (_ctx, count: number) => {
+					expect(await world.salesCount()).toBe(count);
+				});
+
+				And("the sales sell {int} product", async (_ctx, products: number) => {
+					expect(await world.productsOfSales()).toHaveLength(products);
 				});
 			},
 		);

@@ -17,6 +17,7 @@ import { createRateLimiter } from "../../application/rate-limiter.js";
 import { createReservationService } from "../../application/reservation-service.js";
 import { dependenciesFrom } from "../../composition.js";
 import { config } from "../../config.js";
+import { normalizeUser } from "../../domain/user.js";
 import {
 	eventRequests,
 	limitRequests,
@@ -26,7 +27,7 @@ import {
 	type ShopScenario,
 	saleRequests,
 } from "./queue-world.js";
-import { insertSale } from "./seed.js";
+import { insertPurchase, insertSale, loginAs } from "./seed.js";
 import { switchable } from "./switchable.js";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -75,7 +76,12 @@ export async function openQueueIntegration() {
 		systemClock,
 	);
 	// Limits start far out of reach; the rate limit scenarios lower them and `resetSettings` raises them again.
-	const limits = { windowSeconds: 60, perUser: 100_000, perIp: 100_000 };
+	const limits = {
+		windowSeconds: 60,
+		perUser: 100_000,
+		perIp: 100_000,
+		authPerIp: 100_000,
+	};
 	const rateLimiter = createRateLimiter(
 		createRedisRateLimitStore(flaky),
 		createMemoryRateLimitStore(),
@@ -103,9 +109,18 @@ export async function openQueueIntegration() {
 			redisState.down = false;
 		},
 		scenario(): ShopScenario {
+			const cookies = new Map<string, string>();
 			const scenario: ShopScenario = {
 				saleId: "",
 				response: undefined,
+				login: async (user) => {
+					const name = normalizeUser(user) ?? user;
+					const known = cookies.get(name);
+					if (known !== undefined) return known;
+					const cookie = await loginAs(db, name);
+					cookies.set(name, cookie);
+					return cookie;
+				},
 				tickets: new Map(),
 				holds: new Map(),
 				async addSale(overrides) {
@@ -224,15 +239,7 @@ export async function openQueueIntegration() {
 					payment.settings.latencyMs = seconds * 1000;
 				},
 				async sellLastItemTo(user) {
-					await db
-						.insertInto("purchases")
-						.values({
-							sale_id: scenario.saleId,
-							user_id: user,
-							reservation_id: crypto.randomUUID(),
-							payment_ref: `pay-${user}`,
-						})
-						.execute();
+					await insertPurchase(db, { saleId: scenario.saleId, user });
 					await db
 						.updateTable("sales")
 						.set({ sold: sql`stock` })

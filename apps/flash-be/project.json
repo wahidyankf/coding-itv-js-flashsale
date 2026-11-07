@@ -128,6 +128,13 @@
 				"cwd": "apps/flash-be"
 			}
 		},
+		"db:create-operator": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "npm run create-operator --",
+				"cwd": "apps/flash-be"
+			}
+		},
 		"db:seed-sale": {
 			"executor": "nx:run-commands",
 			"options": {

@@ -129,6 +129,13 @@ describe("hexagonal architecture", () => {
 		expect(violations("outbound")).toEqual([]);
 	});
 
+	it("never erases a row: the product code has no `deleteFrom(`", () => {
+		const erasing = product
+			.filter((file) => /\bdeleteFrom\(/.test(readFileSync(file, "utf8")))
+			.map((file) => path.relative(SRC, file));
+		expect(erasing).toEqual([]);
+	});
+
 	it("rejects the imports the rules forbid", () => {
 		expect(allowed("domain", "application/sale-service.ts")).toBe(false);
 		expect(allowed("domain", "kysely")).toBe(false);

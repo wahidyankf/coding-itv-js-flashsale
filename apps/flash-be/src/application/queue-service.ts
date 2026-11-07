@@ -2,7 +2,6 @@ import { attemptAsync, Err, Ok, type Result } from "@flash/typekit";
 import type { QueuePlace } from "../domain/queue.js";
 import { admissionsPerTick, queueBlock } from "../domain/sale.js";
 import { issueTicket, ticketMatches } from "../domain/ticket.js";
-import { normalizeUser } from "../domain/user.js";
 import type { Clock } from "./ports/clock.js";
 import type { QueueStore } from "./ports/queue-store.js";
 import type { SaleDetails, SaleService } from "./sale-service.js";
@@ -13,11 +12,7 @@ export type QueueOptions = {
 	admissionTtlSeconds: number;
 };
 
-export type JoinError =
-	| "sale_not_found"
-	| "invalid_user"
-	| "sale_ended"
-	| "sold_out";
+export type JoinError = "sale_not_found" | "sale_ended" | "sold_out";
 
 export type Joined = {
 	created: boolean;
@@ -28,11 +23,7 @@ export type Joined = {
 
 export type JoinResult = Result<Joined, JoinError>;
 
-export type CheckError =
-	| "sale_not_found"
-	| "invalid_user"
-	| "invalid_ticket"
-	| "not_in_queue";
+export type CheckError = "sale_not_found" | "invalid_ticket" | "not_in_queue";
 
 export type CheckResult = Result<
 	{ user: string; place: QueuePlace },
@@ -41,16 +32,11 @@ export type CheckResult = Result<
 
 const ADMITTED: QueuePlace = { state: "admitted" };
 
-// Who may join: the sale exists, the name is usable and the sale is not over. Pure, so it needs no store.
-function admissible(
-	found: SaleDetails | undefined,
-	rawUser: unknown,
-): Result<string, JoinError> {
+// Who may join: the sale exists and is not over. Pure, so it needs no store.
+function admissible(found: SaleDetails | undefined): Result<true, JoinError> {
 	if (found === undefined) return new Err("sale_not_found");
-	const user = normalizeUser(rawUser);
-	if (user === undefined) return new Err("invalid_user");
 	const block = queueBlock(found.view.status);
-	return block === undefined ? new Ok(user) : new Err(block);
+	return block === undefined ? new Ok(true) : new Err(block);
 }
 
 export type QueueService = ReturnType<typeof createQueueService>;
@@ -62,10 +48,10 @@ export function createQueueService(
 	options: QueueOptions,
 ) {
 	return {
-		async join(saleId: string, rawUser: unknown): Promise<JoinResult> {
-			const admitted = admissible(await sales.details(saleId), rawUser);
+		// `user` is the name of the account that is logged in, so it is already a valid name.
+		async join(saleId: string, user: string): Promise<JoinResult> {
+			const admitted = admissible(await sales.details(saleId));
 			if (admitted.isErr()) return new Err(admitted.error);
-			const user = admitted.value;
 
 			// Without Redis there is no line. The shopper is let through, because the stock and the one item per
 			// user are guarded by Postgres, and a stalled queue would stop the sale.
@@ -83,14 +69,12 @@ export function createQueueService(
 
 		async check(
 			saleId: string,
-			rawUser: unknown,
+			user: string,
 			ticket: string | undefined,
 		): Promise<CheckResult> {
 			if ((await sales.byId(saleId)) === undefined) {
 				return new Err("sale_not_found");
 			}
-			const user = normalizeUser(rawUser);
-			if (user === undefined) return new Err("invalid_user");
 			if (!ticketMatches(options.ticketSecret, saleId, user, ticket)) {
 				return new Err("invalid_ticket");
 			}

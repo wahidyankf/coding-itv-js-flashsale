@@ -152,27 +152,30 @@ describeFeature(
 			},
 		);
 
-		Scenario("A user id is trimmed and lowercased", ({ Given, When, Then }) => {
-			const world = newWorld();
+		Scenario(
+			"A user name is trimmed and lowercased",
+			({ Given, When, Then }) => {
+				const world = newWorld();
 
-			Given(
-				"a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour",
-				async () => {
-					await world.addSale({
-						startsAt: relativeTime("1 hour ago", NOW),
-						endsAt: relativeTime("in 1 hour", NOW),
-					});
-				},
-			);
+				Given(
+					"a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour",
+					async () => {
+						await world.addSale({
+							startsAt: relativeTime("1 hour ago", NOW),
+							endsAt: relativeTime("in 1 hour", NOW),
+						});
+					},
+				);
 
-			When("{string} joins the queue", async (_ctx, user: string) => {
-				await world.join(user);
-			});
+				When("{string} joins the queue", async (_ctx, user: string) => {
+					await world.join(user);
+				});
 
-			Then("the user is {string}", (_ctx, user: string) => {
-				expect(response(world).json().userId).toBe(user);
-			});
-		});
+				Then("the user is {string}", (_ctx, user: string) => {
+					expect(response(world).json().userId).toBe(user);
+				});
+			},
+		);
 
 		ScenarioOutline(
 			"A sale that cannot sell any more does not take new shoppers",
@@ -200,35 +203,6 @@ describeFeature(
 
 				And('the error is "<error>"', () => {
 					expect(response(world).json().errorCode).toBe(examples.error);
-				});
-			},
-		);
-
-		ScenarioOutline(
-			"A user id that cannot be used is refused",
-			({ Given, When, Then, And }, examples) => {
-				const world = newWorld();
-
-				Given(
-					"a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour",
-					async () => {
-						await world.addSale({
-							startsAt: relativeTime("1 hour ago", NOW),
-							endsAt: relativeTime("in 1 hour", NOW),
-						});
-					},
-				);
-
-				When('the user id "<userId>" joins the queue', async () => {
-					await world.join(String(examples.userId));
-				});
-
-				Then("the response status is {int}", (_ctx, status: number) => {
-					expect(response(world).statusCode).toBe(status);
-				});
-
-				And("the error is {string}", (_ctx, error: string) => {
-					expect(response(world).json().errorCode).toBe(error);
 				});
 			},
 		);

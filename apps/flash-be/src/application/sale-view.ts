@@ -8,6 +8,7 @@ import {
 // A sale as the API shows it. Dates are ISO strings, as JSON carries them.
 export type SaleView = {
 	id: string;
+	productId: string;
 	name: string;
 	status: SaleStatus;
 	startsAt: string;
@@ -35,6 +36,7 @@ export function describeAdminSale(sale: Sale, now: Date): AdminSaleView {
 export function describeSale(sale: Sale, now: Date): SaleView {
 	return {
 		id: sale.id,
+		productId: sale.productId,
 		name: sale.name,
 		status: saleStatus(sale, now),
 		startsAt: sale.startsAt.toISOString(),

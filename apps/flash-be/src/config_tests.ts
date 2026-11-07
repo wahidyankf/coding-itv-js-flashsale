@@ -126,7 +126,7 @@ it("describeConfig shows host and port without credentials", () => {
 		}),
 	);
 	expect(line).toBe(
-		"flash-be config: port=9000 database=db:5432 redis=cache:6379 payment=150ms/0.02 limit=30/600/10s cache=1000ms events=1000ms proxy=false admin=off",
+		"flash-be config: port=9000 database=db:5432 redis=cache:6379 payment=150ms/0.02 limit=30/600/10s cache=1000ms events=1000ms proxy=false secureCookies=false",
 	);
 	expect(line).not.toContain("secret");
 });
@@ -140,26 +140,37 @@ it("reads TRUST_PROXY as a true or false flag", () => {
 	);
 });
 
-describe("the admin token", () => {
-	const token = "operator-secret-0001";
-
-	it("is off when ADMIN_TOKEN is missing or empty", () => {
-		expect(buildConfig({}).adminToken).toBeUndefined();
-		expect(buildConfig({ ADMIN_TOKEN: "" }).adminToken).toBeUndefined();
+describe("the cookies of a login", () => {
+	it("are for HTTPS only in production, and for plain HTTP otherwise", () => {
+		expect(buildConfig({}).cookieSecure).toBe(false);
+		expect(
+			buildConfig({
+				NODE_ENV: "production",
+				DATABASE_URL: "postgres://db/flash",
+				REDIS_URL: "redis://cache",
+				TICKET_SECRET: "a-long-random-ticket-secret",
+			}).cookieSecure,
+		).toBe(true);
 	});
 
-	it("is read when it is long enough, and shown only as on", () => {
-		const config = buildConfig({ ADMIN_TOKEN: token });
-		expect(config.adminToken).toBe(token);
-		const line = describeConfig(config);
-		expect(line).toContain("admin=on");
-		expect(line).not.toContain(token);
-	});
-
-	it("refuses a token that is too short to resist guessing", () => {
-		expect(() => buildConfig({ ADMIN_TOKEN: "short" })).toThrow(
-			"ADMIN_TOKEN must be at least 16 characters",
+	it("can be set by COOKIE_SECURE, and refuse a value that is not true or false", () => {
+		expect(buildConfig({ COOKIE_SECURE: "true" }).cookieSecure).toBe(true);
+		expect(
+			buildConfig({
+				NODE_ENV: "production",
+				DATABASE_URL: "postgres://db/flash",
+				REDIS_URL: "redis://cache",
+				TICKET_SECRET: "a-long-random-ticket-secret",
+				COOKIE_SECURE: "false",
+			}).cookieSecure,
+		).toBe(false);
+		expect(() => buildConfig({ COOKIE_SECURE: "yes" })).toThrow(
+			"COOKIE_SECURE must be true or false",
 		);
+	});
+
+	it("shows in the one line of the config", () => {
+		expect(describeConfig(buildConfig({}))).toContain("secureCookies=false");
 	});
 });
 
@@ -182,7 +193,7 @@ describe(".env.example", () => {
 		expect(buildConfig(example)).toEqual(buildConfig({}));
 	});
 
-	it("leaves the admin token empty, so no secret is committed", () => {
-		expect(example.ADMIN_TOKEN).toBe("");
+	it("has no admin token any more: operators log in", () => {
+		expect(example).not.toHaveProperty("ADMIN_TOKEN");
 	});
 });

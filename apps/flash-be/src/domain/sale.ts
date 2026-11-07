@@ -2,6 +2,8 @@ import { MS_PER_SECOND } from "./time.js";
 
 export type Sale = {
 	id: string;
+	// The product this sale sells. Many sales can sell one product, one after the other.
+	productId: string;
 	name: string;
 	startsAt: Date;
 	endsAt: Date;

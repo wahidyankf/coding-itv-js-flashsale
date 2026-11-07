@@ -21,6 +21,9 @@ export default defineConfig({
 				// seed-sale.ts only reads the command line, wires config and sets the exit code. The parser and
 				// the insert it calls are covered by unit and integration tests, and the e2e suite runs the command.
 				"src/seed-sale.ts",
+				// create-operator.ts is the same kind of entry point: it reads the command line, hashes the password and
+				// calls the account store, which the integration tests cover. The e2e suite runs the command.
+				"src/create-operator.ts",
 			],
 			reporter: ["text", "text-summary"],
 			thresholds: { lines: 99, functions: 99, branches: 99, statements: 99 },

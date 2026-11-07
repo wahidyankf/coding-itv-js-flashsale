@@ -124,13 +124,6 @@ describe("the reservation service", () => {
 		expect(calls).toBe(2);
 	});
 
-	it("refuses a user id that cannot be used", async () => {
-		const { world, saleId } = await admittedAna();
-		expect(await world.reservations.reserve(saleId, "has space", "t")).toEqual(
-			new Err("invalid_user"),
-		);
-	});
-
 	it("tells a shopper whose queue place was lost that they are not admitted", async () => {
 		const { world, saleId, ticket } = await admittedAna();
 		world.store.clear();

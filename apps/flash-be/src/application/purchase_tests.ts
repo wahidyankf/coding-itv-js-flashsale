@@ -19,17 +19,13 @@ async function boughtByAna() {
 }
 
 describe("confirming a purchase", () => {
-	it("refuses an unknown sale and a bad user id", async () => {
+	it("refuses an unknown sale", async () => {
 		const world = await boughtByAna();
 		const unknown = await world.confirm("ana", {
 			saleId: "00000000-0000-4000-8000-000000000000",
 			reservationId: "00000000-0000-4000-8000-000000000001",
 		});
 		expect(unknown.json().errorCode).toBe("sale_not_found");
-		const bad = await world.confirm("has space", {
-			reservationId: "00000000-0000-4000-8000-000000000001",
-		});
-		expect(bad.json().errorCode).toBe("invalid_user");
 	});
 
 	it("does not hand a purchase to somebody who is not its buyer", async () => {

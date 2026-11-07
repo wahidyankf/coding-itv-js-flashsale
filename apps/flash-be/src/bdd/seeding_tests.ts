@@ -9,6 +9,8 @@ import { recordingDb } from "./support/recording-db.js";
 
 // A fixed moment, so the window is the same in every run.
 const NOW = new Date("2026-06-01T12:00:00Z");
+// Whoever acts: the recording database has no users, so any id will do.
+const ACTOR = "00000000-0000-4000-8000-0000000000bb";
 
 function statementsInto(
 	db: ReturnType<typeof recordingDb>,
@@ -49,7 +51,7 @@ describeFeature(
 							seedArgs(stock, startsIn, duration),
 							NOW,
 						);
-						await seedSale(db.db as unknown as Kysely<Database>, input);
+						await seedSale(db.db as unknown as Kysely<Database>, input, ACTOR);
 					},
 				);
 
@@ -92,7 +94,11 @@ describeFeature(
 								seedArgs(stock, startsIn, duration),
 								NOW,
 							);
-							await seedSale(db.db as unknown as Kysely<Database>, input);
+							await seedSale(
+								db.db as unknown as Kysely<Database>,
+								input,
+								ACTOR,
+							);
 						} catch (error) {
 							failure = error;
 						}

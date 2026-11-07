@@ -8,6 +8,8 @@ import { createPostgresSaleAdmin } from "./sale-admin.js";
 const db = createDb(config.databaseUrl);
 const admin = createPostgresSaleAdmin(db);
 const MISSING = "00000000-0000-4000-8000-000000000000";
+// Whoever acts: the sale is not there, so no row is written and the id is never looked up.
+const ACTOR = "00000000-0000-4000-8000-0000000000bb";
 
 afterAll(async () => {
 	await db.destroy();
@@ -16,16 +18,20 @@ afterAll(async () => {
 describe("changing and removing a sale that is not there", () => {
 	it("refuses a change with `sale_not_found`, without asking `decide`", async () => {
 		let asked = false;
-		const changed = await admin.update(MISSING, (current) => {
-			asked = true;
-			return new Ok(current);
-		});
+		const changed = await admin.update(
+			MISSING,
+			(current) => {
+				asked = true;
+				return new Ok(current);
+			},
+			ACTOR,
+		);
 		expect(changed.isErr() && changed.error).toBe("sale_not_found");
 		expect(asked).toBe(false);
 	});
 
 	it("refuses a removal with `sale_not_found`", async () => {
-		const removed = await admin.remove(MISSING);
+		const removed = await admin.remove(MISSING, ACTOR);
 		expect(removed.isErr() && removed.error).toBe("sale_not_found");
 	});
 });

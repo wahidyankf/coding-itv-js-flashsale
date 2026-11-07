@@ -11,6 +11,7 @@ import { healthyDeps } from "./deps.js";
 export function fakeSale(overrides: Partial<Sale>): Sale {
 	return {
 		id: randomUUID(),
+		productId: randomUUID(),
 		name: "Flash sale",
 		startsAt: new Date("2026-06-01T11:00:00Z"),
 		endsAt: new Date("2026-06-01T13:00:00Z"),

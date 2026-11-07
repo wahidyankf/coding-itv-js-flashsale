@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
-import { insertSale } from "../../bdd/support/seed.js";
+import { insertPurchase, insertSale } from "../../bdd/support/seed.js";
 import { config } from "../../config.js";
 import { createDb } from "./postgres/database.js";
 import { createReservationRepository } from "./postgres/reservation-repository.js";
@@ -25,15 +25,7 @@ describe("the rebuild from Postgres", () => {
 			startsAt: new Date(now.getTime() - 3_600_000),
 			endsAt: new Date(now.getTime() + 3_600_000),
 		});
-		await db
-			.insertInto("purchases")
-			.values({
-				sale_id: saleId,
-				user_id: "ana",
-				reservation_id: crypto.randomUUID(),
-				payment_ref: "pay-1",
-			})
-			.execute();
+		await insertPurchase(db, { saleId, user: "ana" });
 
 		const gate = createRedisHoldGate(redis);
 		const repository = createReservationRepository(db);
@@ -117,15 +109,7 @@ describe("the reservation without Redis", () => {
 
 	it("tells a buyer they bought", async () => {
 		const saleId = await openSale(3, 1);
-		await db
-			.insertInto("purchases")
-			.values({
-				sale_id: saleId,
-				user_id: "ana",
-				reservation_id: crypto.randomUUID(),
-				payment_ref: "pay-1",
-			})
-			.execute();
+		await insertPurchase(db, { saleId, user: "ana" });
 		expect(
 			await repository.reserveWithoutRedis(requestFor(saleId, "ana", 3), down),
 		).toEqual({ kind: "purchased" });

@@ -11,6 +11,7 @@ import {
 
 const sale: Sale = {
 	id: "00000000-0000-4000-8000-000000000000",
+	productId: "00000000-0000-4000-8000-0000000000aa",
 	name: "Flash sale",
 	startsAt: new Date("2026-01-01T10:00:00Z"),
 	endsAt: new Date("2026-01-01T11:00:00Z"),

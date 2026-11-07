@@ -16,6 +16,8 @@ export function buildApp(
 		logger?: boolean;
 		trustProxy?: boolean;
 		events?: StreamOptions;
+		// Cookies for HTTPS only. Off by default, because plain HTTP could not carry them.
+		cookieSecure?: boolean;
 	} = {},
 ): FastifyInstance {
 	const app = Fastify({
@@ -26,7 +28,9 @@ export function buildApp(
 	});
 	answerErrors(app);
 
-	registerRoutes(app, deps, options.events ?? DEFAULT_STREAM_OPTIONS);
+	registerRoutes(app, deps, options.events ?? DEFAULT_STREAM_OPTIONS, {
+		secure: options.cookieSecure ?? false,
+	});
 	return app;
 }
 

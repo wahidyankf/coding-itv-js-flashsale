@@ -44,13 +44,10 @@ describe("tickets", () => {
 });
 
 describe("the queue service", () => {
-	it("refuses a check for an unknown sale and for a bad user id", async () => {
+	it("refuses a check for an unknown sale", async () => {
 		const world = await openWorld();
 		expect(await world.queue.check("nope", "ana", "t")).toEqual(
 			new Err("sale_not_found"),
-		);
-		expect(await world.queue.check(world.saleId, " ", "t")).toEqual(
-			new Err("invalid_user"),
 		);
 	});
 

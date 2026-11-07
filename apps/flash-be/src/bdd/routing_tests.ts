@@ -3,6 +3,7 @@ import type { FastifyInstance, LightMyRequestResponse } from "fastify";
 import { afterAll, expect } from "vitest";
 import { buildApp } from "../adapters/inbound/http/app.js";
 import { healthyDeps } from "./support/deps.js";
+import { memoryAuth } from "./support/memory-auth.js";
 import { specFile } from "./support/paths.js";
 
 // vitest-cucumber runs every step as its own test, so the apps are closed when the file ends.
@@ -13,7 +14,10 @@ afterAll(async () => {
 });
 
 function newApp(): FastifyInstance {
-	const app = buildApp(healthyDeps);
+	const app = buildApp({
+		...healthyDeps,
+		auth: memoryAuth(() => new Date()).service,
+	});
 	apps.push(app);
 	return app;
 }

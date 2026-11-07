@@ -41,7 +41,7 @@ describe("the rate limiter", () => {
 			broken,
 			createMemoryRateLimitStore(),
 			() => START,
-			{ windowSeconds: 10, perUser: 2, perIp: 100 },
+			{ windowSeconds: 10, perUser: 2, perIp: 100, authPerIp: 100 },
 		);
 		const ask = () =>
 			limiter.check({ saleId: "s", user: "ana", ip: "1.1.1.1" });
@@ -55,7 +55,7 @@ describe("the rate limiter", () => {
 			createMemoryRateLimitStore(),
 			createMemoryRateLimitStore(),
 			() => START,
-			{ windowSeconds: 10, perUser: 1, perIp: 2 },
+			{ windowSeconds: 10, perUser: 1, perIp: 2, authPerIp: 100 },
 		);
 		const ask = () =>
 			limiter.check({ saleId: "s", user: "has space", ip: "1.1.1.1" });
@@ -72,9 +72,30 @@ describe("the rate limiter", () => {
 			windowSeconds: 1,
 			perUser: 1,
 			perIp: 1,
+			authPerIp: 1,
 		});
 		expect(
 			await limiter.check({ saleId: "s", user: "ana", ip: "1.1.1.1" }),
 		).toEqual({ limited: true, retryAfterSeconds: 1 });
+	});
+
+	it("limits the auth routes by address with a limit of their own, apart from any sale", async () => {
+		const limiter = createRateLimiter(
+			createMemoryRateLimitStore(),
+			createMemoryRateLimitStore(),
+			() => START,
+			{ windowSeconds: 10, perUser: 100, perIp: 100, authPerIp: 2 },
+		);
+		const ask = () => limiter.checkAuth({ ip: "1.1.1.1" });
+		expect(await ask()).toEqual({ limited: false });
+		expect(await ask()).toEqual({ limited: false });
+		expect(await ask()).toEqual({ limited: true, retryAfterSeconds: 10 });
+		expect(await limiter.checkAuth({ ip: "2.2.2.2" })).toEqual({
+			limited: false,
+		});
+		// A sale has its own count.
+		expect(
+			await limiter.check({ saleId: "s", user: "ana", ip: "1.1.1.1" }),
+		).toEqual({ limited: false });
 	});
 });

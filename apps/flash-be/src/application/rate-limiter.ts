@@ -8,6 +8,8 @@ export type RateLimits = {
 	windowSeconds: number;
 	perUser: number;
 	perIp: number;
+	// Sign-ups, logins and refreshes per address in each window: guessing a password is a write request that costs more.
+	authPerIp: number;
 };
 
 export type RateLimitVerdict =
@@ -32,21 +34,34 @@ export function createRateLimiter(
 		return counted.isOk() ? counted.value : local.hit(key, windowMs, clock());
 	}
 
+	const windowMs = () => limits.windowSeconds * MS_PER_SECOND;
+	const retryAfter = (resetInMs: number): RateLimitVerdict => ({
+		limited: true,
+		retryAfterSeconds: Math.max(Math.ceil(resetInMs / MS_PER_SECOND), 1),
+	});
+
 	return {
+		// The auth routes: counted by address alone, with a limit of their own, apart from any sale.
+		async checkAuth(request: { ip: string }): Promise<RateLimitVerdict> {
+			const address = await hit(`address:auth:${request.ip}`, windowMs());
+			return address.count > limits.authPerIp
+				? retryAfter(address.resetInMs)
+				: { limited: false };
+		},
+
 		async check(request: {
 			saleId: string;
 			user: unknown;
 			ip: string;
 		}): Promise<RateLimitVerdict> {
-			const windowMs = limits.windowSeconds * MS_PER_SECOND;
 			const address = await hit(
 				`address:${request.saleId}:${request.ip}`,
-				windowMs,
+				windowMs(),
 			);
 			// A request with no usable user id still counts against its address. The route answers the bad id.
 			const user = normalizeUser(request.user);
 			const person = user
-				? await hit(`user:${request.saleId}:${user}`, windowMs)
+				? await hit(`user:${request.saleId}:${user}`, windowMs())
 				: undefined;
 
 			const over: Array<typeof address> = [];
@@ -54,11 +69,7 @@ export function createRateLimiter(
 			if (person && person.count > limits.perUser) over.push(person);
 			if (over.length === 0) return { limited: false };
 
-			const resetInMs = Math.max(...over.map((entry) => entry.resetInMs));
-			return {
-				limited: true,
-				retryAfterSeconds: Math.max(Math.ceil(resetInMs / MS_PER_SECOND), 1),
-			};
+			return retryAfter(Math.max(...over.map((entry) => entry.resetInMs)));
 		},
 	};
 }
