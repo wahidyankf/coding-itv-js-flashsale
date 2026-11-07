@@ -95,6 +95,7 @@ playwright/.cache/
 # Local scratch and generated output (not committed)
 local-tmp/
 generated-reports/
+.playwright-mcp/
 # playwright-bdd output (bddgen)
 .features-gen/
 
