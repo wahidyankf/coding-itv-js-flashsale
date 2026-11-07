@@ -42,7 +42,12 @@
 				"useNodejsImportProtocol": "error",
 				"useShorthandFunctionType": "error",
 				"noUselessElse": "error",
-				"noMagicNumbers": "error"
+				"noMagicNumbers": "error",
+				"noNestedTernary": "error",
+				"noExcessiveLinesPerFile": {
+					"level": "error",
+					"options": { "maxLines": 400, "skipBlankLines": true }
+				}
 			},
 			"suspicious": {
 				"noExplicitAny": "error",
@@ -53,7 +58,27 @@
 			},
 			"complexity": {
 				"noForEach": "error",
-				"useLiteralKeys": "error"
+				"useLiteralKeys": "error",
+				"noExcessiveCognitiveComplexity": {
+					"level": "error",
+					"options": { "maxAllowedComplexity": 15 }
+				},
+				"noExcessiveLinesPerFunction": {
+					"level": "error",
+					"options": {
+						"maxLines": 80,
+						"skipBlankLines": true,
+						"skipIifes": true
+					}
+				},
+				"useMaxParams": {
+					"level": "error",
+					"options": { "max": 5 }
+				},
+				"noExcessiveNestedCallbacks": {
+					"level": "error",
+					"options": { "max": 4 }
+				}
 			},
 			"nursery": {
 				"noFloatingPromises": "error",
@@ -79,6 +104,36 @@
 		}
 	},
 	"overrides": [
+		{
+			"includes": [
+				"**/*_tests.ts",
+				"**/*_tests.tsx",
+				"**/*_integration_tests.ts",
+				"**/*_integration_tests.tsx"
+			],
+			"linter": {
+				"rules": {
+					"complexity": {
+						"noExcessiveLinesPerFunction": "off"
+					},
+					"style": {
+						"noExcessiveLinesPerFile": "off"
+					}
+				}
+			}
+		},
+		{
+			"includes": [
+				"apps/flash-be/src/adapters/outbound/postgres/migrations/**"
+			],
+			"linter": {
+				"rules": {
+					"complexity": {
+						"noExcessiveLinesPerFunction": "off"
+					}
+				}
+			}
+		},
 		{
 			"includes": [
 				"**/*_tests.ts",
