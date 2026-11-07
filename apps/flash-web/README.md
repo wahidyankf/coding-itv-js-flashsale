@@ -12,7 +12,8 @@ src/
   routes/            TanStack routes: the page (index.tsx), the document (__root.tsx), and the server routes under
                      /api that hand every request to the proxy
   proxy.ts           the allow-list of method and path pairs passed on to flash-be, and the headers kept
-  api.ts             what the app knows about the API: header names, the error shape, callApi
+  api.ts             what the app knows about the API: header names, the error shape, and callApi, which decodes
+                     every reply with the decoder its caller names (the decoders sit next to the view types)
   web-api.ts         the one set of clients the page uses, sharing a fetch that renews the login
   config.ts          the settings the web server reads from its environment (server only)
   backend.ts         asks flash-be whether it is up, for the page's backend status

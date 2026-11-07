@@ -9,14 +9,15 @@ in Node, the browser and k6, and flash-be's domain may import it. The one timer 
 It is a workspace package. Build it with `npx nx build flash-commons`. Its Nx targets build `typekit` first. The apps
 that import it (all five) build it first too, as they do for typekit.
 
-The library has four modules, one per concern:
+The library has five modules, one per concern:
 
-| Module                  | What it holds                                                    | Used by                                                                                                                          |
-| ----------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `retry.ts`              | the backoff, `retry` and `retryAsync`                            | flash-be (rebuild wait, Redis reconnect), flash-web (live streams), flash-be-e2e (`pollUntil`), flash-load (k6 join and payment) |
-| `time.ts`               | `MS_PER_SECOND`, `MS_PER_MINUTE`, `MS_PER_HOUR`                  | flash-be, flash-web, flash-be-e2e, flash-web-e2e, flash-load                                                                     |
-| `http-status.ts`        | `HTTP_STATUS`, `FIRST_ERROR_STATUS`, `FIRST_SERVER_ERROR_STATUS` | flash-be, flash-web, flash-load, flash-be-e2e                                                                                    |
-| `timers.ts` (`/timers`) | `sleep`, the one timer helper                                    | flash-be (mock payment, rebuild wait), flash-web (live streams), flash-be-e2e, flash-load (runner)                               |
+| Module                  | What it holds                                                                                                                               | Used by                                                                                                                          |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `retry.ts`              | the backoff, `retry` and `retryAsync`                                                                                                       | flash-be (rebuild wait, Redis reconnect), flash-web (live streams), flash-be-e2e (`pollUntil`), flash-load (k6 join and payment) |
+| `time.ts`               | `MS_PER_SECOND`, `MS_PER_MINUTE`, `MS_PER_HOUR`                                                                                             | flash-be, flash-web, flash-be-e2e, flash-web-e2e, flash-load                                                                     |
+| `http-status.ts`        | `HTTP_STATUS`, `FIRST_ERROR_STATUS`, `FIRST_SERVER_ERROR_STATUS`                                                                            | flash-be, flash-web, flash-load, flash-be-e2e                                                                                    |
+| `timers.ts` (`/timers`) | `sleep`, the one timer helper                                                                                                               | flash-be (mock payment, rebuild wait), flash-web (live streams), flash-be-e2e, flash-load (runner)                               |
+| `decode.ts`             | the decoder kit: `Decoder`, `DecodeError`, `text`, `integer`, `isoDate`, `uuid`, `literal`, `oneOf`, `optional`, `object`, `tagged`, `both` | flash-web (every reply and stream event); flash-be (request bodies)                                                              |
 
 ## Time units
 
@@ -99,6 +100,31 @@ result.match({
 The caller picks the `sleep`. In Node and the browser it is `sleep` from `@flash/flash-commons/timers`; in a test it is a
 fake that records the waits. k6 passes a `sleep` that calls k6's own sleep, and never imports `/timers`.
 
+## Decoding
+
+`decode.ts` turns a payload of unknown shape into a typed value at the edge, so a corrupted reply, stream event or
+request body never enters the app ([decision 018](../../docs/explanation/decisions/018-decode-payloads-at-the-edge.md)).
+A `Decoder<T>` takes `unknown` and returns `Ok(value)` or `Err({ path, expected })`, where `path` is dotted
+(`sale.stock`) and `expected` is a short phrase ("an integer"). `object` ignores keys it does not name, so a reply that
+gains a field breaks no reader; an `optional` field that is absent is left out of the result. `tagged` reads a union
+told apart by one field, such as a place by its `state`.
+
+```ts
+import { integer, isoDate, object, oneOf, uuid } from "@flash/flash-commons";
+
+const decodeSale = object({
+	id: uuid,
+	status: oneOf(["upcoming", "active", "sold_out", "ended"]),
+	remaining: integer,
+	startsAt: isoDate,
+});
+
+decodeSale(JSON.parse(text)).match({
+	ok: (sale) => showSale(sale),
+	err: (error) => refuse(`${error.path}: ${error.expected}`),
+});
+```
+
 ## Waiting
 
 `timers.ts`, imported as `@flash/flash-commons/timers`, has `sleep(ms, signal?)`: a promise that resolves after `ms`
@@ -115,5 +141,5 @@ npx nx test:coverage flash-commons   # unit tests with the 99% floor
 ```
 
 Its tests are plain Vitest tests next to the source (`src/retry_tests.ts`, `src/time_tests.ts`,
-`src/http-status_tests.ts`, `src/timers_tests.ts`, `src/index_tests.ts`). They have no Gherkin scenario, because a retry rule or a constant is a
+`src/http-status_tests.ts`, `src/timers_tests.ts`, `src/decode_tests.ts`, `src/index_tests.ts`). They have no Gherkin scenario, because a retry rule or a constant is a
 developer's concern, not a shopper's.

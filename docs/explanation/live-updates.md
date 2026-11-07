@@ -44,6 +44,9 @@ reached, the reader opens it again with exponential backoff and full jitter: a w
 on up to 30 seconds, for at most 8 tries. A stream that opens resets the count, so each outage gets its own 8 tries. After
 the last one the page stops and says "Live updates stopped. Reload the page to see the latest sale.", so a shopper does
 not trust words that may be old. A thousand pages that lost the server at the same moment do not all come back at the
-same moment either, because each wait is random. The reader stops for good on a `401` or `404`, since asking again will
+same moment either, because each wait is random. Each event is decoded before the page uses it
+([decision 018](decisions/018-decode-payloads-at-the-edge.md)): an event the page cannot read is dropped and does not
+count as a live frame, so a stream that sends nothing readable gives up like one that never opens. The reader stops for
+good on a `401` or `404`, since asking again will
 not change the answer. The policy is in [flash-commons](../reference/flash-commons.md), and
 [decision 017](decisions/017-retry-backoff-jitter.md) says why.

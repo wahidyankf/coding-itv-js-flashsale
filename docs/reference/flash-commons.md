@@ -13,12 +13,13 @@ import { HTTP_STATUS, MS_PER_SECOND, retryAsync } from "@flash/flash-commons";
 
 ## Exports
 
-| Module           | Exports                                                                                                               |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `retry.ts`       | `backoffDelayMs`, `retry`, `retryAsync`, `BackoffPolicy`, `RetryPolicy`, `RetryOptions`, `RetryAsyncOptions`          |
-| `time.ts`        | `MS_PER_SECOND`, `MS_PER_MINUTE`, `MS_PER_HOUR`                                                                       |
-| `http-status.ts` | `HTTP_STATUS`, `FIRST_ERROR_STATUS`, `FIRST_SERVER_ERROR_STATUS`                                                      |
-| `timers.ts`      | `sleep(ms, signal?)`, imported from `@flash/flash-commons/timers`; resolves early when `signal` aborts, never rejects |
+| Module           | Exports                                                                                                                                                                                                                                           |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `retry.ts`       | `backoffDelayMs`, `retry`, `retryAsync`, `BackoffPolicy`, `RetryPolicy`, `RetryOptions`, `RetryAsyncOptions`                                                                                                                                      |
+| `time.ts`        | `MS_PER_SECOND`, `MS_PER_MINUTE`, `MS_PER_HOUR`                                                                                                                                                                                                   |
+| `http-status.ts` | `HTTP_STATUS`, `FIRST_ERROR_STATUS`, `FIRST_SERVER_ERROR_STATUS`                                                                                                                                                                                  |
+| `timers.ts`      | `sleep(ms, signal?)`, imported from `@flash/flash-commons/timers`; resolves early when `signal` aborts, never rejects                                                                                                                             |
+| `decode.ts`      | `Decoder`, `DecodeError`, `text`, `nonEmptyText`, `integer`, `nonNegativeInteger`, `isoDate`, `uuid`, `literal`, `oneOf`, `optional`, `object`, `tagged`, `both`; see [decision 018](../explanation/decisions/018-decode-payloads-at-the-edge.md) |
 
 The wait before try `n` (from 0) is `random() * min(capMs, baseMs * 2 ** n)`, the "full jitter" scheme. A `maxAttempts`
 that is not a finite number of at least 1 means one try.
