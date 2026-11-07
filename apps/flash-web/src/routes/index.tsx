@@ -1,13 +1,14 @@
+// The home route. Loads the backend status and the sale on the server, then renders the sale page.
 import { createFileRoute } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import type { ReactNode } from "react";
 import { type BackendStatus, loadBackendStatus } from "../backend";
 import { BackendStatusView } from "../components/backend-status";
-import { loadSale } from "../sale/load";
+import { loadSale, type SaleLoad } from "../sale/load";
 import { TEXT } from "../sale/messages";
-import { SalePage } from "../sale/sale-page";
-import type { SaleLoad } from "../sale/types";
+import { SalePage } from "../sale-page";
 
+// What the home route loads on the server: the backend status and the sale.
 export type HomeData = { status: BackendStatus; sale: SaleLoad };
 
 // Runs on the server only. process.env is read here, never in the browser bundle.
@@ -33,6 +34,7 @@ function PageFrame({ children }: { children: ReactNode }) {
 	);
 }
 
+// The home page: the sale page, then the backend status.
 export function HomePage({
 	status,
 	sale = { state: "none" },
@@ -69,6 +71,7 @@ export function HomePending() {
 	);
 }
 
+// The home route. The loader fetches the data on the server; while it loads, HomePending shows.
 export const Route = createFileRoute("/")({
 	loader: () => getHomeData(),
 	pendingComponent: HomePending,

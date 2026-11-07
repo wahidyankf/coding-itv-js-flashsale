@@ -1,3 +1,4 @@
+// Settings the web server reads from its environment. Read on the server only, so the browser never sees them.
 export type Config = {
 	backendUrl: string;
 };

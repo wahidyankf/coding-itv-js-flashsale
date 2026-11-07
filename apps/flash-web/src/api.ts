@@ -1,10 +1,17 @@
+// What the web app knows about the HTTP API of flash-be: the header names, the few statuses it acts on, the failure a
+// reply can carry, and `callApi`, the one call that turns a reply into a `Result`. Every error of the API has the shape
+// `{ errorCode, errorMessage }`, plus `retryAfterSeconds` on a rate limit.
 import { attempt, attemptAsync, Err, Ok, type Result } from "@flash/typekit";
 
-// What the web app knows about the HTTP API of flash-be: header names, the few statuses it acts on, and one small call
-// that turns a reply into a `Result`. The API answers every error with `{ errorCode, errorMessage }`.
+// The header that carries the queue ticket. The page sends it, and the proxy passes it on.
 export const TICKET_HEADER = "x-queue-ticket";
+// The header that tells the page how long to wait after a rate limit.
 export const RETRY_AFTER_HEADER = "retry-after";
+// Converts the API's seconds into the milliseconds JavaScript counts in.
 export const MS_PER_SECOND = 1000;
+// The type of a JSON body, as the API expects it on every POST.
+export const JSON_CONTENT_TYPE = "application/json";
+// The HTTP statuses the app acts on by number. Every other status is read from the body's errorCode.
 export const STATUS = {
 	unauthorized: 401,
 	forbidden: 403,
@@ -19,6 +26,9 @@ export type ApiFailure = {
 	retryAfterSeconds?: number | undefined;
 };
 
+// An answer from the API: the body, or why there is none.
+export type ApiResult<T> = Result<T, ApiFailure>;
+
 const NETWORK: ApiFailure = {
 	errorCode: "network",
 	errorMessage: "The server could not be reached.",
@@ -27,6 +37,18 @@ const UNEXPECTED: ApiFailure = {
 	errorCode: "unexpected",
 	errorMessage: "The server sent a reply that this app cannot read.",
 };
+
+// A POST whose body is JSON. The caller passes the body already as text: "{}" when there is nothing to send.
+export function jsonPost(
+	body: string,
+	headers: Record<string, string> = {},
+): RequestInit {
+	return {
+		method: "POST",
+		headers: { "content-type": JSON_CONTENT_TYPE, ...headers },
+		body,
+	};
+}
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	typeof value === "object" && value !== null;
@@ -45,7 +67,7 @@ export async function callApi<T>(
 	fetcher: typeof fetch,
 	url: string,
 	init: RequestInit = {},
-): Promise<Result<T, ApiFailure>> {
+): Promise<ApiResult<T>> {
 	const sent = await attemptAsync(async () => {
 		const reply = await fetcher(url, init);
 		return {

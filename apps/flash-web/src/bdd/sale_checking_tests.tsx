@@ -1,3 +1,4 @@
+// Runs the checking scenarios (`flash/web/behaviours/sale/checking.feature`) in the unit world.
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import { openSale } from "./support/open-sale";
 import { specFile } from "./support/paths";

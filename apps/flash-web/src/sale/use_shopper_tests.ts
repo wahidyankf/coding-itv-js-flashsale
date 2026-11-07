@@ -1,3 +1,4 @@
+// Unit tests for the shopper hook: what it does when there is nothing to confirm, and when the login goes.
 import { Ok } from "@flash/typekit";
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
@@ -9,7 +10,12 @@ describe("useShopper", () => {
 		const confirm = vi.fn();
 		const client = { confirm } as unknown as SaleClient;
 		const { result } = renderHook(() =>
-			useShopper("sale-1", "active", client, true),
+			useShopper({
+				saleId: "sale-1",
+				saleStatus: "active",
+				client,
+				loggedIn: true,
+			}),
 		);
 		await act(async () => result.current.confirm());
 		expect(confirm).not.toHaveBeenCalled();
@@ -27,7 +33,13 @@ describe("useShopper", () => {
 			watchPlace: vi.fn(() => stop),
 		} as unknown as SaleClient;
 		const { result, rerender } = renderHook(
-			({ loggedIn }) => useShopper("sale-1", "active", client, loggedIn),
+			({ loggedIn }) =>
+				useShopper({
+					saleId: "sale-1",
+					saleStatus: "active",
+					client,
+					loggedIn,
+				}),
 			{ initialProps: { loggedIn: true } },
 		);
 		await act(async () => result.current.buy());

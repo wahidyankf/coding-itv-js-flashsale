@@ -1,3 +1,4 @@
+// Unit tests for the account hook: the first check, a failed log in or sign up, and a log out.
 import { Err, Ok } from "@flash/typekit";
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";

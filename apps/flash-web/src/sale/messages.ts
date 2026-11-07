@@ -1,6 +1,8 @@
-import { AUTH_TEXT } from "../auth/messages";
-import type { ApiFailure, SaleStatus } from "./types";
+// The words of the sale: the status labels and notes, every sentence and button label of the sale page, and the error
+// codes that are about a sale or a purchase. The account's words are in auth/messages.ts.
+import type { SaleStatus } from "./types";
 
+// The short name of each status, shown in the badge.
 export const STATUS_LABEL: Record<SaleStatus, string> = {
 	upcoming: "Not open yet",
 	active: "On sale",
@@ -16,17 +18,15 @@ export const STATUS_NOTE: Record<SaleStatus, string> = {
 	ended: "This sale is over.",
 };
 
-// The same rule the API uses for a user name (trimmed, lowercased), so a bad name is refused before anything is sent.
-// A copy of `normalizeUser` in flash-be; `same_as_be_tests.ts` fails when the two differ.
-const USER_ID = /^[a-z0-9][a-z0-9._@+-]{0,63}$/;
-
-export function cleanUser(raw: string): string | undefined {
-	const user = raw.trim().toLowerCase();
-	return USER_ID.test(user) ? user : undefined;
-}
-
+// Every sentence and label of the sale page. Kept in one table, so the page only names what it shows.
 export const TEXT = {
-	invalidUser: "Use 1 to 64 letters, digits or . _ @ + - characters.",
+	status: "Status:",
+	opens: "Opens",
+	closes: "Closes",
+	itemsLeft: "Items left:",
+	buyNow: "Buy Now",
+	checkStatus: "Check my status",
+	confirmPurchase: "Confirm purchase",
 	joining: "Joining the queue…",
 	reserving: "You are through. Holding an item for you…",
 	paying: "Paying…",
@@ -45,17 +45,16 @@ export const TEXT = {
 		"Payment failed. Your item is still held. Press Confirm purchase to try again.",
 };
 
+// The sentence for a shopper's place in the line.
 export const waitingText = (place: number) =>
 	`You are in the queue. Your place: ${place}.`;
 
+// The sentence for an item that is held, with the seconds left to confirm it.
 export const holdingText = (seconds: number) =>
 	`An item is held for you. Confirm within ${seconds} seconds.`;
 
-// One sentence for each error code the API can answer with.
-export function errorText(
-	errorCode: ApiFailure["errorCode"],
-	retryAfterSeconds?: number,
-): string {
+// The sentence for each sale or purchase error code. Undefined for any other code, which another file answers.
+export function saleErrorText(errorCode: string): string | undefined {
 	switch (errorCode) {
 		case "sold_out":
 			return "Sold out. No items are left.";
@@ -65,26 +64,11 @@ export function errorText(
 			return "The sale has not started yet.";
 		case "already_purchased":
 			return "You already bought an item.";
-		case "invalid_user":
-			return TEXT.invalidUser;
-		case "invalid_password":
-			return AUTH_TEXT.passwordLength;
-		case "invalid_credentials":
-			return AUTH_TEXT.badCredentials;
-		case "username_taken":
-			return AUTH_TEXT.nameTaken;
-		case "not_authenticated":
-		case "invalid_refresh_token":
-			return AUTH_TEXT.loginEnded;
-		case "rate_limited":
-			return `Too many requests. Try again in ${retryAfterSeconds ?? 1} seconds.`;
 		case "hold_expired":
 			return TEXT.holdEnded;
 		case "not_admitted":
 			return "Please wait for your turn.";
-		case "network":
-			return "The sale could not be reached. Please try again.";
 		default:
-			return "Something went wrong. Please try again.";
+			return undefined;
 	}
 }

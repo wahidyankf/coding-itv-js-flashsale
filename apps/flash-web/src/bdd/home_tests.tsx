@@ -1,3 +1,4 @@
+// Runs the home scenarios (`flash/web/behaviours/home/backend-status.feature`) in the unit world.
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import { cleanup, render, screen } from "@testing-library/react";
 import { expect, vi } from "vitest";

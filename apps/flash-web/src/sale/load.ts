@@ -1,9 +1,16 @@
+// The sale the server renders on the first visit. It runs on the web server only, asks flash-be for the current sale, and
+// tells "no sale" apart from "could not read it", so the page can say which.
 import { callApi } from "../api";
 import { buildConfig } from "../config";
-import type { SaleLoad, SaleView } from "./types";
+import type { SaleView } from "./types";
 
-// Asks flash-be for the current sale, on the server. A sale that is missing and a sale that cannot be read are told
-// apart, so the page can say which.
+// What the server knows when the page is first rendered: the sale, no sale yet, or a sale that could not be read.
+export type SaleLoad =
+	| { state: "ok"; sale: SaleView }
+	| { state: "none" }
+	| { state: "error" };
+
+// Asks flash-be for the current sale. The page is then shown from this answer, and the live stream takes over.
 export async function loadSale(
 	env: NodeJS.ProcessEnv,
 	fetcher: typeof fetch = fetch,

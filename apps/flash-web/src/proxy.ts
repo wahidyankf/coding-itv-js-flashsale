@@ -1,3 +1,6 @@
+// The web server's proxy: the browser's requests under /api are checked here, then passed on to flash-be, and the answer
+// is streamed back. Only the routes the browser needs get through, each with its one method, and a POST must come from
+// this site. The address of flash-be is read here, on the server, and never reaches the page.
 import { attempt, attemptAsync } from "@flash/typekit";
 import { RETRY_AFTER_HEADER, STATUS, TICKET_HEADER } from "./api";
 import { buildConfig } from "./config";
@@ -22,8 +25,15 @@ const ALLOWED: Array<[method: string, path: RegExp]> = [
 
 // A copy of the sale id rule of flash-be (`isSaleId`); `same_as_be_tests.ts` checks it.
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-// Headers that carry something the API needs, or something the browser needs back.
-const SENT = ["content-type", TICKET_HEADER, "accept", "cookie"];
+// Headers that carry something the API needs, or something the browser needs back. The API limits by address, so it
+// needs the browser's address (`x-forwarded-for`) and not this server's.
+const SENT = [
+	"content-type",
+	TICKET_HEADER,
+	"accept",
+	"cookie",
+	"x-forwarded-for",
+];
 const RETURNED = ["content-type", "cache-control", RETRY_AFTER_HEADER];
 
 // The answers this server gives on its own, in the shape of the API's errors. `not_found` is a copy of flash-be's code,
@@ -95,8 +105,17 @@ function refuse(code: keyof typeof REFUSALS): Response {
 	return Response.json({ errorCode: code, errorMessage: message }, { status });
 }
 
-// Passes a browser request under /api on to flash-be and streams the answer back. The address of flash-be is read
-// here, on the server, and never reaches the page.
+// A new header set with only the named headers that `source` has. A name that is missing is left out.
+function pick(source: Headers, names: readonly string[]): Headers {
+	const picked = new Headers();
+	for (const name of names) {
+		const value = source.get(name);
+		if (value !== null) picked.set(name, value);
+	}
+	return picked;
+}
+
+// Passes a browser request under /api on to flash-be and streams the answer back.
 export async function proxyToBackend(
 	request: Request,
 	env: NodeJS.ProcessEnv,
@@ -109,14 +128,7 @@ export async function proxyToBackend(
 		return refuse("cross_site");
 	}
 
-	const headers = new Headers();
-	for (const name of SENT) {
-		const value = request.headers.get(name);
-		if (value !== null) headers.set(name, value);
-	}
-	// The API limits by address, so it needs the browser's address and not this server's.
-	const forwarded = request.headers.get("x-forwarded-for");
-	if (forwarded !== null) headers.set("x-forwarded-for", forwarded);
+	const headers = pick(request.headers, SENT);
 
 	const answered = await attemptAsync(async (): Promise<Response> => {
 		const upstream = await fetcher(`${buildConfig(env).backendUrl}${path}`, {
@@ -125,11 +137,7 @@ export async function proxyToBackend(
 			body: request.method === "POST" ? await request.text() : null,
 			signal: request.signal,
 		});
-		const returned = new Headers();
-		for (const name of RETURNED) {
-			const value = upstream.headers.get(name);
-			if (value !== null) returned.set(name, value);
-		}
+		const returned = pick(upstream.headers, RETURNED);
 		// Every cookie, one header each: they cannot be joined into one value.
 		for (const cookie of upstream.headers.getSetCookie()) {
 			returned.append("set-cookie", rewritePath(cookie));

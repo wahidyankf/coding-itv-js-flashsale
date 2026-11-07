@@ -1,3 +1,4 @@
+// Unit tests for the event reader: frames, keep-alives, retries, and the refusals that stop it.
 import { describe, expect, it, vi } from "vitest";
 import { createWatcher, parseFrames } from "./sse";
 

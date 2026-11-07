@@ -1,11 +1,9 @@
-import type { Result } from "@flash/typekit";
-import type { ApiFailure } from "../api";
+// The shapes flash-be sends for a sale and a purchase, as the JSON carries them. Dates are ISO strings. Types only: the
+// app's own shapes (the page's first load, the API's failure) live in load.ts and api.ts.
 
-export type { ApiFailure };
-
-// The shapes flash-be sends. Dates are ISO strings, as JSON carries them.
 export type SaleStatus = "upcoming" | "active" | "sold_out" | "ended";
 
+// A sale as the API shows it. `remaining` is what is still for sale.
 export type SaleView = {
 	id: string;
 	productId: string;
@@ -23,29 +21,25 @@ export type Place =
 	| { state: "admitted" }
 	| { state: "absent" };
 
+// A place in the line, with the shopper it is for.
 export type PlaceView = Place & { userId: string };
+// The answer to joining the line: the place, and the ticket that proves it.
 export type JoinedView = PlaceView & { ticket: string };
+// A hold on an item, and when the hold runs out.
 export type ReservedView = {
 	userId: string;
 	reservationId: string;
 	expiresAt: string;
 };
+// A completed purchase.
 export type PurchaseView = {
 	userId: string;
 	purchaseId: string;
 	reservationId: string;
 	purchasedAt: string;
 };
+// Whether the shopper has bought, holds an item, or has neither.
 export type OutcomeView =
 	| (PurchaseView & { state: "purchased" })
 	| (ReservedView & { state: "holding" })
 	| { userId: string; state: "none" };
-
-// What the server renders the first time: the sale, no sale yet, or a sale that could not be read.
-export type SaleLoad =
-	| { state: "ok"; sale: SaleView }
-	| { state: "none" }
-	| { state: "error" };
-
-// An answer from the web server: the body, or why there is none (the code the API gave, `network`, or `unexpected`).
-export type ApiResult<T> = Result<T, ApiFailure>;

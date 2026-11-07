@@ -1,3 +1,4 @@
+// Unit tests for loading the sale on the server: a sale, no sale, and a sale that cannot be read.
 import { describe, expect, it } from "vitest";
 import { loadSale } from "./load";
 import type { SaleView } from "./types";

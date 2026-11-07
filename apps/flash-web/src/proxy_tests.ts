@@ -1,3 +1,4 @@
+// Unit tests for the proxy: which routes pass, which POSTs are refused as cross-site, and which headers and cookies move.
 import { describe, expect, it, vi } from "vitest";
 import { isAllowed, isCrossSite, proxyToBackend } from "./proxy";
 

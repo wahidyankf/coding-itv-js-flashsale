@@ -1,3 +1,4 @@
+// Checks that flash-web's copies of flash-be's rules still agree with flash-be.
 import { describe, expect, it, vi } from "vitest";
 import {
 	ERROR_STATUS,
@@ -6,9 +7,8 @@ import {
 import { usablePassword } from "../../flash-be/src/domain/auth";
 import { isSaleId } from "../../flash-be/src/domain/sale";
 import { normalizeUser } from "../../flash-be/src/domain/user";
-import { cleanPassword } from "./auth/messages";
+import { cleanPassword, cleanUser } from "./auth/messages";
 import { isAllowed, proxyToBackend } from "./proxy";
-import { cleanUser } from "./sale/messages";
 
 // flash-web keeps its own copy of a few rules and sentences of flash-be, so the two apps share no library. These tests
 // are the guard: when flash-be changes one of them, the copy here must change too.

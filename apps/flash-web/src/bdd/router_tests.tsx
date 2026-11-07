@@ -1,3 +1,4 @@
+// Runs the router scenarios (`flash/web/behaviours/home/app-router.feature`) through the real router.
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import { RouterProvider } from "@tanstack/react-router";
 import { cleanup, render, screen } from "@testing-library/react";

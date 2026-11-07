@@ -1,3 +1,4 @@
+// Runs the health scenarios (`flash/web/behaviours/health/liveness.feature`) in the unit world.
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import { expect } from "vitest";
 import { Route } from "../routes/api/health";

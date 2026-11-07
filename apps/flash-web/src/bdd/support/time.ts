@@ -1,3 +1,4 @@
+// Reads the time phrases of the scenarios ("in 2 hours", "1 hour ago") against a given moment.
 const HOUR_MS = 3_600_000;
 
 // Reads phrases such as "in 2 hours" and "1 hour ago" against a given moment, so scenarios stay readable

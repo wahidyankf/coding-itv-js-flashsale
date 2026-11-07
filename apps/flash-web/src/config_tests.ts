@@ -1,3 +1,4 @@
+// Unit tests for the config: the backend address comes from the environment, with a local default.
 import { expect, it } from "vitest";
 import { buildConfig } from "./config";
 

@@ -1,3 +1,5 @@
+// Tests for the sale page as a shopper sees it: the status, the buttons, the feedback and the account, with the clients
+// faked so that each answer is chosen by the test.
 import { Err, Ok } from "@flash/typekit";
 import {
 	act,
@@ -7,19 +9,19 @@ import {
 	screen,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { AuthClient } from "../auth/client";
-import type { Account } from "../auth/types";
-import type { WebApi } from "../auth/web-api";
-import type { SaleClient } from "./client";
-import { SalePage } from "./sale-page";
+import type { ApiResult } from "./api";
+import type { AuthClient } from "./auth/client";
+import type { Account } from "./auth/types";
+import type { SaleClient } from "./sale/client";
 import type {
-	ApiResult,
 	JoinedView,
 	OutcomeView,
 	Place,
 	PurchaseView,
 	SaleView,
-} from "./types";
+} from "./sale/types";
+import { SalePage } from "./sale-page";
+import type { WebApi } from "./web-api";
 
 const SALE: SaleView = {
 	id: "11111111-1111-4111-8111-111111111111",

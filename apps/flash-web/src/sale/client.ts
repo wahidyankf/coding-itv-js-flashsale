@@ -1,7 +1,8 @@
-import { callApi, TICKET_HEADER } from "../api";
+// The browser's calls for the sale: the queue, the hold, the purchase and the outcome, plus the two live streams. The page
+// gets this client, so a test can give it a fake. The calls go to the web server, which passes the sale routes on.
+import { type ApiResult, callApi, jsonPost, TICKET_HEADER } from "../api";
 import { createWatcher, type Watcher } from "./sse";
 import type {
-	ApiResult,
 	JoinedView,
 	OutcomeView,
 	Place,
@@ -11,8 +12,8 @@ import type {
 	SaleView,
 } from "./types";
 
-// Everything the page asks of the sale, in one place. The page gets a client, so tests can give it a fake. None of the
-// calls names the shopper: the login cookie does, so one shopper cannot act as another.
+// Everything the page asks of the sale. None of the calls names the shopper: the login cookie does, so one shopper
+// cannot act as another.
 export type SaleClient = {
 	join: (saleId: string) => Promise<ApiResult<JoinedView>>;
 	reserve: (saleId: string, ticket: string) => Promise<ApiResult<ReservedView>>;
@@ -29,8 +30,8 @@ export type SaleClient = {
 	) => () => void;
 };
 
-// The browser talks to its own web server under /api, which passes the sale routes on. `base` is empty in the browser
-// and a full address in tests. The `fetcher` is the one that renews the login, so these calls need not know about it.
+// `base` is empty in the browser and a full address in tests. The `fetcher` is the one that renews the login, so these
+// calls need not know about it.
 export function createSaleClient(
 	base = "",
 	fetcher: typeof fetch = fetch,
@@ -38,11 +39,8 @@ export function createSaleClient(
 ): SaleClient {
 	const api = `${base}/api`;
 	const sale = (saleId: string) => `${api}/sales/${encodeURIComponent(saleId)}`;
-	const post = (body: object, headers: Record<string, string> = {}) => ({
-		method: "POST",
-		headers: { "content-type": "application/json", ...headers },
-		body: JSON.stringify(body),
-	});
+	const post = (body: object, headers: Record<string, string> = {}) =>
+		jsonPost(JSON.stringify(body), headers);
 
 	return {
 		join: (saleId) =>

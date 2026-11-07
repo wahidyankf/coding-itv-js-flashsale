@@ -1,3 +1,4 @@
+// Unit tests for the account's browser calls: the paths they use, the bodies they send, and the answers they return.
 import { Err, Ok } from "@flash/typekit";
 import { describe, expect, it, vi } from "vitest";
 import { createAuthClient } from "./client";

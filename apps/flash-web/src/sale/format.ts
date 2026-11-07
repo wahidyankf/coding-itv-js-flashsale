@@ -9,11 +9,13 @@ const UTC = new Intl.DateTimeFormat("en-GB", {
 
 const isDate = (date: Date) => !Number.isNaN(date.getTime());
 
+// A sale time in UTC: the same text on the server and in the browser.
 export function formatUtc(iso: string): string {
 	const date = new Date(iso);
 	return isDate(date) ? `${UTC.format(date)} UTC` : iso;
 }
 
+// A sale time in the viewer's own zone and language.
 export function formatLocal(iso: string): string {
 	const date = new Date(iso);
 	return isDate(date)

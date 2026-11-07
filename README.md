@@ -14,7 +14,7 @@ If you have five minutes, read these files in this order:
 | `apps/flash-be/src/adapters/outbound/redis/redis-hold-gate.ts`         | the Redis script that takes one item for one shopper, atomically                                                         |
 | `apps/flash-be/src/adapters/outbound/postgres/purchase-repository.ts`  | the transaction that has the last word: `sold < stock`, one purchase per shopper                                         |
 | `apps/flash-be/src/adapters/inbound/http/routes.ts`                    | every endpoint, and what it does                                                                                         |
-| `apps/flash-web/src/sale/sale-page.tsx`                                | the page: status, name, Buy Now, feedback. Tailwind classes make it responsive and follow the system light or dark theme |
+| `apps/flash-web/src/sale-page.tsx`                                     | the page: status, name, Buy Now, feedback. Tailwind classes make it responsive and follow the system light or dark theme |
 | `apps/flash-load/k6/profiles.ts`, `apps/flash-load/scripts/verdict.ts` | the stress profiles, and the verdict that is read from the data                                                          |
 
 To show it running, follow [run the demo](docs/how-to/run-the-demo.md).

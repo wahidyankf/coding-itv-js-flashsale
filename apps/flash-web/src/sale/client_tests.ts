@@ -1,3 +1,4 @@
+// Unit tests for the sale client: each call's path, method and headers, and how each answer is read.
 import { Err, Ok } from "@flash/typekit";
 import { describe, expect, it, vi } from "vitest";
 import { createSaleClient } from "./client";

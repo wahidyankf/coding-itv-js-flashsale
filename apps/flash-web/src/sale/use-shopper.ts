@@ -1,38 +1,64 @@
+// The shopper's buying state, as a hook. It makes the requests (join the queue, take the hold, pay, check) and runs the
+// effects (the countdown, the place stream, the stop when the login goes). The rules it applies live in shopper-state.ts.
 import { useCallback, useEffect, useRef, useState } from "react";
-import { MS_PER_SECOND } from "../api";
+import type { ApiFailure } from "../api";
+import { errorText } from "../error-text";
 import type { SaleClient } from "./client";
-import { errorText, holdingText, TEXT, waitingText } from "./messages";
-import type { ApiFailure, Place, SaleStatus } from "./types";
+import { TEXT } from "./messages";
+import {
+	type Action,
+	holdingPhase,
+	type Phase,
+	phaseText,
+	secondsLeft,
+} from "./shopper-state";
+import type { Place, SaleStatus } from "./types";
 
-// What the shopper asked for, so the page can show the spinner on the button that was pressed.
-export type Action = "buy" | "check" | "confirm";
-
-// Where the shopper is. `busy` is a request in flight; `message` is a result the shopper reads and moves on from.
-export type Phase =
-	| { kind: "idle" }
-	| { kind: "busy"; action: Action; text: string }
-	| { kind: "waiting"; place: number }
-	| {
-			kind: "holding";
-			reservationId: string;
-			expiresAt: number;
-			notice?: string;
-	  }
-	| { kind: "purchased" }
-	| { kind: "message"; text: string };
-
+// The countdown ticks this often, so the seconds on screen stay within a fraction of a second of the truth.
 const COUNTDOWN_MS = 250;
 
-export function useShopper(
-	saleId: string,
-	saleStatus: SaleStatus,
-	client: SaleClient,
+// What the shopper hook needs: the sale, its status, the client, the login, and optionally the clock.
+export type ShopperOptions = {
+	saleId: string;
+	saleStatus: SaleStatus;
+	client: SaleClient;
 	// Only a shopper who is logged in can buy. When the login goes, whatever the shopper was doing stops.
-	loggedIn: boolean,
-	now: () => number = Date.now,
+	loggedIn: boolean;
+	// The clock. A test can move it; the page uses the real one.
+	now?: () => number;
+};
+
+// The clock that the countdown reads. It moves only while an item is held. When the hold runs out, the shopper is told,
+// so the page never counts on an item that is gone.
+function useCountdown(
+	phase: Phase,
+	now: () => number,
+	showResult: (text: string) => void,
 ) {
-	const [phase, setPhase] = useState<Phase>({ kind: "idle" });
 	const [clock, setClock] = useState(now());
+	const holding = phase.kind === "holding";
+	useEffect(() => {
+		if (!holding) return;
+		const timer = setInterval(() => setClock(now()), COUNTDOWN_MS);
+		return () => clearInterval(timer);
+	}, [holding, now]);
+	useEffect(() => {
+		if (phase.kind === "holding" && phase.expiresAt <= clock) {
+			showResult(TEXT.holdEnded);
+		}
+	}, [phase, clock, showResult]);
+	return { clock, setClock };
+}
+
+// The shopper's phase and the requests that move it on. `text` is the sentence under the buttons.
+export function useShopper({
+	saleId,
+	saleStatus,
+	client,
+	loggedIn,
+	now = Date.now,
+}: ShopperOptions) {
+	const [phase, setPhase] = useState<Phase>({ kind: "idle" });
 	const stopWatching = useRef<() => void>(() => {});
 
 	const stop = useCallback(() => {
@@ -46,23 +72,12 @@ export function useShopper(
 		setPhase({ kind: "idle" });
 	}, [loggedIn, stop]);
 
-	// The countdown ticks only while an item is held.
-	const holding = phase.kind === "holding";
-	useEffect(() => {
-		if (!holding) return;
-		const timer = setInterval(() => setClock(now()), COUNTDOWN_MS);
-		return () => clearInterval(timer);
-	}, [holding, now]);
-
-	const secondsLeft =
-		phase.kind === "holding"
-			? Math.max(0, Math.ceil((phase.expiresAt - clock) / MS_PER_SECOND))
-			: 0;
-	useEffect(() => {
-		if (phase.kind === "holding" && phase.expiresAt <= clock) {
-			setPhase({ kind: "message", text: TEXT.holdEnded });
-		}
-	}, [phase, clock]);
+	// A result is a sentence the shopper reads and moves on from. Every ending of a request shows one this way.
+	const showResult = useCallback(
+		(text: string) => setPhase({ kind: "result", text }),
+		[],
+	);
+	const { clock, setClock } = useCountdown(phase, now, showResult);
 
 	// The line stops moving when the sale ends or sells out, so a waiting shopper is told instead of kept waiting.
 	const waiting = phase.kind === "waiting";
@@ -70,62 +85,60 @@ export function useShopper(
 		if (!waiting) return;
 		if (saleStatus === "ended" || saleStatus === "sold_out") {
 			stop();
-			setPhase({
-				kind: "message",
-				text: errorText(saleStatus === "ended" ? "sale_ended" : "sold_out"),
-			});
+			showResult(errorText(saleStatus === "ended" ? "sale_ended" : "sold_out"));
 		}
-	}, [waiting, saleStatus, stop]);
+	}, [waiting, saleStatus, stop, showResult]);
 
 	const fail = ({ errorCode, retryAfterSeconds }: ApiFailure) =>
-		setPhase({
-			kind: "message",
-			text: errorText(errorCode, retryAfterSeconds),
-		});
+		showResult(errorText(errorCode, retryAfterSeconds));
+
+	// Shows an item held for the shopper. The countdown starts from this moment, not from the last tick.
+	const enterHolding = (reservationId: string, expiresAt: string) => {
+		setClock(now());
+		setPhase(holdingPhase(reservationId, expiresAt));
+	};
+
+	const busy = (action: Action, text: string) =>
+		setPhase({ kind: "busy", action, text });
 
 	const reserve = async (id: string, ticket: string) => {
-		setPhase({ kind: "busy", action: "buy", text: TEXT.reserving });
+		busy("buy", TEXT.reserving);
 		const reserved = await client.reserve(id, ticket);
 		if (reserved.isErr()) return fail(reserved.error);
-		const expiresAt = Date.parse(reserved.value.expiresAt);
-		setClock(now());
-		setPhase({
-			kind: "holding",
-			reservationId: reserved.value.reservationId,
-			expiresAt,
-		});
+		enterHolding(reserved.value.reservationId, reserved.value.expiresAt);
+	};
+
+	// Follows the place in the line. The line either admits the shopper, which takes the hold, or loses them.
+	const onPlace = (ticket: string, place: Place) => {
+		if (place.state === "waiting") {
+			setPhase({ kind: "waiting", place: place.place });
+			return;
+		}
+		stop();
+		if (place.state === "admitted") void reserve(saleId, ticket);
+		else showResult(TEXT.placeLost);
 	};
 
 	const buy = async () => {
 		stop();
-		setPhase({ kind: "busy", action: "buy", text: TEXT.joining });
+		busy("buy", TEXT.joining);
 		const joined = await client.join(saleId);
 		if (joined.isErr()) return fail(joined.error);
-
 		const { ticket } = joined.value;
 		if (joined.value.state === "admitted") return reserve(saleId, ticket);
-
-		const onPlace = (place: Place) => {
-			if (place.state === "waiting") {
-				setPhase({ kind: "waiting", place: place.place });
-			} else if (place.state === "admitted") {
-				stop();
-				void reserve(saleId, ticket);
-			} else {
-				stop();
-				setPhase({ kind: "message", text: TEXT.placeLost });
-			}
-		};
-		onPlace(joined.value);
-		stopWatching.current = client.watchPlace(saleId, ticket, onPlace);
+		onPlace(ticket, joined.value);
+		stopWatching.current = client.watchPlace(saleId, ticket, (place) =>
+			onPlace(ticket, place),
+		);
 	};
 
 	const confirm = async () => {
 		if (phase.kind !== "holding") return;
 		const held = phase;
-		setPhase({ kind: "busy", action: "confirm", text: TEXT.paying });
+		busy("confirm", TEXT.paying);
 		const confirmed = await client.confirm(saleId, held.reservationId);
 		if (confirmed.isOk()) return setPhase({ kind: "purchased" });
+		// A failed payment keeps the item held, so the shopper can try the payment again.
 		if (confirmed.error.errorCode === "payment_failed") {
 			return setPhase({ ...held, notice: TEXT.paymentFailed });
 		}
@@ -134,39 +147,22 @@ export function useShopper(
 
 	const check = async () => {
 		stop();
-		setPhase({ kind: "busy", action: "check", text: TEXT.checking });
+		busy("check", TEXT.checking);
 		const outcome = await client.outcome(saleId);
 		if (outcome.isErr()) return fail(outcome.error);
 		const found = outcome.value;
 		if (found.state === "purchased") return setPhase({ kind: "purchased" });
 		if (found.state === "holding") {
-			setClock(now());
-			return setPhase({
-				kind: "holding",
-				reservationId: found.reservationId,
-				expiresAt: Date.parse(found.expiresAt),
-			});
+			return enterHolding(found.reservationId, found.expiresAt);
 		}
-		setPhase({ kind: "message", text: TEXT.nothing });
+		showResult(TEXT.nothing);
 	};
 
-	// The sentence under the buttons.
-	const text = (() => {
-		switch (phase.kind) {
-			case "idle":
-				return "";
-			case "busy":
-				return phase.text;
-			case "waiting":
-				return waitingText(phase.place);
-			case "holding":
-				return phase.notice ?? holdingText(secondsLeft);
-			case "purchased":
-				return TEXT.purchased;
-			case "message":
-				return phase.text;
-		}
-	})();
-
-	return { phase, text, buy, confirm, check };
+	return {
+		phase,
+		text: phaseText(phase, secondsLeft(phase, clock)),
+		buy,
+		confirm,
+		check,
+	};
 }

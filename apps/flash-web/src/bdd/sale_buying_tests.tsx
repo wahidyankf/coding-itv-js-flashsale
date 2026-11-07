@@ -1,3 +1,4 @@
+// Runs the buying scenarios (`flash/web/behaviours/sale/buying.feature`) in the unit world.
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import { openSale } from "./support/open-sale";
 import { specFile } from "./support/paths";

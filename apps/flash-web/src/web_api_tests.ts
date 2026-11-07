@@ -1,3 +1,4 @@
+// Unit tests for the web API wiring: one shared login refresh, and the listeners for a lost login.
 import { describe, expect, it, vi } from "vitest";
 import { createWebApi, withRefresh } from "./web-api";
 

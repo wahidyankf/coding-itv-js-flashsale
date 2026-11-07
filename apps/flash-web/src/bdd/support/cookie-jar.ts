@@ -2,6 +2,7 @@
 // send a cookie only to the paths it was set for. The refresh cookie depends on that rule.
 export type CookieJar = ReturnType<typeof createCookieJar>;
 
+// Keeps the browser's cookies the way a browser does, so a scenario sees what a shopper's browser would send.
 export function createCookieJar() {
 	const cookies = new Map<string, { value: string; path: string }>();
 

@@ -1,3 +1,4 @@
+// Step helper for the web scenarios: opens a sale in the scenario's world, from the phrases the scenario uses.
 import { relativeTime } from "./time";
 import type { WebWorld } from "./web-world";
 

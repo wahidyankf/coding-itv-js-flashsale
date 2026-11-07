@@ -1,3 +1,4 @@
+// The root route: the HTML document, the stylesheet and the head that every page shares.
 import {
 	createRootRoute,
 	HeadContent,
@@ -7,6 +8,7 @@ import {
 import type { ReactNode } from "react";
 import appCss from "../styles.css?url";
 
+// The root route: the document and the head every page shares.
 export const Route = createRootRoute({
 	head: () => ({
 		meta: [

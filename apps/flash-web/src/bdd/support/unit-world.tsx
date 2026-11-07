@@ -1,3 +1,6 @@
+// The unit world: the scenarios' page, the browser and the web server, all in memory. The page, the client, the proxy and
+// the loader are the real code. flash-be is the fake backend, called as a function, and time is fake, so a scenario can
+// move it. The unit scenarios run here under Vitest. Test support only.
 import {
 	act,
 	cleanup,
@@ -7,21 +10,23 @@ import {
 } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, vi } from "vitest";
-import { TICKET_HEADER } from "../../api";
-import { createWebApi } from "../../auth/web-api";
+import {
+	JSON_CONTENT_TYPE,
+	jsonPost,
+	MS_PER_SECOND,
+	TICKET_HEADER,
+} from "../../api";
 import { proxyToBackend } from "../../proxy";
 import { HomePage } from "../../routes/index";
-import { loadSale } from "../../sale/load";
-import { SalePage } from "../../sale/sale-page";
+import { loadSale, type SaleLoad } from "../../sale/load";
 import type { Watcher } from "../../sale/sse";
-import type { SaleLoad } from "../../sale/types";
+import { SalePage } from "../../sale-page";
+import { createWebApi } from "../../web-api";
 import { createCookieJar } from "./cookie-jar";
-import {
-	createFakeBackend,
-	type FakeBackend,
-	matchRoute,
-	SALE_ID,
-} from "./fake-backend";
+import { ACCESS_COOKIE, REFRESH_COOKIE } from "./fake-account";
+import { createFakeBackend, type FakeBackend } from "./fake-backend";
+import { matchRoute } from "./fake-http";
+import { SALE_ID, type SaleSpec } from "./fake-state";
 import type { WebWorld } from "./web-world";
 
 const BACKEND = "http://flash-be.test";
@@ -30,26 +35,27 @@ const START = new Date("2026-06-01T12:00:00Z");
 const SITE = "http://web.test";
 // The password of a shopper that a scenario logs in without naming one.
 const PASSWORD = "a long password";
+// How many times the page is given a turn to settle after an action.
+const SETTLE_ROUNDS = 10;
 
-// The unit world keeps everything in memory. The page, the client and the proxy are the real code; flash-be is the
-// fake backend, and time is fake, so a scenario can move it.
-export function unitWorld(): WebWorld {
-	let backend: FakeBackend = createFakeBackend(() => Date.now());
-	let load: SaleLoad = { state: "none" };
-	// What the browser keeps between requests.
-	const jar = createCookieJar();
+// What the scenarios share: the fake flash-be (replaced on reset), what the page loaded, and what the browser keeps.
+type Harness = {
+	backend: FakeBackend;
+	load: SaleLoad;
+	jar: ReturnType<typeof createCookieJar>;
+};
 
-	// The fake flash-be, as a fetch.
-	const backendFetch: typeof fetch = async (input, init) => {
+// The fake flash-be as a fetch. Its answers are the replies of the fake, as flash-be would send them.
+function backendFetchOf(h: Harness): typeof fetch {
+	return async (input, init) => {
 		const url = new URL(String(input));
-		const path = url.pathname;
 		const headers = new Headers(init?.headers);
 		const text = typeof init?.body === "string" ? init.body : "";
-		const reply = backend.handle(
+		const reply = h.backend.handle(
 			init?.method ?? "GET",
-			path,
+			url.pathname,
 			{
-				"x-queue-ticket": headers.get("x-queue-ticket") ?? undefined,
+				[TICKET_HEADER]: headers.get(TICKET_HEADER) ?? undefined,
 				cookie: headers.get("cookie") ?? undefined,
 			},
 			text ? JSON.parse(text) : {},
@@ -63,13 +69,15 @@ export function unitWorld(): WebWorld {
 			headers: returned,
 		});
 	};
+}
 
-	// The browser and the web server: the page's requests go through the real proxy to the fake flash-be. Like a browser,
-	// it sends the cookies that match the path, says which site a POST comes from, and keeps the cookies that come back.
-	const webFetch: typeof fetch = async (input, init) => {
+// The browser and the web server: the page's requests go through the real proxy to the fake flash-be. Like a browser, it
+// sends the cookies that match the path, says which site a POST comes from, and keeps the cookies that come back.
+function webFetchOf(h: Harness, backendFetch: typeof fetch): typeof fetch {
+	return async (input, init) => {
 		const url = new URL(String(input), SITE);
 		const headers = new Headers(init?.headers);
-		const cookie = jar.header(url.pathname);
+		const cookie = h.jar.header(url.pathname);
 		if (cookie !== undefined) headers.set("cookie", cookie);
 		if (init?.method === "POST" && !headers.has("origin")) {
 			headers.set("origin", SITE);
@@ -79,12 +87,15 @@ export function unitWorld(): WebWorld {
 			ENV,
 			backendFetch,
 		);
-		jar.store(reply.headers.getSetCookie());
+		h.jar.store(reply.headers.getSetCookie());
 		return reply;
 	};
+}
 
-	// Streams are pushed from the fake backend's changes, the way the real streams push from flash-be.
-	const watch: Watcher = (url, onEvent, headers = {}) => {
+// The event streams, pushed from the fake's changes the way the real streams push from flash-be. A stream sends a value
+// only when it differs from the last one.
+function watchOf(h: Harness): Watcher {
+	return (url, onEvent, headers = {}) => {
 		const match = matchRoute("GET", url.replace(/^.*?\/api/, ""));
 		let last = "";
 		const send = (event: string, data: unknown) => {
@@ -94,112 +105,132 @@ export function unitWorld(): WebWorld {
 			onEvent(event, data);
 		};
 		if (match?.name === "saleEvents") {
-			const push = () => backend.hasSale() && send("sale", backend.view());
+			const push = () => h.backend.hasSale() && send("sale", h.backend.view());
 			push();
-			return backend.onChange(push);
+			return h.backend.onChange(push);
 		}
 		// The user is the one whose cookie the browser holds.
 		const user =
-			backend.userOf(jar.header(url.replace(/^.*?(?=\/api)/, ""))) ?? "";
+			h.backend.userOf(h.jar.header(url.replace(/^.*?(?=\/api)/, ""))) ?? "";
 		if (user === "" || headers[TICKET_HEADER] !== `ticket-${user}`) {
 			return () => {};
 		}
 		const push = () =>
-			send("place", { userId: user, ...backend.placeOf(user) });
+			send("place", { userId: user, ...h.backend.placeOf(user) });
 		push();
-		return backend.onChange(push);
+		return h.backend.onChange(push);
 	};
+}
 
-	// Lets the promises of a request and the effects that follow run.
-	const settle = async () => {
-		for (let round = 0; round < 10; round++) {
-			await vi.advanceTimersByTimeAsync(0);
-		}
-	};
-	const inPage = async (action: () => void | Promise<void>) => {
-		await act(async () => {
-			await action();
-			await settle();
-		});
-	};
+// Lets the promises of a request and the effects that follow run.
+async function settle(): Promise<void> {
+	for (let round = 0; round < SETTLE_ROUNDS; round++) {
+		await vi.advanceTimersByTimeAsync(0);
+	}
+}
 
-	const fill = (label: RegExp, value: string) =>
-		fireEvent.change(screen.getByLabelText(label), { target: { value } });
-	const click = (name: string): void => {
-		fireEvent.click(screen.getByRole("button", { name }));
-	};
-	// Fills the form as a visitor would, in the form that is asked for.
-	const enter = (
-		mode: "I have an account" | "I am new",
-		user: string,
-		password: string,
-		submit: string,
-	) =>
-		inPage(() => {
-			click(mode);
-			fill(/Username/, user);
-			fill(/Password/, password);
-			click(submit);
-		});
+// Runs a page action inside React's act, then lets it settle.
+async function inPage(action: () => void | Promise<void>): Promise<void> {
+	await act(async () => {
+		await action();
+		await settle();
+	});
+}
 
+const fill = (label: RegExp, value: string) =>
+	fireEvent.change(screen.getByLabelText(label), { target: { value } });
+const click = (name: string): void => {
+	fireEvent.click(screen.getByRole("button", { name }));
+};
+// Fills the form as a visitor would, in the form that is asked for.
+const enter = (
+	mode: "I have an account" | "I am new",
+	user: string,
+	password: string,
+	submit: string,
+) =>
+	inPage(() => {
+		click(mode);
+		fill(/Username/, user);
+		fill(/Password/, password);
+		click(submit);
+	});
+
+// Starting a scenario and ending it: the clock, the fake flash-be, the browser's cookies, and the page.
+function lifecycleOf(h: Harness) {
 	return {
-		saleId: SALE_ID,
-		now: () => new Date(),
 		reset() {
 			vi.useFakeTimers();
 			vi.setSystemTime(START);
-			backend = createFakeBackend(() => Date.now());
-			load = { state: "none" };
-			jar.clear();
+			h.backend = createFakeBackend(() => Date.now());
+			h.load = { state: "none" };
+			h.jar.clear();
 		},
 		clear() {
 			cleanup();
 			vi.useRealTimers();
 		},
-		async addSale(spec) {
-			backend.setSale(spec);
+	};
+}
+
+// The state of the sale and of the queue, and the accounts, set up before the visitor acts.
+function setupOf(h: Harness, webFetch: typeof fetch) {
+	return {
+		async addSale(spec: SaleSpec) {
+			h.backend.setSale(spec);
 		},
-		cutOff: () => backend.cutOff(true),
+		cutOff: () => h.backend.cutOff(true),
 		slowAdmission: () => {
-			backend.settings.slowAdmission = true;
+			h.backend.settings.slowAdmission = true;
 		},
-		queueAhead: (count) => backend.queueAhead(count),
-		async hasAccount(user, password) {
-			backend.addAccount(user, password);
+		queueAhead: (count: number) => h.backend.queueAhead(count),
+		async hasAccount(user: string, password: string) {
+			h.backend.addAccount(user, password);
 		},
-		async loggedIn(user) {
-			await webFetch("/api/auth/register", {
-				method: "POST",
-				headers: { "content-type": "application/json" },
-				body: JSON.stringify({ username: user, password: PASSWORD }),
-			});
+		async loggedIn(user: string) {
+			await webFetch(
+				"/api/auth/register",
+				jsonPost(JSON.stringify({ username: user, password: PASSWORD })),
+			);
 		},
-		loginEnds: () => backend.endLogins(),
-		accessTokenEnds: () => backend.endAccessTokens(),
-		holdsLastItem: (user) => {
-			backend.giveHold(user);
+		loginEnds: () => h.backend.endLogins(),
+		accessTokenEnds: () => h.backend.endAccessTokens(),
+		holdsLastItem: (user: string) => {
+			h.backend.giveHold(user);
 		},
-		hasBought: (user) => backend.giveItem(user),
-		holds: (user) => backend.giveHold(user),
-		writeLimit: (count) => {
-			backend.settings.writesPerUser = count;
+		hasBought: (user: string) => h.backend.giveItem(user),
+		holds: (user: string) => h.backend.giveHold(user),
+		writeLimit: (count: number) => {
+			h.backend.settings.writesPerUser = count;
 		},
 		paymentDeclines: () => {
-			backend.settings.paymentDeclines = true;
+			h.backend.settings.paymentDeclines = true;
 		},
-		holdSeconds: (seconds) => {
-			backend.settings.holdSeconds = seconds;
+		holdSeconds: (seconds: number) => {
+			h.backend.settings.holdSeconds = seconds;
 		},
+	};
+}
+
+// The visitor: opens the page, fills the forms, and presses the buttons.
+function pageOf(
+	h: Harness,
+	backendFetch: typeof fetch,
+	webFetch: typeof fetch,
+	watch: Watcher,
+) {
+	return {
 		async openPage() {
-			load = await loadSale(ENV, backendFetch);
+			h.load = await loadSale(ENV, backendFetch);
 			const api = createWebApi("", webFetch, { watch });
 			await act(async () => {
-				render(<SalePage load={load} api={api} />);
+				render(<SalePage load={h.load} api={api} />);
 				await settle();
 			});
 		},
-		signUp: (user, password) => enter("I am new", user, password, "Sign up"),
-		logIn: (user, password) =>
+		signUp: (user: string, password: string) =>
+			enter("I am new", user, password, "Sign up"),
+		logIn: (user: string, password: string) =>
 			enter("I have an account", user, password, "Log in"),
 		logOut: () => inPage(() => click("Log out")),
 		pressBuyNow: () => inPage(() => click("Buy Now")),
@@ -210,36 +241,53 @@ export function unitWorld(): WebWorld {
 					screen.getByRole("button", { name: "Confirm purchase" }),
 				);
 			}),
-		setSold: (sold) => inPage(() => backend.setSold(sold)),
-		endSale: () => inPage(() => backend.endSale()),
-		advance: (seconds) =>
+		setSold: (sold: number) => inPage(() => h.backend.setSold(sold)),
+		endSale: () => inPage(() => h.backend.endSale()),
+		advance: (seconds: number) =>
 			act(async () => {
-				await vi.advanceTimersByTimeAsync(seconds * 1000);
+				await vi.advanceTimersByTimeAsync(seconds * MS_PER_SECOND);
 			}),
-		async expectPageSays(text) {
+	};
+}
+
+// What the visitor sees. Each check reads the page as it is now.
+function expectationsOf(h: Harness) {
+	return {
+		async expectPageSays(text: string) {
 			expect(document.body.textContent).toContain(text);
 		},
-		async expectButton(name, state) {
+		async expectButton(name: string, state: "enabled" | "disabled") {
 			const button = screen.getByRole("button", { name }) as HTMLButtonElement;
 			expect(button.disabled).toBe(state === "disabled");
 		},
-		async expectNoButton(name) {
+		async expectNoButton(name: string) {
 			expect(screen.queryByRole("button", { name })).toBeNull();
 		},
 		async expectNoLogin() {
-			expect(jar.has("access_token")).toBe(false);
-			expect(jar.has("refresh_token")).toBe(false);
+			expect(h.jar.has(ACCESS_COOKIE)).toBe(false);
+			expect(h.jar.has(REFRESH_COOKIE)).toBe(false);
 		},
+	};
+}
+
+// The page as the server renders it, and the request a scenario sends to the web server.
+function apiOf(h: Harness, webFetch: typeof fetch) {
+	return {
 		renderedPage: () =>
-			renderToStaticMarkup(<HomePage status="ok" sale={load} />) +
+			renderToStaticMarkup(<HomePage status="ok" sale={h.load} />) +
 			document.body.innerHTML,
 		apiAddress: () => BACKEND,
-		async send(method, path, body, origin) {
-			const before = backend.requestCount();
+		async send(
+			method: "GET" | "POST",
+			path: string,
+			body?: unknown,
+			origin?: string,
+		) {
+			const before = h.backend.requestCount();
 			const reply = await webFetch(path, {
 				method,
 				headers: {
-					...(body === undefined ? {} : { "content-type": "application/json" }),
+					...(body === undefined ? {} : { "content-type": JSON_CONTENT_TYPE }),
 					...(origin === undefined ? {} : { origin }),
 				},
 				body: body === undefined ? null : JSON.stringify(body),
@@ -248,8 +296,29 @@ export function unitWorld(): WebWorld {
 				status: reply.status,
 				json: (await reply.json()) as Record<string, unknown>,
 				cookies: reply.headers.getSetCookie(),
-				reachedApi: backend.requestCount() > before,
+				reachedApi: h.backend.requestCount() > before,
 			};
 		},
+	};
+}
+
+// The unit world. Every scenario gets the same one, and `reset` makes it fresh.
+export function unitWorld(): WebWorld {
+	const h: Harness = {
+		backend: createFakeBackend(() => Date.now()),
+		load: { state: "none" },
+		jar: createCookieJar(),
+	};
+	const backendFetch = backendFetchOf(h);
+	const webFetch = webFetchOf(h, backendFetch);
+	const watch = watchOf(h);
+	return {
+		saleId: SALE_ID,
+		now: () => new Date(),
+		...lifecycleOf(h),
+		...setupOf(h, webFetch),
+		...pageOf(h, backendFetch, webFetch, watch),
+		...expectationsOf(h),
+		...apiOf(h, webFetch),
 	};
 }

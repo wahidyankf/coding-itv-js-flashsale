@@ -1,9 +1,12 @@
+// The one set of clients the page uses: the sale, the account, and a way to hear that the login ended. They all share one
+// fetch that renews the login when it has gone. This is the app-wide wiring, so it sits in src/ and neither the sale nor
+// the account imports the other for it.
 import { attemptAsync } from "@flash/typekit";
-import { callApi, STATUS } from "../api";
-import { createSaleClient, type SaleClient } from "../sale/client";
-import { createWatcher, type Watcher } from "../sale/sse";
-import { type AuthClient, createAuthClient } from "./client";
-import type { Account } from "./types";
+import { callApi, jsonPost, STATUS } from "./api";
+import { type AuthClient, createAuthClient } from "./auth/client";
+import type { Account } from "./auth/types";
+import { createSaleClient, type SaleClient } from "./sale/client";
+import { createWatcher, type Watcher } from "./sale/sse";
 
 // Everything the page asks of the web server: the sale, the account, and a way to hear that the login ended.
 export type WebApi = {
@@ -27,11 +30,7 @@ export function withRefresh(
 			const traded = await callApi<Account>(
 				fetcher,
 				`${base}/api/auth/refresh`,
-				{
-					method: "POST",
-					headers: { "content-type": "application/json" },
-					body: "{}",
-				},
+				jsonPost("{}"),
 			);
 			return traded.isOk();
 		})().finally(() => {
@@ -39,6 +38,7 @@ export function withRefresh(
 		});
 		return refreshing;
 	};
+	// Only a 401 that names `not_authenticated` means the login is gone; any other failure is passed back as it is.
 	const isLoginLost = async (reply: Response): Promise<boolean> => {
 		if (reply.status !== STATUS.unauthorized) return false;
 		const body = await attemptAsync(

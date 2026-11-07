@@ -1,3 +1,4 @@
+// Unit tests for the sale time: the exact instant in the markup, and the text the server writes first.
 import { cleanup, render } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it } from "vitest";

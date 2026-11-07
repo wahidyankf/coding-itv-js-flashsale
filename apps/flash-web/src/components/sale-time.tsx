@@ -1,3 +1,4 @@
+// Shows a time of the sale. The exact instant stays in the markup, so tools can read it.
 import { useEffect, useState } from "react";
 import { formatLocal, formatUtc } from "../sale/format";
 

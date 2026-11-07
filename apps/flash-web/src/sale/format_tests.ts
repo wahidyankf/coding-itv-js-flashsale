@@ -1,3 +1,4 @@
+// Unit tests for the time formats: UTC for the first text, the viewer's own zone after that.
 import { describe, expect, it } from "vitest";
 import { formatLocal, formatUtc } from "./format";
 

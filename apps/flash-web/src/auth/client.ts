@@ -1,8 +1,9 @@
-import { callApi } from "../api";
-import type { ApiResult } from "../sale/types";
+// The browser's calls for the account: who am I, sign up, log in, and log out. Each one goes to the web server, which
+// passes it on to flash-be and carries the cookies. The page gets this client, so a test can give it a fake.
+import { type ApiResult, callApi, jsonPost } from "../api";
 import type { Account } from "./types";
 
-// What the page asks of the account, in one place. The page gets a client, so tests can give it a fake.
+// What the page asks of the account, in one place.
 export type AuthClient = {
 	me: () => Promise<ApiResult<Account>>;
 	register: (username: string, password: string) => Promise<ApiResult<Account>>;
@@ -10,18 +11,14 @@ export type AuthClient = {
 	logout: () => Promise<ApiResult<unknown>>;
 };
 
-// The routes are under /api/auth on the web server, which passes them on to flash-be and carries the cookies. The tokens
-// are only ever in those cookies: the page never sees them.
+// The routes are under /api/auth on the web server. The tokens are only ever in the cookies, so the page never sees them.
 export function createAuthClient(
 	base = "",
 	fetcher: typeof fetch = fetch,
 ): AuthClient {
 	const auth = `${base}/api/auth`;
-	const post = (body?: object) => ({
-		method: "POST",
-		headers: { "content-type": "application/json" },
-		body: body === undefined ? "{}" : JSON.stringify(body),
-	});
+	const post = (body?: object) =>
+		jsonPost(body === undefined ? "{}" : JSON.stringify(body));
 	return {
 		me: () => callApi<Account>(fetcher, `${auth}/me`),
 		register: (username, password) =>

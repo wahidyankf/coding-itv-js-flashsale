@@ -1,3 +1,4 @@
+// Unit tests for the sale route: requests under /api/sales reach the proxy.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Route } from "./sales.$";
 

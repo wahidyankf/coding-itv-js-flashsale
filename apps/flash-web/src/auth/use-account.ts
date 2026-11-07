@@ -1,19 +1,22 @@
+// The hook that knows who is logged in. The page renders before the browser's cookie is known, so it starts "checking"
+// and asks the server. It also sets the state when a log in, a sign up or a log out finishes, and when the login is
+// found gone for good.
 import { useCallback, useEffect, useRef, useState } from "react";
-import { errorText } from "../sale/messages";
+import { errorText } from "../error-text";
 import type { AuthClient } from "./client";
 import { AUTH_TEXT } from "./messages";
 import type { Account, AuthMode } from "./types";
 
-// Who is logged in. `checking` lasts from the first paint until the server has answered: the page is rendered before the
-// browser's cookie is known, so it must not show a login form to a shopper who is logged in.
+// Who is logged in. `checking` lasts from the first paint until the server has answered: the page must not show a login
+// form to a shopper who is logged in. `anonymous` may carry a notice, such as "your login has ended".
 export type AccountState =
 	| { kind: "checking" }
 	| { kind: "anonymous"; notice?: string }
 	| { kind: "in"; account: Account };
 
+// `onExpired` is the page's way of hearing that a request found the login gone for good.
 export function useAccount(
 	auth: AuthClient,
-	// Calls the listener when a request found the login gone for good.
 	onExpired: (listener: () => void) => () => void,
 ) {
 	const [state, setState] = useState<AccountState>({ kind: "checking" });

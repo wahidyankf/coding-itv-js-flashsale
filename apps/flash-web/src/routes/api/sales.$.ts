@@ -1,3 +1,4 @@
+// The web server's route for the sale API. Every method goes to the proxy, which decides what passes.
 import { createFileRoute } from "@tanstack/react-router";
 import { proxyToBackend } from "../../proxy";
 

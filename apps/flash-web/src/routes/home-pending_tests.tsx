@@ -1,3 +1,4 @@
+// Unit tests for the loading state of the home route.
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { HomePending } from "./index";

@@ -1,3 +1,4 @@
+// Unit tests for the account route: requests under /api/auth reach the proxy.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Route } from "./auth.$";
 

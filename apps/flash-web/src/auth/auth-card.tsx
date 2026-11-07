@@ -1,15 +1,41 @@
+// The log in and sign up form for a shopper who is not logged in. It keeps what is typed and what is shown, checks the
+// input, and asks `enter` to send it. The password stays in this component's state and is stored nowhere else.
 import { type FormEvent, useId, useState } from "react";
 import { Spinner } from "../components/spinner";
-import { FIELD, OUTLINE, PRIMARY } from "../components/ui";
-import { cleanUser, TEXT } from "../sale/messages";
-import { AUTH_TEXT, cleanPassword } from "./messages";
+import {
+	FIELD,
+	MESSAGE_BOX,
+	MUTED_TEXT,
+	OUTLINE,
+	PRIMARY,
+	TONE,
+} from "../components/ui";
+import { checkCredentials } from "./credentials";
+import { AUTH_TEXT } from "./messages";
 import type { AuthMode } from "./types";
 
 const TAB =
 	"h-10 flex-1 rounded-md px-3 text-sm font-medium aria-pressed:bg-sky-700 aria-pressed:text-white aria-pressed:hover:bg-sky-700 dark:aria-pressed:bg-sky-500 dark:aria-pressed:text-slate-950 dark:aria-pressed:hover:bg-sky-500";
 
-// The log in and sign up form of a shopper who is not logged in. `enter` sends it and returns the sentence to show when it
-// failed. The password stays in this component's state and is never stored anywhere else.
+// The words that change with the mode: the heading, the hint under the tabs, and the button.
+const MODE_TEXT: Record<
+	AuthMode,
+	{ prompt: string; hint: string; submit: string }
+> = {
+	login: {
+		prompt: AUTH_TEXT.loginPrompt,
+		hint: AUTH_TEXT.loginHint,
+		submit: AUTH_TEXT.logIn,
+	},
+	signup: {
+		prompt: AUTH_TEXT.signupPrompt,
+		hint: AUTH_TEXT.signupHint,
+		submit: AUTH_TEXT.signUp,
+	},
+};
+
+// `enter` returns the sentence to show when it failed, and nothing when it worked. On success the page replaces this
+// form with the buying buttons, so the form has nothing left to set.
 export function AuthCard({
 	notice,
 	enter,
@@ -28,20 +54,19 @@ export function AuthCard({
 	const [problem, setProblem] = useState<string>();
 	const [sending, setSending] = useState(false);
 	const ids = useId();
+	const words = MODE_TEXT[mode];
 
 	const submit = async (event: FormEvent) => {
 		event.preventDefault();
-		const name = cleanUser(username);
-		if (name === undefined) return setProblem(TEXT.invalidUser);
-		// A login is checked by the server alone: an old account may have a password this form would refuse today.
-		const secret = mode === "signup" ? cleanPassword(password) : password;
-		if (secret === undefined || secret === "") {
-			return setProblem(AUTH_TEXT.passwordLength);
-		}
+		const checked = checkCredentials(mode, username, password);
+		if (checked.isErr()) return setProblem(checked.error);
 		setSending(true);
 		setProblem(undefined);
-		const failed = await enter(mode, name, secret);
-		// On success the page swaps this form for the buying buttons, so there is nothing left to set.
+		const failed = await enter(
+			mode,
+			checked.value.username,
+			checked.value.password,
+		);
 		if (failed !== undefined) {
 			setProblem(failed);
 			setSending(false);
@@ -61,18 +86,15 @@ export function AuthCard({
 			className="flex flex-col gap-4"
 		>
 			<h3 id={`${ids}-title`} className="text-lg font-semibold">
-				{mode === "login" ? AUTH_TEXT.loginPrompt : AUTH_TEXT.signupPrompt}
+				{words.prompt}
 			</h3>
 			{notice !== undefined && (
-				<p
-					role="status"
-					className="rounded-lg bg-amber-100 px-3 py-2.5 text-sm leading-6 text-amber-900 dark:bg-amber-400/15 dark:text-amber-200"
-				>
+				<p role="status" className={`${MESSAGE_BOX} ${TONE.amber}`}>
 					{notice}
 				</p>
 			)}
 			<fieldset className="flex gap-1 rounded-lg border border-slate-300 p-1 dark:border-slate-600">
-				<legend className="sr-only">Account</legend>
+				<legend className="sr-only">{AUTH_TEXT.account}</legend>
 				<button
 					type="button"
 					aria-pressed={mode === "login"}
@@ -90,9 +112,7 @@ export function AuthCard({
 					{AUTH_TEXT.newHere}
 				</button>
 			</fieldset>
-			<p className="text-sm text-slate-600 dark:text-slate-400">
-				{mode === "login" ? AUTH_TEXT.loginHint : AUTH_TEXT.signupHint}
-			</p>
+			<p className={`text-sm ${MUTED_TEXT}`}>{words.hint}</p>
 			<label
 				htmlFor={`${ids}-user`}
 				className="flex flex-col gap-1.5 text-sm font-medium"
@@ -111,7 +131,7 @@ export function AuthCard({
 				/>
 				<span
 					id={`${ids}-user-hint`}
-					className="text-xs font-normal text-slate-600 dark:text-slate-400"
+					className={`text-xs font-normal ${MUTED_TEXT}`}
 				>
 					{AUTH_TEXT.usernameHint}
 				</span>
@@ -136,27 +156,20 @@ export function AuthCard({
 				{mode === "signup" && (
 					<span
 						id={`${ids}-password-hint`}
-						className="text-xs font-normal text-slate-600 dark:text-slate-400"
+						className={`text-xs font-normal ${MUTED_TEXT}`}
 					>
 						{AUTH_TEXT.passwordHint}
 					</span>
 				)}
 			</label>
 			{problem !== undefined && (
-				<p
-					role="alert"
-					className="rounded-lg bg-rose-100 px-3 py-2.5 text-sm leading-6 text-rose-900 dark:bg-rose-400/15 dark:text-rose-200"
-				>
+				<p role="alert" className={`${MESSAGE_BOX} ${TONE.rose}`}>
 					{problem}
 				</p>
 			)}
 			<button type="submit" disabled={sending} className={PRIMARY}>
 				{sending && <Spinner />}
-				{sending
-					? AUTH_TEXT.sending
-					: mode === "login"
-						? AUTH_TEXT.logIn
-						: AUTH_TEXT.signUp}
+				{sending ? AUTH_TEXT.sending : words.submit}
 			</button>
 		</form>
 	);

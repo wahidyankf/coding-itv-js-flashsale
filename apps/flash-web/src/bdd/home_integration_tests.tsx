@@ -1,3 +1,4 @@
+// Runs the home scenarios (`flash/web/behaviours/home/backend-status.feature`) over real HTTP, in the integration world.
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";

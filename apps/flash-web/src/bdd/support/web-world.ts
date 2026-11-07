@@ -16,6 +16,7 @@ export type ApiAnswer = {
 	reachedApi: boolean;
 };
 
+// What a web scenario may do. Both worlds provide it, so the scenario code is the same for each.
 export type WebWorld = {
 	// Each scenario starts clean and ends by clearing the page.
 	reset: () => void;

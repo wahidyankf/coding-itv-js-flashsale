@@ -1,3 +1,4 @@
+// Runs the proxy scenarios (`flash/web/behaviours/proxy/api.feature`) in the unit world.
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import { expect } from "vitest";
 import { openSale } from "./support/open-sale";
