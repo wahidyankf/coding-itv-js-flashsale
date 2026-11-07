@@ -2,8 +2,9 @@ import { type APIRequestContext, expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { shoppers } from "./queue.steps.js";
 import { bodyOf, routes, send, TICKET_HEADER } from "./support/api.js";
+import { shopperCookie } from "./support/auth.js";
 import { currentResponse, setResponse } from "./support/response.js";
-import { query, world } from "./support/world.js";
+import { query, SYSTEM_USER, world } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
 
@@ -24,8 +25,9 @@ async function post(
 		options.reservationId ?? holdOf(options.owner ?? user)?.reservationId;
 	return send(request, routes.confirm, {
 		params: { saleId: options.saleId ?? world.saleId ?? "" },
+		headers: { cookie: await shopperCookie(request, user) },
 		// A shopper with no hold sends no reservation id, which the API refuses.
-		body: { userId: user, reservationId: reservationId ?? "" },
+		body: { reservationId: reservationId ?? "" },
 	});
 }
 
@@ -48,7 +50,8 @@ function purchases() {
 
 async function outcome(request: Request, user: string, saleId = world.saleId) {
 	const reply = await send(request, routes.outcome, {
-		params: { saleId: saleId ?? "", userId: user },
+		params: { saleId: saleId ?? "" },
+		headers: { cookie: await shopperCookie(request, user) },
 	});
 	setResponse(reply);
 	return bodyOf(routes.outcome, reply);
@@ -90,8 +93,10 @@ Given(
 				user,
 				reply: await send(request, routes.reserve, {
 					params: { saleId: world.saleId ?? "" },
-					headers: { [TICKET_HEADER]: shoppers().tickets.get(user) ?? "" },
-					body: { userId: user },
+					headers: {
+						cookie: await shopperCookie(request, user),
+						[TICKET_HEADER]: shoppers().tickets.get(user) ?? "",
+					},
 				}),
 			})),
 		);
@@ -148,8 +153,13 @@ When(
 	/^"([^"]+)" buys the last item$/,
 	async ({ request: _request }, user: string) => {
 		await query(
-			`insert into purchases (sale_id, user_id, reservation_id, payment_ref)
-			 values ($1, $2, gen_random_uuid(), $3)`,
+			`with buyer as (
+			   insert into users (username, created_by) values ($2, ${SYSTEM_USER})
+			   on conflict (username) where deleted_at is null do update set username = excluded.username
+			   returning id
+			 )
+			 insert into purchases (sale_id, user_id, reservation_id, payment_ref, created_by)
+			 select $1, buyer.id, gen_random_uuid(), $3, buyer.id from buyer`,
 			[world.saleId, user, `pay-${user}`],
 		);
 		await query("update sales set sold = stock where id = $1", [world.saleId]);

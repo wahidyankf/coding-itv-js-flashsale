@@ -17,9 +17,11 @@ export const E2E_REDIS_URL = (() => {
 	return url.toString();
 })();
 const START_TIMEOUT_MS = 20_000;
-// The operator token of every private API, unless a step sets another one. Steps use it to set a scenario up through
-// the same routes an operator uses.
-export const E2E_ADMIN_TOKEN = "e2e-operator-token-0001";
+// The user the migration made for the system, as SQL. Steps that write rows with SQL name it as their author.
+export const SYSTEM_USER = "(select id from users where username = '$system')";
+// The operator the scenarios log in as, made by the `create-operator` command, and the password of every account.
+export const E2E_OPERATOR = "e2e-operator";
+export const E2E_PASSWORD = "e2e long password";
 
 // Everything one scenario owns. Each scenario gets its own database and, when it needs one, its own API
 // process, so scenarios never share state with each other or with the shared dev stack.
@@ -27,7 +29,14 @@ export const world: {
 	databaseName?: string;
 	databaseUrl?: string;
 	saleId?: string;
+	// A product a step made with SQL, for the sale that names it.
+	productId?: string | undefined;
 	failure?: string;
+	// The cookie header of everyone who is logged in, by name.
+	logins?: Map<string, string>;
+	// The cookie jar of the shopper in the auth scenarios, and a copy of it kept at one moment.
+	jar?: Map<string, { value: string; path: string }>;
+	jarCopy?: Map<string, { value: string; path: string }>;
 	// What the shoppers of this scenario hold: their tickets, and who joined first.
 	queue?: {
 		tickets: Map<string, string>;
@@ -173,6 +182,25 @@ export function seed(args: string[]): void {
 	world.seed = { status: run.status, stdout: run.stdout, stderr: run.stderr };
 }
 
+// Makes an operator account the way a deployment does, with the command, because the API cannot sign one up.
+export function createOperator(username: string, password: string): void {
+	const run = spawnSync(
+		process.execPath,
+		[
+			path.join(DIST, "create-operator.js"),
+			"--username",
+			username,
+			"--password",
+			password,
+		],
+		{
+			env: childEnv({ DATABASE_URL: world.databaseUrl }),
+			encoding: "utf8",
+		},
+	);
+	expect(run.status, run.stderr).toBe(0);
+}
+
 export async function query<T>(
 	sql: string,
 	params: unknown[] = [],
@@ -215,11 +243,13 @@ export async function startApi(): Promise<string> {
 			RATE_LIMIT_WINDOW_SECONDS: "60",
 			RATE_LIMIT_PER_USER: "100000",
 			RATE_LIMIT_PER_IP: "100000",
+			AUTH_RATE_LIMIT_PER_IP: "100000",
 			// No sale cache, unless a step turns it on, so a scenario always reads the sale as it is.
 			SALE_CACHE_MS: "0",
 			// Event streams read often, so a scenario sees a change within a moment.
 			EVENTS_INTERVAL_MS: "100",
-			ADMIN_TOKEN: E2E_ADMIN_TOKEN,
+			// The e2e API runs on plain HTTP, which cannot carry Secure cookies.
+			COOKIE_SECURE: "false",
 			...world.apiEnv,
 		}),
 		stdio: ["ignore", "pipe", "pipe"],

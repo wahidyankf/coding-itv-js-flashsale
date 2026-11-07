@@ -1,11 +1,28 @@
 import { type APIRequestContext, expect } from "@playwright/test";
-import { ADMIN_AUTH_HEADER, routes, send } from "./api.js";
-import { E2E_ADMIN_TOKEN, world } from "./world.js";
+import { routes, send } from "./api.js";
+import { operatorCookie, shopperCookie } from "./auth.js";
 
-// The header of an operator. A scenario that set its own token (the admin scenarios do) is believed.
-export function operatorHeaders(token?: string): Record<string, string> {
-	const given = token ?? world.apiEnv?.ADMIN_TOKEN ?? E2E_ADMIN_TOKEN;
-	return { [ADMIN_AUTH_HEADER]: `Bearer ${given}` };
+// The header of an operator who is logged in.
+export async function operatorHeaders(
+	request: APIRequestContext,
+): Promise<Record<string, string>> {
+	return { cookie: await operatorCookie(request) };
+}
+
+// Who sends a request: the operator who is logged in, the shopper "ana" who is logged in, or nobody.
+export type Sender = "operator" | "shopper" | "nobody";
+
+export async function senderHeaders(
+	request: APIRequestContext,
+	sender: Sender,
+): Promise<Record<string, string>> {
+	if (sender === "nobody") return {};
+	return {
+		cookie:
+			sender === "operator"
+				? await operatorCookie(request)
+				: await shopperCookie(request, "ana"),
+	};
 }
 
 export type NewSaleInput = {
@@ -13,6 +30,7 @@ export type NewSaleInput = {
 	stock: number;
 	startsAt: Date;
 	endsAt: Date;
+	productId?: string;
 };
 
 // Sets a sale up the way an operator does, through `POST /admin/sales`, and returns its id. Windows in the past are
@@ -22,9 +40,10 @@ export async function createSale(
 	sale: NewSaleInput,
 ): Promise<string> {
 	const reply = await send(request, routes.createSale, {
-		headers: operatorHeaders(),
+		headers: await operatorHeaders(request),
 		body: {
 			...(sale.name === undefined ? {} : { name: sale.name }),
+			...(sale.productId === undefined ? {} : { productId: sale.productId }),
 			stock: sale.stock,
 			startsAt: sale.startsAt.toISOString(),
 			endsAt: sale.endsAt.toISOString(),
@@ -42,7 +61,7 @@ export async function changeSale(
 ): Promise<void> {
 	const reply = await send(request, routes.updateSale, {
 		params: { saleId },
-		headers: operatorHeaders(),
+		headers: await operatorHeaders(request),
 		body: patch,
 	});
 	expect(reply.status(), await reply.text()).toBe(200);

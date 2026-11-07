@@ -1,5 +1,6 @@
 import type { APIRequestContext, APIResponse } from "@playwright/test";
 import type {
+	AccountView,
 	AdminSaleView,
 	JoinedView,
 	OutcomeView,
@@ -11,7 +12,6 @@ import type {
 import { startApi } from "./world.js";
 
 export const TICKET_HEADER = "x-queue-ticket";
-export const ADMIN_AUTH_HEADER = "authorization";
 
 const FIRST_ERROR_STATUS = 400;
 
@@ -31,12 +31,17 @@ export const routes = {
 	currentSale: route<SaleView>("GET", "/sales/current"),
 	sale: route<SaleView>("GET", "/sales/:saleId"),
 	saleEvents: route("GET", "/sales/:saleId/events"),
-	placeEvents: route("GET", "/sales/:saleId/queue/:userId/events"),
+	placeEvents: route("GET", "/sales/:saleId/queue/me/events"),
 	joinQueue: route<JoinedView>("POST", "/sales/:saleId/queue"),
-	checkPlace: route<PlaceView>("GET", "/sales/:saleId/queue/:userId"),
+	checkPlace: route<PlaceView>("GET", "/sales/:saleId/queue/me"),
 	reserve: route<ReservedView>("POST", "/sales/:saleId/reservations"),
 	confirm: route<PurchaseView>("POST", "/sales/:saleId/purchases"),
-	outcome: route<OutcomeView>("GET", "/sales/:saleId/purchases/:userId"),
+	outcome: route<OutcomeView>("GET", "/sales/:saleId/purchases/me"),
+	register: route<AccountView>("POST", "/auth/register"),
+	login: route<AccountView>("POST", "/auth/login"),
+	refresh: route<AccountView>("POST", "/auth/refresh"),
+	logout: route("POST", "/auth/logout"),
+	me: route<AccountView>("GET", "/auth/me"),
 	createSale: route<SaleView>("POST", "/admin/sales"),
 	updateSale: route<SaleView>("PATCH", "/admin/sales/:saleId"),
 	removeSale: route<{ id: string }>("DELETE", "/admin/sales/:saleId"),
@@ -54,7 +59,9 @@ export async function build(route: Route, input: Input = {}) {
 	const path = route.path.replace(/:(\w+)/g, (_match, name: string) =>
 		encodeURIComponent(input.params?.[name] ?? ""),
 	);
-	const headers: Record<string, string> = {};
+	// An empty `cookie` header is always there: without one, the request context of Playwright would send the cookies it
+	// kept from earlier replies, as a browser does, and a step that means "nobody is logged in" would be someone.
+	const headers: Record<string, string> = { cookie: "" };
 	for (const [name, value] of Object.entries(input.headers ?? {})) {
 		if (value !== undefined) headers[name.toLowerCase()] = value;
 	}

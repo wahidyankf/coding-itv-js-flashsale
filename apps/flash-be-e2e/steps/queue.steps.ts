@@ -2,6 +2,7 @@ import { type APIRequestContext, expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { createClient } from "redis";
 import { bodyOf, routes, send, TICKET_HEADER } from "./support/api.js";
+import { shopperCookie } from "./support/auth.js";
 import { changeSale, createSale } from "./support/operator.js";
 import { currentResponse, setResponse } from "./support/response.js";
 import { relativeTime } from "./support/time.js";
@@ -29,7 +30,7 @@ export async function join(
 ) {
 	const reply = await send(request, routes.joinQueue, {
 		params: { saleId: saleId ?? "" },
-		body: { userId: user },
+		headers: { cookie: await shopperCookie(request, user) },
 	});
 	setResponse(reply);
 	const joined = await bodyOf(routes.joinQueue, reply);
@@ -44,8 +45,11 @@ export async function join(
 // Asks for a place. Returns it when the API gave one, and nothing when it refused.
 export async function check(request: Request, user: string, ticket?: string) {
 	const reply = await send(request, routes.checkPlace, {
-		params: { saleId: world.saleId ?? "", userId: user },
-		headers: { [TICKET_HEADER]: ticket },
+		params: { saleId: world.saleId ?? "" },
+		headers: {
+			cookie: await shopperCookie(request, user),
+			[TICKET_HEADER]: ticket,
+		},
 	});
 	setResponse(reply);
 	return bodyOf(routes.checkPlace, reply);
@@ -76,13 +80,6 @@ Given(
 When(/^"([^"]+)" joins the queue$/, async ({ request }, user: string) => {
 	await join(request, user);
 });
-
-When(
-	/^the user id "([^"]*)" joins the queue$/,
-	async ({ request }, user: string) => {
-		await join(request, user);
-	},
-);
 
 When(
 	/^"([^"]+)" joins the queue of the sale with id "([^"]+)"$/,

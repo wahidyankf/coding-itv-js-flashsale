@@ -4,7 +4,12 @@ import { bodyOf, routes, send } from "./support/api.js";
 import { createSale } from "./support/operator.js";
 import { currentResponse, setResponse } from "./support/response.js";
 import { relativeTime } from "./support/time.js";
-import { migratedDatabase, query, world } from "./support/world.js";
+import {
+	migratedDatabase,
+	query,
+	SYSTEM_USER,
+	world,
+} from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
 
@@ -21,8 +26,11 @@ async function insertSale(
 	sold: number,
 ): Promise<string> {
 	const rows = await query<{ id: string }>(
-		`insert into sales (name, starts_at, ends_at, stock, sold)
-		 values ($1, $2, $3, $4, $5) returning id`,
+		`with product as (
+		   insert into products (name, created_by) values ($1, ${SYSTEM_USER}) returning id
+		 )
+		 insert into sales (product_id, name, starts_at, ends_at, stock, sold, created_by)
+		 select product.id, $1, $2, $3, $4, $5, ${SYSTEM_USER} from product returning id`,
 		[name, startsAt, endsAt, stock, sold],
 	);
 	const id = rows[0]?.id;

@@ -3,6 +3,7 @@ import { createBdd } from "playwright-bdd";
 import { createClient } from "redis";
 import { check, join, shoppers } from "./queue.steps.js";
 import { bodyOf, errorOf, routes, send, TICKET_HEADER } from "./support/api.js";
+import { shopperCookie } from "./support/auth.js";
 import { changeSale } from "./support/operator.js";
 import { currentResponse, setResponse } from "./support/response.js";
 import { E2E_REDIS_URL, query, world } from "./support/world.js";
@@ -22,8 +23,10 @@ async function post(
 	const ticket = options.ticket ?? shoppers().tickets.get(key);
 	return send(request, routes.reserve, {
 		params: { saleId: options.saleId ?? world.saleId ?? "" },
-		headers: { [TICKET_HEADER]: ticket },
-		body: { userId: user },
+		headers: {
+			cookie: await shopperCookie(request, user),
+			[TICKET_HEADER]: ticket,
+		},
 	});
 }
 

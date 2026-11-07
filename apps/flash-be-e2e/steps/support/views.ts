@@ -2,6 +2,7 @@
 
 export type SaleView = {
 	id: string;
+	productId: string;
 	name: string;
 	status: "upcoming" | "active" | "sold_out" | "ended";
 	startsAt: string;
@@ -16,6 +17,9 @@ export type AdminSaleView = SaleView & {
 	holdSeconds: number;
 	admitPerSecond: number;
 };
+
+// Who is logged in.
+export type AccountView = { username: string; role: "shopper" | "operator" };
 
 // Where a user stands in a queue.
 export type PlaceView = { userId: string } & (

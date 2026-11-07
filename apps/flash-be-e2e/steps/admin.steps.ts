@@ -1,8 +1,15 @@
 import { type APIResponse, expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
-import { ADMIN_AUTH_HEADER, bodyOf, routes, send } from "./support/api.js";
+import { bodyOf, routes, send } from "./support/api.js";
+import { operatorCookie, shopperCookie } from "./support/auth.js";
+import { type Sender, senderHeaders } from "./support/operator.js";
 import { currentResponse, setResponse } from "./support/response.js";
-import { migratedDatabase, query, world } from "./support/world.js";
+import {
+	migratedDatabase,
+	query,
+	SYSTEM_USER,
+	world,
+} from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
 
@@ -15,40 +22,36 @@ async function ensureDatabase(): Promise<void> {
 	if (!world.databaseUrl) await migratedDatabase();
 }
 
-// The token is read when the private API starts, so it is set before any request.
-async function useToken(token: string): Promise<void> {
-	await ensureDatabase();
-	world.apiEnv = { ...world.apiEnv, ADMIN_TOKEN: token };
-}
-
-function create(
+async function create(
 	request: Parameters<typeof send>[0],
 	stock: number,
 	startsIn: number,
 	minutes: number,
-	authorization: string | undefined,
+	sender: Sender,
+	productId?: string,
 ): Promise<APIResponse> {
+	// A request from nobody has no login to set the database up first.
+	await ensureDatabase();
 	const startsAt = new Date(Date.now() + startsIn * MINUTE_MS);
 	return send(request, routes.createSale, {
-		headers:
-			authorization === undefined ? {} : { [ADMIN_AUTH_HEADER]: authorization },
+		headers: await senderHeaders(request, sender),
 		body: {
 			stock,
 			startsAt: startsAt.toISOString(),
 			endsAt: new Date(startsAt.getTime() + minutes * MINUTE_MS).toISOString(),
+			...(productId === undefined ? {} : { productId }),
 		},
 	});
 }
 
-Given(
-	/^the admin token is "([^"]+)"$/,
-	async ({ request: _request }, token: string) => {
-		await useToken(token);
-	},
-);
+Given("an operator is logged in", async ({ request }) => {
+	await ensureDatabase();
+	await operatorCookie(request);
+});
 
-Given("no admin token is set", async ({ request: _request }) => {
-	await useToken("");
+Given("a shopper is logged in", async ({ request }) => {
+	await ensureDatabase();
+	await shopperCookie(request, "ana");
 });
 
 Given(
@@ -59,36 +62,69 @@ Given(
 			Number(stock),
 			Number(startsIn),
 			Number(minutes),
-			`Bearer ${world.apiEnv?.ADMIN_TOKEN ?? ""}`,
+			"operator",
+			world.productId,
 		);
 		expect(made.status()).toBe(201);
 		world.saleId = (await made.json()).id;
 	},
 );
 
-When(
-	/^the operator creates a sale with stock (\d+), opening in (\d+) minutes for (\d+) minutes, using the token "([^"]+)"$/,
-	async (
-		{ request },
-		stock: string,
-		startsIn: string,
-		minutes: string,
-		token: string,
-	) => {
-		setResponse(
-			await create(
-				request,
-				Number(stock),
-				Number(startsIn),
-				Number(minutes),
-				`Bearer ${token}`,
-			),
+// There is no route for a product, so the scenario writes the row, as the system.
+Given(
+	/^a product named "([^"]+)" exists$/,
+	async ({ request: _request }, name: string) => {
+		const rows = await query<{ id: string }>(
+			`insert into products (name, created_by) values ($1, ${SYSTEM_USER}) returning id`,
+			[name],
 		);
+		world.productId = rows[0]?.id;
+	},
+);
+
+type Request = Parameters<typeof send>[0];
+
+async function createAs(
+	sender: Sender,
+	request: Request,
+	stock: string,
+	startsIn: string,
+	minutes: string,
+) {
+	setResponse(
+		await create(
+			request,
+			Number(stock),
+			Number(startsIn),
+			Number(minutes),
+			sender,
+		),
+	);
+}
+
+When(
+	/^the operator creates a sale with stock (\d+), opening in (\d+) minutes for (\d+) minutes$/,
+	async ({ request }, stock: string, startsIn: string, minutes: string) => {
+		await createAs("operator", request, stock, startsIn, minutes);
 	},
 );
 
 When(
-	/^the operator creates a sale with stock (\d+), opening in (\d+) minutes for (\d+) minutes, without a token$/,
+	/^the shopper creates a sale with stock (\d+), opening in (\d+) minutes for (\d+) minutes$/,
+	async ({ request }, stock: string, startsIn: string, minutes: string) => {
+		await createAs("shopper", request, stock, startsIn, minutes);
+	},
+);
+
+When(
+	/^someone who is not logged in creates a sale with stock (\d+), opening in (\d+) minutes for (\d+) minutes$/,
+	async ({ request }, stock: string, startsIn: string, minutes: string) => {
+		await createAs("nobody", request, stock, startsIn, minutes);
+	},
+);
+
+When(
+	/^the operator creates a sale of that product with stock (\d+), opening in (\d+) minutes for (\d+) minutes$/,
 	async ({ request }, stock: string, startsIn: string, minutes: string) => {
 		setResponse(
 			await create(
@@ -96,7 +132,24 @@ When(
 				Number(stock),
 				Number(startsIn),
 				Number(minutes),
-				undefined,
+				"operator",
+				world.productId,
+			),
+		);
+	},
+);
+
+When(
+	/^the operator creates a sale of a product that does not exist with stock (\d+), opening in (\d+) minutes for (\d+) minutes$/,
+	async ({ request }, stock: string, startsIn: string, minutes: string) => {
+		setResponse(
+			await create(
+				request,
+				Number(stock),
+				Number(startsIn),
+				Number(minutes),
+				"operator",
+				"00000000-0000-4000-8000-000000000000",
 			),
 		);
 	},
@@ -118,7 +171,7 @@ When(
 					Number(stock),
 					Number(startsIn),
 					Number(minutes),
-					`Bearer ${world.apiEnv?.ADMIN_TOKEN ?? ""}`,
+					"operator",
 				),
 			),
 		);
@@ -143,10 +196,30 @@ Then("the current sale is the new sale", async ({ request }) => {
 	expect(current?.id).toBe(made.id);
 });
 
+Then("the new sale sells that product", async ({ request: _request }) => {
+	expect((await currentResponse().json()).productId).toBe(world.productId);
+	const rows = await query<{ product_id: string }>(
+		"select distinct product_id from sales where deleted_at is null",
+	);
+	expect(rows.map((row) => row.product_id)).toEqual([world.productId]);
+});
+
+Then(
+	/^the sales sell (\d+) product$/,
+	async ({ request: _request }, count: string) => {
+		const rows = await query(
+			"select distinct product_id from sales where deleted_at is null",
+		);
+		expect(rows).toHaveLength(Number(count));
+	},
+);
+
 Then(
 	/^the number of sales is (\d+)$/,
 	async ({ request: _request }, count: string) => {
-		expect(await query("select 1 from sales")).toHaveLength(Number(count));
+		expect(
+			await query("select 1 from sales where deleted_at is null"),
+		).toHaveLength(Number(count));
 	},
 );
 

@@ -1,7 +1,8 @@
-import { expect } from "@playwright/test";
+import { type APIRequestContext, expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { shoppers } from "./queue.steps.js";
 import { build, routes, send, TICKET_HEADER } from "./support/api.js";
+import { shopperCookie } from "./support/auth.js";
 import { changeSale } from "./support/operator.js";
 import { setResponse } from "./support/response.js";
 import { openStream, type Stream } from "./support/stream.js";
@@ -22,10 +23,11 @@ async function watchSale(saleId: string) {
 	await watch(built.url, built.headers);
 }
 
-async function watchPlace(user: string) {
+async function watchPlace(request: APIRequestContext, user: string) {
 	const built = await build(routes.placeEvents, {
-		params: { saleId: world.saleId ?? "", userId: user },
+		params: { saleId: world.saleId ?? "" },
 		headers: {
+			cookie: await shopperCookie(request, user),
 			[TICKET_HEADER]: shoppers().tickets.get(user.trim().toLowerCase()),
 		},
 	});
@@ -58,26 +60,26 @@ When(
 
 Given(
 	/^"([^"]+)" is watching her place$/,
-	async ({ request: _request }, user: string) => {
-		await watchPlace(user);
+	async ({ request }, user: string) => {
+		await watchPlace(request, user);
 		await current().next();
 	},
 );
 
-When(
-	/^"([^"]+)" watches her place$/,
-	async ({ request: _request }, user: string) => {
-		await watchPlace(user);
-	},
-);
+When(/^"([^"]+)" watches her place$/, async ({ request }, user: string) => {
+	await watchPlace(request, user);
+});
 
 When(
 	/^"([^"]+)" watches her place with a wrong ticket$/,
 	async ({ request }, user: string) => {
 		setResponse(
 			await send(request, routes.placeEvents, {
-				params: { saleId: world.saleId ?? "", userId: user },
-				headers: { [TICKET_HEADER]: "not-the-ticket" },
+				params: { saleId: world.saleId ?? "" },
+				headers: {
+					cookie: await shopperCookie(request, user),
+					[TICKET_HEADER]: "not-the-ticket",
+				},
 			}),
 		);
 	},
