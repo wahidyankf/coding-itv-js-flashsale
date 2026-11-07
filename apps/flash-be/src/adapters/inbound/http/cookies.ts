@@ -1,11 +1,9 @@
 // The cookies of a login, as HTTP carries them. The domain says how long a login lasts; this file says how a cookie
 // is written and read. The access cookie goes with every request, the refresh cookie only to the auth routes.
 
-// The two cookies of a login. The access token is short and goes with every request. The refresh token lives longer,
-// is sent only to the auth routes, and is replaced each time it is used.
-// The name of the cookie that holds the access token.
+// The name of the cookie that holds the access token. It is short and goes with every request.
 export const ACCESS_COOKIE = "access_token";
-// The name of the cookie that holds the refresh token.
+// The name of the cookie that holds the refresh token. It lives longer, and is replaced each time it is used.
 export const REFRESH_COOKIE = "refresh_token";
 // The only path the refresh cookie is sent to, so it travels to the auth routes and nowhere else.
 export const REFRESH_COOKIE_PATH = "/auth";

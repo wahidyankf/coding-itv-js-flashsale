@@ -51,6 +51,12 @@ const settingDefaults = {
 	eventsIntervalMs: 1000,
 } as const;
 
+// The text of a setting, or undefined when it is not set. An empty variable counts as not set, so it takes the default.
+function setting(env: NodeJS.ProcessEnv, name: string): string | undefined {
+	const value = env[name];
+	return value === undefined || value === "" ? undefined : value;
+}
+
 // The readers of one environment. Each takes a setting by name, reads it, and refuses a value that breaks its rule.
 function readersOf(env: NodeJS.ProcessEnv) {
 	// A whole number that is at least `min`. The error says the rule, so a bad value says what it needed.
@@ -59,7 +65,7 @@ function readersOf(env: NodeJS.ProcessEnv) {
 		fallback: number,
 		min: 0 | 1,
 	): number => {
-		const value = Number(env[name] ?? fallback);
+		const value = Number(setting(env, name) ?? fallback);
 		if (!Number.isInteger(value) || value < min) {
 			const rule =
 				min === 0 ? "zero or a positive integer" : "a positive integer";
@@ -70,7 +76,7 @@ function readersOf(env: NodeJS.ProcessEnv) {
 
 	// A number from 0 to 1, such as a share of charges.
 	const fraction = (name: string, fallback: number): number => {
-		const value = Number(env[name] ?? fallback);
+		const value = Number(setting(env, name) ?? fallback);
 		if (!Number.isFinite(value) || value < 0 || value > 1) {
 			throw new Error(`${name} must be a number from 0 to 1`);
 		}
@@ -103,13 +109,13 @@ export function buildConfig(env: NodeJS.ProcessEnv): Config {
 		return fallback;
 	};
 
-	const port = Number(env.FLASH_BE_PORT ?? localDefaults.port);
+	const port = Number(setting(env, "FLASH_BE_PORT") ?? localDefaults.port);
 	if (!Number.isInteger(port) || port < 1 || port > MAX_PORT) {
 		throw new Error("FLASH_BE_PORT must be a valid port number");
 	}
 
 	return {
-		host: env.FLASH_BE_HOST ?? localDefaults.host,
+		host: setting(env, "FLASH_BE_HOST") ?? localDefaults.host,
 		port,
 		databaseUrl: withDefault("DATABASE_URL", localDefaults.databaseUrl),
 		redisUrl: withDefault("REDIS_URL", localDefaults.redisUrl),

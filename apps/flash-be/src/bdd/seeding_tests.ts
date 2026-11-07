@@ -47,11 +47,16 @@ describeFeature(
 				When(
 					"the sale is seeded with stock {int}, opening in {int} minutes for {int} minutes",
 					async (_ctx, stock: number, startsIn: number, duration: number) => {
-						const input = parseSeedArgs(
+						const parsed = parseSeedArgs(
 							seedArgs(stock, startsIn, duration),
 							NOW,
 						);
-						await seedSale(db.db as unknown as Kysely<Database>, input, ACTOR);
+						if (parsed.isErr()) throw new Error(parsed.error);
+						await seedSale(
+							db.db as unknown as Kysely<Database>,
+							parsed.value,
+							ACTOR,
+						);
 					},
 				);
 
@@ -90,13 +95,14 @@ describeFeature(
 					"the sale is seeded with stock {int}, opening in {int} minutes for {int} minutes",
 					async (_ctx, stock: number, startsIn: number, duration: number) => {
 						try {
-							const input = parseSeedArgs(
+							const parsed = parseSeedArgs(
 								seedArgs(stock, startsIn, duration),
 								NOW,
 							);
+							if (parsed.isErr()) throw new Error(parsed.error);
 							await seedSale(
 								db.db as unknown as Kysely<Database>,
-								input,
+								parsed.value,
 								ACTOR,
 							);
 						} catch (error) {

@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import { MS_PER_HOUR, MS_PER_SECOND } from "@flash/flash-commons";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../../adapters/inbound/http/app.js";
+import { DEFAULT_STREAM_OPTIONS } from "../../adapters/inbound/http/event-stream.js";
 import { createMemoryRateLimitStore } from "../../adapters/outbound/memory/memory-rate-limit-store.js";
 import { createMockPayment } from "../../adapters/outbound/payment/mock-payment.js";
 import { admitCurrentSale } from "../../application/admission.js";
@@ -24,6 +25,7 @@ import type { ReservationService } from "../../application/reservation-service.j
 import { createReservationService } from "../../application/reservation-service.js";
 import type { SaleService } from "../../application/sale-service.js";
 import { createSaleService } from "../../application/sale-service.js";
+import { buildConfig } from "../../config.js";
 import type { Sale } from "../../domain/sale.js";
 import { normalizeUser } from "../../domain/user.js";
 import { healthyDeps } from "./deps.js";
@@ -68,11 +70,13 @@ export type {
 	ShopScenario,
 } from "./queue-scenario.js";
 
-// The queue settings the unit layer runs with: a short tick, and an admission that lasts ten minutes.
+// The queue settings the unit layer runs with. The tick and the admission take the configuration defaults, so the unit
+// layer and a server agree on them; only the ticket secret is set here.
+const queueDefaults = buildConfig({});
 export const QUEUE_OPTIONS = {
 	ticketSecret: "unit-secret",
-	admissionTickMs: 1000,
-	admissionTtlSeconds: 600,
+	admissionTickMs: queueDefaults.admissionTickMs,
+	admissionTtlSeconds: queueDefaults.admissionTtlSeconds,
 };
 
 export type UnitQueueScenario = ShopScenario & {
@@ -207,13 +211,17 @@ function unitApp(parts: UnitParts): FastifyInstance {
 			checkGate: async () => {
 				if (parts.redis.down) throw new Error("redis is down");
 			},
+			saleCache: parts.cache,
 			sales: parts.saleService,
 			queue: parts.queue,
 			reservations: parts.reservations,
 			purchases: parts.purchases,
 			rateLimiter: parts.rateLimiter,
 		},
-		{ events: { intervalMs: 20, heartbeatMs: 15_000 } },
+		{
+			cookieSecure: false,
+			events: { ...DEFAULT_STREAM_OPTIONS, intervalMs: 20 },
+		},
 	);
 }
 

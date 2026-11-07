@@ -1,4 +1,5 @@
-// Purchases and their holds, kept in Postgres. A purchase is written in the same transaction that checks the stock.
+// Kind: repository (a record kept in Postgres, which survives a Redis outage). Purchases and their holds. A purchase is
+// written in the same transaction that checks the stock. Application layer, port.
 import type { Purchase } from "../../domain/purchase.js";
 import type { Reservation } from "../../domain/reservation.js";
 import type { Username } from "../../domain/user.js";

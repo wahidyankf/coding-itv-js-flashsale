@@ -14,10 +14,13 @@ import {
 } from "../domain/auth.js";
 import { isLive } from "../domain/time.js";
 import type { UserId, Username } from "../domain/user.js";
-import type { AccountStore } from "./ports/account-store.js";
+import type { AccountRepository } from "./ports/account-repository.js";
 import type { Clock } from "./ports/clock.js";
 import type { PasswordHasher } from "./ports/password-hasher.js";
-import type { ClientInfo, SessionStore } from "./ports/session-store.js";
+import type {
+	ClientInfo,
+	SessionRepository,
+} from "./ports/session-repository.js";
 import type { TokenSource } from "./ports/token-source.js";
 
 // What a login hands to the client: who it is, and the two tokens with the time each one ends.
@@ -73,8 +76,8 @@ export type AuthService = {
 
 // The ports the steps below work with. They are passed as one value, so each step keeps a short parameter list.
 type AuthPorts = {
-	accounts: AccountStore;
-	sessions: SessionStore;
+	accounts: AccountRepository;
+	sessions: SessionRepository;
 	hasher: PasswordHasher;
 	clock: Clock;
 	tokens: TokenSource;
@@ -143,15 +146,21 @@ async function authenticateWith(
 }
 
 export function createAuthService(
-	accounts: AccountStore,
-	sessions: SessionStore,
+	accounts: AccountRepository,
+	sessions: SessionRepository,
 	hasher: PasswordHasher,
 	clock: Clock,
 	tokens: TokenSource,
 ): AuthService {
 	const ports: AuthPorts = { accounts, sessions, hasher, clock, tokens };
 	// A hash to check against when the name is unknown, so that case takes as long as a wrong password.
-	const decoy = hasher.hash(tokens());
+	// It is made by the first unknown name, not at start, so a service with no such login pays for no hash and draws no
+	// token. Concurrent unknown names share the one promise.
+	let decoy: Promise<string> | undefined;
+	const decoyHash = (): Promise<string> => {
+		decoy ??= hasher.hash(tokens());
+		return decoy;
+	};
 
 	return {
 		register: async (username, password, client) => {
@@ -168,7 +177,7 @@ export function createAuthService(
 			const found = await accounts.findCredentials(username);
 			const matches = await hasher.verify(
 				password,
-				found?.passwordHash ?? (await decoy),
+				found?.passwordHash ?? (await decoyHash()),
 			);
 			if (found === undefined || !matches) {
 				return new Err("invalid_credentials");

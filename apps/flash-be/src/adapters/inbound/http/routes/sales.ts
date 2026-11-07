@@ -4,8 +4,9 @@
 import { HTTP_STATUS, MS_PER_SECOND } from "@flash/flash-commons";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import type { Dependencies } from "../../../../application/dependencies.js";
-import type { SaleView } from "../../../../application/sale-view.js";
+import type { SaleWithStatus } from "../../../../application/sale-service.js";
 import { type StreamOptions, serveEvents } from "../event-stream.js";
+import { describeSale, type SaleView } from "../sale-view.js";
 import type { SaleParams } from "./guards.js";
 import { sendError } from "./reply.js";
 
@@ -18,21 +19,24 @@ export function registerSaleRoutes(
 	deps: Dependencies,
 	stream: StreamOptions,
 ): void {
-	// Public sale reads may be kept for the cache time. Zero means no cache header at all.
-	const cacheable = <R extends FastifyReply>(reply: R): R => {
-		const ms = deps.sales.cacheMs();
+	// Public sale reads may be kept for the cache time. Zero means no cache header at all. The time is read from the cache
+	// the composition set, so the header and the reads agree.
+	const cacheable = (reply: FastifyReply): FastifyReply => {
+		const ms = deps.saleCache.ttlMs;
 		return ms > 0
-			? (reply.header(
+			? reply.header(
 					"cache-control",
 					`public, max-age=${Math.ceil(ms / MS_PER_SECOND)}`,
-				) as R)
+				)
 			: reply;
 	};
 	// The reply to a sale read: the sale, or the not-found reply when there is none.
-	const sendSale = (reply: FastifyReply, sale: SaleView | undefined) =>
-		sale === undefined
+	const sendSale = (reply: FastifyReply, found: SaleWithStatus | undefined) =>
+		found === undefined
 			? sendError(reply, "sale_not_found")
-			: cacheable(reply).code(HTTP_STATUS.ok).send(sale);
+			: cacheable(reply)
+					.code(HTTP_STATUS.ok)
+					.send(describeSale(found.sale, found.status));
 
 	// The sale a shopper sees. "current" is the running sale, else the one that opens next, else none.
 	app.route({
@@ -63,11 +67,14 @@ export function registerSaleRoutes(
 				request,
 				reply,
 				async () => {
-					const sale = await deps.sales.byId(saleId);
+					const found = await deps.sales.byId(saleId);
 					// A sale that is gone has nothing to tell. The stream stays open and sends nothing for it.
-					return sale === undefined
+					return found === undefined
 						? undefined
-						: ({ event: "sale", data: sale } satisfies SaleEvent);
+						: ({
+								event: "sale",
+								data: describeSale(found.sale, found.status),
+							} satisfies SaleEvent);
 				},
 				stream,
 				(error) => request.log.warn({ err: error }, "event read failed"),

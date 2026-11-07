@@ -22,7 +22,9 @@ async function newApp(): Promise<FastifyInstance> {
 		() => db.destroy(),
 		() => redis.close(),
 	);
-	const app = buildApp(dependenciesFrom(db, redis, config));
+	const app = buildApp(dependenciesFrom(db, redis, config), {
+		cookieSecure: false,
+	});
 	cleanups.push(() => app.close());
 	return app;
 }

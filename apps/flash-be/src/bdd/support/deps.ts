@@ -9,7 +9,8 @@ const noSale = async () => undefined;
 export const healthyDeps: Dependencies = {
 	checkDatabase: async () => {},
 	checkGate: async () => {},
-	sales: { cacheMs: () => 0, current: noSale, byId: noSale, details: noSale },
+	saleCache: { ttlMs: 0 },
+	sales: { current: noSale, byId: noSale, details: noSale },
 	auth: {
 		register: async () => new Err("username_taken"),
 		login: async () => new Err("invalid_credentials"),

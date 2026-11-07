@@ -17,13 +17,12 @@ export type EventWatcher = {
 
 export type { Response };
 
-// What a queue scenario does, whatever the layer. Unit tests answer it in memory; integration tests use
-// Postgres and Redis.
 // The sale fields a scenario sets when it makes a sale. Both layers honour exactly these four, so nothing else is passed.
 export type SaleOverrides = Partial<
 	Pick<Sale, "stock" | "sold" | "startsAt" | "endsAt">
 >;
 
+// What a queue scenario does, whatever the layer. Unit tests answer it in memory; integration tests use Postgres and Redis.
 export type QueueScenario = {
 	saleId: string;
 	response: Response | undefined;
@@ -38,10 +37,10 @@ export type QueueScenario = {
 	loseQueue: () => Promise<void>;
 };
 
-// The same, for reserving. A scenario that reserves also joins and admits shoppers, so it extends the queue scenario.
 // How many shoppers one admission call lets in: more than any queue in a scenario, so "everyone waiting" is admitted.
 export const ADMIT_EVERYONE_WAITING = 1000;
 
+// The same, for reserving. A scenario that reserves also joins and admits shoppers, so it extends the queue scenario.
 export type ShopScenario = QueueScenario & {
 	holds: Map<string, { reservationId: string; expiresAt: string }>;
 	setHoldSeconds: (seconds: number) => Promise<void>;

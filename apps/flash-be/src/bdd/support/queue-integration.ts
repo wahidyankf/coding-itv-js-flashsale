@@ -8,6 +8,7 @@ import { sleep } from "@flash/flash-commons/timers";
 import type { FastifyInstance } from "fastify";
 import { type Kysely, sql } from "kysely";
 import { buildApp } from "../../adapters/inbound/http/app.js";
+import { DEFAULT_STREAM_OPTIONS } from "../../adapters/inbound/http/event-stream.js";
 import { createMemoryRateLimitStore } from "../../adapters/outbound/memory/memory-rate-limit-store.js";
 import { createMockPayment } from "../../adapters/outbound/payment/mock-payment.js";
 import {
@@ -133,7 +134,10 @@ function integrationParts(
 	const app = buildApp(
 		{ ...base, reservations, purchases, rateLimiter },
 		// Streams read often in tests, so a change shows within a few milliseconds.
-		{ events: { intervalMs: 20, heartbeatMs: 15_000 } },
+		{
+			cookieSecure: false,
+			events: { ...DEFAULT_STREAM_OPTIONS, intervalMs: 20 },
+		},
 	);
 	return {
 		redis,

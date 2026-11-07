@@ -1,17 +1,16 @@
 // Logins in Postgres: each session holds two tokens, and Postgres has the last word on whether one is still good. Only the
 // SHA-256 hashes of the tokens are stored, so a copy of the table cannot be used to log in. Outbound Postgres adapter for
-// the SessionStore port.
-import { type Kysely, sql } from "kysely";
+// the SessionRepository port.
+import type { Kysely } from "kysely";
 import type {
 	NewSession,
 	Rotation,
-	SessionStore,
-} from "../../../application/ports/session-store.js";
+	SessionRepository,
+} from "../../../application/ports/session-repository.js";
 import type { Principal } from "../../../domain/auth.js";
-import { storedUsername, userIdOf } from "../../../domain/user.js";
 import type { Database } from "./database.js";
-
-const now = sql<Date>`now()`;
+import { dbNow, live } from "./queries.js";
+import { toPrincipal } from "./users.js";
 
 // What a rotation hands back: the user, when the refresh token worked, and the access hashes that stopped working.
 type Rotated = { principal: Principal | undefined; ended: string[] };
@@ -25,15 +24,9 @@ async function principalOf(
 		.selectFrom("users")
 		.select(["id", "username", "role"])
 		.where("id", "=", userId)
-		.where("deleted_at", "is", null)
+		.where(live("users"))
 		.executeTakeFirst();
-	return user === undefined
-		? undefined
-		: {
-				userId: userIdOf(user.id),
-				username: storedUsername(user.username),
-				role: user.role,
-			};
+	return user === undefined ? undefined : toPrincipal(user);
 }
 
 // Records a login, and stamps the user's last login, in one transaction.
@@ -57,7 +50,7 @@ async function createSession(
 			.execute();
 		await trx
 			.updateTable("users")
-			.set({ last_login_at: now })
+			.set({ last_login_at: dbNow })
 			.where("id", "=", session.userId)
 			.execute();
 	});
@@ -79,18 +72,14 @@ async function findLiveSession(
 			"sessions.access_expires_at",
 		])
 		.where("sessions.access_hash", "=", accessHash)
-		.where("sessions.deleted_at", "is", null)
+		.where(live("sessions"))
 		.where("sessions.access_expires_at", ">", at)
-		.where("users.deleted_at", "is", null)
+		.where(live("users"))
 		.executeTakeFirst();
 	return row === undefined
 		? undefined
 		: {
-				principal: {
-					userId: userIdOf(row.id),
-					username: storedUsername(row.username),
-					role: row.role,
-				},
+				principal: toPrincipal(row),
 				expiresAt: row.access_expires_at,
 			};
 }
@@ -101,7 +90,7 @@ async function currentByRefresh(trx: Kysely<Database>, refreshHash: string) {
 		.selectFrom("sessions")
 		.select(["id", "user_id", "access_hash", "refresh_expires_at"])
 		.where("refresh_hash", "=", refreshHash)
-		.where("deleted_at", "is", null)
+		.where(live("sessions"))
 		.forUpdate()
 		.executeTakeFirst();
 }
@@ -116,13 +105,13 @@ async function endReplayedSession(
 		.selectFrom("sessions")
 		.select(["id", "user_id", "access_hash"])
 		.where("previous_refresh_hash", "=", refreshHash)
-		.where("deleted_at", "is", null)
+		.where(live("sessions"))
 		.forUpdate()
 		.executeTakeFirst();
 	if (replayed !== undefined) {
 		await trx
 			.updateTable("sessions")
-			.set({ deleted_at: now, deleted_by: replayed.user_id })
+			.set({ deleted_at: dbNow, deleted_by: replayed.user_id })
 			.where("id", "=", replayed.id)
 			.execute();
 	}
@@ -148,7 +137,7 @@ async function swapTokens(
 			previous_refresh_hash: rotation.presentedRefreshHash,
 			refresh_hash: rotation.refreshHash,
 			refresh_expires_at: rotation.refreshExpiresAt,
-			updated_at: now,
+			updated_at: dbNow,
 			updated_by: userId,
 		})
 		.where("id", "=", sessionId)
@@ -187,8 +176,8 @@ async function revokeSessions(
 	if (accessHash === undefined && refreshHash === undefined) return [];
 	const ended = await db
 		.updateTable("sessions")
-		.set((eb) => ({ deleted_at: now, deleted_by: eb.ref("user_id") }))
-		.where("deleted_at", "is", null)
+		.set((eb) => ({ deleted_at: dbNow, deleted_by: eb.ref("user_id") }))
+		.where(live("sessions"))
 		.where((eb) =>
 			eb.or([
 				...(accessHash === undefined
@@ -208,7 +197,9 @@ async function revokeSessions(
 }
 
 // The session store over Postgres. The methods are the steps above; the factory only connects them.
-export function createSessionStore(db: Kysely<Database>): SessionStore {
+export function createSessionRepository(
+	db: Kysely<Database>,
+): SessionRepository {
 	return {
 		create: (session) => createSession(db, session),
 		findByAccess: (accessHash, at) => findLiveSession(db, accessHash, at),

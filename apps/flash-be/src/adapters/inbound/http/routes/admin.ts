@@ -5,6 +5,7 @@
 import { HTTP_STATUS } from "@flash/flash-commons";
 import type { FastifyInstance } from "fastify";
 import type { Dependencies } from "../../../../application/dependencies.js";
+import { describeAdminSale, describeSale } from "../sale-view.js";
 import { saleDraftBody, salePatchBody } from "./bodies.js";
 import { createGuards, operatorOf, type SaleParams } from "./guards.js";
 import { sendError, sendResult } from "./reply.js";
@@ -29,7 +30,10 @@ export function registerAdminRoutes(
 			return sendResult(
 				reply,
 				await deps.admin.create(draft.value, operatorOf(request)),
-				(sale) => reply.code(HTTP_STATUS.created).send(sale),
+				(found) =>
+					reply
+						.code(HTTP_STATUS.created)
+						.send(describeSale(found.sale, found.status)),
 			);
 		},
 	});
@@ -39,8 +43,12 @@ export function registerAdminRoutes(
 		method: "GET",
 		url: "/admin/sales",
 		onRequest: guarded,
-		handler: async (_request, reply) =>
-			reply.code(HTTP_STATUS.ok).send({ sales: await deps.admin.list() }),
+		handler: async (_request, reply) => {
+			const listed = (await deps.admin.list()).map(({ sale, status }) =>
+				describeAdminSale(sale, status),
+			);
+			return reply.code(HTTP_STATUS.ok).send({ sales: listed });
+		},
 	});
 
 	// An operator changes a sale. What may change depends on whether the sale has started (see `changeSaleFrom`).
@@ -58,7 +66,10 @@ export function registerAdminRoutes(
 					patch.value,
 					operatorOf(request),
 				),
-				(sale) => reply.code(HTTP_STATUS.ok).send(sale),
+				(found) =>
+					reply
+						.code(HTTP_STATUS.ok)
+						.send(describeSale(found.sale, found.status)),
 			);
 		},
 	});

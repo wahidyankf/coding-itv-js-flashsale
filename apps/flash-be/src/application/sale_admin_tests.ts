@@ -43,15 +43,15 @@ describe("create", () => {
 				return new Ok({ id: "sale-9", productId: PRODUCT_ID });
 			}),
 		).create(draft, userIdOf(ACTOR));
-		expect(created.isOk() && created.value).toEqual({
-			id: "sale-9",
-			productId: PRODUCT_ID,
-			name: "Flash sale",
+		expect(created.isOk() && created.value).toMatchObject({
+			sale: {
+				id: "sale-9",
+				productId: PRODUCT_ID,
+				name: "Flash sale",
+				stock: 5,
+				sold: 0,
+			},
 			status: "upcoming",
-			startsAt: draft.startsAt,
-			endsAt: draft.endsAt,
-			stock: 5,
-			remaining: 5,
 		});
 		expect(stored).toHaveLength(1);
 	});
@@ -100,10 +100,8 @@ describe("changing, removing and listing", () => {
 			userIdOf(ACTOR),
 		);
 		expect(changed.isOk() && changed.value).toMatchObject({
-			id: upcoming.id,
+			sale: { id: upcoming.id, stock: 9 },
 			status: "upcoming",
-			stock: 9,
-			remaining: 9,
 		});
 	});
 
@@ -152,15 +150,12 @@ describe("changing, removing and listing", () => {
 		expect(sales.map((sale) => sale.id)).toEqual([running.id]);
 	});
 
-	it("lists every sale, the one that opens last first, with the operator numbers", async () => {
+	it("lists every sale, the one that opens last first, with its status", async () => {
 		const listed = await serviceOver([{ ...running }, { ...upcoming }]).list();
-		expect(listed.map((sale) => sale.id)).toEqual([upcoming.id, running.id]);
+		expect(listed.map((row) => row.sale.id)).toEqual([upcoming.id, running.id]);
 		expect(listed[1]).toMatchObject({
 			status: "active",
-			sold: 2,
-			remaining: 3,
-			holdSeconds: 120,
-			admitPerSecond: 50,
+			sale: { sold: 2, holdSeconds: 120, admitPerSecond: 50 },
 		});
 	});
 });

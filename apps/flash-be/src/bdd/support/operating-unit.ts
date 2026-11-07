@@ -22,15 +22,20 @@ export function unitOperatingWorld(apps: FastifyInstance[]) {
 	const products = new Map<string, string>();
 	const removed = new Map<string, string>();
 	const auth = memoryAuth(clock);
-	const app = buildApp({
-		...healthyDeps,
-		auth: auth.service,
-		sales: createSaleService(fakeRepository(sales), clock),
-		admin: createSaleAdminService(
-			memorySaleAdmin(sales, products, removed),
-			clock,
-		),
-	});
+	const saleCache = { ttlMs: 0 };
+	const app = buildApp(
+		{
+			...healthyDeps,
+			auth: auth.service,
+			saleCache,
+			sales: createSaleService(fakeRepository(sales), clock, saleCache),
+			admin: createSaleAdminService(
+				memorySaleAdmin(sales, products, removed),
+				clock,
+			),
+		},
+		{ cookieSecure: false },
+	);
 	apps.push(app);
 	return operatorWorld({
 		app: () => app,

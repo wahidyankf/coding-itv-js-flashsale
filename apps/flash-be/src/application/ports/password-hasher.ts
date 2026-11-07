@@ -1,4 +1,5 @@
-// Hashing of passwords, so the database never holds one. The adapter picks the algorithm and its cost.
+// Kind: a plain port (no suffix). Hashing of passwords, so the database never holds one. The adapter picks the algorithm
+// and its cost.
 
 // Hashes a password for storage, and checks a password against a stored hash. The stored text carries what the check
 // needs (the algorithm, the salt), so a hash made by an older setting still checks.

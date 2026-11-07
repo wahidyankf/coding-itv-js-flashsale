@@ -15,7 +15,7 @@ afterEach(async () => {
 });
 
 function appWith(deps: Dependencies): FastifyInstance {
-	const app = buildApp(deps);
+	const app = buildApp(deps, { cookieSecure: false });
 	apps.push(app);
 	return app;
 }

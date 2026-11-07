@@ -16,6 +16,7 @@ const redis = await createRedis(config.redisUrl);
 // No cache, so the current sale is read as it is.
 const app = buildApp(
 	dependenciesFrom(db, redis, { ...config, saleCacheMs: 0 }),
+	{ cookieSecure: false },
 );
 
 afterAll(async () => {

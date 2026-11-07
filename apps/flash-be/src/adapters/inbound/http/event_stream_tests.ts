@@ -2,15 +2,26 @@ import { Err, Ok } from "@flash/typekit";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Dependencies } from "../../../application/dependencies.js";
+import type { SaleWithStatus } from "../../../application/sale-service.js";
 import { healthyDeps } from "../../../bdd/support/deps.js";
 import { fakeSale } from "../../../bdd/support/fake-sales.js";
 import { usernameOf } from "../../../bdd/support/users.js";
 import { userIdOf } from "../../../domain/user.js";
 import { buildApp } from "./app.js";
-import { formatEvent, serveEvents } from "./event-stream.js";
+import {
+	DEFAULT_STREAM_OPTIONS,
+	formatEvent,
+	serveEvents,
+} from "./event-stream.js";
 
 // Edges of the stream that the scenarios do not reach: a keep-alive, a sale that vanishes, a place that was lost.
 const fast = { intervalMs: 10, heartbeatMs: 0 };
+
+// A sale as a read returns it: a stock of 10, the number sold as given, and active.
+const activeSale = (sold: number): SaleWithStatus => ({
+	sale: fakeSale({ stock: 10, sold }),
+	status: "active",
+});
 const apps: Array<{ close: () => Promise<void> }> = [];
 
 // A shopper who is logged in: the place stream is for a login.
@@ -97,17 +108,13 @@ describe("the event stream", () => {
 
 	it("sends a keep-alive comment when nothing changed", async () => {
 		const sale = fakeSale({});
-		const view = {
-			...sale,
-			status: "active",
-			remaining: 10,
-		} as never;
+		const view = activeSale(0);
 		const app = buildApp(
 			{
 				...healthyDeps,
 				sales: { ...healthyDeps.sales, byId: async () => view },
 			},
-			{ events: fast },
+			{ cookieSecure: false, events: fast },
 		);
 		apps.push(app);
 		const origin = await app.listen({ host: "127.0.0.1", port: 0 });
@@ -122,7 +129,7 @@ describe("the event stream", () => {
 
 	it("keeps the stream open when a read fails, and goes on afterwards", async () => {
 		let calls = 0;
-		const view = { id: "s", status: "active", remaining: 4 } as never;
+		const view = activeSale(6);
 		const app = buildApp(
 			{
 				...healthyDeps,
@@ -136,7 +143,34 @@ describe("the event stream", () => {
 					},
 				},
 			},
-			{ events: fast },
+			{ cookieSecure: false, events: fast },
+		);
+		apps.push(app);
+		const origin = await app.listen({ host: "127.0.0.1", port: 0 });
+		const seen = await readUntil(
+			`${origin}/sales/s/events`,
+			{},
+			'"remaining":4',
+		);
+		expect(seen).toContain('"remaining":4');
+		expect(calls).toBeGreaterThan(2);
+	});
+
+	it("keeps a sale stream open when a read throws, and goes on afterwards", async () => {
+		let calls = 0;
+		const app = buildApp(
+			{
+				...healthyDeps,
+				sales: {
+					...healthyDeps.sales,
+					byId: async () => {
+						calls++;
+						if (calls === 2) throw new Error("redis is down");
+						return activeSale(6);
+					},
+				},
+			},
+			{ cookieSecure: false, events: fast },
 		);
 		apps.push(app);
 		const origin = await app.listen({ host: "127.0.0.1", port: 0 });
@@ -151,8 +185,8 @@ describe("the event stream", () => {
 
 	it("sends nothing for a read of a sale that is gone, and keeps reading until it is back", async () => {
 		let calls = 0;
-		const view = { id: "s", status: "active", remaining: 4 } as never;
-		const back = { id: "s", status: "active", remaining: 5 } as never;
+		const view = activeSale(6);
+		const back = activeSale(5);
 		const app = buildApp(
 			{
 				...healthyDeps,
@@ -167,7 +201,7 @@ describe("the event stream", () => {
 					},
 				},
 			},
-			{ events: fast },
+			{ cookieSecure: false, events: fast },
 		);
 		apps.push(app);
 		const origin = await app.listen({ host: "127.0.0.1", port: 0 });
@@ -200,7 +234,7 @@ describe("the event stream", () => {
 					},
 				},
 			},
-			{ events: fast },
+			{ cookieSecure: false, events: fast },
 		);
 		apps.push(app);
 		const origin = await app.listen({ host: "127.0.0.1", port: 0 });
@@ -223,7 +257,7 @@ describe("the event stream", () => {
 					check: async () => new Err("invalid_ticket"),
 				},
 			},
-			{ events: fast },
+			{ cookieSecure: false, events: fast },
 		);
 		apps.push(app);
 		const origin = await app.listen({ host: "127.0.0.1", port: 0 });
@@ -251,7 +285,7 @@ describe("the event stream", () => {
 					},
 				},
 			},
-			{ events: fast },
+			{ cookieSecure: false, events: fast },
 		);
 		apps.push(app);
 		const origin = await app.listen({ host: "127.0.0.1", port: 0 });
@@ -266,7 +300,7 @@ describe("the event stream", () => {
 
 	it("stops reading once the client left in the middle of a read", async () => {
 		let calls = 0;
-		const view = { id: "s", status: "active", remaining: 4 } as never;
+		const view = activeSale(6);
 		const app = buildApp(
 			{
 				...healthyDeps,
@@ -279,7 +313,10 @@ describe("the event stream", () => {
 					},
 				},
 			},
-			{ events: { intervalMs: 5, heartbeatMs: 15_000 } },
+			{
+				cookieSecure: false,
+				events: { ...DEFAULT_STREAM_OPTIONS, intervalMs: 5 },
+			},
 		);
 		apps.push(app);
 		const origin = await app.listen({ host: "127.0.0.1", port: 0 });

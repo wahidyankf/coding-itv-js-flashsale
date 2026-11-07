@@ -1,6 +1,6 @@
-// Holds in Postgres, the source of truth. The gate decides fast; this repository keeps the copy that a rebuild reads,
-// and it decides alone when the gate is down. Application layer, port: an adapter implements it, and the services use it
-// without knowing which store it is.
+// Kind: repository (a record kept in Postgres, which survives a Redis outage). Holds in Postgres, the source of truth.
+// The gate decides fast; this repository keeps the copy a rebuild reads, and decides alone when the gate is down.
+// Application layer, port: an adapter implements it, and the services use it without knowing which store it is.
 import type {
 	FallbackAnswer,
 	HoldSnapshot,

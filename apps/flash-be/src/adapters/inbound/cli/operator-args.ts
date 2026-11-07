@@ -2,7 +2,7 @@
 // uses, and words each refusal for the terminal. It is an inbound adapter, so it knows the command line and nothing of
 // the database.
 import { parseArgs } from "node:util";
-import { Err, Ok, type Result } from "@flash/typekit";
+import { attempt, Err, Ok, type Result } from "@flash/typekit";
 import {
 	PASSWORD_MAX_LENGTH,
 	PASSWORD_MIN_LENGTH,
@@ -22,17 +22,26 @@ export type OperatorRefusal =
 	| "invalid_password"
 	| "username_taken";
 
-// Reads `--username` and `--password`, each as `--flag value` or `--flag=value`. Anything else is a usage error.
-export function parseOperatorArgs(argv: string[]): OperatorArgs {
-	const { values } = parseArgs({
-		args: argv,
-		options: {
-			username: { type: "string" },
-			password: { type: "string" },
-		},
-		strict: true,
-	});
-	return { username: values.username, password: values.password };
+// Reads `--username` and `--password`, each as `--flag value` or `--flag=value`. Anything else is a usage error, and it
+// comes back as the message the command prints, so the caller decides what to do with it.
+export function parseOperatorArgs(
+	argv: string[],
+): Result<OperatorArgs, string> {
+	const parsed = attempt(
+		() =>
+			parseArgs({
+				args: argv,
+				options: {
+					username: { type: "string" },
+					password: { type: "string" },
+				},
+				strict: true,
+			}),
+		Error,
+	);
+	if (parsed.isErr()) return new Err(parsed.error.message);
+	const { values } = parsed.value;
+	return new Ok({ username: values.username, password: values.password });
 }
 
 // The options as the use case takes them: a usable name and a usable password, or the first refusal. It runs before the

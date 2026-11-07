@@ -141,8 +141,8 @@ export function createRedisQueueStore(redis: RedisClient): QueueStore {
 			return usersOf(users);
 		},
 
-		// Only one instance admits in a tick, so the line moves at the sale's rate. The lead lasts one millisecond less than a
-		// tick, so it is free again by the next tick.
+		// Only one instance admits in a tick, so the line moves at the sale's rate. The caller sets how long the lead lasts
+		// (see queue-service); the key expires by itself, so a crashed leader does not hold the line.
 		async tryLead(saleId, ms) {
 			const reply = await redis.set(saleKey(saleId, "admit-lead"), "1", {
 				condition: "NX",

@@ -1,5 +1,5 @@
-// Seeding a sale for the demo and the tests. It is the one write that skips the overlap check an operator's create
-// makes: the seed command does not check overlap, and the operator routes do.
+// Kind: a plain port (no suffix). Seeding a sale for the demo and the tests. It is the one write that skips the overlap
+// check an operator's create makes: the seed command does not check overlap, and the operator routes do.
 import type { NewSale } from "../../domain/sale-window.js";
 import type { UserId } from "../../domain/user.js";
 

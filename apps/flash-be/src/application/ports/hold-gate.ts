@@ -1,4 +1,5 @@
-// The gate: the fast, shared answer to "who holds or bought an item of this sale". Redis implements it. Postgres stays
+// Kind: gate (the fast check that answers before Postgres is asked). The gate: the fast, shared answer to "who holds or
+// bought an item of this sale". Redis implements it. Postgres stays
 // the source of truth: when the gate loses its state, a rebuild copies Postgres back into it. Application layer, port.
 import type { Result } from "@flash/typekit";
 import type {

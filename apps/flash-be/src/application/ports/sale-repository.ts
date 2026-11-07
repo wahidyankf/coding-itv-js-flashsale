@@ -1,4 +1,5 @@
-// The sales that shoppers read, kept in Postgres. Reads only: an operator writes through the sale admin port.
+// Kind: repository (a record kept in Postgres, which survives a Redis outage). The sales that shoppers read. Reads only:
+// an operator writes through the sale admin port.
 import type { Sale } from "../../domain/sale.js";
 
 export type SaleRepository = {

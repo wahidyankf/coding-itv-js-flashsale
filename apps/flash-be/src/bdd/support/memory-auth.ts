@@ -8,10 +8,10 @@ import {
 	type AuthService,
 	createAuthService,
 } from "../../application/auth-service.js";
-import type { AccountStore } from "../../application/ports/account-store.js";
+import type { AccountRepository } from "../../application/ports/account-repository.js";
 import type { Clock } from "../../application/ports/clock.js";
 import type { PasswordHasher } from "../../application/ports/password-hasher.js";
-import type { SessionStore } from "../../application/ports/session-store.js";
+import type { SessionRepository } from "../../application/ports/session-repository.js";
 import type { Principal, Role } from "../../domain/auth.js";
 import { type UserId, type Username, userIdOf } from "../../domain/user.js";
 import { usernameOf } from "./users.js";
@@ -50,7 +50,7 @@ export type MemoryAuth = {
 };
 
 // Accounts by name: a name is taken once, and a principal is found by name.
-function memoryAccounts(users: Map<Username, Account>): AccountStore {
+function memoryAccounts(users: Map<Username, Account>): AccountRepository {
 	return {
 		register: async (account) => {
 			if (users.has(account.username)) {
@@ -78,7 +78,7 @@ function memoryAccounts(users: Map<Username, Account>): AccountStore {
 function memorySessions(
 	rows: Row[],
 	principalById: (userId: UserId) => Principal | undefined,
-): SessionStore {
+): SessionRepository {
 	const liveRows = (predicate: (row: Row) => boolean) =>
 		rows.filter((row) => !row.deleted && predicate(row));
 	return {

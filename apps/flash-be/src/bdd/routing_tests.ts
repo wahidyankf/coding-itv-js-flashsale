@@ -14,10 +14,10 @@ afterAll(async () => {
 });
 
 function newApp(): FastifyInstance {
-	const app = buildApp({
-		...healthyDeps,
-		auth: memoryAuth(() => new Date()).service,
-	});
+	const app = buildApp(
+		{ ...healthyDeps, auth: memoryAuth(() => new Date()).service },
+		{ cookieSecure: false },
+	);
 	apps.push(app);
 	return app;
 }

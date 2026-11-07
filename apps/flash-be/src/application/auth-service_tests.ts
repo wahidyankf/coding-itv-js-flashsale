@@ -7,6 +7,9 @@ import { usernameOf } from "../bdd/support/users.js";
 import { ACCESS_TTL_SECONDS, REFRESH_TTL_SECONDS } from "../domain/auth.js";
 import { userIdOf } from "../domain/user.js";
 import { createAuthService } from "./auth-service.js";
+import type { AccountRepository } from "./ports/account-repository.js";
+import type { PasswordHasher } from "./ports/password-hasher.js";
+import type { SessionRepository } from "./ports/session-repository.js";
 
 // The branches of the auth service that no scenario of a shopper reaches by itself.
 const START = new Date("2026-06-01T12:00:00Z");
@@ -194,6 +197,54 @@ describe("refreshing", () => {
 		expect(refreshed.isErr()).toBe(true);
 		if (refreshed.isOk()) return;
 		expect(refreshed.error).toBe("invalid_refresh_token");
+	});
+});
+
+// The decoy is the hash an unknown name is checked against. It is made when first needed, so a service that starts with no
+// unknown name pays for no hash and draws no token for one.
+describe("the decoy hash of an unknown name", () => {
+	it("is made by the first login of an unknown name, not when the service starts", async () => {
+		let hashes = 0;
+		let draws = 0;
+		const hasher: PasswordHasher = {
+			hash: async (password) => {
+				hashes++;
+				return `plain$${password}`;
+			},
+			verify: async (password, stored) => stored === `plain$${password}`,
+		};
+		const tokens = () => {
+			draws++;
+			return `token-${draws}`;
+		};
+		const accounts: AccountRepository = {
+			register: async () => new Err("username_taken" as const),
+			findCredentials: async () => undefined,
+		};
+		const refuse = async () => {
+			throw new Error("the login path does not use the sessions");
+		};
+		const sessions: SessionRepository = {
+			create: refuse,
+			findByAccess: refuse,
+			rotate: refuse,
+			revoke: refuse,
+		};
+		const service = createAuthService(
+			accounts,
+			sessions,
+			hasher,
+			() => START,
+			tokens,
+		);
+		expect({ hashes, draws }).toEqual({ hashes: 0, draws: 0 });
+
+		const first = await service.login(usernameOf("nobody"), PASSWORD);
+		expect(first.isErr() && first.error).toBe("invalid_credentials");
+		expect({ hashes, draws }).toEqual({ hashes: 1, draws: 1 });
+
+		await service.login(usernameOf("someone"), PASSWORD);
+		expect(hashes).toBe(1);
 	});
 });
 

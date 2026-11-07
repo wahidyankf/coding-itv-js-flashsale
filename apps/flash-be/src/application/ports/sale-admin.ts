@@ -1,5 +1,6 @@
-// What an operator does to the sales, kept in Postgres. Each write checks and writes in one step, so two operators
-// cannot both pass a check that only one of them can satisfy.
+// Kind: a plain port (no suffix). It writes Postgres rows, so the suffix rule would call it a repository; the name stays
+// because SaleRepository already names the reads. What an operator does to the sales, kept in Postgres. Each write
+// checks and writes in one step, so two operators cannot both pass a check that only one of them can satisfy.
 import type { Result } from "@flash/typekit";
 import type { Sale } from "../../domain/sale.js";
 import type { ChangeSaleError, NewSale } from "../../domain/sale-window.js";

@@ -30,6 +30,8 @@ export function saleStatus(sale: Sale, now: Date): SaleStatus {
 
 // The sale shoppers are shown: the one whose window holds `now`, else the one that opens next, else none. A sale that
 // has ended is not current any more (it can still be read by its id). Windows never overlap, so at most one is running.
+// The database repeats this rule in `findCurrent` (sale-repository.ts); sale-rules_integration_tests checks both at the
+// same moments.
 export function pickCurrent(
 	sales: readonly Sale[],
 	now: Date,
@@ -50,7 +52,7 @@ export function remaining(sale: Sale): number {
 // Why a shopper cannot hold an item now.
 export type ReserveBlock = "sale_not_started" | "sale_ended" | "sold_out";
 
-// The sale answers in this order, so a shopper learns why without a valid ticket.
+// Decided by the sale's status alone, so the reason needs no ticket.
 export function reserveBlock(status: SaleStatus): ReserveBlock | undefined {
 	switch (status) {
 		case "upcoming":

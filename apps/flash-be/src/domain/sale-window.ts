@@ -15,7 +15,8 @@ export type NewSale = {
 	admitPerSecond: number;
 };
 
-// The defaults an operator gets for what they leave out. The seed command and the operator routes share them.
+// The defaults for what an operator or the seed command leaves out. The length of the window is the seed command's only:
+// an operator gives both ends of the window.
 export const DEFAULT_SALE_NAME = "Flash sale";
 export const DEFAULT_HOLD_SECONDS = 120;
 export const DEFAULT_ADMIT_PER_SECOND = 50;
@@ -127,7 +128,8 @@ export function changeSaleFrom(
 type Window = { startsAt: Date; endsAt: Date };
 
 // Two windows overlap when each opens before the other closes. A sale that opens at the moment another one closes
-// does not overlap it.
+// does not overlap it. The database repeats this rule in `clashes` (sale-admin.ts); sale-rules_integration_tests checks
+// the two on the same windows.
 export function overlaps(a: Window, b: Window): boolean {
 	return a.startsAt < b.endsAt && a.endsAt > b.startsAt;
 }

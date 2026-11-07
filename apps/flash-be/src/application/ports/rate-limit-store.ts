@@ -1,4 +1,5 @@
-// The counter behind the rate limit. Redis counts for every instance; a memory copy counts when Redis is down, so an
+// Kind: store (keyed counters in Redis; LocalRateLimitStore is the memory copy of the same rule). The counter behind the
+// rate limit. Redis counts for every instance; a memory copy counts when Redis is down, so an
 // outage never switches the limit off. Application layer, port.
 import type { Result } from "@flash/typekit";
 import type { UnreadableReply } from "./reply.js";

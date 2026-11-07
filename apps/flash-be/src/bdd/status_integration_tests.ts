@@ -13,7 +13,9 @@ import { relativeTime } from "./support/time.js";
 // The run database is migrated once by the global setup. Each scenario empties the sales table first.
 const db = createDb(config.databaseUrl);
 const redis = await createRedis(config.redisUrl);
-const app = buildApp(dependenciesFrom(db, redis, config));
+const app = buildApp(dependenciesFrom(db, redis, config), {
+	cookieSecure: false,
+});
 
 afterAll(async () => {
 	await app.close();

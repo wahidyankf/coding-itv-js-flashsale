@@ -49,9 +49,14 @@ describeFeature(
 				When(
 					"the sale is seeded with stock {int}, opening in {int} minutes for {int} minutes",
 					async (_ctx, stock: number, startsIn: number, duration: number) => {
+						const parsed = parseSeedArgs(
+							args(stock, startsIn, duration),
+							new Date(),
+						);
+						if (parsed.isErr()) throw new Error(parsed.error);
 						await seedSale(
 							scratch,
-							parseSeedArgs(args(stock, startsIn, duration), new Date()),
+							parsed.value,
 							await actorId(scratch, SYSTEM_USERNAME),
 						);
 					},
@@ -97,9 +102,14 @@ describeFeature(
 					"the sale is seeded with stock {int}, opening in {int} minutes for {int} minutes",
 					async (_ctx, stock: number, startsIn: number, duration: number) => {
 						try {
+							const parsed = parseSeedArgs(
+								args(stock, startsIn, duration),
+								new Date(),
+							);
+							if (parsed.isErr()) throw new Error(parsed.error);
 							await seedSale(
 								scratch,
-								parseSeedArgs(args(stock, startsIn, duration), new Date()),
+								parsed.value,
 								await actorId(scratch, SYSTEM_USERNAME),
 							);
 						} catch (error) {

@@ -1,4 +1,5 @@
-// The payment provider, behind a port. The shop has no real provider; a mock stands in (see mock-payment.ts).
+// Kind: a plain port (no suffix). The payment provider, behind a port. The shop has no real provider; a mock stands in
+// (see mock-payment.ts).
 import type { Result } from "@flash/typekit";
 
 // A charge that went through. The ref is what a refund names.

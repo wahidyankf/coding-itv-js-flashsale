@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildConfig, describeConfig } from "./config.js";
+import { localDefaults } from "./local-defaults.js";
 
 // How the environment becomes a Config is a detail of the code, so it is checked here and not with scenarios.
 const hostAndPort = (url: string) => {
@@ -138,6 +139,27 @@ it("reads TRUST_PROXY as a true or false flag", () => {
 	expect(() => buildConfig({ TRUST_PROXY: "yes" })).toThrow(
 		"TRUST_PROXY must be true or false",
 	);
+});
+
+// An empty variable (set to nothing) is the same as one that is not set, so it takes the default. Read as a number it
+// would be 0, which is a different setting.
+describe("an empty value is the same as an unset one", () => {
+	it("takes the default for a whole number, a share and the port", () => {
+		const config = buildConfig({
+			ADMISSION_TICK_MS: "",
+			PAYMENT_LATENCY_MS: "",
+			PAYMENT_FAILURE_RATE: "",
+			FLASH_BE_PORT: "",
+		});
+		expect(config.admissionTickMs).toBe(1000);
+		expect(config.paymentLatencyMs).toBe(150);
+		expect(config.paymentFailureRate).toBeCloseTo(0.02);
+		expect(config.port).toBe(Number(localDefaults.port));
+	});
+
+	it("takes the default host", () => {
+		expect(buildConfig({ FLASH_BE_HOST: "" }).host).toBe(localDefaults.host);
+	});
 });
 
 describe("the cookies of a login", () => {

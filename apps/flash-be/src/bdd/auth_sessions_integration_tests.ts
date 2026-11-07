@@ -21,6 +21,7 @@ const app = buildApp(
 		// Every scenario signs up from the same address, and the limit has its own scenarios.
 		authRateLimitPerIp: 100_000,
 	}),
+	{ cookieSecure: false },
 );
 
 afterAll(async () => {

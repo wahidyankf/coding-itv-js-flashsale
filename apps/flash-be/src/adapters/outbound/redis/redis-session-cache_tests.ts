@@ -1,7 +1,7 @@
 // Unit tests for the Redis session cache (adapter layer, outbound). An entry that cannot be read is refused, never guessed.
 
 import { describe, expect, it } from "vitest";
-import type { SessionStore } from "../../../application/ports/session-store.js";
+import type { SessionRepository } from "../../../application/ports/session-repository.js";
 import { usernameOf } from "../../../bdd/support/users.js";
 import type { Principal } from "../../../domain/auth.js";
 import { userIdOf } from "../../../domain/user.js";
@@ -42,7 +42,7 @@ function fakeRedis(down = false) {
 
 function innerStore() {
 	const calls = { find: 0, revoke: 0, rotate: 0 };
-	const store: SessionStore = {
+	const store: SessionRepository = {
 		create: async () => {},
 		findByAccess: async () => {
 			calls.find += 1;

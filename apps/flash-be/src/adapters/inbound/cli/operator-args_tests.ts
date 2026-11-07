@@ -51,30 +51,37 @@ describe("refusalMessage", () => {
 	});
 });
 
+// A bad flag is a value the command prints, not an exception: the parser answers with the usage error.
 describe("parseOperatorArgs", () => {
 	it("reads both flags, with a space or with =", () => {
 		expect(
 			parseOperatorArgs(["--username", "ana", "--password", "a long phrase"]),
-		).toEqual({
-			username: "ana",
-			password: "a long phrase",
-		});
+		).toEqual(
+			new Ok({
+				username: "ana",
+				password: "a long phrase",
+			}),
+		);
 		expect(
 			parseOperatorArgs(["--username=ana", "--password=a long phrase"]),
-		).toEqual({
-			username: "ana",
-			password: "a long phrase",
-		});
+		).toEqual(
+			new Ok({
+				username: "ana",
+				password: "a long phrase",
+			}),
+		);
 	});
 
 	it("leaves a flag that was not given undefined", () => {
-		expect(parseOperatorArgs([])).toEqual({
-			username: undefined,
-			password: undefined,
-		});
+		expect(parseOperatorArgs([])).toEqual(
+			new Ok({
+				username: undefined,
+				password: undefined,
+			}),
+		);
 	});
 
 	it("refuses a flag the command does not have", () => {
-		expect(() => parseOperatorArgs(["--role", "operator"])).toThrow();
+		expect(parseOperatorArgs(["--role", "operator"]).isErr()).toBe(true);
 	});
 });

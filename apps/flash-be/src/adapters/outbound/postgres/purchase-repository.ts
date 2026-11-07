@@ -12,8 +12,10 @@ import type { Reservation } from "../../../domain/reservation.js";
 import { storedUsername } from "../../../domain/user.js";
 import type { Database } from "./database.js";
 import {
+	dbNow,
+	live,
 	livePurchaseOf,
-	lockSaleRow,
+	lockLiveSale,
 	purchasesWithBuyer,
 	reservationsWithUser,
 } from "./queries.js";
@@ -74,7 +76,6 @@ async function holdOf(
 	const row = await reservationsWithUser(db)
 		.where("reservations.sale_id", "=", saleId)
 		.where("users.username", "=", user)
-		.where("users.deleted_at", "is", null)
 		.executeTakeFirst();
 	return row === undefined ? undefined : toReservation(row);
 }
@@ -90,11 +91,11 @@ async function takeItem(
 		.updateTable("sales")
 		.set({
 			sold: sql`sold + 1`,
-			updated_at: sql<Date>`now()`,
+			updated_at: dbNow,
 			updated_by: userId,
 		})
 		.where("id", "=", saleId)
-		.where("deleted_at", "is", null)
+		.where(live("sales"))
 		.where(sql<boolean>`sold < stock`)
 		.executeTakeFirst();
 	return updated.numUpdatedRows !== 0n;
@@ -127,10 +128,10 @@ async function spendHold(
 ): Promise<void> {
 	await trx
 		.updateTable("reservations")
-		.set({ deleted_at: sql<Date>`now()`, deleted_by: userId })
+		.set({ deleted_at: dbNow, deleted_by: userId })
 		.where("sale_id", "=", saleId)
 		.where("user_id", "=", userId)
-		.where("deleted_at", "is", null)
+		.where(live("reservations"))
 		.execute();
 }
 
@@ -141,7 +142,7 @@ async function commitPurchase(
 	input: CommitInput,
 ): Promise<CommitResult> {
 	return db.transaction().execute(async (trx): Promise<CommitResult> => {
-		await lockSaleRow(trx, input.saleId);
+		await lockLiveSale(trx, input.saleId);
 
 		// A retry of a paid hold gets its purchase back, and nothing is written twice.
 		const same = await purchaseByReservation(trx, input.reservationId);

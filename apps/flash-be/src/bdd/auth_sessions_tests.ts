@@ -21,7 +21,10 @@ afterAll(async () => {
 function newWorld() {
 	let now = new Date("2026-06-01T12:00:00Z");
 	const auth = memoryAuth(() => now, createScryptHasher());
-	const app = buildApp({ ...healthyDeps, auth: auth.service });
+	const app = buildApp(
+		{ ...healthyDeps, auth: auth.service },
+		{ cookieSecure: false },
+	);
 	apps.push(app);
 	return authWorld({
 		app: () => app,

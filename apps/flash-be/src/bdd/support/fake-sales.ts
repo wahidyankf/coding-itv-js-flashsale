@@ -39,10 +39,15 @@ export function fakeRepository(sales: Sale[]): SaleRepository {
 	};
 }
 
-// The app over an in-memory list of sales and a fixed clock.
+// The app over an in-memory list of sales and a fixed clock. The sale reads are not cached here, so a change shows at once.
 export function appWithSales(sales: Sale[], clock: Clock): FastifyInstance {
-	return buildApp({
-		...healthyDeps,
-		sales: createSaleService(fakeRepository(sales), clock),
-	});
+	const saleCache = { ttlMs: 0 };
+	return buildApp(
+		{
+			...healthyDeps,
+			saleCache,
+			sales: createSaleService(fakeRepository(sales), clock, saleCache),
+		},
+		{ cookieSecure: false },
+	);
 }

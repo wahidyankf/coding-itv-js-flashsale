@@ -1,7 +1,7 @@
-// The operator's writes to sales: create, change, remove and list. The rules that decide a write are in the domain
-// (sale-window); this service asks the store, and shapes the reply. Seeding is a different use case (sale-seed-service).
+// The operator's writes to sales (application layer): create, change, remove and list. The rules that decide a write are in
+// the domain (sale-window); this service asks the store and pairs each sale with its status. The HTTP adapter shapes the
+// reply. Seeding is a different use case (sale-seed-service).
 import { Err, Ok, type Result } from "@flash/typekit";
-import { isUuid } from "../domain/sale.js";
 import {
 	changeSaleFrom,
 	newSale,
@@ -16,12 +16,7 @@ import type {
 	SaleAdmin,
 	UpdateSaleError,
 } from "./ports/sale-admin.js";
-import {
-	type AdminSaleView,
-	describeAdminSale,
-	describeSale,
-	type SaleView,
-} from "./sale-view.js";
+import { type SaleWithStatus, saleIdOf, withStatus } from "./sale-service.js";
 
 // Why an operator's sale cannot be created: the input is not usable, the window overlaps a sale, or the product named
 // does not exist.
@@ -35,20 +30,21 @@ export type SaleAdminService = {
 	create: (
 		draft: SaleDraft,
 		actor: UserId,
-	) => Promise<Result<SaleView, CreateSaleError>>;
+	) => Promise<Result<SaleWithStatus, CreateSaleError>>;
 	// A sale that has not started can change in every field. Once it has started it keeps its start and can only get more
 	// stock; a sale that is over cannot change (see `changeSaleFrom`).
 	update: (
 		id: string,
 		patch: SalePatch,
 		actor: UserId,
-	) => Promise<Result<SaleView, UpdateSaleError>>;
+	) => Promise<Result<SaleWithStatus, UpdateSaleError>>;
 	// Removes a sale that nobody bought from.
 	remove: (id: string, actor: UserId) => Promise<Result<true, RemoveSaleError>>;
 	// Every sale, for the operator's list.
-	list: () => Promise<AdminSaleView[]>;
+	list: () => Promise<SaleWithStatus[]>;
 };
 
+// The sale admin use case over its store and the clock. Both come in, so the rules read the time from the wiring.
 export function createSaleAdminService(
 	store: SaleAdmin,
 	clock: Clock,
@@ -60,26 +56,27 @@ export function createSaleAdminService(
 			const stored = await store.create(input.value, actor);
 			if (stored.isErr()) return new Err(stored.error);
 			const sale = newSale({ ...input.value, ...stored.value });
-			return new Ok(describeSale(sale, clock()));
+			return new Ok(withStatus(sale, clock()));
 		},
 		update: async (id, patch, actor) => {
-			// A malformed id can never match a row, so the store is not asked.
-			if (!isUuid(id)) return new Err("sale_not_found");
+			const known = saleIdOf(id);
+			if (known.isErr()) return new Err(known.error);
 			const updated = await store.update(
-				id,
+				known.value,
 				(current) => changeSaleFrom(current, patch, clock()),
 				actor,
 			);
 			if (updated.isErr()) return new Err(updated.error);
-			return new Ok(describeSale(updated.value, clock()));
+			return new Ok(withStatus(updated.value, clock()));
 		},
 		remove: async (id, actor) => {
-			if (!isUuid(id)) return new Err("sale_not_found");
-			return store.remove(id, actor);
+			const known = saleIdOf(id);
+			if (known.isErr()) return new Err(known.error);
+			return store.remove(known.value, actor);
 		},
 		list: async () => {
 			const now = clock();
-			return (await store.list()).map((sale) => describeAdminSale(sale, now));
+			return (await store.list()).map((sale) => withStatus(sale, now));
 		},
 	};
 }

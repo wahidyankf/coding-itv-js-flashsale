@@ -1,4 +1,5 @@
-// The line of shoppers for one sale, and who the queue has admitted. It is fast shared state: Redis keeps it so every
+// Kind: store (keyed state in Redis that a lost reply or outage can drop). The line of shoppers for one sale, and who the
+// queue has admitted. It is fast shared state: Redis keeps it so every
 // instance sees one line. If it is lost, shoppers are let through (see queue-service). Application layer, port.
 import type { Result } from "@flash/typekit";
 import type { QueuePlace } from "../../domain/queue.js";

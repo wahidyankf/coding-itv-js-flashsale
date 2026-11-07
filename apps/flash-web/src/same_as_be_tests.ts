@@ -1,10 +1,10 @@
 // Checks that flash-web's copies of flash-be's rules still agree with flash-be.
 import { describe, expect, it, vi } from "vitest";
 import {
-	TICKET_HEADER as BACKEND_TICKET_HEADER,
 	ERROR_STATUS,
 	errorPayload,
 } from "../../flash-be/src/adapters/inbound/http/errors";
+import { TICKET_HEADER as BACKEND_TICKET_HEADER } from "../../flash-be/src/adapters/inbound/http/headers";
 import { usablePassword } from "../../flash-be/src/domain/auth";
 import { isUuid } from "../../flash-be/src/domain/sale";
 import { normalizeUser } from "../../flash-be/src/domain/user";

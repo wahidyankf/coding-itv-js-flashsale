@@ -5,6 +5,7 @@ import { HTTP_STATUS } from "@flash/flash-commons";
 import type { FastifyInstance } from "fastify";
 import type { Dependencies } from "../../../../application/dependencies.js";
 import type { QueuePlace } from "../../../../domain/queue.js";
+import type { Username } from "../../../../domain/user.js";
 import { type StreamOptions, serveEvents } from "../event-stream.js";
 import {
 	createGuards,
@@ -14,8 +15,14 @@ import {
 } from "./guards.js";
 import { createdOrOk, sendError, sendResult } from "./reply.js";
 
+// A shopper's place as the wire carries it: whose it is, then the place it has.
+const placeBody = (user: Username, place: QueuePlace) => ({
+	userId: user,
+	...place,
+});
+
 // One event of a shopper's place: whose it is, and the place it now has.
-type PlaceEvent = { event: "place"; data: { userId: string } & QueuePlace };
+type PlaceEvent = { event: "place"; data: ReturnType<typeof placeBody> };
 
 // Registers the queue routes. `stream` paces the place stream.
 export function registerQueueRoutes(
@@ -34,6 +41,7 @@ export function registerQueueRoutes(
 			sendResult(
 				reply,
 				await deps.queue.join(request.params.saleId, shopperOf(request)),
+				// The ticket sits between the user and the place in the reply, as it always has been written.
 				({ created, user, ticket, place }) =>
 					createdOrOk(reply, created).send({ userId: user, ticket, ...place }),
 			),
@@ -53,7 +61,7 @@ export function registerQueueRoutes(
 					ticketOf(request),
 				),
 				({ user, place }) =>
-					reply.code(HTTP_STATUS.ok).send({ userId: user, ...place }),
+					reply.code(HTTP_STATUS.ok).send(placeBody(user, place)),
 			),
 	});
 
@@ -79,7 +87,7 @@ export function registerQueueRoutes(
 						: ({ state: "absent" } as const);
 					return {
 						event: "place",
-						data: { userId: user, ...place },
+						data: placeBody(user, place),
 					} satisfies PlaceEvent;
 				},
 				stream,

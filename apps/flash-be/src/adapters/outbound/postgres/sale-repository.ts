@@ -4,6 +4,7 @@ import { type Kysely, type Selectable, sql } from "kysely";
 import type { SaleRepository } from "../../../application/ports/sale-repository.js";
 import type { Sale } from "../../../domain/sale.js";
 import type { Database } from "./database.js";
+import { live } from "./queries.js";
 
 // A sale row, as the domain knows a sale. The column names are the database's; the fields are the domain's.
 export function toSale(row: Selectable<Database["sales"]>): Sale {
@@ -28,17 +29,18 @@ export function createSaleRepository(db: Kysely<Database>): SaleRepository {
 				.selectFrom("sales")
 				.selectAll()
 				.where("id", "=", id)
-				.where("deleted_at", "is", null)
+				.where(live("sales"))
 				.executeTakeFirst();
 			return row === undefined ? undefined : toSale(row);
 		},
-		// Same rule as `pickCurrent`: the running sale first, else the one that opens next; a sale that is over is skipped.
+		// Same rule as `pickCurrent` (domain/sale.ts): the running sale first, else the one that opens next; a sale that is over
+		// is skipped. sale-rules_integration_tests checks the two at the same moments.
 		findCurrent: async (now) => {
 			const row = await db
 				.selectFrom("sales")
 				.selectAll()
 				.where("ends_at", ">", now)
-				.where("deleted_at", "is", null)
+				.where(live("sales"))
 				.orderBy(sql<boolean>`starts_at <= ${now}`, "desc")
 				.orderBy("starts_at", "asc")
 				.limit(1)

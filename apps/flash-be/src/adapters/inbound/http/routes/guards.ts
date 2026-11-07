@@ -4,11 +4,12 @@
 // Inbound HTTP adapter.
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { Dependencies } from "../../../../application/dependencies.js";
-import type { RateLimitVerdict } from "../../../../application/rate-limiter.js";
 import type { Principal } from "../../../../domain/auth.js";
+import type { RateLimitVerdict } from "../../../../domain/rate-limit.js";
 import type { UserId, Username } from "../../../../domain/user.js";
 import { ACCESS_COOKIE, cookieValue } from "../cookies.js";
-import { ERROR_STATUS, errorPayload, TICKET_HEADER } from "../errors.js";
+import { ERROR_STATUS, errorPayload } from "../errors.js";
+import { TICKET_HEADER } from "../headers.js";
 import { sendError } from "./reply.js";
 
 // The path parameter that every sale route has.

@@ -15,9 +15,9 @@ afterEach(async () => {
 
 function appWith(
 	deps: Dependencies = healthyDeps,
-	options: Parameters<typeof buildApp>[1] = {},
+	options: Partial<Parameters<typeof buildApp>[1]> = {},
 ) {
-	const app = buildApp(deps, options);
+	const app = buildApp(deps, { cookieSecure: false, ...options });
 	apps.push(app);
 	return app;
 }
@@ -63,6 +63,39 @@ describe("the errors of the HTTP edge", () => {
 				...healthyDeps.sales,
 				current: async () => {
 					throw new Error("secret detail");
+				},
+			},
+		});
+		const reply = await app.inject({ method: "GET", url: "/sales/current" });
+		expect(reply.statusCode).toBe(500);
+		expect(reply.json()).toEqual(errorPayload("internal"));
+	});
+
+	it("answers a thrown error whose status is not a number with `internal`", async () => {
+		const app = appWith({
+			...healthyDeps,
+			sales: {
+				...healthyDeps.sales,
+				current: async () => {
+					throw Object.assign(new Error("secret detail"), {
+						statusCode: "400",
+					});
+				},
+			},
+		});
+		const reply = await app.inject({ method: "GET", url: "/sales/current" });
+		expect(reply.statusCode).toBe(500);
+		expect(reply.json()).toEqual(errorPayload("internal"));
+	});
+
+	it("answers a thrown value that is not an object with `internal`", async () => {
+		const app = appWith({
+			...healthyDeps,
+			sales: {
+				...healthyDeps.sales,
+				current: async () => {
+					const bare: unknown = "a bare string";
+					throw bare;
 				},
 			},
 		});

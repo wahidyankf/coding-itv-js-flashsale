@@ -1,10 +1,10 @@
 // The login cache in Redis, placed in front of the session store. It answers an access token without a Postgres read,
 // for a minute at most. Postgres stays the truth: a miss, a failing Redis or an entry that cannot be read all fall back
-// to it (see decision 007 for why logins are kept in Postgres at all). Outbound Redis adapter for the SessionStore port.
+// to it (see decision 007 for why logins are kept in Postgres at all). Outbound Redis adapter for the SessionRepository port.
 
 import { MS_PER_SECOND } from "@flash/flash-commons";
 import { attempt, attemptAsync, Err, Ok, type Result } from "@flash/typekit";
-import type { SessionStore } from "../../../application/ports/session-store.js";
+import type { SessionRepository } from "../../../application/ports/session-repository.js";
 import type { Principal, Role } from "../../../domain/auth.js";
 import { storedUsername, userIdOf } from "../../../domain/user.js";
 import type { RedisClient } from "./redis-client.js";
@@ -76,9 +76,9 @@ function readCached(text: string): Result<Cached, typeof UNREADABLE_ENTRY> {
 // Remembers who an access token belongs to, so a request does not read Postgres to be recognised. Postgres is the truth:
 // a miss reads it, and so does a failing Redis. Logging out forgets the token here at once.
 export function createRedisSessionCache(
-	inner: SessionStore,
+	inner: SessionRepository,
 	redis: RedisClient,
-): SessionStore {
+): SessionRepository {
 	const keyOf = (accessHash: string) => `session:${accessHash}`;
 	// A failed delete is not fatal: the entry ends by itself within the cache time.
 	const forget = async (accessHashes: string[]) => {

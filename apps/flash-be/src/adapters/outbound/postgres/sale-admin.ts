@@ -12,6 +12,7 @@ import type { Sale } from "../../../domain/sale.js";
 import type { ChangeSaleError, NewSale } from "../../../domain/sale-window.js";
 import type { UserId } from "../../../domain/user.js";
 import type { Database } from "./database.js";
+import { dbNow, live, lockLiveSale } from "./queries.js";
 import { toSale } from "./sale-repository.js";
 import { seedSale } from "./sale-seeder.js";
 
@@ -28,7 +29,8 @@ async function lockSaleWindows(trx: Transaction<Database>): Promise<void> {
 }
 
 // Whether another sale uses part of the window. Two windows overlap when each opens before the other closes. `except`
-// leaves one sale out, so a sale does not clash with itself.
+// leaves one sale out, so a sale does not clash with itself. The same rule as `overlaps` in the domain (sale-window.ts);
+// sale-rules_integration_tests holds the two to each other.
 async function clashes(
 	trx: Transaction<Database>,
 	window: { startsAt: Date; endsAt: Date },
@@ -37,7 +39,7 @@ async function clashes(
 	let query = trx
 		.selectFrom("sales")
 		.select("id")
-		.where("deleted_at", "is", null)
+		.where(live("sales"))
 		.where("starts_at", "<", window.endsAt)
 		.where("ends_at", ">", window.startsAt);
 	if (except !== undefined) query = query.where("id", "<>", except);
@@ -53,7 +55,7 @@ async function productExists(
 		.selectFrom("products")
 		.select("id")
 		.where("id", "=", productId)
-		.where("deleted_at", "is", null)
+		.where(live("products"))
 		.executeTakeFirst();
 	return product !== undefined;
 }
@@ -82,13 +84,7 @@ async function lockedSale(
 	trx: Transaction<Database>,
 	id: string,
 ): Promise<Sale | undefined> {
-	const row = await trx
-		.selectFrom("sales")
-		.selectAll()
-		.where("id", "=", id)
-		.where("deleted_at", "is", null)
-		.forUpdate()
-		.executeTakeFirst();
+	const row = await lockLiveSale(trx, id);
 	return row === undefined ? undefined : toSale(row);
 }
 
@@ -108,7 +104,7 @@ async function writeSale(
 			stock: next.stock,
 			reservation_ttl_seconds: next.holdSeconds,
 			admit_per_second: next.admitPerSecond,
-			updated_at: sql<Date>`now()`,
+			updated_at: dbNow,
 			updated_by: actor,
 		})
 		.where("id", "=", id)
@@ -150,7 +146,7 @@ async function hasPurchases(
 		.selectFrom("purchases")
 		.select("id")
 		.where("sale_id", "=", saleId)
-		.where("deleted_at", "is", null)
+		.where(live("purchases"))
 		.limit(1)
 		.executeTakeFirst();
 	return bought !== undefined;
@@ -164,14 +160,14 @@ async function markSaleDeleted(
 	actor: UserId,
 ): Promise<void> {
 	const deletion = {
-		deleted_at: sql<Date>`now()`,
+		deleted_at: dbNow,
 		deleted_by: actor,
 	};
 	await trx
 		.updateTable("reservations")
 		.set(deletion)
 		.where("sale_id", "=", saleId)
-		.where("deleted_at", "is", null)
+		.where(live("reservations"))
 		.execute();
 	await trx
 		.updateTable("sales")
@@ -190,13 +186,7 @@ function removeSale(
 	return db
 		.transaction()
 		.execute(async (trx): Promise<Result<true, RemoveSaleError>> => {
-			const row = await trx
-				.selectFrom("sales")
-				.select("id")
-				.where("id", "=", id)
-				.where("deleted_at", "is", null)
-				.forUpdate()
-				.executeTakeFirst();
+			const row = await lockLiveSale(trx, id);
 			if (row === undefined) return new Err("sale_not_found");
 			if (await hasPurchases(trx, id)) return new Err("sale_has_purchases");
 			await markSaleDeleted(trx, id, actor);
@@ -209,7 +199,7 @@ async function listSales(db: Kysely<Database>): Promise<Sale[]> {
 	const rows = await db
 		.selectFrom("sales")
 		.selectAll()
-		.where("deleted_at", "is", null)
+		.where(live("sales"))
 		.orderBy("starts_at", "desc")
 		.execute();
 	return rows.map(toSale);

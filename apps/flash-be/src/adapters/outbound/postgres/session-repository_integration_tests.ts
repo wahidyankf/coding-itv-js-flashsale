@@ -7,12 +7,12 @@ import { hashToken } from "../../../domain/auth.js";
 import { userIdOf } from "../../../domain/user.js";
 import { randomTokenSource } from "../crypto/token-source.js";
 import { createDb } from "./database.js";
-import { createSessionStore } from "./session-store.js";
+import { createSessionRepository } from "./session-repository.js";
 import { ensureUser } from "./users.js";
 
 // The branches of the session store that a scenario of a shopper does not reach by itself.
 const db = createDb(config.databaseUrl);
-const sessions = createSessionStore(db);
+const sessions = createSessionRepository(db);
 
 // The end time of a token that lasts an hour from `from`.
 const anHourFrom = (from: Date) => new Date(from.getTime() + MS_PER_HOUR);

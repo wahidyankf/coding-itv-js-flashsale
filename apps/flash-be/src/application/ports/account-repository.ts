@@ -1,4 +1,5 @@
-// The accounts that can log in, kept in Postgres. The system user has no password, so it is not an account.
+// Kind: repository (a record kept in Postgres, which survives a Redis outage). The accounts that can log in. The system
+// user has no password, so it is not an account. Application layer, port.
 import type { Result } from "@flash/typekit";
 import type { Principal, Role } from "../../domain/auth.js";
 import type { UserId, Username } from "../../domain/user.js";
@@ -12,7 +13,7 @@ export type NewAccount = {
 	createdBy?: UserId | undefined;
 };
 
-export type AccountStore = {
+export type AccountRepository = {
 	// Adds the account, unless a live account already has its name. The unique index decides, so two sign-ups for one
 	// name cannot both succeed.
 	register: (

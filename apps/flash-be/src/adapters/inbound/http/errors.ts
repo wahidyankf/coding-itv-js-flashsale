@@ -1,42 +1,43 @@
-// The words of the HTTP side of the API: the header that carries the queue ticket, and the error codes with their statuses
-// and sentences. Inbound HTTP adapter. The rules that raise these errors are in the domain and the application, not here.
-// The standard status numbers (200, 404, 500 and the rest) come from @flash/flash-commons; this file owns only which
-// code answers with which status.
-
-// The header that carries the queue ticket. A ticket is sent in it, and nowhere else.
-export const TICKET_HEADER = "x-queue-ticket";
+// The error codes of the HTTP API with their statuses and sentences (inbound HTTP adapter). The standard status numbers
+// come from @flash/flash-commons (HTTP_STATUS); this file owns only which code answers with which status. The rules that
+// raise these errors are in the domain and the application, not here.
+import { HTTP_STATUS } from "@flash/flash-commons";
+import {
+	PASSWORD_MAX_LENGTH,
+	PASSWORD_MIN_LENGTH,
+} from "../../../domain/auth.js";
 
 // Every error code of the API and the HTTP status that answers it. A code has one status everywhere.
 export const ERROR_STATUS = {
-	invalid_user: 400,
-	invalid_reservation: 400,
-	invalid_request: 400,
-	invalid_sale: 400,
-	invalid_password: 400,
-	invalid_ticket: 401,
-	invalid_credentials: 401,
-	invalid_refresh_token: 401,
-	not_authenticated: 401,
-	payment_failed: 402,
-	not_admitted: 403,
-	forbidden: 403,
-	sale_not_found: 404,
-	product_not_found: 404,
-	not_in_queue: 404,
-	reservation_not_found: 404,
-	not_found: 404,
-	sale_not_started: 409,
-	sale_ended: 409,
-	sold_out: 409,
-	hold_expired: 409,
-	already_purchased: 409,
-	username_taken: 409,
-	sale_overlaps: 409,
-	sale_locked: 409,
-	sale_has_purchases: 409,
-	rate_limited: 429,
-	internal: 500,
-	unavailable: 503,
+	invalid_user: HTTP_STATUS.badRequest,
+	invalid_reservation: HTTP_STATUS.badRequest,
+	invalid_request: HTTP_STATUS.badRequest,
+	invalid_sale: HTTP_STATUS.badRequest,
+	invalid_password: HTTP_STATUS.badRequest,
+	invalid_ticket: HTTP_STATUS.unauthorized,
+	invalid_credentials: HTTP_STATUS.unauthorized,
+	invalid_refresh_token: HTTP_STATUS.unauthorized,
+	not_authenticated: HTTP_STATUS.unauthorized,
+	payment_failed: HTTP_STATUS.paymentRequired,
+	not_admitted: HTTP_STATUS.forbidden,
+	forbidden: HTTP_STATUS.forbidden,
+	sale_not_found: HTTP_STATUS.notFound,
+	product_not_found: HTTP_STATUS.notFound,
+	not_in_queue: HTTP_STATUS.notFound,
+	reservation_not_found: HTTP_STATUS.notFound,
+	not_found: HTTP_STATUS.notFound,
+	sale_not_started: HTTP_STATUS.conflict,
+	sale_ended: HTTP_STATUS.conflict,
+	sold_out: HTTP_STATUS.conflict,
+	hold_expired: HTTP_STATUS.conflict,
+	already_purchased: HTTP_STATUS.conflict,
+	username_taken: HTTP_STATUS.conflict,
+	sale_overlaps: HTTP_STATUS.conflict,
+	sale_locked: HTTP_STATUS.conflict,
+	sale_has_purchases: HTTP_STATUS.conflict,
+	rate_limited: HTTP_STATUS.tooManyRequests,
+	internal: HTTP_STATUS.internalServerError,
+	unavailable: HTTP_STATUS.serviceUnavailable,
 } as const;
 
 // Every error code the API can answer with. Adding a code means adding it to ERROR_STATUS and ERROR_MESSAGE.
@@ -48,7 +49,7 @@ const ERROR_MESSAGE = {
 	invalid_reservation: "The reservation id is missing or not valid.",
 	invalid_request: "The request could not be read.",
 	invalid_sale: "The sale is not valid.",
-	invalid_password: "The password must have 8 to 128 characters.",
+	invalid_password: `The password must have ${PASSWORD_MIN_LENGTH} to ${PASSWORD_MAX_LENGTH} characters.`,
 	invalid_ticket: "The queue ticket is missing or not valid.",
 	invalid_credentials: "The user name or the password is wrong.",
 	invalid_refresh_token:

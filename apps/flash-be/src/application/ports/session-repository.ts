@@ -1,5 +1,6 @@
-// The logins that are open, kept in Postgres. Only hashes of tokens come in and out, so a copy of the table cannot be
-// used to log in. Redis may cache an answer from here (see redis-session-cache), but Postgres has the last word.
+// Kind: repository (a record kept in Postgres, which survives a Redis outage). The logins that are open. Only hashes of
+// tokens come in and out, so a copy of the table cannot be used to log in. Redis may cache an answer from here (see
+// redis-session-cache), but Postgres has the last word. Application layer, port.
 import type { Principal } from "../../domain/auth.js";
 import type { UserId } from "../../domain/user.js";
 
@@ -28,7 +29,7 @@ export type Rotation = {
 	now: Date;
 };
 
-export type SessionStore = {
+export type SessionRepository = {
 	// Records a login.
 	create: (session: NewSession) => Promise<void>;
 	// Who the access token belongs to and when it ends, unless it is unknown, expired or ended.

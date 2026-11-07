@@ -2,7 +2,7 @@
 // that a rebuild reads, and it decides alone when Redis is down (decision 003). Outbound Postgres adapter for the
 // ReservationRepository port.
 import { attemptAsync } from "@flash/typekit";
-import { type Kysely, sql } from "kysely";
+import type { Kysely } from "kysely";
 import type { ReservationRepository } from "../../../application/ports/reservation-repository.js";
 import {
 	earlyReservationAnswer,
@@ -16,8 +16,10 @@ import {
 import { storedUsername } from "../../../domain/user.js";
 import type { Database } from "./database.js";
 import {
+	dbNow,
+	live,
 	livePurchaseOf,
-	lockSaleRow,
+	lockLiveSale,
 	purchasesWithBuyer,
 	reservationsWithUser,
 } from "./queries.js";
@@ -50,7 +52,7 @@ async function upsertHold(
 				.doUpdateSet({
 					id: hold.id,
 					expires_at: hold.expiresAt,
-					updated_at: sql<Date>`now()`,
+					updated_at: dbNow,
 					updated_by: hold.userId,
 				}),
 		)
@@ -82,7 +84,7 @@ async function ownHoldOf(
 		.select(["id", "expires_at"])
 		.where("sale_id", "=", saleId)
 		.where("user_id", "=", userId)
-		.where("deleted_at", "is", null)
+		.where(live("reservations"))
 		.executeTakeFirst();
 }
 
@@ -95,15 +97,15 @@ async function countHoldsOfOthers(
 	userId: string,
 	now: Date,
 ): Promise<number> {
-	const live = await trx
+	const holders = await trx
 		.selectFrom("reservations")
 		.select((builder) => builder.fn.countAll<string>().as("count"))
 		.where("sale_id", "=", saleId)
-		.where("deleted_at", "is", null)
+		.where(live("reservations"))
 		.where("expires_at", ">", now)
 		.where("user_id", "!=", userId)
 		.executeTakeFirstOrThrow();
-	return Number(live.count);
+	return Number(holders.count);
 }
 
 // What the early answers need about the shopper, read in their order: the purchase first, then the own hold. A buyer's own
@@ -135,13 +137,7 @@ async function reserveUnderLock(
 	gateReady: () => Promise<boolean>,
 ): Promise<FallbackAnswer> {
 	// The sale row lock. The rebuild takes the same lock, so after it Redis is ready and holds everything written so far.
-	const sale = await trx
-		.selectFrom("sales")
-		.select("sold")
-		.where("id", "=", request.saleId)
-		.where("deleted_at", "is", null)
-		.forUpdate()
-		.executeTakeFirst();
+	const sale = await lockLiveSale(trx, request.saleId);
 	if (sale === undefined) return { kind: "sale_not_found" };
 	const ready = await attemptAsync(gateReady, Error);
 	if (ready.isOk() && ready.value) return { kind: "gate_ready" };
@@ -219,7 +215,7 @@ export function createReservationRepository(
 
 		rebuild: (saleId, now, restore) =>
 			db.transaction().execute(async (trx) => {
-				await lockSaleRow(trx, saleId);
+				await lockLiveSale(trx, saleId);
 				await restore(await snapshotOf(trx, saleId, now));
 			}),
 	};

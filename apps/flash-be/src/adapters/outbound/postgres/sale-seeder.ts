@@ -6,6 +6,7 @@ import type { Kysely } from "kysely";
 import type { SaleSeeder } from "../../../application/ports/sale-seeder.js";
 import type { NewSale } from "../../../domain/sale-window.js";
 import type { Database } from "./database.js";
+import { live } from "./queries.js";
 
 // The live product of this name, made if there is none. Two products may share a name, so the oldest one is taken.
 async function productNamed(
@@ -17,7 +18,7 @@ async function productNamed(
 		.selectFrom("products")
 		.select("id")
 		.where("name", "=", name)
-		.where("deleted_at", "is", null)
+		.where(live("products"))
 		.orderBy("created_at", "asc")
 		.limit(1)
 		.executeTakeFirst();

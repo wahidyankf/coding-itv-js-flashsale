@@ -12,30 +12,35 @@ crosses a layer it must not know.
 src/
   domain/                rules and values, no I/O, no clock read: sale.ts (status, reserve and confirm rules),
                          sale-window.ts (a new sale and a change), reservation.ts (holds), purchase.ts, queue.ts,
-                         ticket.ts, auth.ts (password and token rules), user.ts (Username, UserId), time.ts
+                         ticket.ts, auth.ts (password and token rules), user.ts (Username, UserId), rate-limit.ts, time.ts
   application/           one service per use case (sale, queue, reservation, purchase, auth, rate limit, admin, seed),
-                         and the steps they share (admission, guarded-gate, sale-cache, sale-view)
+                         and the steps they share (admission, guarded-gate, sale-cache)
     ports/               the stores and services a use case needs, named in the words of the sale
   adapters/
-    inbound/http/        app.ts (Fastify), errors.ts (error codes, statuses, sentences), cookies.ts, event-stream.ts
+    inbound/http/        app.ts (Fastify), errors.ts (error codes, statuses, sentences), headers.ts, cookies.ts,
+                         sale-view.ts (the sale as a reply shows it), event-stream.ts
       routes/            one file per area: auth, health, sales, queue, reservations, purchases, admin;
                          guards.ts, reply.ts and bodies.ts are shared by them
     inbound/cli/         the options of the seed-sale and create-operator commands
-    outbound/postgres/   the repositories, the shared queries, and migrations/ (hand-written; the SQL of one that has run never changes)
-    outbound/redis/      the hold gate, the queue, the rate limit counters and the session cache, as single scripts
+    outbound/postgres/   the repositories, the shared queries, health.ts (the /ready check), and migrations/
+                         (hand-written; the SQL of one that has run never changes)
+    outbound/redis/      the hold gate, the queue, the rate limit counters and the session cache, as single scripts;
+                         redis-health.ts (the /ready check)
     outbound/crypto/     scrypt password hashes and random tokens
     outbound/payment/    the in-process mock payment
     outbound/memory/     the rate limit store used when Redis is down
     outbound/system/     the clock
   composition.ts         the one place that picks an adapter for each port
   config.ts              the config, read once from process.env; local-defaults.ts holds the local addresses
-  main.ts, migrate.ts, seed-sale.ts, create-operator.ts   the entry points
+  main.ts, migrate.ts, seed-sale.ts, create-operator.ts   the entry points; with-db.ts opens and closes the database
+                         for one command
   bdd/                   the Gherkin bindings of specs/apps/flash/be; bdd/support holds the worlds and the memory copies
                          of the ports that let a scenario run at unit level
 ```
 
 Port names follow one rule: a **Repository** is the Postgres record of a thing, a **Store** holds keyed state, and a
-**Gate** is the fast check in front of Postgres.
+**Gate** is the fast check in front of Postgres. `SaleAdmin` has no suffix: it writes sale rows, but `SaleRepository`
+already names the reads. Each port file starts with a `Kind:` line that says which one it is.
 
 ## To add something
 
