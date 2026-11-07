@@ -1,8 +1,8 @@
 # HTTP endpoints
 
 The routes of the two services, the shape of their replies, and the rules that a shape cannot say. The API routes are
-registered in `apps/flash-be/src/adapters/inbound/http/routes.ts`, and the error codes with their statuses and sentences
-are in `errors.ts` next to it. The web routes are in `apps/flash-web/src/routes/`.
+registered in `apps/flash-be/src/adapters/inbound/http/routes/`, one file per area, and the error codes with their
+statuses and sentences are in `adapters/inbound/http/errors.ts`. The web routes are in `apps/flash-web/src/routes/`.
 
 Every error is `{"errorCode": "<code>", "errorMessage": "<sentence>"}`, whether the route refused the request, the route
 does not exist (`404` `not_found`), the body is not JSON (`400` `invalid_request`) or the server failed (`500` `internal`).

@@ -6,7 +6,7 @@ Accepted. Nx runs commands. It has no plugins, and every target is written by ha
 
 ## Context
 
-The repository has five apps and one library in one npm workspace. People and tools need one way to say "typecheck this
+The repository has five apps and two libraries in one npm workspace. People and tools need one way to say "typecheck this
 app", "test that one", and "check only what my change touches". The pre-push hook needs the last one.
 
 ## Decision

@@ -4,7 +4,8 @@ The API is plain code. There is no shared contract library, so a change goes to 
 
 1. **Write the scenario first** in `specs/` when a shopper or an operator can see the change. See
    [add a behaviour](add-a-behaviour.md).
-2. **Change the handler** in `apps/flash-be/src/adapters/inbound/http/routes.ts`. A new error code goes in
+2. **Change the handler** in `apps/flash-be/src/adapters/inbound/http/routes/<area>.ts` (a new area is registered in
+   `routes/index.ts`). A new error code goes in
    `adapters/inbound/http/errors.ts`, in `ERROR_STATUS` and in `ERROR_MESSAGE` (one sentence; the compiler asks for it), and
    in the error type of the service that can answer it.
 3. **Fix the callers** by searching for the path: `apps/flash-web` (the client in `src/sale/client.ts`, and the allow-list of

@@ -42,7 +42,12 @@ Six checks.
    `T | undefined` for a lookup, every `switch` over a union closed. Input from a body, a header, or the environment is
    checked at the edge; no `any`, no cast that hides an unchecked value.
 2. **Clarity and cost.** Names, comments that say why, no near-duplicate of something the repository already holds, no
-   dead code, no magic number, no new dependency without a reason, and no ORM, Nx plugin, Prettier, or ESLint.
+   dead code, no magic number, no new dependency without a reason, and no ORM, Nx plugin, Prettier, or ESLint. Every
+   source file has a header comment and every export a doc comment that says why; Biome cannot check this, so this
+   review does. The rule of three from `AGENTS.md`: a third copy is a finding, and a value 3 or more places across the
+   apps share belongs in `libs/flash-commons`, except what the e2e and load oracles write themselves. A retry that does
+   not go through `@flash/flash-commons` with backoff, a max attempt count and jitter is a finding. A new kind of file
+   that its app's `README.md` does not name is a finding.
 3. **Stack and domain rules** from `AGENTS.md`: the oversell and one-per-shopper guards in Postgres stay
    (`sold < stock`, the partial unique indexes, the `CHECK`); Redis commands on the sale path fail at once; nothing is
    hard-deleted and every read adds `deleted_at IS NULL`; tokens never reach a body, URL, or log; no route takes a user

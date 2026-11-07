@@ -39,5 +39,11 @@ server closes, it drops open streams so it does not wait for them.
 
 The browser never talks to this API. It opens the streams on its own web server, which passes them on (see
 [the web server in front of the API](web-server-proxy.md)). An `EventSource` cannot send the ticket header, so the page
-reads the stream with `fetch` and sets `x-queue-ticket` itself. The reader opens the stream again after a short pause
-if it ends, and stops for good on a `401` or `404`, since asking again will not change the answer.
+reads the stream with `fetch` and sets `x-queue-ticket` itself. When a stream ends or cannot be
+reached, the reader opens it again with exponential backoff and full jitter: a wait of up to 1 second, then 2, 4 and so
+on up to 30 seconds, for at most 8 tries. A stream that opens resets the count, so each outage gets its own 8 tries. After
+the last one the page stops and says "Live updates stopped. Reload the page to see the latest sale.", so a shopper does
+not trust words that may be old. A thousand pages that lost the server at the same moment do not all come back at the
+same moment either, because each wait is random. The reader stops for good on a `401` or `404`, since asking again will
+not change the answer. The policy is in [flash-commons](../reference/flash-commons.md), and
+[decision 017](decisions/017-retry-backoff-jitter.md) says why.

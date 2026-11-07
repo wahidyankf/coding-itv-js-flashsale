@@ -6,11 +6,11 @@ know about Redis or Fastify cannot break when they change.
 
 ```text
 src/
-  domain/          rules and values; imports only Node built-ins and @flash/typekit
+  domain/          rules and values; imports only Node built-ins, @flash/typekit and @flash/flash-commons
   application/     services (use cases) and ports/
   adapters/
-    inbound/       http (Fastify routes, SSE), cli (seed and create-operator options)
-    outbound/      postgres, redis, crypto (scrypt), memory, payment, system (clock)
+    inbound/       http (routes/ one file per area, errors, cookies, SSE), cli (seed and create-operator options)
+    outbound/      postgres, redis, crypto (scrypt, tokens), memory, payment, system (clock)
   composition.ts   the one place that picks an adapter for a port
   main.ts          entry points: main, migrate, seed-sale, create-operator
 ```
@@ -22,7 +22,9 @@ src/
   There is no I/O and no clock read, so a unit test needs no fake.
 - **Application.** One service per use case (sale status, queue, reserve, pay, rate limit). A service orders the steps
   and calls ports. It decides nothing that a domain function can decide. Ports are small types in
-  `application/ports/`, named in the language of the sale: `HoldGate`, `QueueStore`, `PurchaseRepository`.
+  `application/ports/`, named in the language of the sale: `HoldGate`, `QueueStore`, `PurchaseRepository`. The suffix says what a port is: a
+  **Repository** is the Postgres record of a thing, a **Store** holds keyed state, and a **Gate** is the fast check in
+  front of Postgres. Randomness is a port too (`TokenSource`), so the domain only takes values.
 - **Adapters.** Inbound adapters drive the application (HTTP, the seed command). Outbound adapters implement ports
   (Postgres through Kysely, Redis scripts, an in-process rate counter, the mock payment, the system clock).
 
@@ -69,9 +71,10 @@ flowchart LR
 ## The rule and how it is kept
 
 Dependencies point inward: adapters know the application and the domain, the application knows the domain, and the
-domain knows nothing. The only package the inner layers may import is [`@flash/typekit`](../reference/typekit.md),
-which has no dependency and no I/O (see [failures as values](failures-as-values.md)). The HTTP words (error codes, statuses,
-sentences) live in the inbound HTTP adapter, and the rules the domain needs, such as the user id rule, live in the domain.
+domain knows nothing. The only packages the inner layers may import are [`@flash/typekit`](../reference/typekit.md)
+(see [failures as values](failures-as-values.md)) and [`@flash/flash-commons`](../reference/flash-commons.md). Both are
+pure: no I/O, no timer and no randomness of their own. The HTTP words (error codes, statuses, sentences, cookies) live in
+the inbound HTTP adapter, and the rules the domain needs, such as the user id rule, live in the domain.
 Inbound adapters never import outbound adapters, and outbound adapters import only ports and the
 domain. Only `composition.ts` and the entry points see both sides.
 

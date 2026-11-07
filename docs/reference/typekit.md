@@ -1,7 +1,8 @@
 # typekit
 
 `@flash/typekit` in `libs/typekit` is a TypeScript port of [py-typekit](https://github.com/wahidyankf/py-typekit). It has
-no runtime dependencies and is used by `flash-be` and `flash-web`. Its tests are plain Vitest tests next to the source
+no runtime dependencies and is used by `flash-be`, `flash-web` and `flash-commons`. It holds types and the `attempt`
+wrappers only; shared behaviour such as retry lives in [flash-commons](flash-commons.md). Its tests are plain Vitest tests next to the source
 (`libs/typekit/src/*_tests.ts`); the library has no Gherkin. Why it exists is in
 [failures as values](../explanation/failures-as-values.md).
 

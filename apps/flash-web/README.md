@@ -1,0 +1,55 @@
+# flash-web
+
+The page a shopper uses: the sale status, log in or sign up, **Buy Now**, the hold countdown, **Confirm purchase** and
+the answer. It is React on TanStack Start, styled with Tailwind classes. The browser talks only to this app's own web
+server, which passes a fixed list of routes on to `flash-be`
+([why](../../docs/explanation/decisions/006-browser-talks-to-web-server-only.md)).
+
+## Where things are
+
+```text
+src/
+  routes/            TanStack routes: the page (index.tsx), the document (__root.tsx), and the server routes under
+                     /api that hand every request to the proxy
+  proxy.ts           the allow-list of method and path pairs passed on to flash-be, and the headers kept
+  api.ts             what the app knows about the API: header names, the error shape, callApi
+  web-api.ts         the one set of clients the page uses, sharing a fetch that renews the login
+  config.ts          the settings the web server reads from its environment (server only)
+  backend.ts         asks flash-be whether it is up, for the page's backend status
+  router.tsx         the router, built from the generated routeTree.gen.ts
+  error-text.ts      the sentence a shopper reads for each error code
+  sale-page.tsx      the page itself: where the sale and the account meet
+  sale/              everything about the sale and buying
+    shopper-state.ts   the rules of the buying card as pure functions (phase, countdown, text, which buttons work)
+    use-shopper.ts     the hook that makes the requests and runs the effects
+    messages.ts        the sale's words (TEXT) and its error sentences
+    client.ts, sse.ts  the sale's calls and the live streams
+    *.tsx              the cards: status, stock meter, buy actions
+  auth/              everything about the account: the form, its checks, its words, the account hook and client
+  components/        look and parts shared by sale/ and auth/ (ui.ts holds the Tailwind class lists)
+  bdd/               the Gherkin bindings of specs/apps/flash/web; bdd/support holds the worlds and the fake backend
+  same_as_be_tests.ts  fails when a rule copied from flash-be drifts (user name, password, sale id, ticket header, two replies)
+```
+
+`sale/` and `auth/` never import each other. What both need lives directly in `src/`.
+
+## To add something
+
+| To add …                                    | Put it in …                                                         | Also update …                                                                                                                     |
+| ------------------------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| a rule of the buying card                   | `sale/shopper-state.ts`, with a test in `shopper_state_tests.ts`    | the scenario in `specs/apps/flash/web/behaviours/` if a shopper can see it                                                        |
+| a sentence or a button label                | `TEXT` in `sale/messages.ts` (or `AUTH_TEXT` in `auth/messages.ts`) | the locators of `flash-web-e2e` if they read it                                                                                   |
+| the text of a new error code                | `error-text.ts`, or the area's `messages.ts`                        | `flash-be`'s `errors.ts` already names the code                                                                                   |
+| a call to a new API route                   | `sale/client.ts` or `auth/client.ts`                                | `ALLOWED` in `proxy.ts`, `api-flash-web.http`, [HTTP endpoints](../../docs/reference/http-endpoints.md)                           |
+| a part of the page                          | a component in `sale/` or `auth/`; a shared one in `components/`    | classes in `components/ui.ts` when two parts share a look                                                                         |
+| a value used by 3 or more places in the app | one named constant or function in the folder that owns it           | when other apps use it in 3+ places too, `libs/flash-commons` ([rule](../../docs/explanation/decisions/016-dry-rule-of-three.md)) |
+| a behaviour                                 | a scenario first, then bindings in `src/bdd/`                       | `npm run bdd:check` ([how](../../docs/how-to/add-a-behaviour.md))                                                                 |
+
+## Commands
+
+```bash
+npx nx dev flash-web             # the page on :3000 (start flash-be first)
+npx nx test:quick flash-web      # typecheck, lint, unit tests
+npx nx test:integration flash-web
+npx nx test:coverage flash-web   # unit and integration, 99% floor
+```

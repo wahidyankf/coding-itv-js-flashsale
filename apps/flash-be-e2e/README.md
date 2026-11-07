@@ -1,0 +1,47 @@
+# flash-be-e2e
+
+Playwright tests of the running API. Each scenario of [specs/apps/flash/be](../../specs/apps/flash/be/README.md) that
+is not `@e2e-exempt` runs here against the built `flash-be`, with its own scratch database and, where the scenario
+needs one, a Redis proxy that can cut the connection.
+
+## Where things are
+
+```text
+steps/
+  <area>.steps.ts    the step definitions, one file per area of the feature files (named in each file's header)
+  world.steps.ts     the After hook
+  support/           everything steps share; a step never imports another step file
+    world.ts           the state of the running scenario, and currentSaleId() for the sale it made
+    processes.ts       the API process and the Redis proxy
+    database.ts        the scratch database, migrations, seed and queries
+    cleanup.ts         the teardown of a scenario
+    api.ts, views.ts   the routes and request builder; the reply bodies as the steps read them
+    auth.ts            the accounts and their login cookies
+    shoppers.ts        a shopper's calls on the way to a purchase
+    operator.ts        the operator's calls
+    stream.ts          reading a Server-Sent Events stream
+    time.ts            time units, "in 2 hours" phrases, and pollUntil
+    response.ts        the reply to the last request
+    relay.ts           the TCP relay used by the proxies
+```
+
+`flash-web-e2e` imports these helpers too, so a helper lives here once.
+
+## To add something
+
+| To add …                         | Put it in …                               | Also update …                                                     |
+| -------------------------------- | ----------------------------------------- | ----------------------------------------------------------------- |
+| a step                           | the `<area>.steps.ts` of its feature file | `npm run bdd:check`                                               |
+| a helper two step files need     | `steps/support/`                          | its doc comment                                                   |
+| a wait for something to be ready | `pollUntil` in `support/time.ts`          | nothing: it already backs off with jitter and a max attempt count |
+
+The steps write the API's paths, headers, error codes and expected statuses themselves. They do not import them from
+`flash-be`, so a renamed route or header fails here before a real client sees it
+([decision 016](../../docs/explanation/decisions/016-dry-rule-of-three.md)).
+
+## Commands
+
+```bash
+npx nx test:quick flash-be-e2e    # typecheck and lint
+npx nx test:e2e flash-be-e2e      # builds flash-be, needs Docker for Postgres and Redis
+```

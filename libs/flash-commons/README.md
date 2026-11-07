@@ -2,18 +2,18 @@
 
 Small behaviour and constants shared by several apps. The library is pure: it has no timers, no randomness and no I/O of
 its own. The caller passes in the wait and the random numbers, so the same code runs in Node, the browser and k6.
-`@flash/typekit` stays types and `Result` only; behaviour and shared values go here.
+`@flash/typekit` stays `Result` and `attempt` only; shared helpers and values go here.
 
 It is a workspace package. Build it with `npx nx build flash-commons`. Its Nx targets build `typekit` first. The apps
-that import it (`flash-web`, `flash-be-e2e`, `flash-web-e2e`, `flash-load`) build it first too, as they do for typekit.
+that import it (all five) build it first too, as they do for typekit.
 
 The library has three modules, one per concern:
 
-| Module           | What it holds                                                    | Used by                                                                                |
-| ---------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `retry.ts`       | the backoff, `retry` and `retryAsync`                            | flash-web (live streams), flash-be-e2e (`pollUntil`), flash-load (k6 join and payment) |
-| `time.ts`        | `MS_PER_SECOND`, `MS_PER_MINUTE`, `MS_PER_HOUR`                  | flash-web, flash-be-e2e, flash-web-e2e, flash-load                                     |
-| `http-status.ts` | `HTTP_STATUS`, `FIRST_ERROR_STATUS`, `FIRST_SERVER_ERROR_STATUS` | flash-web, flash-load, flash-be-e2e                                                    |
+| Module           | What it holds                                                    | Used by                                                                                                                          |
+| ---------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `retry.ts`       | the backoff, `retry` and `retryAsync`                            | flash-be (rebuild wait, Redis reconnect), flash-web (live streams), flash-be-e2e (`pollUntil`), flash-load (k6 join and payment) |
+| `time.ts`        | `MS_PER_SECOND`, `MS_PER_MINUTE`, `MS_PER_HOUR`                  | flash-be, flash-web, flash-be-e2e, flash-web-e2e, flash-load                                                                     |
+| `http-status.ts` | `HTTP_STATUS`, `FIRST_ERROR_STATUS`, `FIRST_SERVER_ERROR_STATUS` | flash-be, flash-web, flash-load, flash-be-e2e                                                                                    |
 
 ## Time units
 

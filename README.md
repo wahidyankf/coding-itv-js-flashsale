@@ -13,53 +13,64 @@ If you have five minutes, read these files in this order:
 | `apps/flash-be/src/domain/sale.ts`                                     | the sale rules: upcoming, active, sold out or ended, from window and stock                                               |
 | `apps/flash-be/src/adapters/outbound/redis/redis-hold-gate.ts`         | the Redis script that takes one item for one shopper, atomically                                                         |
 | `apps/flash-be/src/adapters/outbound/postgres/purchase-repository.ts`  | the transaction that has the last word: `sold < stock`, one purchase per shopper                                         |
-| `apps/flash-be/src/adapters/inbound/http/routes.ts`                    | every endpoint, and what it does                                                                                         |
+| `apps/flash-be/src/adapters/inbound/http/routes/`                      | every endpoint, one file per area, and what it does                                                                      |
 | `apps/flash-web/src/sale-page.tsx`                                     | the page: status, name, Buy Now, feedback. Tailwind classes make it responsive and follow the system light or dark theme |
 | `apps/flash-load/k6/profiles.ts`, `apps/flash-load/scripts/verdict.ts` | the stress profiles, and the verdict that is read from the data                                                          |
 
-To show it running, follow [run the demo](docs/how-to/run-the-demo.md).
+To show it running, follow [run the demo](docs/how-to/run-the-demo.md). To change it, the
+[code map](docs/reference/code-map.md) and each app's `README.md` say where each kind of thing goes.
 
-That is the core. The rest is support that keeps the code checked as it grows: Nx targets, the `typekit`
-library, the hexagon layers, the behaviour-coverage check, the docs check and the lint rules. You can ignore all of
+That is the core. The rest is support that keeps the code checked as it grows: Nx targets, the two
+libraries, the hexagon layers, the behaviour-coverage check, the docs check and the lint rules. You can ignore all of
 it to understand the system; it only matters when you change the code.
 
 ### What the brief asks for, and where it is
 
-| The brief asks for                | Where it is                                                                                                                                                                                                                             |
-| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A configurable start and end time | `sales.starts_at` and `ends_at`. Set them with `POST /admin/sales` (absolute times, needs an operator login) or with the seed command (minutes from now). `PATCH` and `DELETE /admin/sales/:saleId` change and remove a sale            |
-| One product, limited stock        | `sales.stock`, with `UPDATE ... WHERE sold < stock` and `CHECK (sold <= stock)` in Postgres                                                                                                                                             |
-| One item per user                 | `UNIQUE(sale_id, user_id)` on purchases and on reservations; a Redis set of buyers in front of it                                                                                                                                       |
-| An endpoint for the sale status   | `GET /sales/current` and `GET /sales/:saleId`, plus a live stream at `.../events`                                                                                                                                                       |
-| An endpoint to attempt a purchase | Three calls, because a rush needs a queue: `POST /sales/:saleId/queue` (join, get a ticket), `POST .../reservations` (hold one item), `POST .../purchases` (pay). **Buy Now** makes the first two; **Confirm purchase** makes the third |
-| An endpoint to check the outcome  | `GET /sales/:saleId/purchases/me`: a purchase, a live hold, or nothing (for the shopper who is logged in)                                                                                                                               |
-| A simple React frontend           | `apps/flash-web`                                                                                                                                                                                                                        |
-| A system diagram                  | below; the C4 views are in [specs/apps/flash/c4](specs/apps/flash/c4/README.md)                                                                                                                                                         |
-| Unit and integration tests        | next to the code; the apps add Gherkin scenarios bound at unit, integration and end-to-end level (see [Tests](#tests))                                                                                                                  |
-| Stress tests                      | `apps/flash-load` (see [Load test](#load-test))                                                                                                                                                                                         |
+| The brief asks for                 | Where it is                                                                                                                                                                                                                                                                                                                                            |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A configurable start and end time  | `sales.starts_at` and `ends_at`. Set them with `POST /admin/sales` (absolute times, needs an operator login) or with the seed command (minutes from now). `PATCH` and `DELETE /admin/sales/:saleId` change and remove a sale                                                                                                                           |
+| One product, limited stock         | `sales.stock`, with `UPDATE ... WHERE sold < stock` and `CHECK (sold <= stock)` in Postgres                                                                                                                                                                                                                                                            |
+| One item per user                  | `UNIQUE(sale_id, user_id)` on purchases and on reservations; a Redis set of buyers in front of it                                                                                                                                                                                                                                                      |
+| An endpoint for the sale status    | `GET /sales/current` and `GET /sales/:saleId`, plus a live stream at `.../events`                                                                                                                                                                                                                                                                      |
+| An endpoint to attempt a purchase  | Three calls, because a rush needs a queue: `POST /sales/:saleId/queue` (join, get a ticket), `POST .../reservations` (hold one item), `POST .../purchases` (pay). **Buy Now** makes the first two; **Confirm purchase** makes the third                                                                                                                |
+| An endpoint to check the outcome   | `GET /sales/:saleId/purchases/me`: a purchase, a live hold, or nothing (for the shopper who is logged in)                                                                                                                                                                                                                                              |
+| A simple React frontend            | `apps/flash-web`                                                                                                                                                                                                                                                                                                                                       |
+| The frontend shows the sale status | the status badge, a sentence for what the shopper can do now, the window and the items left; it follows the sale live ([`specs/apps/flash/web/behaviours/sale/status.feature`](specs/apps/flash/web/behaviours/sale/status.feature))                                                                                                                   |
+| A way to enter a user identifier   | log in or sign up with a user name. A password is added so one shopper cannot buy as another ([decision 007](docs/explanation/decisions/007-accounts-and-cookie-sessions.md), [`account/login.feature`](specs/apps/flash/web/behaviours/account/login.feature))                                                                                        |
+| A Buy Now button, and feedback     | **Buy Now** and **Confirm purchase**; the page says "You got it! Your purchase is confirmed.", "You already bought an item.", "The sale has ended." or "Sold out. No items are left." ([`sale/buying.feature`](specs/apps/flash/web/behaviours/sale/buying.feature), [`sale/checking.feature`](specs/apps/flash/web/behaviours/sale/checking.feature)) |
+| A system diagram                   | below; the C4 views are in [specs/apps/flash/c4](specs/apps/flash/c4/README.md)                                                                                                                                                                                                                                                                        |
+| Unit and integration tests         | next to the code; the apps add Gherkin scenarios bound at unit, integration and end-to-end level (see [Tests](#tests))                                                                                                                                                                                                                                 |
+| Stress tests                       | `apps/flash-load` (see [Load test](#load-test))                                                                                                                                                                                                                                                                                                        |
 
 ## What is in the repository
 
-It is an npm workspace with five apps in `apps/` and one library in `libs/`:
+It is an npm workspace with five apps in `apps/` and two libraries in `libs/`. Each app has a `README.md` with its folder
+tree and where to add each kind of thing; the [code map](docs/reference/code-map.md) is the index.
 
-| App             | What it is                                                                                |
-| --------------- | ----------------------------------------------------------------------------------------- |
-| `flash-be`      | REST API (Fastify) with the sale logic, on Postgres (Kysely, no ORM) and Redis            |
-| `flash-web`     | React client (TanStack Start, Tailwind CSS). The browser only talks to its own web server |
-| `flash-be-e2e`  | Playwright tests against the running API                                                  |
-| `flash-web-e2e` | Playwright tests in a browser                                                             |
-| `flash-load`    | k6 load test against three API instances behind nginx, with a verdict from the data       |
+| App                                             | What it is                                                                                |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| [`flash-be`](apps/flash-be/README.md)           | REST API (Fastify) with the sale logic, on Postgres (Kysely, no ORM) and Redis            |
+| [`flash-web`](apps/flash-web/README.md)         | React client (TanStack Start, Tailwind CSS). The browser only talks to its own web server |
+| [`flash-be-e2e`](apps/flash-be-e2e/README.md)   | Playwright tests against the running API                                                  |
+| [`flash-web-e2e`](apps/flash-web-e2e/README.md) | Playwright tests in a browser                                                             |
+| [`flash-load`](apps/flash-load/README.md)       | k6 load test against three API instances behind nginx, with a verdict from the data       |
 
 `libs/typekit` (`@flash/typekit`) is a TypeScript port of [py-typekit](https://github.com/wahidyankf/py-typekit). It has
 `Result` and `attempt`. `flash-be` and `flash-web` use it, so a failure is a value and product code has no `catch`. The
-linter enforces that; see [failures as values](docs/explanation/failures-as-values.md).
+linter enforces that; see [failures as values](docs/explanation/failures-as-values.md). It holds types only.
 
-The HTTP API is plain code: `flash-be` registers its routes in one file, and every route, request and reply is listed in
+`libs/flash-commons` (`@flash/flash-commons`) holds the pure behaviour and values that 3 or more places across the apps
+share: retry with exponential backoff, a max attempt count and jitter, the time units and the HTTP status numbers. Every
+retry in the repository goes through it ([decision 017](docs/explanation/decisions/017-retry-backoff-jitter.md),
+[policies](docs/reference/flash-commons.md)). A value repeated a third time gets one name
+([decision 016](docs/explanation/decisions/016-dry-rule-of-three.md)).
+
+The HTTP API is plain code: `flash-be` registers its routes in `adapters/inbound/http/routes/`, one file per area, and every route, request and reply is listed in
 [docs/reference/http-endpoints.md](docs/reference/http-endpoints.md). The callers (`flash-web`, the e2e tests and the k6
 script) write the paths they use.
 
 Nx runs the commands only. It has no plugins, and every target is in the project's `project.json`. The apps' targets build
-the library first.
+the libraries first.
 
 `flash-be` is a hexagon: the rules sit in `src/domain`, the use cases in `src/application`, and Postgres, Redis, the
 payment mock and HTTP are adapters behind ports. A unit test fails when a layer imports one it must not know. See
@@ -168,22 +179,42 @@ any request, so adding capacity is adding instances.
 
 ## Design choices and trade-offs
 
-| Choice                                  | Why                                                                                                                                                                    | What it costs                                                      |
-| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| Redis Lua script as the hot path        | One script counts and takes an item atomically, so thousands of requests per second do not touch the database row                                                      | A second store to run, and a rebuild when it is lost               |
-| Postgres as the source of truth         | `UPDATE ... WHERE sold < stock`, `UNIQUE(sale_id, user_id)` and `CHECK (sold <= stock)` still refuse an oversell if Redis is wrong or empty                            | Every purchase pays one short transaction                          |
-| Reserve, then confirm                   | A shopper is not charged for an item that is gone, and an abandoned hold frees the item                                                                                | A hold takes stock from others until it ends                       |
-| Waiting queue with a ticket             | Smooths a rush and cannot be skipped by posting to the reserve route                                                                                                   | Shoppers wait; the queue needs an admitter that runs once per sale |
-| Serving without Redis                   | Redis down means the queue fails open, reserve runs on Postgres under a row lock, and `/ready` reports 503. Redis is rebuilt from Postgres when it returns             | The Postgres path is slower under load                             |
-| Sale read cache of one second, with SSE | Many readers cost one database read a second. Writes never use the cache                                                                                               | The page can be a second old                                       |
-| Rate limit per user and per address     | A flood gets `429` with `Retry-After`, not a slow server                                                                                                               | Shoppers behind one address share a limit                          |
-| In-process mock payment                 | The flow, the refund and the retry rules are real; no provider is needed                                                                                               | It proves nothing about a real provider                            |
-| Accounts and cookie sessions            | Sign-up with a password (scrypt), an access and a refresh cookie, only token hashes stored, roles `shopper` and `operator` ([how](docs/explanation/authentication.md)) | No password reset, e-mail check or two-factor step                 |
+| Choice                                                                                                               | Why                                                                                                                                                                    | What it costs                                                      |
+| -------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Redis Lua script as the hot path ([002](docs/explanation/decisions/002-redis-gate-postgres-last-word.md))            | One script counts and takes an item atomically, so thousands of requests per second do not touch the database row                                                      | A second store to run, and a rebuild when it is lost               |
+| Postgres as the source of truth ([002](docs/explanation/decisions/002-redis-gate-postgres-last-word.md))             | `UPDATE ... WHERE sold < stock`, `UNIQUE(sale_id, user_id)` and `CHECK (sold <= stock)` still refuse an oversell if Redis is wrong or empty                            | Every purchase pays one short transaction                          |
+| Reserve, then confirm ([001](docs/explanation/decisions/001-queue-hold-pay.md))                                      | A shopper is not charged for an item that is gone, and an abandoned hold frees the item                                                                                | A hold takes stock from others until it ends                       |
+| Waiting queue with a ticket ([001](docs/explanation/decisions/001-queue-hold-pay.md))                                | Smooths a rush and cannot be skipped by posting to the reserve route                                                                                                   | Shoppers wait; the queue needs an admitter that runs once per sale |
+| Serving without Redis ([003](docs/explanation/decisions/003-keep-selling-without-redis.md))                          | Redis down means the queue fails open, reserve runs on Postgres under a row lock, and `/ready` reports 503. Redis is rebuilt from Postgres when it returns             | The Postgres path is slower under load                             |
+| Sale read cache of one second, with SSE ([008](docs/explanation/decisions/008-server-sent-events.md))                | Many readers cost one database read a second. Writes never use the cache                                                                                               | The page can be a second old                                       |
+| Rate limit per user and per address                                                                                  | A flood gets `429` with `Retry-After`, not a slow server                                                                                                               | Shoppers behind one address share a limit                          |
+| In-process mock payment ([009](docs/explanation/decisions/009-in-process-mock-payment.md))                           | The flow, the refund and the retry rules are real; no provider is needed                                                                                               | It proves nothing about a real provider                            |
+| Accounts and cookie sessions ([007](docs/explanation/decisions/007-accounts-and-cookie-sessions.md))                 | Sign-up with a password (scrypt), an access and a refresh cookie, only token hashes stored, roles `shopper` and `operator` ([how](docs/explanation/authentication.md)) | No password reset, e-mail check or two-factor step                 |
+| The browser talks to the web server only ([006](docs/explanation/decisions/006-browser-talks-to-web-server-only.md)) | The API needs no CORS and no public address, and an allow-list keeps the operator routes away from the browser                                                         | One more hop for every sale call                                   |
+| A hexagon in the API only ([004](docs/explanation/decisions/004-hexagon-in-the-api-only.md))                         | The sale rules are tested without Postgres or Redis, and a unit test fails on a wrong import                                                                           | More files than a flat API; the page stays plain React             |
+| Failures as values ([005](docs/explanation/decisions/005-failures-as-values.md))                                     | A failure is in the type, so a caller cannot forget it; no `catch` in product code                                                                                     | Every call that may throw is wrapped in `attempt`                  |
+| Soft delete ([011](docs/explanation/decisions/011-soft-delete-everywhere.md))                                        | Nothing is lost, and a removal says who did it                                                                                                                         | Every read and every unique index filters `deleted_at`             |
+| Retry with backoff and jitter ([017](docs/explanation/decisions/017-retry-backoff-jitter.md))                        | A retry storm cannot hit a server that is coming back, and every retry ends                                                                                            | A shopper may wait a little longer before a retry                  |
 
 Longer explanations are in [docs/explanation](docs/explanation/README.md), and the architecture diagrams are in
 [specs/apps/flash/c4](specs/apps/flash/c4/README.md). One sale runs at a time, and each sale is one type of product with a stock of units. `GET /sales/current` is the sale that
 is running, or else the next one to open. The admin routes refuse a window that overlaps another sale; the seed command
 does not check. There is no admin page: an operator logs in through the API and uses it with the cookies.
+
+Every choice has a decision record in [docs/explanation/decisions](docs/explanation/decisions/README.md), with the
+other options that were weighed and when to look at it again.
+
+### What was left out, and why
+
+| Left out                                 | Why                                                                                                                                                        | What would make it worth adding                                     |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| A message broker                         | The Redis queue and one admitter per second smooth the rush already, and a purchase needs an answer now, not later                                         | Work that may finish after the reply, such as e-mail or fulfilment  |
+| Microservices                            | One API holds every rule of one sale; a split would add network calls and a distributed transaction on the hot path                                        | Teams that ship separately, or parts that scale very differently    |
+| An ORM                                   | The guards are a few exact SQL statements (`WHERE sold < stock`, the unique indexes); Kysely keeps them visible and typed                                  | Many more tables with plain CRUD                                    |
+| An admin page                            | An operator needs only a few calls, and they are in the API with tests and in `api-flash-be.http`                                                          | Operators who are not developers                                    |
+| A real payment                           | The brief does not ask for one; the mock keeps the hard parts real: charge once, refund on a lost race, retry on a decline                                 | Real money; then the provider's idempotency keys replace the mock's |
+| Password reset, e-mail check, two-factor | The brief asks only for a user identifier; the password is there so one shopper cannot buy as another                                                      | Real shoppers' accounts                                             |
+| Several sales at once                    | The brief has one product and one sale; one current sale keeps the queue and the page simple ([010](docs/explanation/decisions/010-one-sale-at-a-time.md)) | A shop with many products on sale at the same time                  |
 
 ## How it scales, and where it stops
 
@@ -292,6 +323,7 @@ npx nx test:integration <app>  # needs the dev stack (flash-be, flash-web)
 npx nx test:e2e <app>          # Playwright (flash-be-e2e, flash-web-e2e)
 npx nx test:coverage <app>     # unit + integration, 99% floor; starts the dev stack
 npx nx test:quick typekit      # a library: typecheck + lint + unit tests (no Docker)
+npx nx test:quick flash-commons # the other library, the same way
 npm run lint:rules:test        # the lint rules: no catch, exhaustive switches
 npm run bdd:check              # every scenario is bound at the layers it needs
 npm run lint                   # Biome check of the whole repo: format, lint, imports
@@ -366,4 +398,5 @@ in [what the load runs found](docs/explanation/load-test-findings.md). The profi
 - [docs/](docs/README.md): a tutorial, how-to guides, reference and explanations.
 - [specs/](specs/README.md): the apps' Gherkin behaviour scenarios and the C4 architecture. Specs win when they disagree with the docs.
 - [api-flash-be.http](api-flash-be.http) and [api-flash-web.http](api-flash-web.http): every route of the API and of the web server, one request each. [api-flash-demo.http](api-flash-demo.http): the demo, in order. All three are in the [kulala.nvim](https://github.com/wahidyankf/kulala.nvim) format.
+- [docs/reference/code-map.md](docs/reference/code-map.md) and the `README.md` of each app and library: where each kind of thing lives, and where to add one.
 - [AGENTS.md](AGENTS.md): rules for people and tools that change the code.
