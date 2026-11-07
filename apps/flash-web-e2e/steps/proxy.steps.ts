@@ -1,9 +1,19 @@
-import { type APIResponse, expect } from "@playwright/test";
+// Steps for the web server's /api proxy: a shopper's request reaches the API through it, the cookies a reply sets must be
+// HttpOnly on the right path, the body must not hold a token, and a request from another site must not reach the API.
+// Binds proxy/api.feature.
+
+import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
+import { E2E_PASSWORD } from "../../flash-be-e2e/steps/support/auth.js";
+import {
+	currentResponse,
+	setCookiesOf,
+	setResponse,
+} from "../../flash-be-e2e/steps/support/response.js";
+import { world } from "../../flash-be-e2e/steps/support/world.js";
 import { salePath } from "./support/api.js";
 import { FORWARDER_URL } from "./support/forwarder.js";
-import { connectWebServer, E2E_PASSWORD, world } from "./support/shop.js";
-import { current, setResponse } from "./web.steps.js";
+import { connectWebServer } from "./support/shop.js";
 
 const { When, Then } = createBdd();
 
@@ -46,17 +56,10 @@ When(
 	},
 );
 
-const setCookiesOf = (response: APIResponse): string[] =>
-	response
-		.headersArray()
-		.filter(({ name }) => name.toLowerCase() === "set-cookie")
-		.map(({ value }) => value);
-
 Then(
 	/^the response sets the cookie "([^"]+)" for the path "([^"]+)"$/,
-	// biome-ignore lint/correctness/noEmptyPattern: playwright-bdd needs an object pattern as the first argument
-	async ({}, name: string, path: string) => {
-		const cookie = setCookiesOf(current()).find((value) =>
+	async ({ request: _request }, name: string, path: string) => {
+		const cookie = setCookiesOf(currentResponse()).find((value) =>
 			value.startsWith(`${name}=`),
 		);
 		expect(cookie, `a cookie named ${name}`).toBeDefined();
@@ -66,19 +69,17 @@ Then(
 	},
 );
 
-// biome-ignore lint/correctness/noEmptyPattern: playwright-bdd needs an object pattern as the first argument
-Then("both cookies are HttpOnly", async ({}) => {
-	const cookies = setCookiesOf(current());
+Then("both cookies are HttpOnly", async ({ request: _request }) => {
+	const cookies = setCookiesOf(currentResponse());
 	expect(cookies).toHaveLength(2);
 	for (const cookie of cookies) {
 		expect(cookie.split(";").map((part) => part.trim())).toContain("HttpOnly");
 	}
 });
 
-// biome-ignore lint/correctness/noEmptyPattern: playwright-bdd needs an object pattern as the first argument
-Then("the body holds neither token", async ({}) => {
-	const body = await current().text();
-	for (const cookie of setCookiesOf(current())) {
+Then("the body holds neither token", async ({ request: _request }) => {
+	const body = await currentResponse().text();
+	for (const cookie of setCookiesOf(currentResponse())) {
 		const token = cookie.split(";")[0]?.split("=")[1] ?? "";
 		expect(token).not.toBe("");
 		expect(body).not.toContain(token);
@@ -94,23 +95,23 @@ Then("the API was not asked", async ({ page }) => {
 Then(
 	/^the body names "([^"]+)"$/,
 	async ({ request: _request }, name: string) => {
-		expect((await current().json()).userId).toBe(name);
+		expect((await currentResponse().json()).userId).toBe(name);
 	},
 );
 
 Then(
 	/^the body has error "([^"]+)"$/,
 	async ({ request: _request }, error: string) => {
-		expect((await current().json()).errorCode).toBe(error);
+		expect((await currentResponse().json()).errorCode).toBe(error);
 	},
 );
 
 Then("the body names the sale", async ({ request: _request }) => {
-	expect((await current().json()).id).toBe(world.saleId);
+	expect((await currentResponse().json()).id).toBe(world.saleId);
 });
 
 Then("the body has a ticket", async ({ request: _request }) => {
-	expect(typeof (await current().json()).ticket).toBe("string");
+	expect(typeof (await currentResponse().json()).ticket).toBe("string");
 });
 
 Then("the page does not contain the address of the API", async ({ page }) => {

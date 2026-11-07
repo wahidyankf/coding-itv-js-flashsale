@@ -1,4 +1,5 @@
-// The bodies of the API as the steps read them. They are written by hand: a step only reads a few fields.
+// The bodies of the private API as the steps read them. They are written by hand: a step only reads the fields it checks,
+// so these types list those fields and no more.
 
 export type SaleView = {
 	id: string;

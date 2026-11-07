@@ -1,9 +1,13 @@
+// Steps for the operator's sale routes once a sale exists: changing its stock and hold time, moving its window, removing it,
+// and listing the sales. Each request is sent by the operator, a shopper or nobody, as the scenario names it. Binds
+// sale/operating.feature. The routes that create a sale are in admin.steps.ts.
+
+import type { APIRequestContext } from "@playwright/test";
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
-import { confirm } from "./purchase.steps.js";
-import { join } from "./queue.steps.js";
-import { reserve, waitUntilAdmitted } from "./reservation.steps.js";
-import { bodyOf, routes, send } from "./support/api.js";
+import { bodyOf, givenFields, routes, send } from "./support/api.js";
+import { E2E_OPERATOR } from "./support/auth.js";
+import { query } from "./support/database.js";
 import {
 	createSale,
 	operatorHeaders,
@@ -11,26 +15,23 @@ import {
 	senderHeaders,
 } from "./support/operator.js";
 import { currentResponse, setResponse } from "./support/response.js";
-import { query, world } from "./support/world.js";
+import {
+	confirm,
+	join,
+	reserve,
+	waitUntilAdmitted,
+} from "./support/shoppers.js";
+import { windowFromNow } from "./support/time.js";
+import { world } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
-
-const MINUTE_MS = 60_000;
-
-function windowOf(startsInMinutes: number, minutes: number) {
-	const startsAt = new Date(Date.now() + startsInMinutes * MINUTE_MS);
-	return {
-		startsAt,
-		endsAt: new Date(startsAt.getTime() + minutes * MINUTE_MS),
-	};
-}
 
 Given(
 	/^a sale was created with stock (\d+), opened (\d+) minutes ago for (\d+) minutes$/,
 	async ({ request }, stock: string, ago: string, minutes: string) => {
 		world.saleId = await createSale(request, {
 			stock: Number(stock),
-			...windowOf(-Number(ago), Number(minutes)),
+			...windowFromNow(-Number(ago), Number(minutes)),
 		});
 	},
 );
@@ -40,7 +41,7 @@ Given(
 	async ({ request }, stock: string, startsIn: string, minutes: string) => {
 		world.saleId = await createSale(request, {
 			stock: Number(stock),
-			...windowOf(Number(startsIn), Number(minutes)),
+			...windowFromNow(Number(startsIn), Number(minutes)),
 		});
 	},
 );
@@ -56,7 +57,7 @@ Given("an item of that sale was bought", async ({ request }) => {
 
 // One request of an operator, written the way the scenarios say it. `sender` is who sends it.
 async function operate(
-	request: Parameters<typeof send>[0],
+	request: APIRequestContext,
 	sender: Sender,
 	verb: string,
 	what: string,
@@ -75,16 +76,17 @@ async function operate(
 			await send(request, routes.updateSale, {
 				params: { saleId },
 				headers,
-				body: {
+				body: givenFields({
 					stock: Number(change[1]),
-					...(change[2] === undefined
-						? {}
-						: { holdSeconds: Number(change[2]) }),
-				},
+					holdSeconds: change[2] === undefined ? undefined : Number(change[2]),
+				}),
 			}),
 		);
 	} else if (move) {
-		const { startsAt, endsAt } = windowOf(Number(move[1]), Number(move[2]));
+		const { startsAt, endsAt } = windowFromNow(
+			Number(move[1]),
+			Number(move[2]),
+		);
 		setResponse(
 			await send(request, routes.updateSale, {
 				params: { saleId },
@@ -186,6 +188,6 @@ Then(
 			 where s.id = $1 and s.deleted_at is not null`,
 			[world.saleId],
 		);
-		expect(rows.map((row) => row.username)).toEqual(["e2e-operator"]);
+		expect(rows.map((row) => row.username)).toEqual([E2E_OPERATOR]);
 	},
 );

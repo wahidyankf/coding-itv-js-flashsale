@@ -1,4 +1,9 @@
+// How the e2e steps call the private API of a scenario: the routes, the request builder, and how a reply is read. The paths
+// are written by hand, as AGENTS.md asks of the e2e apps; a route change must also update the list in
+// docs/how-to/change-an-endpoint.md.
+
 import type { APIRequestContext, APIResponse } from "@playwright/test";
+import { startApi } from "./processes.js";
 import type {
 	AccountView,
 	AdminSaleView,
@@ -9,13 +14,13 @@ import type {
 	ReservedView,
 	SaleView,
 } from "./views.js";
-import { startApi } from "./world.js";
 
+// The header that carries the queue ticket. flash-web-e2e sends it too.
 export const TICKET_HEADER = "x-queue-ticket";
 
 const FIRST_ERROR_STATUS = 400;
 
-// A route is a method and a path. `B` is the body of its success reply; it is only there for the types.
+// A route is a method and a path with `:name` placeholders. `B` is the body of its success reply; it only types the reply.
 export type Route<B = unknown> = {
 	method: "GET" | "POST" | "PATCH" | "DELETE";
 	path: string;
@@ -27,6 +32,7 @@ const route = <B>(method: Route["method"], path: string): Route<B> => ({
 	path,
 });
 
+// Every route the steps call, by a name that says what it does.
 export const routes = {
 	currentSale: route<SaleView>("GET", "/sales/current"),
 	sale: route<SaleView>("GET", "/sales/:saleId"),
@@ -48,13 +54,14 @@ export const routes = {
 	listSales: route<{ sales: AdminSaleView[] }>("GET", "/admin/sales"),
 };
 
+// What a request carries: values for the path placeholders, headers (an undefined one is left out), and a JSON body.
 export type Input = {
 	params?: Record<string, string>;
 	headers?: Record<string, string | undefined>;
 	body?: unknown;
 };
 
-// The URL, headers and body text of a request to the private API of the scenario.
+// The URL, headers and body text of a request to the scenario's private API. Starts that API if it is not running yet.
 export async function build(route: Route, input: Input = {}) {
 	const path = route.path.replace(/:(\w+)/g, (_match, name: string) =>
 		encodeURIComponent(input.params?.[name] ?? ""),
@@ -73,6 +80,7 @@ export async function build(route: Route, input: Input = {}) {
 	};
 }
 
+// Sends a request to the private API and returns the reply, without reading it. Use bodyOf or errorOf to read it.
 export async function send(
 	request: APIRequestContext,
 	route: Route,
@@ -86,7 +94,7 @@ export async function send(
 	});
 }
 
-// The body of a reply that is not a refusal, or undefined.
+// The body of a reply that is not a refusal, or undefined when the reply is a refusal.
 export async function bodyOf<B>(
 	_route: Route<B>,
 	response: APIResponse,
@@ -96,7 +104,17 @@ export async function bodyOf<B>(
 		: undefined;
 }
 
-// The `errorCode` of a refusal, or undefined.
+// The fields that have a value. A body is built from these, so a field a step leaves unset is not sent at all, rather than
+// sent as undefined (which JSON would drop) or as null (which the API would refuse).
+export function givenFields<T extends Record<string, unknown>>(
+	fields: T,
+): Partial<T> {
+	return Object.fromEntries(
+		Object.entries(fields).filter(([, value]) => value !== undefined),
+	) as Partial<T>;
+}
+
+// The `errorCode` of a refusal, or undefined when the reply is not one.
 export async function errorOf(
 	response: APIResponse,
 ): Promise<string | undefined> {

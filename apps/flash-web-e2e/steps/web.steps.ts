@@ -1,6 +1,16 @@
-import type { APIResponse, Page } from "@playwright/test";
+// Steps that drive the web server from outside: the status of flash-be the web server is shown, the page a visitor opens and
+// what it says, and the plain requests a client sends to the web server. Binds home/app-router.feature,
+// home/backend-status.feature and health/liveness.feature, and the page steps the other flash-web features share. Its After
+// hook clears the reply and the scenario's connections, so a scenario starts with neither.
+
+import type { Page } from "@playwright/test";
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
+import {
+	clearResponse,
+	currentResponse,
+	setResponse,
+} from "../../flash-be-e2e/steps/support/response.js";
 import { FORWARDER_URL } from "./support/forwarder.js";
 import {
 	answerWith,
@@ -13,23 +23,11 @@ import {
 // The shared flash-be of the e2e stack, started by the Playwright config.
 const sharedPort = Number(process.env.FLASH_BE_PORT ?? 8080);
 
-// One request per scenario. Workers run one at a time (see playwright.config.ts), so this is safe.
-let response: APIResponse | undefined;
-
-export function current(): APIResponse {
-	if (!response) throw new Error("no request was sent in this scenario");
-	return response;
-}
-
-export function setResponse(next: APIResponse): void {
-	response = next;
-}
-
 const { Given, When, Then, After } = createBdd();
 
 // Every scenario cleans up what it started: its private flash-be, its database, and where the web server leads.
 After(async () => {
-	response = undefined;
+	clearResponse();
 	await cleanup();
 });
 
@@ -47,15 +45,13 @@ Given(
 	},
 );
 
-// biome-ignore lint/correctness/noEmptyPattern: playwright-bdd needs an object pattern as the first argument
-Given("flash-be cannot be reached", async ({}) => {
+Given("flash-be cannot be reached", async ({ request: _request }) => {
 	await cutWebServerOff();
 });
 
 Given(
 	/^flash-be answers \/health with status (\d+)$/,
-	// biome-ignore lint/correctness/noEmptyPattern: playwright-bdd needs an object pattern as the first argument
-	async ({}, status: string) => {
+	async ({ request: _request }, status: string) => {
 		await answerWith(
 			Number(status),
 			JSON.stringify({
@@ -98,15 +94,19 @@ Then(/^the page says "(.+)"$/, async ({ page }, text: string) => {
 
 When(/^a client sends GET (\/.+)$/, async ({ request }, path: string) => {
 	await connectWebServer();
-	response = await request.get(path);
+	setResponse(await request.get(path));
 });
 
-// biome-ignore lint/correctness/noEmptyPattern: playwright-bdd needs an object pattern as the first argument
-Then(/^the response status is (\d+)$/, async ({}, status: string) => {
-	expect(current().status()).toBe(Number(status));
-});
+Then(
+	/^the response status is (\d+)$/,
+	async ({ request: _request }, status: string) => {
+		expect(currentResponse().status()).toBe(Number(status));
+	},
+);
 
-// biome-ignore lint/correctness/noEmptyPattern: playwright-bdd needs an object pattern as the first argument
-Then(/^the body has status "([^"]+)"$/, async ({}, status: string) => {
-	expect(await current().json()).toEqual({ status });
-});
+Then(
+	/^the body has status "([^"]+)"$/,
+	async ({ request: _request }, status: string) => {
+		expect(await currentResponse().json()).toEqual({ status });
+	},
+);

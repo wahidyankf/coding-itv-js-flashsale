@@ -1,21 +1,25 @@
+// Steps for the API when Postgres or Redis does not answer, and when they come back (with the data they had, or with none).
+// Binds degraded/serving.feature and health/readiness.feature. Postgres is pointed at an address nobody listens on, and
+// Redis is cut at the proxy, which leaves the data in Redis as it was.
+
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
-import { createClient } from "redis";
-import { E2E_REDIS_URL, startApi, world } from "./support/world.js";
+import { E2E_REDIS_URL, startApi, withRedis } from "./support/processes.js";
+import { pollUntil } from "./support/time.js";
+import { setApiEnv, world } from "./support/world.js";
 
 const { Given } = createBdd();
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
 // /ready answers 503 while the API cannot reach Redis and 200 once it can. Waiting for it makes the step exact.
 async function waitForReady(url: string, ready: boolean): Promise<void> {
-	const deadline = Date.now() + 15_000;
-	while (Date.now() < deadline) {
-		const status = (await fetch(`${url}/ready`)).status;
-		if ((status === 200) === ready) return;
-		await sleep(50);
-	}
-	throw new Error(`the API did not become ${ready ? "ready" : "not ready"}`);
+	await pollUntil(
+		async () => ((await fetch(`${url}/ready`)).status === 200) === ready,
+		{
+			withinMs: 15_000,
+			everyMs: 50,
+			failure: `the API did not become ${ready ? "ready" : "not ready"}`,
+		},
+	);
 }
 
 function proxy() {
@@ -27,7 +31,7 @@ function proxy() {
 const DEAD_POSTGRES = "postgres://flash:flash@127.0.0.1:1/flash";
 
 Given("Postgres does not answer", async ({ request: _request }) => {
-	world.apiEnv = { ...world.apiEnv, DATABASE_URL: DEAD_POSTGRES };
+	setApiEnv({ DATABASE_URL: DEAD_POSTGRES });
 	await startApi();
 });
 
@@ -53,12 +57,6 @@ Given("Redis is back with no data", async ({ request: _request }) => {
 	const url = await startApi();
 	await proxy().up();
 	await waitForReady(url, true);
-	const redis = createClient({ url: E2E_REDIS_URL });
-	await redis.connect();
-	try {
-		await redis.flushDb();
-	} finally {
-		await redis.close();
-	}
+	await withRedis(E2E_REDIS_URL, (redis) => redis.flushDb());
 	expect(world.redisProxy).toBeDefined();
 });

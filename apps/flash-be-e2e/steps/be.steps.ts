@@ -1,7 +1,12 @@
+// Steps shared by most flash-be features: a client that asks for a path (with or without a body), the status and body of a
+// reply, and the Redis connection the API keeps (cut and restored). Binds health/liveness.feature, health/readiness.feature,
+// routing/unknown-routes.feature and readiness' Redis steps. The other features use the request and reply steps.
+
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
-import { createClient } from "redis";
+import { DEV_REDIS_URL, withRedis } from "./support/processes.js";
 import { currentResponse, setResponse } from "./support/response.js";
+import { pollUntil } from "./support/time.js";
 import { world } from "./support/world.js";
 
 // createBdd exposes Given, When and Then only. Matching is by step text, so an And line binds to When or Then.
@@ -47,52 +52,46 @@ Given("the API is running and Redis answers", async ({ request }) => {
 When("Redis drops the API's connection", async () => {
 	// CLIENT KILL with SKIPME leaves this connection open and drops the API's normal connection.
 	// The e2e stack runs one flash-be and no other Redis clients, so no other test loses its link.
-	const redis = createClient({
-		url: process.env.REDIS_URL ?? "redis://localhost:6379",
-	});
-	await redis.connect();
-	try {
-		await redis.sendCommand([
-			"CLIENT",
-			"KILL",
-			"TYPE",
-			"normal",
-			"SKIPME",
-			"yes",
-		]);
-	} finally {
-		await redis.close();
-	}
+	await withRedis(DEV_REDIS_URL, (redis) =>
+		redis.sendCommand(["CLIENT", "KILL", "TYPE", "normal", "SKIPME", "yes"]),
+	);
 });
 
 When("Redis reconnects", async ({ request }) => {
-	const deadline = Date.now() + 10_000;
-	while (Date.now() < deadline) {
-		// A crashed API refuses connections; keep polling until it answers again.
-		try {
-			if ((await request.get("/ready")).status() === 200) return;
-		} catch {
-			// not up yet
-		}
-		await new Promise((resolve) => setTimeout(resolve, 200));
-	}
-	throw new Error("flash-be did not recover its Redis connection");
-});
-
-// biome-ignore lint/correctness/noEmptyPattern: playwright-bdd needs an object pattern as the first argument
-Then(/^the response status is (\d+)$/, async ({}, status: string) => {
-	expect(currentResponse().status()).toBe(Number(status));
-});
-
-// biome-ignore lint/correctness/noEmptyPattern: playwright-bdd needs an object pattern as the first argument
-Then(/^the body has status "([^"]+)"$/, async ({}, status: string) => {
-	expect(await currentResponse().json()).toEqual({ status });
+	// A crashed API refuses connections; keep polling until it answers again.
+	await pollUntil(
+		async () => {
+			try {
+				return (await request.get("/ready")).status() === 200;
+			} catch {
+				return false;
+			}
+		},
+		{
+			withinMs: 10_000,
+			everyMs: 200,
+			failure: "flash-be did not recover its Redis connection",
+		},
+	);
 });
 
 Then(
+	/^the response status is (\d+)$/,
+	async ({ request: _request }, status: string) => {
+		expect(currentResponse().status()).toBe(Number(status));
+	},
+);
+
+Then(
+	/^the body has status "([^"]+)"$/,
+	async ({ request: _request }, status: string) => {
+		expect(await currentResponse().json()).toEqual({ status });
+	},
+);
+
+Then(
 	/^the readiness checks report database "([^"]+)" and redis "([^"]+)"$/,
-	// biome-ignore lint/correctness/noEmptyPattern: playwright-bdd needs an object pattern as the first argument
-	async ({}, database: string, redis: string) => {
+	async ({ request: _request }, database: string, redis: string) => {
 		expect((await currentResponse().json()).checks).toEqual({
 			database,
 			redis,

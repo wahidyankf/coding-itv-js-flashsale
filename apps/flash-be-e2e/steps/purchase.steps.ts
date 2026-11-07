@@ -1,54 +1,27 @@
-import { type APIRequestContext, expect } from "@playwright/test";
+// Steps for the purchase: confirming a hold, what the confirmation answers (a purchase id, a refusal, a time), what a shopper's
+// outcome is (purchased, still holding, or none), the payment (declined, slow, refunded), and an item another instance sold
+// behind the API's back. Binds purchase/confirming.feature and purchase/outcome.feature. The hold itself is in
+// reservation.steps.ts, and the calls every step uses are in support/shoppers.ts.
+
+import type { APIRequestContext } from "@playwright/test";
+import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
-import { shoppers } from "./queue.steps.js";
 import { bodyOf, routes, send, TICKET_HEADER } from "./support/api.js";
-import { shopperCookie } from "./support/auth.js";
+import { shopperCookie, usernameKey } from "./support/auth.js";
+import { query, SYSTEM_USER } from "./support/database.js";
 import { currentResponse, setResponse } from "./support/response.js";
-import { query, SYSTEM_USER, world } from "./support/world.js";
+import { confirm, holdOf, postConfirm, shoppers } from "./support/shoppers.js";
+import { MS_PER_SECOND, pollUntil } from "./support/time.js";
+import { setApiEnv, world } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
 
-type Request = APIRequestContext;
-
-const key = (user: string) => user.trim().toLowerCase();
-
-function holdOf(user: string) {
-	return shoppers().holds.get(key(user));
-}
-
-async function post(
-	request: Request,
+// The outcome a shopper has in the sale: purchased, holding an item, or none. Keeps the reply for the steps after it.
+async function outcome(
+	request: APIRequestContext,
 	user: string,
-	options: { reservationId?: string; owner?: string; saleId?: string } = {},
+	saleId = world.saleId,
 ) {
-	const reservationId =
-		options.reservationId ?? holdOf(options.owner ?? user)?.reservationId;
-	return send(request, routes.confirm, {
-		params: { saleId: options.saleId ?? world.saleId ?? "" },
-		headers: { cookie: await shopperCookie(request, user) },
-		// A shopper with no hold sends no reservation id, which the API refuses.
-		body: { reservationId: reservationId ?? "" },
-	});
-}
-
-export async function confirm(
-	request: Request,
-	user: string,
-	options: { reservationId?: string; owner?: string } = {},
-) {
-	const started = performance.now();
-	const reply = await post(request, user, options);
-	world.confirmMs = [...(world.confirmMs ?? []), performance.now() - started];
-	setResponse(reply);
-	const bought = await bodyOf(routes.confirm, reply);
-	if (bought && !purchases().has(key(user))) purchases().set(key(user), bought);
-}
-
-function purchases() {
-	return shoppers().purchases;
-}
-
-async function outcome(request: Request, user: string, saleId = world.saleId) {
 	const reply = await send(request, routes.outcome, {
 		params: { saleId: saleId ?? "" },
 		headers: { cookie: await shopperCookie(request, user) },
@@ -60,17 +33,14 @@ async function outcome(request: Request, user: string, saleId = world.saleId) {
 Given(
 	"the payment provider declines every payment",
 	async ({ request: _request }) => {
-		world.apiEnv = { ...world.apiEnv, PAYMENT_FAILURE_RATE: "1" };
+		setApiEnv({ PAYMENT_FAILURE_RATE: "1" });
 	},
 );
 
 Given(
 	/^the payment provider takes (\d+) seconds$/,
 	async ({ request: _request }, seconds: string) => {
-		world.apiEnv = {
-			...world.apiEnv,
-			PAYMENT_LATENCY_MS: String(Number(seconds) * 1000),
-		};
+		setApiEnv({ PAYMENT_LATENCY_MS: String(Number(seconds) * MS_PER_SECOND) });
 	},
 );
 
@@ -113,8 +83,7 @@ When(/^"([^"]+)" confirms the purchase$/, async ({ request }, user: string) => {
 
 Then(
 	/^every confirmation answered in less than (\d+) milliseconds$/,
-	// biome-ignore lint/correctness/noEmptyPattern: playwright-bdd needs an object pattern as the first argument
-	async ({}, limit: string) => {
+	async ({ request: _request }, limit: string) => {
 		const times = world.confirmMs ?? [];
 		expect(times).toHaveLength(3);
 		expect(Math.max(...times)).toBeLessThan(Number(limit));
@@ -135,10 +104,11 @@ When(
 	},
 );
 
+// Starts a confirmation and does not wait for it, so a later step can let another purchase go first.
 When(
 	/^"([^"]+)" starts to confirm the purchase$/,
 	async ({ request }, user: string) => {
-		world.pendingConfirm = post(request, user);
+		world.pendingConfirm = postConfirm(request, user);
 	},
 );
 
@@ -171,7 +141,7 @@ When(
 	async ({ request }) => {
 		const holders = [...shoppers().holds.keys()];
 		const replies = await Promise.all(
-			holders.map((user) => post(request, user)),
+			holders.map((user) => postConfirm(request, user)),
 		);
 		shoppers().replies = replies.map((reply) => ({ status: reply.status() }));
 	},
@@ -201,7 +171,7 @@ Then(
 	/^the purchase is the one "([^"]+)" had before$/,
 	async ({ request: _request }, user: string) => {
 		expect((await currentResponse().json()).purchaseId).toBe(
-			purchases().get(key(user))?.purchaseId,
+			shoppers().purchases.get(usernameKey(user))?.purchaseId,
 		);
 	},
 );
@@ -230,14 +200,16 @@ Then(
 	},
 );
 
+// The refund is written to the API's log by the mock payment. The log is read until the line appears, for up to 3 seconds.
 Then(
 	/^the payment of "([^"]+)" is refunded$/,
 	async ({ request: _request }, user: string) => {
 		const line = `payment refunded: mock-${holdOf(user)?.reservationId}`;
-		const deadline = Date.now() + 3000;
-		while (Date.now() < deadline && !world.api?.log.includes(line)) {
-			await new Promise((resolve) => setTimeout(resolve, 50));
-		}
+		await pollUntil(async () => world.api?.log.includes(line) ?? false, {
+			withinMs: 3000,
+			everyMs: 50,
+			failure: `no refund was written for ${user}`,
+		});
 		expect(world.api?.log).toContain(line);
 	},
 );

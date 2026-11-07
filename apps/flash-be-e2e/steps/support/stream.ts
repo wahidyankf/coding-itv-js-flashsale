@@ -1,6 +1,10 @@
+// A Server-Sent Events stream as the steps read it: the events one by one, each read with a time limit, and a way to close the
+// stream. The steps that watch a sale or a place open one and close it in cleanup.
+
+import { sleep } from "./time.js";
 import type { StreamEvent } from "./views.js";
 
-// A Server-Sent Events stream as a step reads it: events one by one, with a time limit, and a way to close it.
+// An open stream: `next` reads the following event, and `close` ends the connection.
 export type Stream = {
 	next: () => Promise<StreamEvent>;
 	close: () => void;
@@ -9,7 +13,8 @@ export type Stream = {
 const NEXT_EVENT_TIMEOUT_MS = 8000;
 const POLL_MS = 200;
 
-// Splits the text that arrived so far into events. Returns the events and the rest. Keep-alive comments are skipped.
+// Splits the text that arrived so far into events, and returns them with the unfinished rest. Keep-alive comments and
+// events other than sale and place are skipped.
 function parseEvents(buffer: string): { events: StreamEvent[]; rest: string } {
 	const events: StreamEvent[] = [];
 	const frames = buffer.split("\n\n");
@@ -24,6 +29,7 @@ function parseEvents(buffer: string): { events: StreamEvent[]; rest: string } {
 	return { events, rest };
 }
 
+// Opens the stream at `url` with these headers. Throws when the server does not open it. Read the events with `next`.
 export async function openStream(
 	url: string,
 	headers: Record<string, string> = {},
@@ -52,10 +58,7 @@ export async function openStream(
 			const deadline = Date.now() + NEXT_EVENT_TIMEOUT_MS;
 			while (events.length === 0) {
 				if (Date.now() > deadline) throw new Error("no event in time");
-				await Promise.race([
-					fill(),
-					new Promise<void>((resolve) => setTimeout(resolve, POLL_MS)),
-				]);
+				await Promise.race([fill(), sleep(POLL_MS)]);
 			}
 			const event = events.shift();
 			if (!event) throw new Error("no event");

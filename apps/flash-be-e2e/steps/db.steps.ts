@@ -1,13 +1,19 @@
+// Steps for the schema: the migrations, the audit columns every table has, and the constraints the database enforces even
+// when the API would not allow the row (more sold than stock, a second purchase, an unknown role). Binds
+// db/migrations.feature. They write SQL on purpose: the database itself must refuse each row the API would never let through.
+
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import {
 	createScratchDatabase,
+	insertSale,
 	migrate,
 	migratedDatabase,
 	query,
 	SYSTEM_USER,
-	world,
-} from "./support/world.js";
+} from "./support/database.js";
+import { HOUR_MS } from "./support/time.js";
+import { world } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
 
@@ -36,22 +42,12 @@ async function exists(table: string): Promise<boolean> {
 	return rows[0]?.name === table;
 }
 
-// These scenarios test the constraints of the tables, so they write rows the API would never allow (more sold than
-// stock). That is why they use SQL.
-async function insertSale(stock: number, sold: number): Promise<string> {
-	const rows = await query<{ id: string }>(
-		`with product as (
-		   insert into products (name, created_by) values ('Flash sale', ${SYSTEM_USER}) returning id
-		 )
-		 insert into sales (product_id, name, starts_at, ends_at, stock, sold, created_by)
-		 select product.id, 'Flash sale', now() - interval '1 hour', now() + interval '1 hour', $1, $2, ${SYSTEM_USER}
-		 from product
-		 returning id`,
-		[stock, sold],
-	);
-	const id = rows[0]?.id;
-	if (!id) throw new Error("the sale was not inserted");
-	return id;
+// A sale that opened an hour ago and closes in an hour, for the rows that only need a valid window.
+function openNow() {
+	return {
+		startsAt: new Date(Date.now() - HOUR_MS),
+		endsAt: new Date(Date.now() + HOUR_MS),
+	};
 }
 
 Given("a database with no tables", async () => {
@@ -101,7 +97,12 @@ Then(
 
 When("a sale with stock 5 and 6 sold is inserted", async () => {
 	try {
-		await insertSale(5, 6);
+		await insertSale({
+			name: "Flash sale",
+			...openNow(),
+			stock: 5,
+			sold: 6,
+		});
 	} catch (error) {
 		world.failure = (error as Error).message;
 	}
@@ -112,7 +113,12 @@ Then("the database refuses the row", () => {
 });
 
 Given("a sale with stock 5 exists", async () => {
-	world.saleId = await insertSale(5, 0);
+	world.saleId = await insertSale({
+		name: "Flash sale",
+		...openNow(),
+		stock: 5,
+		sold: 0,
+	});
 });
 
 When("a sale with no product is inserted", async () => {

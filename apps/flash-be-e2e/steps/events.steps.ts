@@ -1,11 +1,16 @@
-import { type APIRequestContext, expect } from "@playwright/test";
+// Steps for the event streams: a client watches the sale or a shopper's place, and the events that come next (a sale's
+// status and items left, a place in line). Binds events/streaming.feature. A stream a scenario opens is closed in cleanup.
+
+import type { APIRequestContext } from "@playwright/test";
+import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
-import { shoppers } from "./queue.steps.js";
 import { build, routes, send, TICKET_HEADER } from "./support/api.js";
-import { shopperCookie } from "./support/auth.js";
-import { changeSale } from "./support/operator.js";
+import { shopperCookie, usernameKey } from "./support/auth.js";
+import { patchSale } from "./support/operator.js";
 import { setResponse } from "./support/response.js";
+import { shoppers } from "./support/shoppers.js";
 import { openStream, type Stream } from "./support/stream.js";
+import { HOUR_MS } from "./support/time.js";
 import { world } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
@@ -13,7 +18,7 @@ const { Given, When, Then } = createBdd();
 // The stream of the scenario. Closed in `cleanup` through `world.streams`.
 let stream: Stream | undefined;
 
-function current(): Stream {
+function currentStream(): Stream {
 	if (!stream) throw new Error("nobody is watching");
 	return stream;
 }
@@ -28,7 +33,7 @@ async function watchPlace(request: APIRequestContext, user: string) {
 		params: { saleId: world.saleId ?? "" },
 		headers: {
 			cookie: await shopperCookie(request, user),
-			[TICKET_HEADER]: shoppers().tickets.get(user.trim().toLowerCase()),
+			[TICKET_HEADER]: shoppers().tickets.get(usernameKey(user)),
 		},
 	});
 	await watch(built.url, built.headers);
@@ -41,7 +46,7 @@ async function watch(url: string, headers: Record<string, string>) {
 
 Given("a client is watching the sale", async ({ request: _request }) => {
 	await watchSale(world.saleId ?? "");
-	await current().next();
+	await currentStream().next();
 });
 
 When("a client watches the sale", async ({ request: _request }) => {
@@ -62,7 +67,7 @@ Given(
 	/^"([^"]+)" is watching her place$/,
 	async ({ request }, user: string) => {
 		await watchPlace(request, user);
-		await current().next();
+		await currentStream().next();
 	},
 );
 
@@ -85,12 +90,10 @@ When(
 	},
 );
 
-const HOUR_MS = 3_600_000;
-
 // The operator moves the start of a sale that has not opened. The private API admits on its own timer, so the shopper is
 // admitted within a tick.
 When("the sale opens", async ({ request }) => {
-	await changeSale(request, world.saleId ?? "", {
+	await patchSale(request, world.saleId ?? "", {
 		startsAt: new Date(Date.now() - HOUR_MS).toISOString(),
 	});
 });
@@ -103,7 +106,7 @@ Then(
 		status: string,
 		left: string,
 	) => {
-		const next = await current().next();
+		const next = await currentStream().next();
 		expect(next.event).toBe(event);
 		const sale = next.event === "sale" ? next.data : undefined;
 		expect(sale?.status).toBe(status);
@@ -114,7 +117,7 @@ Then(
 Then(
 	/^the next event is "([^"]+)" with the state "([^"]+)"$/,
 	async ({ request: _request }, event: string, state: string) => {
-		const next = await current().next();
+		const next = await currentStream().next();
 		expect(next.event).toBe(event);
 		expect(next.event === "place" ? next.data.state : undefined).toBe(state);
 	},
@@ -128,7 +131,7 @@ Then(
 		state: string,
 		place: string,
 	) => {
-		const first = await current().next();
+		const first = await currentStream().next();
 		expect(first.event).toBe(event);
 		const view = first.event === "place" ? first.data : undefined;
 		expect(view?.state).toBe(state);

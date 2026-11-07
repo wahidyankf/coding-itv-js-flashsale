@@ -1,46 +1,54 @@
-import { type APIResponse, expect } from "@playwright/test";
+// Steps for creating a sale through the operator's route (`POST /admin/sales`): who may create one, the sale it makes, the
+// product it sells, the races between operators, and the rows the database keeps. Binds sale/admin.feature and
+// sale/operating.feature (its creating steps; the other operator steps are in operating.steps.ts).
+
+import type { APIRequestContext, APIResponse } from "@playwright/test";
+import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
-import { bodyOf, routes, send } from "./support/api.js";
+import { bodyOf, givenFields, routes, send } from "./support/api.js";
 import { operatorCookie, shopperCookie } from "./support/auth.js";
+import { ensureDatabase, query, SYSTEM_USER } from "./support/database.js";
 import { type Sender, senderHeaders } from "./support/operator.js";
 import { currentResponse, setResponse } from "./support/response.js";
-import {
-	migratedDatabase,
-	query,
-	SYSTEM_USER,
-	world,
-} from "./support/world.js";
+import { windowFromNow } from "./support/time.js";
+import { world } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
-
-const MINUTE_MS = 60_000;
 
 // The responses of operators who created at the same moment.
 let racers: APIResponse[] = [];
 
-async function ensureDatabase(): Promise<void> {
-	if (!world.databaseUrl) await migratedDatabase();
+// The numbers of a sale as the Gherkin writes them: its stock, and when it opens and closes, in minutes from now.
+function saleOf(stock: string, startsIn: string, minutes: string) {
+	return {
+		stock: Number(stock),
+		startsIn: Number(startsIn),
+		minutes: Number(minutes),
+	};
 }
 
+// The request that creates a sale, sent by `sender`. The sale opens `startsIn` minutes from now and lasts `minutes`.
+// A request from nobody has no login to set the database up first, so the database is set up here too.
 async function create(
-	request: Parameters<typeof send>[0],
-	stock: number,
-	startsIn: number,
-	minutes: number,
-	sender: Sender,
-	productId?: string,
+	request: APIRequestContext,
+	sale: {
+		stock: number;
+		startsIn: number;
+		minutes: number;
+		sender: Sender;
+		productId?: string | undefined;
+	},
 ): Promise<APIResponse> {
-	// A request from nobody has no login to set the database up first.
 	await ensureDatabase();
-	const startsAt = new Date(Date.now() + startsIn * MINUTE_MS);
+	const { startsAt, endsAt } = windowFromNow(sale.startsIn, sale.minutes);
 	return send(request, routes.createSale, {
-		headers: await senderHeaders(request, sender),
-		body: {
-			stock,
+		headers: await senderHeaders(request, sale.sender),
+		body: givenFields({
+			stock: sale.stock,
 			startsAt: startsAt.toISOString(),
-			endsAt: new Date(startsAt.getTime() + minutes * MINUTE_MS).toISOString(),
-			...(productId === undefined ? {} : { productId }),
-		},
+			endsAt: endsAt.toISOString(),
+			productId: sale.productId,
+		}),
 	});
 }
 
@@ -57,14 +65,11 @@ Given("a shopper is logged in", async ({ request }) => {
 Given(
 	/^a sale was created with stock (\d+), opening in (\d+) minutes for (\d+) minutes$/,
 	async ({ request }, stock: string, startsIn: string, minutes: string) => {
-		const made = await create(
-			request,
-			Number(stock),
-			Number(startsIn),
-			Number(minutes),
-			"operator",
-			world.productId,
-		);
+		const made = await create(request, {
+			...saleOf(stock, startsIn, minutes),
+			sender: "operator",
+			productId: world.productId,
+		});
 		expect(made.status()).toBe(201);
 		world.saleId = (await made.json()).id;
 	},
@@ -82,44 +87,39 @@ Given(
 	},
 );
 
-type Request = Parameters<typeof send>[0];
-
-async function createAs(
-	sender: Sender,
-	request: Request,
-	stock: string,
-	startsIn: string,
-	minutes: string,
-) {
-	setResponse(
-		await create(
-			request,
-			Number(stock),
-			Number(startsIn),
-			Number(minutes),
-			sender,
-		),
-	);
-}
-
 When(
 	/^the operator creates a sale with stock (\d+), opening in (\d+) minutes for (\d+) minutes$/,
 	async ({ request }, stock: string, startsIn: string, minutes: string) => {
-		await createAs("operator", request, stock, startsIn, minutes);
+		setResponse(
+			await create(request, {
+				...saleOf(stock, startsIn, minutes),
+				sender: "operator",
+			}),
+		);
 	},
 );
 
 When(
 	/^the shopper creates a sale with stock (\d+), opening in (\d+) minutes for (\d+) minutes$/,
 	async ({ request }, stock: string, startsIn: string, minutes: string) => {
-		await createAs("shopper", request, stock, startsIn, minutes);
+		setResponse(
+			await create(request, {
+				...saleOf(stock, startsIn, minutes),
+				sender: "shopper",
+			}),
+		);
 	},
 );
 
 When(
 	/^someone who is not logged in creates a sale with stock (\d+), opening in (\d+) minutes for (\d+) minutes$/,
 	async ({ request }, stock: string, startsIn: string, minutes: string) => {
-		await createAs("nobody", request, stock, startsIn, minutes);
+		setResponse(
+			await create(request, {
+				...saleOf(stock, startsIn, minutes),
+				sender: "nobody",
+			}),
+		);
 	},
 );
 
@@ -127,14 +127,11 @@ When(
 	/^the operator creates a sale of that product with stock (\d+), opening in (\d+) minutes for (\d+) minutes$/,
 	async ({ request }, stock: string, startsIn: string, minutes: string) => {
 		setResponse(
-			await create(
-				request,
-				Number(stock),
-				Number(startsIn),
-				Number(minutes),
-				"operator",
-				world.productId,
-			),
+			await create(request, {
+				...saleOf(stock, startsIn, minutes),
+				sender: "operator",
+				productId: world.productId,
+			}),
 		);
 	},
 );
@@ -143,14 +140,11 @@ When(
 	/^the operator creates a sale of a product that does not exist with stock (\d+), opening in (\d+) minutes for (\d+) minutes$/,
 	async ({ request }, stock: string, startsIn: string, minutes: string) => {
 		setResponse(
-			await create(
-				request,
-				Number(stock),
-				Number(startsIn),
-				Number(minutes),
-				"operator",
-				"00000000-0000-4000-8000-000000000000",
-			),
+			await create(request, {
+				...saleOf(stock, startsIn, minutes),
+				sender: "operator",
+				productId: "00000000-0000-4000-8000-000000000000",
+			}),
 		);
 	},
 );
@@ -166,13 +160,10 @@ When(
 	) => {
 		racers = await Promise.all(
 			Array.from({ length: Number(operators) }, () =>
-				create(
-					request,
-					Number(stock),
-					Number(startsIn),
-					Number(minutes),
-					"operator",
-				),
+				create(request, {
+					...saleOf(stock, startsIn, minutes),
+					sender: "operator",
+				}),
 			),
 		);
 	},

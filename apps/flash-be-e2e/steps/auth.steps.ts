@@ -1,38 +1,34 @@
+// Steps for accounts and sessions: signing up and logging in, the two cookies a login sets (their names, HttpOnly, and their
+// paths), the stored tokens (only hashes), logging out, refreshing, and the copy of a cookie that must stop working. The
+// shopper's cookie jar is kept here, as a browser would keep it. Binds auth/accounts.feature and auth/sessions.feature.
+
 import { createHash } from "node:crypto";
-import { type APIRequestContext, expect } from "@playwright/test";
+import type { APIRequestContext } from "@playwright/test";
+import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
-import { createClient } from "redis";
 import { routes, send } from "./support/api.js";
-import { currentResponse, setResponse } from "./support/response.js";
+import { ensureDatabase, query } from "./support/database.js";
+import { E2E_REDIS_URL, withRedis } from "./support/processes.js";
 import {
-	E2E_REDIS_URL,
-	migratedDatabase,
-	query,
-	world,
-} from "./support/world.js";
+	currentResponse,
+	setCookiesOf,
+	setResponse,
+} from "./support/response.js";
+import { world } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
 
 type Jar = NonNullable<typeof world.jar>;
 
-async function ensureDatabase(): Promise<void> {
-	if (!world.databaseUrl) await migratedDatabase();
-}
-
+// The shopper's cookie jar, made on first use.
 function jar(): Jar {
 	world.jar ??= new Map();
 	return world.jar;
 }
 
-const setCookies = () =>
-	currentResponse()
-		.headersArray()
-		.filter((header) => header.name.toLowerCase() === "set-cookie")
-		.map((header) => header.value);
-
-// Keeps what a reply set, as a browser does.
+// Keeps what the last reply set, as a browser does: a cookie with a value is stored, a cookie cleared is forgotten.
 function remember(into: Jar) {
-	for (const cookie of setCookies()) {
+	for (const cookie of setCookiesOf(currentResponse())) {
 		const [pair = "", ...attributes] = cookie.split(";").map((p) => p.trim());
 		const at = pair.indexOf("=");
 		const name = pair.slice(0, at);
@@ -44,8 +40,8 @@ function remember(into: Jar) {
 	}
 }
 
-// The cookies a browser would send to this path.
-function cookieFor(from: Jar, path: string): string {
+// The cookies a browser would send to this path, from the jar it holds.
+function cookiesSentTo(from: Jar, path: string): string {
 	return [...from]
 		.filter(([, cookie]) => path.startsWith(cookie.path))
 		.map(([name, cookie]) => `${name}=${cookie.value}`)
@@ -62,7 +58,7 @@ async function go(
 	const path = route.path;
 	setResponse(
 		await send(request, route, {
-			headers: { cookie: cookieFor(options.from ?? jar(), path) },
+			headers: { cookie: cookiesSentTo(options.from ?? jar(), path) },
 			body: options.body,
 		}),
 	);
@@ -105,7 +101,9 @@ Then(
 	/^the reply sets an "([^"]+)" cookie and a "([^"]+)" cookie, both HttpOnly$/,
 	async ({ request: _request }, access: string, refresh: string) => {
 		for (const name of [access, refresh]) {
-			const cookie = setCookies().find((c) => c.startsWith(`${name}=`));
+			const cookie = setCookiesOf(currentResponse()).find((c) =>
+				c.startsWith(`${name}=`),
+			);
 			expect(cookie, name).toBeDefined();
 			expect(cookie).toContain("HttpOnly");
 		}
@@ -113,7 +111,7 @@ Then(
 );
 
 Then("the reply sets no cookie", async ({ request: _request }) => {
-	expect(setCookies()).toEqual([]);
+	expect(setCookiesOf(currentResponse())).toEqual([]);
 });
 
 Then(
@@ -160,8 +158,9 @@ When("the shopper logs out", async ({ request }) => {
 });
 
 Then("the reply clears both cookies", async ({ request: _request }) => {
-	expect(setCookies()).toHaveLength(2);
-	for (const cookie of setCookies()) expect(cookie).toContain("Max-Age=0");
+	const cookies = setCookiesOf(currentResponse());
+	expect(cookies).toHaveLength(2);
+	for (const cookie of cookies) expect(cookie).toContain("Max-Age=0");
 });
 
 Given(
@@ -187,13 +186,9 @@ When("the access token expires", async ({ request: _request }) => {
 		"update sessions set access_expires_at = now() - interval '1 minute' where access_hash = $1",
 		[hash(token)],
 	);
-	const redis = createClient({ url: E2E_REDIS_URL });
-	await redis.connect();
-	try {
-		await redis.del(`session:${hash(token)}`);
-	} finally {
-		await redis.quit();
-	}
+	await withRedis(E2E_REDIS_URL, (redis) =>
+		redis.del(`session:${hash(token)}`),
+	);
 });
 
 When("the shopper refreshes the login", async ({ request }) => {

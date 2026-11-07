@@ -1,38 +1,45 @@
+// The scenario's side of the web server: which flash-be the web server reaches (through the forwarder), the sale a scenario
+// plans for that flash-be, and the logins its shoppers and operator hold. The planned sale is made on the scenario's own
+// flash-be the first time the page needs the API, through the operator route. Steps that come after the plan may still
+// change it, so it is made late. Shoppers are logged in directly, as other clients would be.
+
 import {
-	cleanup as cleanupBackend,
-	createOperator,
-	E2E_OPERATOR,
+	givenFields,
+	TICKET_HEADER,
+} from "../../../flash-be-e2e/steps/support/api.js";
+import {
+	cookieHeaderFrom,
+	cookieOnce,
 	E2E_PASSWORD,
-	migratedDatabase,
+	operatorCookieVia,
+	usernameKey,
+} from "../../../flash-be-e2e/steps/support/auth.js";
+import { cleanup as cleanupBackend } from "../../../flash-be-e2e/steps/support/cleanup.js";
+import {
+	ensureDatabase,
 	query,
-	startApi,
-	world,
-} from "../../../flash-be-e2e/steps/support/world.js";
-import { salePath, TICKET_HEADER } from "./api.js";
+} from "../../../flash-be-e2e/steps/support/database.js";
+import { startApi } from "../../../flash-be-e2e/steps/support/processes.js";
+import {
+	HOUR_MS,
+	pollUntil,
+	relativeTime,
+} from "../../../flash-be-e2e/steps/support/time.js";
+import { world } from "../../../flash-be-e2e/steps/support/world.js";
+import { fetchJson, salePath } from "./api.js";
 import { forwarder } from "./forwarder.js";
 
-export { E2E_PASSWORD, query, world };
+const UNAUTHORIZED = 401;
+const CREATED = 201;
+// How long a shopper waits to be admitted, and how often the place is read meanwhile.
+const ADMISSION_WAIT_MS = 20_000;
+const POLL_MS = 100;
 
 // True when a step has already chosen where the web server's API address leads.
-const shop: { chosen: boolean } = { chosen: false };
+const target: { chosen: boolean } = { chosen: false };
 
-const HOUR_MS = 3_600_000;
-
-// Reads phrases such as "in 2 hours" and "1 hour ago" against a given moment.
-function relativeTime(phrase: string, now: Date): Date {
-	const ahead = /^in (\d+) hours?$/.exec(phrase);
-	if (ahead) return new Date(now.getTime() + Number(ahead[1]) * HOUR_MS);
-	const past = /^(\d+) hours? ago$/.exec(phrase);
-	if (past) return new Date(now.getTime() - Number(past[1]) * HOUR_MS);
-	throw new Error(`cannot read the time "${phrase}"`);
-}
-
-export async function ensureDatabase(): Promise<void> {
-	if (!world.databaseUrl) await migratedDatabase();
-}
-
-// What a scenario said about its sale. The sale is made when the scenario's flash-be starts, so the steps that come
-// after it (a slow queue, a short hold) can still shape it, the way they shape the API's environment.
+// What a scenario said about its sale. The sale is made when the scenario's flash-be starts, so the steps that come after
+// it (a slow queue, a short hold) can still shape it, the way they shape the API's environment.
 type SalePlan = {
 	stock: number;
 	sold: number;
@@ -43,66 +50,79 @@ type SalePlan = {
 };
 let planned: SalePlan | undefined;
 
-// The `cookie` header for what a reply set: the cookies that were given a value, not the ones that were cleared.
-function cookieHeaderOf(reply: Response): string {
-	return reply.headers
-		.getSetCookie()
-		.filter((cookie) => !cookie.includes("Max-Age=0"))
-		.map((cookie) => cookie.split(";")[0])
-		.join("; ");
-}
+// The settings a step may change on the sale. A field left out keeps what the sale has.
+type SaleChange = {
+	holdSeconds?: number;
+	admitPerSecond?: number;
+	closes?: Date;
+};
 
-async function postAuth(
-	api: string,
-	path: string,
-	body: object,
-): Promise<Response> {
-	return fetch(`${api}${path}`, {
-		method: "POST",
-		headers: { "content-type": "application/json" },
-		body: JSON.stringify(body),
+// The cookie header of the operator on this API. The command makes the account once, and fetch logs it in.
+function operatorCookie(api: string): Promise<string> {
+	return operatorCookieVia(async (credentials) => {
+		const reply = await fetchJson("POST", `${api}/auth/login`, credentials);
+		return { status: reply.status, setCookies: reply.headers.getSetCookie() };
 	});
 }
 
-function logins(): Map<string, string> {
-	world.logins ??= new Map();
-	return world.logins;
+// One call of the operator to flash-be, which must succeed. Returns the sale the API answered with.
+async function operator(
+	api: string,
+	method: "POST" | "PATCH",
+	path: string,
+	body: object,
+): Promise<{ id: string }> {
+	const reply = await fetchJson(method, `${api}${path}`, body, {
+		cookie: await operatorCookie(api),
+	});
+	const text = await reply.text();
+	if (!reply.ok)
+		throw new Error(`${method} ${path} gave ${reply.status}: ${text}`);
+	return JSON.parse(text) as { id: string };
 }
 
-// The cookie header of a user of the scenario's own flash-be, as a client other than the page would hold it. The account
-// is made the first time (a sign up logs in); when the page or an earlier step made it, it is logged in to.
-export async function cookieFor(
+// A JSON request as the shopper with this cookie: the cookie is sent, and so are any extra headers.
+function postAs(
+	cookie: string,
+	url: string,
+	body: object,
+	headers: Record<string, string> = {},
+): Promise<Response> {
+	return fetchJson("POST", url, body, { cookie, ...headers });
+}
+
+// The cookie header of a shopper of this scenario's flash-be. The account is signed up the first time, when the login is
+// refused; a later call reuses the login. A page or an earlier step may already have made the account, so it logs in first.
+export async function loginOrSignUp(
 	username: string,
 	password = E2E_PASSWORD,
 	apiUrl?: string,
 ): Promise<string> {
-	const key = username.trim().toLowerCase();
-	const known = logins().get(key);
-	if (known !== undefined) return known;
-	const api = apiUrl ?? (await privateApi());
-	const body = { username: key, password };
-	let reply = await postAuth(api, "/auth/login", body);
-	if (reply.status === UNAUTHORIZED) {
-		reply = await postAuth(api, "/auth/register", body);
-	}
-	if (!reply.ok) {
-		throw new Error(
-			`${key} got no login: ${reply.status} ${await reply.text()}`,
-		);
-	}
-	const cookie = cookieHeaderOf(reply);
-	logins().set(key, cookie);
-	return cookie;
+	const key = usernameKey(username);
+	return cookieOnce(key, async () => {
+		const api = apiUrl ?? (await privateApi());
+		const body = { username: key, password };
+		let reply = await fetchJson("POST", `${api}/auth/login`, body);
+		if (reply.status === UNAUTHORIZED) {
+			reply = await fetchJson("POST", `${api}/auth/register`, body);
+		}
+		if (!reply.ok) {
+			throw new Error(
+				`${key} got no login: ${reply.status} ${await reply.text()}`,
+			);
+		}
+		return cookieHeaderFrom(reply.headers.getSetCookie());
+	});
 }
 
-// An account that exists but is not logged in anywhere, made as a deployment's sign up would.
+// An account that exists but is not logged in anywhere, made as a deployment's sign-up would make it.
 export async function createAccount(
 	username: string,
 	password: string,
 ): Promise<void> {
 	const api = await privateApi();
-	const reply = await postAuth(api, "/auth/register", {
-		username: username.trim().toLowerCase(),
+	const reply = await fetchJson("POST", `${api}/auth/register`, {
+		username: usernameKey(username),
 		password,
 	});
 	if (reply.status !== CREATED) {
@@ -110,25 +130,7 @@ export async function createAccount(
 	}
 }
 
-const UNAUTHORIZED = 401;
-const CREATED = 201;
-
-// The operator is made with the command, as in a deployment, and logs in through the API. The web server never gets the
-// cookie: the sale is made on flash-be directly and not through the browser's proxy.
-async function operatorCookie(api: string): Promise<string> {
-	const known = logins().get(E2E_OPERATOR);
-	if (known !== undefined) return known;
-	createOperator(E2E_OPERATOR, E2E_PASSWORD);
-	const reply = await postAuth(api, "/auth/login", {
-		username: E2E_OPERATOR,
-		password: E2E_PASSWORD,
-	});
-	if (!reply.ok) throw new Error(`the operator got no login: ${reply.status}`);
-	const cookie = cookieHeaderOf(reply);
-	logins().set(E2E_OPERATOR, cookie);
-	return cookie;
-}
-
+// Plans the sale the scenario talks about. It is made later, when the API first starts.
 export function planSale(
 	stock: number,
 	sold: number,
@@ -144,113 +146,77 @@ export function planSale(
 	};
 }
 
-// Shapes the sale before the API starts, and changes it through the operator route after.
-export async function changeSale(change: {
-	holdSeconds?: number;
-	admitPerSecond?: number;
-	closes?: Date;
-}): Promise<void> {
+// Changes the sale's settings: the plan while the sale is not made yet, and the operator route after that.
+export async function reviseSale(change: SaleChange): Promise<void> {
 	if (planned) {
-		planned = {
-			...planned,
-			...(change.holdSeconds === undefined
-				? {}
-				: { holdSeconds: change.holdSeconds }),
-			...(change.admitPerSecond === undefined
-				? {}
-				: { admitPerSecond: change.admitPerSecond }),
-			...(change.closes === undefined ? {} : { closes: change.closes }),
-		};
+		planned = { ...planned, ...givenFields(change) };
 		return;
 	}
 	const api = await privateApi();
 	await operator(api, "PATCH", `/admin/sales/${world.saleId}`, {
-		...(change.holdSeconds === undefined
-			? {}
-			: { holdSeconds: change.holdSeconds }),
-		...(change.admitPerSecond === undefined
-			? {}
-			: { admitPerSecond: change.admitPerSecond }),
-		...(change.closes === undefined
-			? {}
-			: { endsAt: change.closes.toISOString() }),
+		...givenFields({
+			holdSeconds: change.holdSeconds,
+			admitPerSecond: change.admitPerSecond,
+			endsAt: change.closes?.toISOString(),
+		}),
 	});
 }
 
-// One call of the operator to flash-be, which must succeed.
-async function operator(
-	api: string,
-	method: "POST" | "PATCH",
-	path: string,
-	body: object,
-): Promise<{ id: string }> {
-	const reply = await fetch(`${api}${path}`, {
-		method,
-		headers: {
-			cookie: await operatorCookie(api),
-			"content-type": "application/json",
-		},
-		body: JSON.stringify(body),
-	});
-	const text = await reply.text();
-	if (!reply.ok)
-		throw new Error(`${method} ${path} gave ${reply.status}: ${text}`);
-	return JSON.parse(text) as { id: string };
-}
-
-// Shoppers u1..uN each buy one item through the real routes: sign up, queue, hold, purchase.
+// Shoppers u1..uN each buy one item through the real routes. They all go at the same time.
 async function buyItems(
 	api: string,
 	saleId: string,
 	count: number,
 ): Promise<void> {
-	const sale = `${api}${salePath(saleId)}`;
 	await Promise.all(
-		Array.from({ length: count }, async (_, index) => {
-			const user = `u${index + 1}`;
-			const cookie = await cookieFor(user, E2E_PASSWORD, api);
-			const post = (
-				url: string,
-				body: object,
-				headers: Record<string, string> = {},
-			) =>
-				fetch(url, {
-					method: "POST",
-					headers: { "content-type": "application/json", cookie, ...headers },
-					body: JSON.stringify(body),
-				});
-			const joined = await post(`${sale}/queue`, {});
-			const { ticket } = (await joined.json()) as { ticket: string };
-			const headers = { [TICKET_HEADER]: ticket };
-			const deadline = Date.now() + ADMISSION_WAIT_MS;
-			for (;;) {
-				const place = await fetch(`${sale}/queue/me`, {
-					headers: { cookie, ...headers },
-				});
-				if (((await place.json()) as { state: string }).state === "admitted")
-					break;
-				if (Date.now() > deadline) throw new Error(`${user} was not admitted`);
-				await new Promise((resolve) => setTimeout(resolve, POLL_MS));
-			}
-			const held = await post(`${sale}/reservations`, {}, headers);
-			if (held.status !== 201)
-				throw new Error(`${user} got no hold: ${held.status}`);
-			const { reservationId } = (await held.json()) as {
-				reservationId: string;
-			};
-			const bought = await post(`${sale}/purchases`, { reservationId });
-			if (bought.status !== 201)
-				throw new Error(`${user} bought nothing: ${bought.status}`);
-		}),
+		Array.from({ length: count }, (_, index) =>
+			buyItem(api, saleId, `u${index + 1}`),
+		),
 	);
 }
 
-const ADMISSION_WAIT_MS = 20_000;
-const POLL_MS = 100;
+// One shopper's way to an item: queue, wait to be admitted, hold, and purchase. A step that does not answer as expected throws.
+async function buyItem(api: string, saleId: string, user: string) {
+	const sale = `${api}${salePath(saleId)}`;
+	const cookie = await loginOrSignUp(user, E2E_PASSWORD, api);
+	const joined = await postAs(cookie, `${sale}/queue`, {});
+	const { ticket } = (await joined.json()) as { ticket: string };
+	const headers = { [TICKET_HEADER]: ticket };
+	await waitForAdmission(sale, cookie, headers, user);
+	const held = await postAs(cookie, `${sale}/reservations`, {}, headers);
+	if (held.status !== CREATED)
+		throw new Error(`${user} got no hold: ${held.status}`);
+	const { reservationId } = (await held.json()) as { reservationId: string };
+	const bought = await postAs(cookie, `${sale}/purchases`, { reservationId });
+	if (bought.status !== CREATED)
+		throw new Error(`${user} bought nothing: ${bought.status}`);
+}
+
+// Reads the shopper's place until the API admits them, or the wait runs out.
+async function waitForAdmission(
+	sale: string,
+	cookie: string,
+	headers: Record<string, string>,
+	user: string,
+): Promise<void> {
+	await pollUntil(
+		async () => {
+			const place = await fetch(`${sale}/queue/me`, {
+				headers: { cookie, ...headers },
+			});
+			return ((await place.json()) as { state: string }).state === "admitted";
+		},
+		{
+			withinMs: ADMISSION_WAIT_MS,
+			everyMs: POLL_MS,
+			failure: `${user} was not admitted`,
+		},
+	);
+}
 
 // Makes the planned sale on the scenario's flash-be. Items can be bought only while the window is open, so a sale that is
 // already over is made open, sold from, and then closed by moving its end. A sale that has not opened yet cannot be bought
-// from by any route; the sold count is written to the table, as it would be by another instance.
+// from by any route; the sold count is written to the table, as another instance would write it.
 async function makePlannedSale(api: string): Promise<void> {
 	if (!planned) return;
 	const plan = planned;
@@ -265,12 +231,10 @@ async function makePlannedSale(api: string): Promise<void> {
 			? new Date(now + HOUR_MS)
 			: plan.closes
 		).toISOString(),
-		...(plan.holdSeconds === undefined
-			? {}
-			: { holdSeconds: plan.holdSeconds }),
-		...(plan.admitPerSecond === undefined
-			? {}
-			: { admitPerSecond: plan.admitPerSecond }),
+		...givenFields({
+			holdSeconds: plan.holdSeconds,
+			admitPerSecond: plan.admitPerSecond,
+		}),
 	});
 	world.saleId = created.id;
 	if (plan.sold === 0) return;
@@ -290,7 +254,7 @@ async function makePlannedSale(api: string): Promise<void> {
 	}
 }
 
-// The scenario's own flash-be, started on first use, with the sale the scenario planned.
+// The scenario's own flash-be, started on first use, with the sale the scenario planned. Returns its URL.
 export async function privateApi(): Promise<string> {
 	await ensureDatabase();
 	const api = await startApi();
@@ -300,32 +264,32 @@ export async function privateApi(): Promise<string> {
 
 // Points the web server at this scenario's flash-be, unless a step has already chosen another place.
 export async function connectWebServer(): Promise<void> {
-	if (shop.chosen) return;
+	if (target.chosen) return;
 	const url = await privateApi();
 	await forwarder.to(Number(new URL(url).port));
 }
 
+// Makes the API unreachable for the web server: the forwarder drops every connection.
 export async function cutWebServerOff(): Promise<void> {
-	shop.chosen = true;
+	target.chosen = true;
 	await forwarder.cut();
 }
 
+// Makes the API answer every call of the web server with this status and body, instead of the real API.
 export async function answerWith(status: number, body: string): Promise<void> {
-	shop.chosen = true;
+	target.chosen = true;
 	await forwarder.canned(status, body);
 }
 
+// Points the web server at a flash-be that is already running, such as the shared one of the e2e stack.
 export async function pointAtSharedBackend(port: number): Promise<void> {
-	shop.chosen = true;
+	target.chosen = true;
 	await forwarder.to(port);
 }
 
-export function setApiEnv(extra: Record<string, string>): void {
-	world.apiEnv = { ...world.apiEnv, ...extra };
-}
-
+// Ends the scenario: the forwarder is pointed nowhere, the plan is dropped, and the backend is cleaned up.
 export async function cleanup(): Promise<void> {
-	shop.chosen = false;
+	target.chosen = false;
 	planned = undefined;
 	await forwarder.reset();
 	await cleanupBackend();

@@ -1,6 +1,10 @@
+// Steps for the seed-sale command: it makes the one sale a deployment starts with, from its flags, and it refuses bad values.
+// Binds sale/seeding.feature.
+
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
-import { query, seed, world } from "./support/world.js";
+import { query, seed } from "./support/database.js";
+import { world } from "./support/world.js";
 
 const { When, Then } = createBdd();
 

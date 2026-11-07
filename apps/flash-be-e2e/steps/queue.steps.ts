@@ -1,59 +1,18 @@
-import { type APIRequestContext, expect } from "@playwright/test";
+// Steps for the queue: joining it, the ticket and place a shopper gets, the admission the API runs on its own timer, and the
+// loss of the queue from Redis. Binds queue/joining.feature and queue/admission.feature. The join and check calls are in
+// support/shoppers.ts, because other features use them too.
+
+import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
-import { createClient } from "redis";
-import { bodyOf, routes, send, TICKET_HEADER } from "./support/api.js";
-import { shopperCookie } from "./support/auth.js";
-import { changeSale, createSale } from "./support/operator.js";
-import { currentResponse, setResponse } from "./support/response.js";
-import { relativeTime } from "./support/time.js";
-import { E2E_REDIS_URL, world } from "./support/world.js";
+import { bodyOf, routes, send } from "./support/api.js";
+import { createSale, patchSale } from "./support/operator.js";
+import { E2E_REDIS_URL, withRedis } from "./support/processes.js";
+import { currentResponse } from "./support/response.js";
+import { check, join, shoppers } from "./support/shoppers.js";
+import { pollUntil, relativeTime, sleep } from "./support/time.js";
+import { world } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
-
-type Request = APIRequestContext;
-
-export function shoppers(): NonNullable<typeof world.queue> {
-	world.queue ??= {
-		tickets: new Map(),
-		joined: [],
-		holds: new Map(),
-		purchases: new Map(),
-		replies: [],
-	};
-	return world.queue;
-}
-
-export async function join(
-	request: Request,
-	user: string,
-	saleId = world.saleId,
-) {
-	const reply = await send(request, routes.joinQueue, {
-		params: { saleId: saleId ?? "" },
-		headers: { cookie: await shopperCookie(request, user) },
-	});
-	setResponse(reply);
-	const joined = await bodyOf(routes.joinQueue, reply);
-	const held = shoppers();
-	const key = user.trim().toLowerCase();
-	if (joined && !held.tickets.has(key)) {
-		held.tickets.set(key, joined.ticket);
-		held.joined.push(key);
-	}
-}
-
-// Asks for a place. Returns it when the API gave one, and nothing when it refused.
-export async function check(request: Request, user: string, ticket?: string) {
-	const reply = await send(request, routes.checkPlace, {
-		params: { saleId: world.saleId ?? "" },
-		headers: {
-			cookie: await shopperCookie(request, user),
-			[TICKET_HEADER]: ticket,
-		},
-	});
-	setResponse(reply);
-	return bodyOf(routes.checkPlace, reply);
-}
 
 // The scenario keeps talking about the running sale; the later one only has to exist.
 Given(
@@ -71,7 +30,7 @@ Given(
 Given(
 	/^the sale admits (\d+) users per second$/,
 	async ({ request }, rate: string) => {
-		await changeSale(request, world.saleId ?? "", {
+		await patchSale(request, world.saleId ?? "", {
 			admitPerSecond: Number(rate),
 		});
 	},
@@ -103,18 +62,12 @@ Given(
 	},
 );
 
-Given("the queue is lost", async () => {
-	const redis = createClient({ url: E2E_REDIS_URL });
-	await redis.connect();
-	try {
-		await redis.flushDb();
-	} finally {
-		await redis.close();
-	}
+Given("the queue is lost", async ({ request: _request }) => {
+	await withRedis(E2E_REDIS_URL, (redis) => redis.flushDb());
 });
 
-// The private API admits on its own timer. A sale that is open admits its first shopper within one tick, so wait
-// for that. A sale that is not open admits nobody, so wait out a tick and a half instead.
+// The private API admits on its own timer. A sale that is open admits its first shopper within one tick, so wait for that.
+// A sale that is not open admits nobody, so wait out a tick and a half instead.
 When("admission runs once", async ({ request }) => {
 	const sale = await bodyOf(
 		routes.sale,
@@ -124,16 +77,19 @@ When("admission runs once", async ({ request }) => {
 	);
 	const first = shoppers().joined[0];
 	if (sale?.status !== "active" || !first) {
-		await new Promise((resolve) => setTimeout(resolve, 1500));
+		await sleep(1500);
 		return;
 	}
-	const deadline = Date.now() + 5000;
-	while (Date.now() < deadline) {
-		const body = await check(request, first, shoppers().tickets.get(first));
-		if (body?.state === "admitted") return;
-		await new Promise((resolve) => setTimeout(resolve, 25));
-	}
-	throw new Error("the queue admitted nobody in time");
+	await pollUntil(
+		async () =>
+			(await check(request, first, shoppers().tickets.get(first)))?.state ===
+			"admitted",
+		{
+			withinMs: 5000,
+			everyMs: 25,
+			failure: "the queue admitted nobody in time",
+		},
+	);
 });
 
 When(

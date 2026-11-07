@@ -1,15 +1,22 @@
-import { type APIRequestContext, expect } from "@playwright/test";
+// Steps for the rate limits: how many write requests a shopper or an address may send in a window, and what a refused one
+// looks like (429 with a Retry-After). Binds rate-limit/limiting.feature. The requests are sent with the join, reserve and
+// confirm calls of support/shoppers.ts, and each answer is kept for the counting steps.
+
+import type { APIRequestContext } from "@playwright/test";
+import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
-import { confirm } from "./purchase.steps.js";
-import { join, shoppers } from "./queue.steps.js";
-import { reserve } from "./reservation.steps.js";
 import { currentResponse } from "./support/response.js";
-import { world } from "./support/world.js";
+import { confirm, join, reserve, shoppers } from "./support/shoppers.js";
+import { setApiEnv } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
 
 // Sends one write request by the name a scenario uses for it, and notes how it was answered.
-async function send(request: APIRequestContext, kind: string, user: string) {
+async function sendKind(
+	request: APIRequestContext,
+	kind: string,
+	user: string,
+) {
 	if (kind === "join the queue") await join(request, user);
 	else if (kind === "reserve an item") await reserve(request, user);
 	else if (kind === "confirm a purchase") {
@@ -25,22 +32,20 @@ async function send(request: APIRequestContext, kind: string, user: string) {
 Given(
 	/^the limit is (\d+) requests per user in each (\d+) seconds$/,
 	async ({ request: _request }, requests: string, seconds: string) => {
-		world.apiEnv = {
-			...world.apiEnv,
+		setApiEnv({
 			RATE_LIMIT_PER_USER: requests,
 			RATE_LIMIT_WINDOW_SECONDS: seconds,
-		};
+		});
 	},
 );
 
 Given(
 	/^the limit is (\d+) requests per address in each (\d+) seconds$/,
 	async ({ request: _request }, requests: string, seconds: string) => {
-		world.apiEnv = {
-			...world.apiEnv,
+		setApiEnv({
 			RATE_LIMIT_PER_IP: requests,
 			RATE_LIMIT_WINDOW_SECONDS: seconds,
-		};
+		});
 	},
 );
 
@@ -48,7 +53,7 @@ Given(
 	/^"([^"]+)" has tried to join the queue (\d+) times$/,
 	async ({ request }, user: string, times: string) => {
 		for (let attempt = 0; attempt < Number(times); attempt++) {
-			await send(request, "join the queue", user);
+			await sendKind(request, "join the queue", user);
 		}
 	},
 );
@@ -57,7 +62,7 @@ When(
 	/^"([^"]+)" tries to (.+) (\d+) times$/,
 	async ({ request }, user: string, kind: string, times: string) => {
 		for (let attempt = 0; attempt < Number(times); attempt++) {
-			await send(request, kind, user);
+			await sendKind(request, kind, user);
 		}
 	},
 );
@@ -66,7 +71,7 @@ When(
 	/^(\d+) different shoppers join the queue from one address$/,
 	async ({ request }, count: string) => {
 		for (let index = 0; index < Number(count); index++) {
-			await send(request, "join the queue", `visitor${index}`);
+			await sendKind(request, "join the queue", `visitor${index}`);
 		}
 	},
 );

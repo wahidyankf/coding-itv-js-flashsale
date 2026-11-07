@@ -1,23 +1,25 @@
+// Steps for the cache of sale reads: how long the API keeps a sale, a change made behind its back, and the Cache-Control
+// header it sends. Binds sale/caching.feature. The request and reply steps are in be.steps.ts.
+
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { routes, send } from "./support/api.js";
+import { query } from "./support/database.js";
 import { currentResponse, setResponse } from "./support/response.js";
-import { query, world } from "./support/world.js";
+import { MS_PER_SECOND } from "./support/time.js";
+import { setApiEnv, world } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
 
 Given(
 	/^the sale reads are cached for (\d+) seconds$/,
 	async ({ request: _request }, seconds: string) => {
-		world.apiEnv = {
-			...world.apiEnv,
-			SALE_CACHE_MS: String(Number(seconds) * 1000),
-		};
+		setApiEnv({ SALE_CACHE_MS: String(Number(seconds) * MS_PER_SECOND) });
 	},
 );
 
 Given("the sale reads are not cached", async ({ request: _request }) => {
-	world.apiEnv = { ...world.apiEnv, SALE_CACHE_MS: "0" };
+	setApiEnv({ SALE_CACHE_MS: "0" });
 });
 
 Given("a client has asked for that sale", async ({ request }) => {

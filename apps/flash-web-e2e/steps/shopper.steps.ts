@@ -1,26 +1,31 @@
+// Steps for shoppers: those who queue, hold or buy before the page opens (they talk to flash-be directly, as other clients
+// would), the shopper who is logged in through the page, and the buttons and labels the page shows. Binds
+// sale/buying.feature, sale/checking.feature, sale/status.feature and account/login.feature.
+
 import type { APIRequestContext } from "@playwright/test";
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
-import { getJson, postJson, salePath, TICKET_HEADER } from "./support/api.js";
+import { TICKET_HEADER } from "../../flash-be-e2e/steps/support/api.js";
+import { E2E_PASSWORD } from "../../flash-be-e2e/steps/support/auth.js";
+import { world } from "../../flash-be-e2e/steps/support/world.js";
+import { getJson, postJson, salePath } from "./support/api.js";
 import {
 	connectWebServer,
-	cookieFor,
 	createAccount,
-	E2E_PASSWORD,
+	loginOrSignUp,
 	privateApi,
-	world,
 } from "./support/shop.js";
 
 const { Given, When, Then } = createBdd();
 
-// Shoppers that the scenario set up before the page opened talk to flash-be directly, as other clients would. Each
-// holds the cookie of their own login.
+// Shoppers that the scenario set up before the page opened talk to flash-be directly, as other clients would. Each holds
+// the cookie of their own login.
 async function joinAndWait(
 	request: APIRequestContext,
 	user: string,
 ): Promise<{ api: string; ticket: string; cookie: string }> {
 	const api = await privateApi();
-	const cookie = await cookieFor(user);
+	const cookie = await loginOrSignUp(user);
 	const sale = `${api}${salePath(world.saleId)}`;
 	const joined = await postJson(request, `${sale}/queue`, {}, { cookie });
 	const ticket: string = (await joined.json()).ticket ?? "";
@@ -39,6 +44,7 @@ async function joinAndWait(
 	return { api, ticket, cookie };
 }
 
+// Makes the shopper hold an item: queue, wait to be admitted, then reserve.
 async function hold(
 	request: APIRequestContext,
 	user: string,
@@ -77,10 +83,12 @@ Given(/^"([^"]+)" has bought an item$/, async ({ request }, user: string) => {
 	expect(bought.status()).toBe(201);
 });
 
-// biome-ignore lint/correctness/noEmptyPattern: playwright-bdd needs an object pattern as the first argument
-Given(/^"([^"]+)" has done nothing$/, async ({}, _user: string) => {
-	// Nothing to set up: a shopper with no history is the default.
-});
+Given(
+	/^"([^"]+)" has done nothing$/,
+	async ({ request: _request }, _user: string) => {
+		// Nothing to set up: a shopper with no history is the default.
+	},
+);
 
 // The line the scenario describes: shoppers who joined and are still waiting.
 Given(
@@ -92,7 +100,7 @@ Given(
 				request,
 				`${api}${salePath(world.saleId)}/queue`,
 				{},
-				{ cookie: await cookieFor(`shopper${index}`) },
+				{ cookie: await loginOrSignUp(`shopper${index}`) },
 			);
 			expect(joined.status()).toBe(201);
 		}
@@ -101,7 +109,7 @@ Given(
 
 // The pages of a shopper who is logged in are reached through the web server, so the cookies are the browser's own.
 Given(/^"([^"]+)" is logged in$/, async ({ page }, user: string) => {
-	await cookieFor(user);
+	await loginOrSignUp(user);
 	await connectWebServer();
 	const reply = await page.request.post("/api/auth/login", {
 		data: { username: user, password: E2E_PASSWORD },
@@ -111,8 +119,7 @@ Given(/^"([^"]+)" is logged in$/, async ({ page }, user: string) => {
 
 Given(
 	/^"([^"]+)" has an account with the password "([^"]*)"$/,
-	// biome-ignore lint/correctness/noEmptyPattern: playwright-bdd needs an object pattern as the first argument
-	async ({}, user: string, password: string) => {
+	async ({ request: _request }, user: string, password: string) => {
 		await createAccount(user, password);
 	},
 );

@@ -1,3 +1,6 @@
+// Steps for the account page: a visitor logs in or signs up in the form, logs out, and the browser's cookies are the proof
+// of a login (a login ends when its cookies go). Binds account/login.feature.
+
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 

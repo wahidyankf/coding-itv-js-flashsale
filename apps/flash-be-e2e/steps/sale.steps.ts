@@ -1,42 +1,21 @@
-import { type APIRequestContext, expect } from "@playwright/test";
+// Steps for reading one sale: its status and items left, read by its id or as the current sale, and the error a refusal
+// carries. Binds sale/status.feature. The sale's window is set with the operator's routes (admin.steps.ts) or with SQL when
+// the state is one real traffic cannot reach.
+
+import type { APIRequestContext } from "@playwright/test";
+import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { bodyOf, routes, send } from "./support/api.js";
+import { ensureDatabase, insertSale } from "./support/database.js";
 import { createSale } from "./support/operator.js";
 import { currentResponse, setResponse } from "./support/response.js";
 import { relativeTime } from "./support/time.js";
-import {
-	migratedDatabase,
-	query,
-	SYSTEM_USER,
-	world,
-} from "./support/world.js";
+import { world } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
 
-async function ensureDatabase(): Promise<void> {
-	if (!world.databaseUrl) await migratedDatabase();
-}
-
-// A sale made with SQL. Only for a state real traffic cannot produce, such as items sold before the sale opens.
-async function insertSale(
-	name: string,
-	startsAt: Date,
-	endsAt: Date,
-	stock: number,
-	sold: number,
-): Promise<string> {
-	const rows = await query<{ id: string }>(
-		`with product as (
-		   insert into products (name, created_by) values ($1, ${SYSTEM_USER}) returning id
-		 )
-		 insert into sales (product_id, name, starts_at, ends_at, stock, sold, created_by)
-		 select product.id, $1, $2, $3, $4, $5, ${SYSTEM_USER} from product returning id`,
-		[name, startsAt, endsAt, stock, sold],
-	);
-	const id = rows[0]?.id;
-	if (!id) throw new Error("the sale was not inserted");
-	return id;
-}
+// The sales of the scenario by the name a step gave them.
+const saleIds = new Map<string, string>();
 
 Given(
 	/^a sale with stock (\d+) and (\d+) sold that opens (.+) and closes (.+)$/,
@@ -55,17 +34,15 @@ Given(
 		world.saleId =
 			Number(sold) === 0
 				? await createSale(request, { stock: Number(stock), startsAt, endsAt })
-				: await insertSale(
-						"Flash sale",
+				: await insertSale({
+						name: "Flash sale",
 						startsAt,
 						endsAt,
-						Number(stock),
-						Number(sold),
-					);
+						stock: Number(stock),
+						sold: Number(sold),
+					});
 	},
 );
-
-const saleIds = new Map<string, string>();
 
 Given(
 	/^a sale named "([^"]+)" that opens (.+) and closes (.+)$/,
@@ -85,7 +62,7 @@ Given(
 );
 
 // The scenario's database is brand new, so it holds no sale until a step adds one.
-Given("no sale exists", async () => {
+Given("no sale exists", async ({ request: _request }) => {
 	await ensureDatabase();
 });
 
