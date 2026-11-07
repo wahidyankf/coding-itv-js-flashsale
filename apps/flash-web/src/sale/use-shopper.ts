@@ -24,6 +24,8 @@ export type ShopperOptions = {
 	client: SaleClient;
 	// Only a shopper who is logged in can buy. When the login goes, whatever the shopper was doing stops.
 	loggedIn: boolean;
+	// Called when the place stream has given up, so the page can say that its live updates stopped. Must be stable.
+	onLiveStopped: () => void;
 	// The clock. A test can move it; the page uses the real one.
 	now?: () => number;
 };
@@ -56,6 +58,7 @@ export function useShopper({
 	saleStatus,
 	client,
 	loggedIn,
+	onLiveStopped,
 	now = Date.now,
 }: ShopperOptions) {
 	const [phase, setPhase] = useState<Phase>({ kind: "idle" });
@@ -127,8 +130,11 @@ export function useShopper({
 		const { ticket } = joined.value;
 		if (joined.value.state === "admitted") return reserve(saleId, ticket);
 		onPlace(ticket, joined.value);
-		stopWatching.current = client.watchPlace(saleId, ticket, (place) =>
-			onPlace(ticket, place),
+		stopWatching.current = client.watchPlace(
+			saleId,
+			ticket,
+			(place) => onPlace(ticket, place),
+			onLiveStopped,
 		);
 	};
 

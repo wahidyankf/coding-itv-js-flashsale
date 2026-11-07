@@ -1,6 +1,6 @@
 // The sale page: the sale card, the buying card and the account line, put together for a shopper. It is the one place the
 // sale and the account meet, so it sits in src/ and neither the sale nor the account folder imports the other.
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AccountBar } from "./auth/account-bar";
 import { AuthCard } from "./auth/auth-card";
 import { AUTH_TEXT } from "./auth/messages";
@@ -20,24 +20,36 @@ const ALERT_CARD =
 	"rounded-2xl border border-rose-300 bg-rose-50 p-6 text-rose-900 dark:border-rose-400/30 dark:bg-rose-400/10 dark:text-rose-200";
 const EMPTY_CARD =
 	"rounded-2xl border border-dashed border-slate-300 p-8 text-center dark:border-slate-700";
+// A note above the sale when its live updates have stopped. It is a sentence, not only a colour.
+const LIVE_NOTE =
+	"mb-5 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm font-medium text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200";
 
-// Follows the sale as the server pushes changes. Starts from what the server rendered.
-function useLiveSale(initial: SaleView | undefined, client: WebApi["sale"]) {
+// Follows the sale as the server pushes changes. Starts from what the server rendered. `onStopped` is called when the
+// stream has given up; it must be stable, or the stream would be opened again on every render.
+function useLiveSale(
+	initial: SaleView | undefined,
+	client: WebApi["sale"],
+	onStopped: () => void,
+) {
 	const [sale, setSale] = useState(initial);
 	const id = initial?.id;
 	useEffect(() => {
 		if (!id) return;
-		return client.watchSale(id, setSale);
-	}, [id, client]);
+		return client.watchSale(id, setSale, onStopped);
+	}, [id, client, onStopped]);
 	return sale;
 }
 
-// The page for one load of the sale. `api` is given by tests; the browser builds its own.
+// The page for one load of the sale. `api` is given by tests; the browser builds its own. When a live stream gives up,
+// the page says so, so a shopper reloads rather than trusting words that no longer change.
 export function SalePage({ load, api }: { load: SaleLoad; api?: WebApi }) {
 	const web = useMemo(() => api ?? createWebApi(), [api]);
+	const [liveStopped, setLiveStopped] = useState(false);
+	const stopLive = useCallback(() => setLiveStopped(true), []);
 	const sale = useLiveSale(
 		load.state === "ok" ? load.sale : undefined,
 		web.sale,
+		stopLive,
 	);
 
 	if (!sale) {
@@ -56,18 +68,36 @@ export function SalePage({ load, api }: { load: SaleLoad; api?: WebApi }) {
 			</div>
 		);
 	}
-	return <SaleShop sale={sale} web={web} />;
+	return (
+		<>
+			{liveStopped && (
+				<p role="status" className={LIVE_NOTE}>
+					{TEXT.liveStopped}
+				</p>
+			)}
+			<SaleShop sale={sale} web={web} onLiveStopped={stopLive} />
+		</>
+	);
 }
 
 // The part of the page that exists only when there is a sale to buy from. It asks who is logged in, and gives the right
 // card what the account is doing: a "checking" line, the login form, or the buying buttons.
-function SaleShop({ sale, web }: { sale: SaleView; web: WebApi }) {
+function SaleShop({
+	sale,
+	web,
+	onLiveStopped,
+}: {
+	sale: SaleView;
+	web: WebApi;
+	onLiveStopped: () => void;
+}) {
 	const account = useAccount(web.auth, web.onExpired);
 	const shopper = useShopper({
 		saleId: sale.id,
 		saleStatus: sale.status,
 		client: web.sale,
 		loggedIn: account.state.kind === "in",
+		onLiveStopped,
 	});
 
 	return (

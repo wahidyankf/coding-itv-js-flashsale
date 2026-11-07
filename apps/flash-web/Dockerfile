@@ -3,6 +3,7 @@ FROM node:26.13.0-alpine AS build
 WORKDIR /repo
 COPY package.json package-lock.json ./
 COPY libs/typekit/package.json libs/typekit/
+COPY libs/flash-commons/package.json libs/flash-commons/
 COPY apps/flash-be/package.json apps/flash-be/
 COPY apps/flash-be-e2e/package.json apps/flash-be-e2e/
 COPY apps/flash-web/package.json apps/flash-web/
@@ -11,6 +12,9 @@ COPY apps/flash-load/package.json apps/flash-load/
 RUN npm ci --ignore-scripts
 COPY libs/typekit libs/typekit
 RUN npm run build -w @flash/typekit
+# flash-commons is built on top of typekit, and flash-web imports its dist.
+COPY libs/flash-commons libs/flash-commons
+RUN npm run build -w @flash/flash-commons
 COPY apps/flash-web apps/flash-web
 RUN npm run build -w flash-web
 

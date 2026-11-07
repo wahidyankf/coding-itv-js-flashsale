@@ -50,6 +50,8 @@ export type WebWorld = {
 	// Things that happen to the sale while the page is open.
 	setSold: (sold: number) => Promise<void>;
 	endSale: () => Promise<void>;
+	// The live streams stop working for good: the watcher has tried again until it gave up.
+	liveUpdatesFail: () => Promise<void>;
 	advance: (seconds: number) => Promise<void>;
 	// What the visitor sees. Each waits for the page to catch up, so a slow layer does not fail a correct page.
 	expectPageSays: (text: string) => Promise<void>;

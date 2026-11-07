@@ -2,6 +2,7 @@
 // sold-out answer, a write that fails in Postgres, and the hold state lost from Redis. Binds reservation/reserving.feature
 // and recovery/rebuild.feature. The reserve and waitUntilAdmitted calls are in support/shoppers.ts.
 
+import { MS_PER_SECOND } from "@flash/flash-commons";
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { errorOf } from "./support/api.js";
@@ -16,7 +17,7 @@ import {
 	shoppers,
 	waitUntilAdmitted,
 } from "./support/shoppers.js";
-import { MS_PER_SECOND, sleep } from "./support/time.js";
+import { sleep } from "./support/time.js";
 import { world } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();

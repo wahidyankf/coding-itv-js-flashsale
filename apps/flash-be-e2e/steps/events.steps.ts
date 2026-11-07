@@ -1,6 +1,7 @@
 // Steps for the event streams: a client watches the sale or a shopper's place, and the events that come next (a sale's
 // status and items left, a place in line). Binds events/streaming.feature. A stream a scenario opens is closed in cleanup.
 
+import { MS_PER_HOUR } from "@flash/flash-commons";
 import type { APIRequestContext } from "@playwright/test";
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
@@ -10,7 +11,6 @@ import { patchSale } from "./support/operator.js";
 import { setResponse } from "./support/response.js";
 import { shoppers } from "./support/shoppers.js";
 import { openStream, type Stream } from "./support/stream.js";
-import { HOUR_MS } from "./support/time.js";
 import { world } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
@@ -94,7 +94,7 @@ When(
 // admitted within a tick.
 When("the sale opens", async ({ request }) => {
 	await patchSale(request, world.saleId ?? "", {
-		startsAt: new Date(Date.now() - HOUR_MS).toISOString(),
+		startsAt: new Date(Date.now() - MS_PER_HOUR).toISOString(),
 	});
 });
 

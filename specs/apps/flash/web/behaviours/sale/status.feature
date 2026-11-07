@@ -47,3 +47,11 @@ Feature: Sale status on the page
     Given the sale cannot be reached
     When a visitor opens the page
     Then the page says "The sale could not be loaded."
+
+  # Exemption(e2e): a backoff run takes minutes, because the page waits between up to 8 attempts, from 1 second up to 30 seconds apart; alternative-proof: flash-web:integration / The page says so when live updates stop
+  @e2e-exempt
+  Scenario: The page says so when live updates stop
+    Given a sale with stock 10 and 3 sold that opens 1 hour ago and closes in 1 hour
+    And a visitor has the page open
+    When the live updates keep failing
+    Then the page says "Live updates stopped. Reload the page to see the latest sale."

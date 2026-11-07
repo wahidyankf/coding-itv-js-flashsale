@@ -2,6 +2,7 @@
 // when the API would not allow the row (more sold than stock, a second purchase, an unknown role). Binds
 // db/migrations.feature. They write SQL on purpose: the database itself must refuse each row the API would never let through.
 
+import { MS_PER_HOUR } from "@flash/flash-commons";
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import {
@@ -12,7 +13,6 @@ import {
 	query,
 	SYSTEM_USER,
 } from "./support/database.js";
-import { HOUR_MS } from "./support/time.js";
 import { world } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
@@ -45,8 +45,8 @@ async function exists(table: string): Promise<boolean> {
 // A sale that opened an hour ago and closes in an hour, for the rows that only need a valid window.
 function openNow() {
 	return {
-		startsAt: new Date(Date.now() - HOUR_MS),
-		endsAt: new Date(Date.now() + HOUR_MS),
+		startsAt: new Date(Date.now() - MS_PER_HOUR),
+		endsAt: new Date(Date.now() + MS_PER_HOUR),
 	};
 }
 

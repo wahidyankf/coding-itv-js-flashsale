@@ -8,6 +8,7 @@ import {
 	type ServerResponse,
 } from "node:http";
 import type { AddressInfo } from "node:net";
+import { MS_PER_SECOND } from "@flash/flash-commons";
 import {
 	cleanup,
 	fireEvent,
@@ -16,12 +17,7 @@ import {
 	waitFor,
 } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
-import {
-	JSON_CONTENT_TYPE,
-	jsonPost,
-	MS_PER_SECOND,
-	TICKET_HEADER,
-} from "../../api";
+import { JSON_CONTENT_TYPE, jsonPost, TICKET_HEADER } from "../../api";
 import { proxyToBackend } from "../../proxy";
 import { HomePage } from "../../routes/index";
 import { loadSale, type SaleLoad } from "../../sale/load";
@@ -37,9 +33,13 @@ import type { WebWorld } from "./web-world";
 const WAIT = { timeout: 8000, interval: 50 };
 // The password of a shopper that a scenario logs in without naming one.
 const PASSWORD = "a long password";
-// How long the page waits before it opens a live stream again, after the stream ended or failed. Short, so a scenario
-// that cuts the stream does not wait long for the page to come back.
-const RETRY_MS = 200;
+// The page's retry for a live stream, with short waits: a scenario that cuts the streams does not wait long for the
+// page to give up. The count of attempts is the page's own.
+const LIVE_RETRY = {
+	baseMs: 10,
+	capMs: 50,
+	maxAttempts: 8,
+};
 
 function listen(server: Server): Promise<string> {
 	return new Promise((resolve) =>
@@ -287,7 +287,7 @@ function setupOf(h: Harness, browserFetch: typeof fetch) {
 }
 
 // The visitor: opens the page, fills the forms, and presses the buttons. Each press waits for the page to answer.
-function pageOf(h: Harness, browserFetch: typeof fetch) {
+function pageOf(h: Harness, browserFetch: typeof fetch, backendHttp: Server) {
 	return {
 		async openPage() {
 			const loaded = await loadSale({ FLASH_BE_URL: h.backendUrl });
@@ -295,7 +295,9 @@ function pageOf(h: Harness, browserFetch: typeof fetch) {
 			render(
 				<SalePage
 					load={loaded}
-					api={createWebApi(h.webUrl, browserFetch, { retryMs: RETRY_MS })}
+					api={createWebApi(h.webUrl, browserFetch, {
+						live: { policy: LIVE_RETRY },
+					})}
 				/>,
 			);
 			// A sale page asks who is logged in first; the scenario goes on once it knows.
@@ -329,6 +331,12 @@ function pageOf(h: Harness, browserFetch: typeof fetch) {
 		},
 		async endSale() {
 			h.backend.endSale();
+		},
+		async liveUpdatesFail() {
+			// The backend stops answering and its open streams are cut, as a dropped connection cuts them. The page then
+			// tries to open each stream again, and gives up after its last failed attempt.
+			h.backend.cutOff(true);
+			backendHttp.closeAllConnections();
 		},
 		advance: (seconds: number) =>
 			new Promise<void>((resolve) =>
@@ -431,7 +439,7 @@ export async function integrationWorld(): Promise<
 	return {
 		...lifecycleOf(h, { web: webHttp, backend: backendHttp }),
 		...setupOf(h, browserFetch),
-		...pageOf(h, browserFetch),
+		...pageOf(h, browserFetch, backendHttp),
 		...expectationsOf(h),
 		...apiOf(h, browserFetch),
 	};

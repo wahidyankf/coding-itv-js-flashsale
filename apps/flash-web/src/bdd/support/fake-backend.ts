@@ -2,7 +2,8 @@
 // sees, and keeps everything in memory. The route groups are in fake-account, fake-queue and fake-purchase; this file
 // sends each request to its group, and offers the controls a scenario uses to set the world up. Time comes from `now`,
 // so a scenario can move it. Test support only.
-import { MS_PER_SECOND, TICKET_HEADER } from "../../api";
+import { MS_PER_SECOND } from "@flash/flash-commons";
+import { TICKET_HEADER } from "../../api";
 import {
 	addAccount,
 	endAccessTokens,

@@ -22,11 +22,17 @@ export type SaleClient = {
 		reservationId: string,
 	) => Promise<ApiResult<PurchaseView>>;
 	outcome: (saleId: string) => Promise<ApiResult<OutcomeView>>;
-	watchSale: (saleId: string, onSale: (sale: SaleView) => void) => () => void;
+	// Each watch calls `onGiveUp` once when the live stream has stopped for good, so the page can say so.
+	watchSale: (
+		saleId: string,
+		onSale: (sale: SaleView) => void,
+		onGiveUp: () => void,
+	) => () => void;
 	watchPlace: (
 		saleId: string,
 		ticket: string,
 		onPlace: (place: Place) => void,
+		onGiveUp: () => void,
 	) => () => void;
 };
 
@@ -60,17 +66,21 @@ export function createSaleClient(
 		outcome: (saleId) =>
 			callApi<OutcomeView>(fetcher, `${sale(saleId)}/purchases/me`),
 		// The events are trusted to be what the API sends, like the replies above.
-		watchSale: (saleId, onSale) =>
-			watch(`${sale(saleId)}/events`, (event, data) => {
-				if (event === "sale") onSale(data as SaleView);
-			}),
-		watchPlace: (saleId, ticket, onPlace) =>
+		watchSale: (saleId, onSale, onGiveUp) =>
+			watch(
+				`${sale(saleId)}/events`,
+				(event, data) => {
+					if (event === "sale") onSale(data as SaleView);
+				},
+				{ onGiveUp },
+			),
+		watchPlace: (saleId, ticket, onPlace, onGiveUp) =>
 			watch(
 				`${sale(saleId)}/queue/me/events`,
 				(event, data) => {
 					if (event === "place") onPlace(data as PlaceView);
 				},
-				{ [TICKET_HEADER]: ticket },
+				{ headers: { [TICKET_HEADER]: ticket }, onGiveUp },
 			),
 	};
 }

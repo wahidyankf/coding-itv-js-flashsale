@@ -1,6 +1,6 @@
 // The fake flash-be's purchase routes: take a hold on an item, pay for the hold, and say whether a shopper has bought.
 // Each route first checks what would refuse it, then does its one step. Test support only.
-import { MS_PER_SECOND } from "../../api";
+import { MS_PER_SECOND } from "@flash/flash-commons";
 import { type Reply, refuse, reply } from "./fake-http";
 import {
 	changed,

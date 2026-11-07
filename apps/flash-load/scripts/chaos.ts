@@ -1,9 +1,9 @@
 // The chaos timers of a run. The chaos profile stops Redis part way through the run and starts it again later, while
 // shoppers keep arriving. With --calm no timer is set, so the same run is a control without the failure.
+import { MS_PER_SECOND } from "@flash/flash-commons";
 import type { Profile } from "../k6/profiles.ts";
 import { composeRedis } from "./compose.ts";
 
-const MS_PER_SECOND = 1000;
 // The report's wording for each action on Redis.
 const PAST_TENSE = { stop: "stopped", start: "started" } as const;
 

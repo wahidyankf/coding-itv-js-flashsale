@@ -10,21 +10,39 @@
 			"options": {
 				"command": "npm run typecheck",
 				"cwd": "apps/flash-be-e2e"
-			}
+			},
+			"dependsOn": [
+				{
+					"projects": ["typekit", "flash-commons"],
+					"target": "build"
+				}
+			]
 		},
 		"lint": {
 			"executor": "nx:run-commands",
 			"options": {
 				"command": "npm run lint",
 				"cwd": "apps/flash-be-e2e"
-			}
+			},
+			"dependsOn": [
+				{
+					"projects": ["typekit", "flash-commons"],
+					"target": "build"
+				}
+			]
 		},
 		"test:e2e": {
 			"executor": "nx:run-commands",
 			"options": {
 				"command": "npx nx run flash-be:db:up && npx nx run flash-be:db:migrate && npm run test:e2e",
 				"cwd": "apps/flash-be-e2e"
-			}
+			},
+			"dependsOn": [
+				{
+					"projects": ["typekit", "flash-commons"],
+					"target": "build"
+				}
+			]
 		},
 		"test:e2e:watch": {
 			"executor": "nx:run-commands",

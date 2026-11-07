@@ -138,7 +138,11 @@ describe("createSaleClient", () => {
 	it("hands only sale events to the sale callback", () => {
 		const { api, watch } = client(() => Response.json({}));
 		const seen: unknown[] = [];
-		api.watchSale(SALE, (sale) => seen.push(sale));
+		api.watchSale(
+			SALE,
+			(sale) => seen.push(sale),
+			() => {},
+		);
 		const onEvent = watch.mock.calls[0]?.[1];
 		expect(watch.mock.calls[0]?.[0]).toBe(
 			`http://web.test/api/sales/${SALE}/events`,
@@ -151,13 +155,30 @@ describe("createSaleClient", () => {
 	it("hands only place events to the place callback, with the ticket", () => {
 		const { api, watch } = client(() => Response.json({}));
 		const seen: unknown[] = [];
-		api.watchPlace(SALE, "t1", (place) => seen.push(place));
-		const [url, onEvent, headers] = watch.mock.calls[0] ?? [];
+		api.watchPlace(
+			SALE,
+			"t1",
+			(place) => seen.push(place),
+			() => {},
+		);
+		const [url, onEvent, subscription] = watch.mock.calls[0] ?? [];
 		expect(url).toBe(`http://web.test/api/sales/${SALE}/queue/me/events`);
-		expect(headers).toEqual({ "x-queue-ticket": "t1" });
+		expect(subscription?.headers).toEqual({ "x-queue-ticket": "t1" });
 		onEvent?.("sale", SALE_VIEW);
 		onEvent?.("place", { userId: "ana", state: "admitted" });
 		expect(seen).toEqual([{ userId: "ana", state: "admitted" }]);
+	});
+
+	it("passes the give-up of each stream on to the watcher", () => {
+		const { api, watch } = client(() => Response.json({}));
+		const giveUpSale = vi.fn();
+		const giveUpPlace = vi.fn();
+		api.watchSale(SALE, () => {}, giveUpSale);
+		api.watchPlace(SALE, "t1", () => {}, giveUpPlace);
+		watch.mock.calls[0]?.[2]?.onGiveUp?.();
+		watch.mock.calls[1]?.[2]?.onGiveUp?.();
+		expect(giveUpSale).toHaveBeenCalledOnce();
+		expect(giveUpPlace).toHaveBeenCalledOnce();
 	});
 
 	it("works with the defaults", () => {

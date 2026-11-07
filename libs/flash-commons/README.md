@@ -1,10 +1,46 @@
 # @flash/flash-commons
 
-Small behaviour shared by several apps. The library is pure: it has no timers, no randomness and no I/O of its own. The
-caller passes in the wait and the random numbers, so the same code runs in Node, the browser and k6.
-`@flash/typekit` stays types and `Result` only; behaviour goes here.
+Small behaviour and constants shared by several apps. The library is pure: it has no timers, no randomness and no I/O of
+its own. The caller passes in the wait and the random numbers, so the same code runs in Node, the browser and k6.
+`@flash/typekit` stays types and `Result` only; behaviour and shared values go here.
 
-It is a workspace package. Build it with `npx nx build flash-commons`. Its Nx targets build `typekit` first.
+It is a workspace package. Build it with `npx nx build flash-commons`. Its Nx targets build `typekit` first. The apps
+that import it (`flash-web`, `flash-be-e2e`, `flash-web-e2e`, `flash-load`) build it first too, as they do for typekit.
+
+The library has three modules, one per concern:
+
+| Module           | What it holds                                                    | Used by                                                                                |
+| ---------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `retry.ts`       | the backoff, `retry` and `retryAsync`                            | flash-web (live streams), flash-be-e2e (`pollUntil`), flash-load (k6 join and payment) |
+| `time.ts`        | `MS_PER_SECOND`, `MS_PER_MINUTE`, `MS_PER_HOUR`                  | flash-web, flash-be-e2e, flash-web-e2e, flash-load                                     |
+| `http-status.ts` | `HTTP_STATUS`, `FIRST_ERROR_STATUS`, `FIRST_SERVER_ERROR_STATUS` | flash-web, flash-load, flash-be-e2e                                                    |
+
+## Time units
+
+`time.ts` gives the units every app converts with. The API counts seconds and JavaScript counts milliseconds, so each app
+used to write `1000` or `60_000` itself. One definition keeps them the same, and a reader sees `MS_PER_HOUR` rather than
+a long number. The units convert a length; they are not a contract, so any app may use them.
+
+```ts
+import { MS_PER_HOUR, MS_PER_SECOND } from "@flash/flash-commons";
+
+const holdMs = holdSeconds * MS_PER_SECOND; // a hold of `holdSeconds` from the API
+const startsAt = new Date(now.getTime() + MS_PER_HOUR); // "in 1 hour"
+```
+
+## HTTP status numbers
+
+`http-status.ts` names the standard status numbers the apps act on: `HTTP_STATUS.notFound` is `404`, and so on. It holds
+HTTP's numbers only. Which error code answers with which status is the contract of flash-be, so it stays in flash-be, and
+the e2e and k6 oracles write the codes they expect themselves. `FIRST_ERROR_STATUS` (400) and
+`FIRST_SERVER_ERROR_STATUS` (500) are the lowest statuses of an error and of a server error, for range checks.
+
+```ts
+import { FIRST_ERROR_STATUS, HTTP_STATUS } from "@flash/flash-commons";
+
+const refused = reply.status >= FIRST_ERROR_STATUS;
+const unauthorized = reply.status === HTTP_STATUS.unauthorized;
+```
 
 ## Retry
 
@@ -70,5 +106,6 @@ npx nx test:quick flash-commons      # typecheck + lint + unit tests
 npx nx test:coverage flash-commons   # unit tests with the 99% floor
 ```
 
-Its tests are plain Vitest tests next to the source (`src/retry_tests.ts`, `src/index_tests.ts`). They have no Gherkin
-scenario, because a retry rule is a developer's concern, not a shopper's.
+Its tests are plain Vitest tests next to the source (`src/retry_tests.ts`, `src/time_tests.ts`,
+`src/http-status_tests.ts`, `src/index_tests.ts`). They have no Gherkin scenario, because a retry rule or a constant is a
+developer's concern, not a shopper's.

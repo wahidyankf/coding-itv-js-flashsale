@@ -1,29 +1,54 @@
 // A Server-Sent Events reader built on fetch, for the sale's two live streams. The browser's EventSource cannot send a
 // header, and the queue ticket travels in one, so the page reads the stream itself. The same code runs in the browser
-// and in tests.
-import { attempt, attemptAsync } from "@flash/typekit";
-import { STATUS } from "../api";
+// and in tests. A failed connection is retried with exponential backoff and full jitter, through @flash/flash-commons.
+import {
+	backoffDelayMs,
+	HTTP_STATUS,
+	MS_PER_SECOND,
+	type RetryPolicy,
+	retryAsync,
+} from "@flash/flash-commons";
+import { attempt, attemptAsync, Err, Ok, type Result } from "@flash/typekit";
+
+// What one subscription asks for: its headers, and a call when the watcher has given up on it.
+export type Subscription = {
+	headers?: Record<string, string>;
+	// Called once, after the last attempt failed. A refused stream does not call it, because it is not retried at all.
+	onGiveUp?: () => void;
+};
 
 // Starts reading a stream and calls `onEvent` for each event. Returns a way to stop it.
 export type Watcher = (
 	url: string,
 	onEvent: (event: string, data: unknown) => void,
-	headers?: Record<string, string>,
+	subscription?: Subscription,
 ) => () => void;
 
-// How a watcher behaves: the fetch it uses, and how long it waits before it reconnects.
+// How a watcher behaves: the fetch it uses, and how it waits between attempts. The sleep and the random source are
+// injected, so a test runs without the real clock.
 export type WatchOptions = {
 	fetcher?: typeof fetch;
-	// How long to wait before opening the stream again after it ended or failed.
-	retryMs?: number;
+	// The backoff and the attempt count of one outage. A stream that opens with 200 starts the count again.
+	policy?: RetryPolicy;
+	sleep?: (ms: number) => Promise<void>;
+	random?: () => number;
 };
 
-const DEFAULT_RETRY_MS = 1000;
+// The live streams wait about a second before the first retry, double the wait up to 30 seconds, and give up after 8
+// failed attempts in a row. A page that keeps failing is told to reload, rather than retrying forever.
+const LIVE_BASE_MS = MS_PER_SECOND;
+const LIVE_CAP_SECONDS = 30;
+const LIVE_MAX_ATTEMPTS = 8;
+const LIVE_POLICY: RetryPolicy = {
+	baseMs: LIVE_BASE_MS,
+	capMs: LIVE_CAP_SECONDS * MS_PER_SECOND,
+	maxAttempts: LIVE_MAX_ATTEMPTS,
+};
 
 type Frame = { event: string; data: unknown };
 type Listener = (event: string, data: unknown) => void;
-// `refused`: asking again would get the same answer, so the watcher stops. `closed`: the stream ended, and may reopen.
-type Ending = "refused" | "closed";
+// `refused`: asking again would get the same answer, so the watcher stops. `failed`: no stream came, so the try counts.
+type Failure = "refused" | "failed";
 
 // Splits the text that arrived so far into complete frames. Returns the frames and the rest. A keep-alive comment and a
 // frame whose data is not JSON are skipped.
@@ -43,7 +68,8 @@ export function parseFrames(buffer: string): { frames: Frame[]; rest: string } {
 	return { frames, rest };
 }
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const pause = (ms: number) =>
+	new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 // Reads an open stream until it ends, and hands each complete frame to the listener. A frame can be split between two
 // chunks, so the text is kept until its blank line arrives.
@@ -64,42 +90,66 @@ async function readFrames(
 	}
 }
 
-// One connection: asks for the stream, and reads it when the server accepts it.
+// One connection: asks for the stream. Ok means the server opened it with a 200; the stream is then read until it ends
+// or breaks, and either way the connection had succeeded. A refusal (401, 404) and any other failure are Err.
 async function connectOnce(
 	fetcher: typeof fetch,
 	url: string,
 	headers: Record<string, string>,
 	signal: AbortSignal,
 	onEvent: Listener,
-): Promise<Ending> {
-	const reply = await fetcher(url, { headers, signal });
+): Promise<Result<void, Failure>> {
+	const reply = await attemptAsync(
+		() => fetcher(url, { headers, signal }),
+		Error,
+	);
+	if (reply.isErr()) return new Err("failed");
+	const response = reply.value;
 	if (
-		reply.status === STATUS.unauthorized ||
-		reply.status === STATUS.notFound
+		response.status === HTTP_STATUS.unauthorized ||
+		response.status === HTTP_STATUS.notFound
 	) {
-		return "refused";
+		return new Err("refused");
 	}
-	if (reply.ok && reply.body) await readFrames(reply.body, onEvent);
-	return "closed";
+	if (!response.ok) return new Err("failed");
+	const body = response.body;
+	// A drop mid-stream is not a failed attempt; the stream is simply opened again. The error is not needed.
+	if (body) await attemptAsync(() => readFrames(body, onEvent), Error);
+	return new Ok(undefined);
 }
 
-// The watcher keeps a stream open until it is stopped. A stream that fails or closes is opened again after `retryMs`,
-// unless the server refused it.
+// The watcher keeps a stream open until it is stopped. Each outage gets up to `maxAttempts` tries, waiting a jittered
+// backoff between them. When a stream opens and then ends, the next try starts a fresh count after a short wait. When
+// the last try of an outage fails, the watcher stops and tells the subscription. A refusal stops it at once.
 export function createWatcher(options: WatchOptions = {}): Watcher {
-	const retryMs = options.retryMs ?? DEFAULT_RETRY_MS;
-	return (url, onEvent, headers = {}) => {
+	const policy = options.policy ?? LIVE_POLICY;
+	const sleep = options.sleep ?? pause;
+	const random = options.random ?? Math.random;
+	return (url, onEvent, subscription = {}) => {
 		const controller = new AbortController();
 		const fetcher = options.fetcher ?? fetch;
+		const headers = subscription.headers ?? {};
 
 		const run = async (): Promise<void> => {
 			while (!controller.signal.aborted) {
-				// A failure means the connection failed. The loop opens it again unless the watcher was stopped.
-				const ended = await attemptAsync(
+				const outcome = await retryAsync(
 					() => connectOnce(fetcher, url, headers, controller.signal, onEvent),
-					Error,
+					{
+						...policy,
+						shouldRetry: (failure) => failure === "failed",
+						sleep,
+						random,
+						signal: controller.signal,
+					},
 				);
-				if (ended.isOk() && ended.value === "refused") return;
-				if (!controller.signal.aborted) await sleep(retryMs);
+				if (controller.signal.aborted) return;
+				if (outcome.isOk()) {
+					// The stream opened and ended. It is opened again after a short wait, counting from the first attempt.
+					await sleep(backoffDelayMs(0, policy, random));
+					continue;
+				}
+				if (outcome.error === "failed") subscription.onGiveUp?.();
+				return;
 			}
 		};
 

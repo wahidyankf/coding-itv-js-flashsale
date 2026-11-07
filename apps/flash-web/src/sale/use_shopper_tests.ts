@@ -15,6 +15,7 @@ describe("useShopper", () => {
 				saleStatus: "active",
 				client,
 				loggedIn: true,
+				onLiveStopped: () => {},
 			}),
 		);
 		await act(async () => result.current.confirm());
@@ -39,6 +40,7 @@ describe("useShopper", () => {
 					saleStatus: "active",
 					client,
 					loggedIn,
+					onLiveStopped: () => {},
 				}),
 			{ initialProps: { loggedIn: true } },
 		);

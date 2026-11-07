@@ -7,17 +7,8 @@ import { attempt, attemptAsync, Err, Ok, type Result } from "@flash/typekit";
 export const TICKET_HEADER = "x-queue-ticket";
 // The header that tells the page how long to wait after a rate limit.
 export const RETRY_AFTER_HEADER = "retry-after";
-// Converts the API's seconds into the milliseconds JavaScript counts in.
-export const MS_PER_SECOND = 1000;
 // The type of a JSON body, as the API expects it on every POST.
 export const JSON_CONTENT_TYPE = "application/json";
-// The HTTP statuses the app acts on by number. Every other status is read from the body's errorCode.
-export const STATUS = {
-	unauthorized: 401,
-	forbidden: 403,
-	notFound: 404,
-	badGateway: 502,
-} as const;
 
 // `errorCode` is a code of the API, or `network` or `unexpected`, which only this app makes up.
 export type ApiFailure = {

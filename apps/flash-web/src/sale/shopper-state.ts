@@ -1,7 +1,7 @@
 // The rules of the buying card as plain functions: where the shopper is, how long a hold has left, which sentence the
 // page shows, and which buttons work. No React and no I/O, so each rule is tested by calling it. `use-shopper.ts` keeps
 // the requests and the effects, and calls these.
-import { MS_PER_SECOND } from "../api";
+import { MS_PER_SECOND } from "@flash/flash-commons";
 import { holdingText, TEXT, waitingText } from "./messages";
 import type { SaleStatus } from "./types";
 

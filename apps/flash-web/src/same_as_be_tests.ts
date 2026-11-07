@@ -1,12 +1,14 @@
 // Checks that flash-web's copies of flash-be's rules still agree with flash-be.
 import { describe, expect, it, vi } from "vitest";
 import {
+	TICKET_HEADER as BACKEND_TICKET_HEADER,
 	ERROR_STATUS,
 	errorPayload,
 } from "../../flash-be/src/adapters/inbound/http/errors";
 import { usablePassword } from "../../flash-be/src/domain/auth";
 import { isSaleId } from "../../flash-be/src/domain/sale";
 import { normalizeUser } from "../../flash-be/src/domain/user";
+import { TICKET_HEADER } from "./api";
 import { cleanPassword, cleanUser } from "./auth/messages";
 import { isAllowed, proxyToBackend } from "./proxy";
 
@@ -48,6 +50,10 @@ describe("what flash-web copies from flash-be", () => {
 		"",
 	])("passes the sale id %j on only when flash-be accepts it", (saleId) => {
 		expect(isAllowed("GET", `/sales/${saleId}`)).toBe(isSaleId(saleId));
+	});
+
+	it("names the queue-ticket header as flash-be does", () => {
+		expect(TICKET_HEADER).toBe(BACKEND_TICKET_HEADER);
 	});
 
 	it("answers an unknown path with the code, status and sentence of flash-be", async () => {

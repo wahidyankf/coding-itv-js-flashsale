@@ -1,12 +1,12 @@
 // Steps for the cache of sale reads: how long the API keeps a sale, a change made behind its back, and the Cache-Control
 // header it sends. Binds sale/caching.feature. The request and reply steps are in be.steps.ts.
 
+import { MS_PER_SECOND } from "@flash/flash-commons";
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { routes, send } from "./support/api.js";
 import { query } from "./support/database.js";
 import { currentResponse, setResponse } from "./support/response.js";
-import { MS_PER_SECOND } from "./support/time.js";
 import { setApiEnv, world } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();

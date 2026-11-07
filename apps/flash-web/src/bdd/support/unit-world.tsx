@@ -1,6 +1,8 @@
 // The unit world: the scenarios' page, the browser and the web server, all in memory. The page, the client, the proxy and
 // the loader are the real code. flash-be is the fake backend, called as a function, and time is fake, so a scenario can
 // move it. The unit scenarios run here under Vitest. Test support only.
+
+import { MS_PER_SECOND } from "@flash/flash-commons";
 import {
 	act,
 	cleanup,
@@ -10,12 +12,7 @@ import {
 } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, vi } from "vitest";
-import {
-	JSON_CONTENT_TYPE,
-	jsonPost,
-	MS_PER_SECOND,
-	TICKET_HEADER,
-} from "../../api";
+import { JSON_CONTENT_TYPE, jsonPost, TICKET_HEADER } from "../../api";
 import { proxyToBackend } from "../../proxy";
 import { HomePage } from "../../routes/index";
 import { loadSale, type SaleLoad } from "../../sale/load";
@@ -43,6 +40,8 @@ type Harness = {
 	backend: FakeBackend;
 	load: SaleLoad;
 	jar: ReturnType<typeof createCookieJar>;
+	// The give-up callbacks of the live streams that are open now.
+	giveUps: Set<() => void>;
 };
 
 // The fake flash-be as a fetch. Its answers are the replies of the fake, as flash-be would send them.
@@ -95,31 +94,48 @@ function webFetchOf(h: Harness, backendFetch: typeof fetch): typeof fetch {
 // The event streams, pushed from the fake's changes the way the real streams push from flash-be. A stream sends a value
 // only when it differs from the last one.
 function watchOf(h: Harness): Watcher {
-	return (url, onEvent, headers = {}) => {
-		const match = matchRoute("GET", url.replace(/^.*?\/api/, ""));
-		let last = "";
-		const send = (event: string, data: unknown) => {
-			const key = JSON.stringify([event, data]);
-			if (key === last) return;
-			last = key;
-			onEvent(event, data);
+	return (url, onEvent, subscription = {}) => {
+		const stop = streamOf(h, url, onEvent, subscription.headers ?? {});
+		// The give-up is kept, so a scenario can make the streams give up as the real watcher does after its retries.
+		const giveUp = subscription.onGiveUp;
+		if (giveUp) h.giveUps.add(giveUp);
+		return () => {
+			stop();
+			if (giveUp) h.giveUps.delete(giveUp);
 		};
-		if (match?.name === "saleEvents") {
-			const push = () => h.backend.hasSale() && send("sale", h.backend.view());
-			push();
-			return h.backend.onChange(push);
-		}
-		// The user is the one whose cookie the browser holds.
-		const user =
-			h.backend.userOf(h.jar.header(url.replace(/^.*?(?=\/api)/, ""))) ?? "";
-		if (user === "" || headers[TICKET_HEADER] !== `ticket-${user}`) {
-			return () => {};
-		}
-		const push = () =>
-			send("place", { userId: user, ...h.backend.placeOf(user) });
+	};
+}
+
+// The fake of one stream: what it sends, and when it sends it. Returns the way to stop it.
+function streamOf(
+	h: Harness,
+	url: string,
+	onEvent: (event: string, data: unknown) => void,
+	headers: Record<string, string>,
+): () => void {
+	const match = matchRoute("GET", url.replace(/^.*?\/api/, ""));
+	let last = "";
+	const send = (event: string, data: unknown) => {
+		const key = JSON.stringify([event, data]);
+		if (key === last) return;
+		last = key;
+		onEvent(event, data);
+	};
+	if (match?.name === "saleEvents") {
+		const push = () => h.backend.hasSale() && send("sale", h.backend.view());
 		push();
 		return h.backend.onChange(push);
-	};
+	}
+	// The user is the one whose cookie the browser holds.
+	const user =
+		h.backend.userOf(h.jar.header(url.replace(/^.*?(?=\/api)/, ""))) ?? "";
+	if (user === "" || headers[TICKET_HEADER] !== `ticket-${user}`) {
+		return () => {};
+	}
+	const push = () =>
+		send("place", { userId: user, ...h.backend.placeOf(user) });
+	push();
+	return h.backend.onChange(push);
 }
 
 // Lets the promises of a request and the effects that follow run.
@@ -165,6 +181,7 @@ function lifecycleOf(h: Harness) {
 			h.backend = createFakeBackend(() => Date.now());
 			h.load = { state: "none" };
 			h.jar.clear();
+			h.giveUps.clear();
 		},
 		clear() {
 			cleanup();
@@ -243,6 +260,14 @@ function pageOf(
 			}),
 		setSold: (sold: number) => inPage(() => h.backend.setSold(sold)),
 		endSale: () => inPage(() => h.backend.endSale()),
+		// The unit world does not replay the retries (sse_tests.ts proves those). It gives the page the report the
+		// watcher makes after its last attempt, for every stream that is open.
+		liveUpdatesFail: () =>
+			inPage(() => {
+				const giveUps = [...h.giveUps];
+				h.giveUps.clear();
+				for (const giveUp of giveUps) giveUp();
+			}),
 		advance: (seconds: number) =>
 			act(async () => {
 				await vi.advanceTimersByTimeAsync(seconds * MS_PER_SECOND);
@@ -308,6 +333,7 @@ export function unitWorld(): WebWorld {
 		backend: createFakeBackend(() => Date.now()),
 		load: { state: "none" },
 		jar: createCookieJar(),
+		giveUps: new Set(),
 	};
 	const backendFetch = backendFetchOf(h);
 	const webFetch = webFetchOf(h, backendFetch);

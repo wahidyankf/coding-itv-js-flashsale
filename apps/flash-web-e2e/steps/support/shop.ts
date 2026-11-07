@@ -3,6 +3,7 @@
 // flash-be the first time the page needs the API, through the operator route. Steps that come after the plan may still
 // change it, so it is made late. Shoppers are logged in directly, as other clients would be.
 
+import { MS_PER_HOUR } from "@flash/flash-commons";
 import {
 	givenFields,
 	TICKET_HEADER,
@@ -21,7 +22,6 @@ import {
 } from "../../../flash-be-e2e/steps/support/database.js";
 import { startApi } from "../../../flash-be-e2e/steps/support/processes.js";
 import {
-	HOUR_MS,
 	pollUntil,
 	relativeTime,
 } from "../../../flash-be-e2e/steps/support/time.js";
@@ -228,7 +228,7 @@ async function makePlannedSale(api: string): Promise<void> {
 		stock: plan.stock,
 		startsAt: plan.opens.toISOString(),
 		endsAt: (over && plan.sold > 0
-			? new Date(now + HOUR_MS)
+			? new Date(now + MS_PER_HOUR)
 			: plan.closes
 		).toISOString(),
 		...givenFields({

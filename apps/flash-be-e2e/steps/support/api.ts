@@ -2,6 +2,7 @@
 // are written by hand, as AGENTS.md asks of the e2e apps; a route change must also update the list in
 // docs/how-to/change-an-endpoint.md.
 
+import { FIRST_ERROR_STATUS } from "@flash/flash-commons";
 import type { APIRequestContext, APIResponse } from "@playwright/test";
 import { startApi } from "./processes.js";
 import type {
@@ -17,8 +18,6 @@ import type {
 
 // The header that carries the queue ticket. flash-web-e2e sends it too.
 export const TICKET_HEADER = "x-queue-ticket";
-
-const FIRST_ERROR_STATUS = 400;
 
 // A route is a method and a path with `:name` placeholders. `B` is the body of its success reply; it only types the reply.
 export type Route<B = unknown> = {

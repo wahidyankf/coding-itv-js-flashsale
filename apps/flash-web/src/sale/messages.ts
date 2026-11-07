@@ -39,6 +39,8 @@ export const TEXT = {
 	noSaleHint: "Check back later, and reload this page to see a new sale.",
 	loadFailed: "The sale could not be loaded.",
 	loadFailedHint: "Reload the page to try again.",
+	// Shown when the page has stopped following the sale, so the shopper knows the words on screen may be old.
+	liveStopped: "Live updates stopped. Reload the page to see the latest sale.",
 	waitingHint: "You can keep this page open. It updates by itself.",
 	pending: "Loading the sale…",
 	paymentFailed:

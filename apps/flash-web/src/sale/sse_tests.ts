@@ -1,4 +1,5 @@
-// Unit tests for the event reader: frames, keep-alives, retries, and the refusals that stop it.
+// Unit tests for the event reader: frames, keep-alives, the backoff between attempts, the give-up after the last one, and
+// the refusals that stop it. The waits and the randomness are injected, so no test waits on the real clock.
 import { describe, expect, it, vi } from "vitest";
 import { createWatcher, parseFrames } from "./sse";
 
@@ -14,6 +15,40 @@ function body(...chunks: string[]): ReadableStream<Uint8Array> {
 	});
 }
 
+// A body that breaks part way through, as a dropped connection does.
+function droppedBody(): ReadableStream<Uint8Array> {
+	return new ReadableStream({
+		start(controller) {
+			controller.error(new TypeError("connection reset"));
+		},
+	});
+}
+
+// Yields to the event loop once, without a real wait. A loop that reopens at once must still let timers run.
+const tick = (): Promise<void> =>
+	new Promise((resolve) => setTimeout(resolve, 0));
+
+// The jitter that gives the top of each bound, and the one that gives none.
+const topOfBound = () => 1;
+const noJitter = () => 0;
+const halfOfBound = () => 0.5;
+
+// Records each wait, and yields like tick instead of waiting.
+function recordWaits() {
+	const waits: number[] = [];
+	return {
+		waits,
+		sleep: async (ms: number): Promise<void> => {
+			waits.push(ms);
+			await tick();
+		},
+	};
+}
+
+// `count` answers that refuse the stream as busy.
+const busy = (count: number): Response[] =>
+	Array.from({ length: count }, () => new Response("busy", { status: 503 }));
+
 describe("createWatcher", () => {
 	it("passes events on, with the headers it was given", async () => {
 		const events: Array<[string, unknown]> = [];
@@ -23,25 +58,36 @@ describe("createWatcher", () => {
 				body('event: sale\ndata: {"remaining":', "4}\n\n: keep-alive\n\n"),
 			);
 		});
-		const stop = createWatcher({ fetcher, retryMs: 5_000 })(
+		const stop = createWatcher({ fetcher, sleep: tick, random: noJitter })(
 			"/api/sales/x/events",
 			(event, data) => events.push([event, data]),
-			{ "x-queue-ticket": "t" },
+			{ headers: { "x-queue-ticket": "t" } },
 		);
-		await vi.waitFor(() => expect(events).toHaveLength(1));
+		// The stream ends at once and is opened again, so the same frame may come more than once; the first is enough.
+		await vi.waitFor(() => expect(events.length).toBeGreaterThan(0));
 		stop();
 		expect(events[0]).toEqual(["sale", { remaining: 4 }]);
 		const [, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
 		expect(init.headers).toEqual({ "x-queue-ticket": "t" });
 	});
 
-	it.each([401, 404])("stops for good on %i", async (status) => {
-		const fetcher = vi.fn(async () => new Response("no", { status }));
-		createWatcher({ fetcher, retryMs: 1 })("/x", () => {});
-		await vi.waitFor(() => expect(fetcher).toHaveBeenCalled());
-		await new Promise((resolve) => setTimeout(resolve, 30));
-		expect(fetcher).toHaveBeenCalledTimes(1);
-	});
+	it.each([401, 404])(
+		"stops for good on %i, and does not report a give-up",
+		async (status) => {
+			const fetcher = vi.fn(async () => new Response("no", { status }));
+			const onGiveUp = vi.fn();
+			createWatcher({ fetcher, sleep: tick, random: noJitter })(
+				"/x",
+				() => {},
+				{ onGiveUp },
+			);
+			await vi.waitFor(() => expect(fetcher).toHaveBeenCalled());
+			await tick();
+			await tick();
+			expect(fetcher).toHaveBeenCalledTimes(1);
+			expect(onGiveUp).not.toHaveBeenCalled();
+		},
+	);
 
 	it("opens the stream again after it ends, fails, or answers with an error", async () => {
 		const answers = [
@@ -59,8 +105,9 @@ describe("createWatcher", () => {
 			return answer();
 		});
 		const seen: unknown[] = [];
-		const stop = createWatcher({ fetcher, retryMs: 5 })("/x", (_event, data) =>
-			seen.push(data),
+		const stop = createWatcher({ fetcher, sleep: tick, random: noJitter })(
+			"/x",
+			(_event, data) => seen.push(data),
 		);
 		await vi.waitFor(() =>
 			expect(seen).toEqual(expect.arrayContaining([{ n: 2 }])),
@@ -71,15 +118,97 @@ describe("createWatcher", () => {
 
 	it("stops asking once it is stopped", async () => {
 		const fetcher = vi.fn(async () => new Response(body()));
-		const stop = createWatcher({ fetcher, retryMs: 5 })("/x", () => {});
+		const stop = createWatcher({ fetcher, sleep: tick, random: noJitter })(
+			"/x",
+			() => {},
+		);
 		await vi.waitFor(() => expect(fetcher).toHaveBeenCalled());
 		stop();
 		const calls = fetcher.mock.calls.length;
-		await new Promise((resolve) => setTimeout(resolve, 40));
+		await tick();
+		await tick();
 		expect(fetcher.mock.calls.length).toBeLessThanOrEqual(calls + 1);
 	});
 
-	it("uses the global fetch and a one second pause by default", async () => {
+	it("waits a backoff delay between failed attempts, then reports the give-up once", async () => {
+		const { waits, sleep } = recordWaits();
+		const fetcher = vi.fn(async () => new Response("busy", { status: 503 }));
+		const onGiveUp = vi.fn();
+		createWatcher({
+			fetcher,
+			policy: { baseMs: 100, capMs: 300, maxAttempts: 4 },
+			sleep,
+			random: halfOfBound,
+		})("/x", () => {}, { onGiveUp });
+		await vi.waitFor(() => expect(onGiveUp).toHaveBeenCalledOnce());
+		expect(fetcher).toHaveBeenCalledTimes(4);
+		// The bounds are 100, 200 and then the cap of 300; each wait is half of its bound.
+		expect(waits).toEqual([50, 100, 150]);
+	});
+
+	it("makes eight attempts by default, waiting from 1 s up to 30 s apart", async () => {
+		const { waits, sleep } = recordWaits();
+		const fetcher = vi.fn(async () => new Response("busy", { status: 503 }));
+		const onGiveUp = vi.fn();
+		createWatcher({ fetcher, sleep, random: topOfBound })("/x", () => {}, {
+			onGiveUp,
+		});
+		await vi.waitFor(() => expect(onGiveUp).toHaveBeenCalledOnce());
+		expect(fetcher).toHaveBeenCalledTimes(8);
+		expect(waits).toEqual([1_000, 2_000, 4_000, 8_000, 16_000, 30_000, 30_000]);
+	});
+
+	it("starts the count again once a stream has opened with 200", async () => {
+		// Seven failures, a stream that opens and ends, then eight more failures before the give-up.
+		const plan = [...busy(7), new Response(body()), ...busy(8)];
+		const fetcher = vi.fn(
+			async () => plan.shift() ?? new Response("late", { status: 503 }),
+		);
+		const onGiveUp = vi.fn();
+		createWatcher({ fetcher, sleep: tick, random: noJitter })("/x", () => {}, {
+			onGiveUp,
+		});
+		await vi.waitFor(() => expect(onGiveUp).toHaveBeenCalledOnce());
+		expect(fetcher).toHaveBeenCalledTimes(16);
+	});
+
+	it("reopens a stream that drops after it opened, and does not count that as a failure", async () => {
+		const plan = [
+			new Response(droppedBody()),
+			new Response("gone", { status: 404 }),
+		];
+		const fetcher = vi.fn(
+			async () => plan.shift() ?? new Response("late", { status: 503 }),
+		);
+		const onGiveUp = vi.fn();
+		createWatcher({ fetcher, sleep: tick, random: noJitter })("/x", () => {}, {
+			onGiveUp,
+		});
+		await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
+		await tick();
+		await tick();
+		expect(onGiveUp).not.toHaveBeenCalled();
+	});
+
+	it("gives up at once when it is stopped during a wait, and reports nothing", async () => {
+		let stopWatching: () => void = () => {};
+		const onGiveUp = vi.fn();
+		const fetcher = vi.fn(async () => new Response("busy", { status: 503 }));
+		stopWatching = createWatcher({
+			fetcher,
+			sleep: async () => {
+				stopWatching();
+			},
+			random: noJitter,
+		})("/x", () => {}, { onGiveUp });
+		await vi.waitFor(() => expect(fetcher).toHaveBeenCalled());
+		await tick();
+		await tick();
+		expect(fetcher).toHaveBeenCalledTimes(1);
+		expect(onGiveUp).not.toHaveBeenCalled();
+	});
+
+	it("uses the global fetch by default", async () => {
 		const fetcher = vi.fn(async () => new Response("no", { status: 404 }));
 		vi.stubGlobal("fetch", fetcher);
 		try {

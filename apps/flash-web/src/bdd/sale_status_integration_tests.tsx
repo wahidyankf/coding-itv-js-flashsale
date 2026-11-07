@@ -146,5 +146,24 @@ describeFeature(
 				);
 			},
 		);
+
+		Scenario(
+			"The page says so when live updates stop",
+			({ Given, And, When, Then }) => {
+				Given(SALE_WITH_3, async () =>
+					openSale(world, 10, 3, "1 hour ago", "in 1 hour"),
+				);
+
+				And("a visitor has the page open", async () => world.openPage());
+
+				When("the live updates keep failing", async () =>
+					world.liveUpdatesFail(),
+				);
+
+				Then("the page says {string}", async (_ctx, text: string) =>
+					world.expectPageSays(text),
+				);
+			},
+		);
 	},
 );

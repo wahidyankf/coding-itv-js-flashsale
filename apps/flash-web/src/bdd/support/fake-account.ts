@@ -2,7 +2,11 @@
 // are kept here the way flash-be keeps them: two cookies per login, and a refresh token that works only once. Test
 // support only.
 
-import { MS_PER_SECOND } from "../../api";
+import {
+	MS_PER_HOUR,
+	MS_PER_MINUTE,
+	MS_PER_SECOND,
+} from "@flash/flash-commons";
 import { cleanPassword, cleanUser } from "../../auth/messages";
 import { type Reply, refuse, reply } from "./fake-http";
 import type { FakeState, Session } from "./fake-state";
@@ -11,8 +15,9 @@ import type { FakeState, Session } from "./fake-state";
 export const ACCESS_COOKIE = "access_token";
 // The name of the refresh cookie, which flash-be sets for /auth only.
 export const REFRESH_COOKIE = "refresh_token";
-const ACCESS_TTL_MS = 15 * 60 * MS_PER_SECOND;
-const REFRESH_TTL_MS = 7 * 24 * 60 * 60 * MS_PER_SECOND;
+// Fifteen minutes for the access cookie and seven days for the refresh cookie, as flash-be sets them.
+const ACCESS_TTL_MS = 15 * MS_PER_MINUTE;
+const REFRESH_TTL_MS = 7 * 24 * MS_PER_HOUR;
 
 const cookie = (name: string, value: string, path: string, maxAgeMs: number) =>
 	`${name}=${value}; Path=${path}; Max-Age=${Math.floor(maxAgeMs / MS_PER_SECOND)}; HttpOnly; SameSite=Lax`;

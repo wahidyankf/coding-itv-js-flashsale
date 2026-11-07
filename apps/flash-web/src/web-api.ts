@@ -1,12 +1,13 @@
 // The one set of clients the page uses: the sale, the account, and a way to hear that the login ended. They all share one
 // fetch that renews the login when it has gone. This is the app-wide wiring, so it sits in src/ and neither the sale nor
 // the account imports the other for it.
+import { HTTP_STATUS } from "@flash/flash-commons";
 import { attemptAsync } from "@flash/typekit";
-import { callApi, jsonPost, STATUS } from "./api";
+import { callApi, jsonPost } from "./api";
 import { type AuthClient, createAuthClient } from "./auth/client";
 import type { Account } from "./auth/types";
 import { createSaleClient, type SaleClient } from "./sale/client";
-import { createWatcher, type Watcher } from "./sale/sse";
+import { createWatcher, type Watcher, type WatchOptions } from "./sale/sse";
 
 // Everything the page asks of the web server: the sale, the account, and a way to hear that the login ended.
 export type WebApi = {
@@ -40,7 +41,7 @@ export function withRefresh(
 	};
 	// Only a 401 that names `not_authenticated` means the login is gone; any other failure is passed back as it is.
 	const isLoginLost = async (reply: Response): Promise<boolean> => {
-		if (reply.status !== STATUS.unauthorized) return false;
+		if (reply.status !== HTTP_STATUS.unauthorized) return false;
 		const body = await attemptAsync(
 			async () => (await reply.clone().json()) as { errorCode?: unknown },
 			Error,
@@ -57,11 +58,12 @@ export function withRefresh(
 }
 
 // The clients of the page, all sharing one fetch that renews the login. `base` is empty in the browser and a full address
-// in tests. The event streams use the same fetch, so a stream that finds the login gone renews it too.
+// in tests. The event streams use the same fetch, so a stream that finds the login gone renews it too. `live` sets the
+// retry of the streams (the policy, and the sleep and random source for tests); `watch` replaces the streams altogether.
 export function createWebApi(
 	base = "",
 	fetcher: typeof fetch = fetch,
-	options: { watch?: Watcher; retryMs?: number } = {},
+	options: { watch?: Watcher; live?: Omit<WatchOptions, "fetcher"> } = {},
 ): WebApi {
 	const listeners = new Set<() => void>();
 	const session = withRefresh(base, fetcher, () => {
@@ -71,13 +73,7 @@ export function createWebApi(
 		sale: createSaleClient(
 			base,
 			session,
-			options.watch ??
-				createWatcher({
-					fetcher: session,
-					...(options.retryMs === undefined
-						? {}
-						: { retryMs: options.retryMs }),
-				}),
+			options.watch ?? createWatcher({ ...options.live, fetcher: session }),
 		),
 		auth: createAuthClient(base, session),
 		onExpired: (listener) => {

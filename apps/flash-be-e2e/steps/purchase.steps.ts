@@ -3,6 +3,7 @@
 // behind the API's back. Binds purchase/confirming.feature and purchase/outcome.feature. The hold itself is in
 // reservation.steps.ts, and the calls every step uses are in support/shoppers.ts.
 
+import { MS_PER_SECOND } from "@flash/flash-commons";
 import type { APIRequestContext } from "@playwright/test";
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
@@ -11,7 +12,7 @@ import { shopperCookie, usernameKey } from "./support/auth.js";
 import { query, SYSTEM_USER } from "./support/database.js";
 import { currentResponse, setResponse } from "./support/response.js";
 import { confirm, holdOf, postConfirm, shoppers } from "./support/shoppers.js";
-import { MS_PER_SECOND, pollUntil } from "./support/time.js";
+import { pollUntil } from "./support/time.js";
 import { setApiEnv, world } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();

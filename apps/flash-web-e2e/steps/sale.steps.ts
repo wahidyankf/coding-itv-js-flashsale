@@ -2,12 +2,12 @@
 // (the queue, the hold, the rate limit, the payment, the end), and the time that passes. Binds the sale scenarios of
 // flash-web: sale/status.feature, sale/buying.feature and sale/checking.feature. The shoppers are in shopper.steps.ts.
 
+import { MS_PER_SECOND } from "@flash/flash-commons";
 import { createBdd } from "playwright-bdd";
 import {
 	ensureDatabase,
 	query,
 } from "../../flash-be-e2e/steps/support/database.js";
-import { MS_PER_SECOND } from "../../flash-be-e2e/steps/support/time.js";
 import { setApiEnv, world } from "../../flash-be-e2e/steps/support/world.js";
 import { cutWebServerOff, planSale, reviseSale } from "./support/shop.js";
 

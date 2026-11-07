@@ -13,6 +13,10 @@
 		"load:burst": "node scripts/run.ts burst",
 		"load:contention": "node scripts/run.ts contention"
 	},
+	"dependencies": {
+		"@flash/flash-commons": "*",
+		"@flash/typekit": "*"
+	},
 	"devDependencies": {
 		"@types/k6": "^2.3.1",
 		"esbuild": "^0.28.2"

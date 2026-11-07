@@ -1,6 +1,15 @@
 // The k6 script of the load test. Each iteration is one shopper's visit to the sale: sign up, join the queue, wait to be
 // admitted, reserve an item, confirm the purchase, then ask whether they got it. scripts/bundle.ts bundles this file and
 // its imports into one file, which k6 runs, so it may use only the k6 modules and the files of this app, never Node.
+
+import {
+	FIRST_ERROR_STATUS,
+	FIRST_SERVER_ERROR_STATUS,
+	HTTP_STATUS,
+	MS_PER_SECOND,
+	retry,
+} from "@flash/flash-commons";
+import { Err, Ok, type Result } from "@flash/typekit";
 import { check, sleep } from "k6";
 import exec from "k6/execution";
 import http from "k6/http";
@@ -21,15 +30,6 @@ const TICKET_HEADER = "x-queue-ticket";
 const ACCESS_COOKIE = "access_token";
 // The state the queue gives a shopper once they may buy.
 const ADMITTED = "admitted";
-const STATUS = {
-	ok: 200,
-	created: 201,
-	paymentFailed: 402,
-	alreadyPurchased: 409,
-	rateLimited: 429,
-	firstServerError: 500,
-} as const;
-const FIRST_ERROR_STATUS = 400;
 // An IPv4 address is four bytes; a shopper's index is spread over the last three of them.
 const BYTE = 255;
 const BYTE_BITS = 8;
@@ -41,6 +41,17 @@ const MAX_JOIN_RETRIES = 3;
 const MAX_POLLS = 90;
 // A declined payment is tried this many times in all.
 const MAX_PAYMENT_ATTEMPTS = 3;
+// The tries of a join: the first one, then the retries.
+const JOIN_TRIES = 1 + MAX_JOIN_RETRIES;
+const JOIN_BASE_MS = 1_000;
+const JOIN_CAP_MS = 4_000;
+const PAYMENT_BASE_MS = 300;
+const PAYMENT_CAP_MS = 1_200;
+// The waits between retries are exponential with full jitter (flash-commons `retry`), so a crowd of refused shoppers
+// does not come back in step. A join waits about a second at first, as the old fixed pause did, and at most 4 seconds.
+// A declined payment comes back sooner, starting at 0.3 s and at most 1.2 s. The caps keep a shopper from stalling.
+const JOIN_BACKOFF = { baseMs: JOIN_BASE_MS, capMs: JOIN_CAP_MS };
+const PAYMENT_BACKOFF = { baseMs: PAYMENT_BASE_MS, capMs: PAYMENT_CAP_MS };
 // The share of buyers who press confirm a second time.
 const REPEAT_CONFIRM_SHARE = 0.2;
 // Latecomers get addresses far from the shoppers' range, so the two never share one.
@@ -56,7 +67,6 @@ const HAMMER_REQUESTS = 60;
 type Pause = { min: number; spread: number };
 const POLL_PAUSE: Pause = { min: 1, spread: 1 };
 const THINK_BEFORE_PAYING: Pause = { min: 0.2, spread: 0.8 };
-const BEFORE_PAYMENT_RETRY: Pause = { min: 0.3, spread: 0.4 };
 
 // What the runner compares with Postgres afterwards.
 const purchased = new Counter("purchased");
@@ -68,8 +78,8 @@ const serverErrors = new Counter("server_errors");
 // A refusal such as 409 or 429 is an answer. Only a 5xx or no answer counts as a failed request.
 http.setResponseCallback(
 	http.expectedStatuses({
-		min: STATUS.ok,
-		max: STATUS.firstServerError - 1,
+		min: HTTP_STATUS.ok,
+		max: FIRST_SERVER_ERROR_STATUS - 1,
 	}),
 );
 
@@ -176,9 +186,9 @@ function call(
 		method === "GET"
 			? http.get(url, params)
 			: http.post(url, body ? JSON.stringify(body) : null, params);
-	if (response.status === 0 || response.status >= STATUS.firstServerError)
+	if (response.status === 0 || response.status >= FIRST_SERVER_ERROR_STATUS)
 		serverErrors.add(1);
-	if (response.status === STATUS.rateLimited) rateLimited.add(1);
+	if (response.status === HTTP_STATUS.tooManyRequests) rateLimited.add(1);
 	// A gateway error page is not JSON; the status says enough.
 	const isJson = String(response.headers["Content-Type"]).includes("json");
 	const accessToken = response.cookies[ACCESS_COOKIE]?.[0]?.value;
@@ -194,6 +204,9 @@ const address = (index: number) =>
 	`10.${(index >> (BYTE_BITS * 2)) & BYTE}.${(index >> BYTE_BITS) & BYTE}.${index & BYTE}`;
 
 const pause = ({ min, spread }: Pause) => sleep(min + Math.random() * spread);
+
+// The wait that `retry` asks for is in milliseconds; k6's sleep counts seconds.
+const waitMs = (ms: number) => sleep(ms / MS_PER_SECOND);
 
 // The headers of a request that carries only the shopper's cookie.
 function cookieHeaders(cookie: string): Record<string, string> {
@@ -214,25 +227,25 @@ function signUp(user: string, ip: string): string | undefined {
 	return account.accessToken && `${ACCESS_COOKIE}=${account.accessToken}`;
 }
 
-// Joins the queue. A shopper refused for going too fast tries again a few times, then gives up. Returns the reply that
-// holds the shopper's place, or undefined when there is none.
+// Joins the queue. A shopper refused for going too fast tries again, with backoff, then gives up. Returns the reply that
+// holds the shopper's place, or undefined when there is none. Only a join refused as rate limited is sent again.
 function joinQueue(ip: string, cookie: string): Body | undefined {
-	const join = () =>
-		call("POST", `${SALE_PATH}/queue`, "join", ip, {
+	const join = (): Result<Answer, Answer> => {
+		const answer = call("POST", `${SALE_PATH}/queue`, "join", ip, {
 			headers: cookieHeaders(cookie),
 		});
-	let joined = join();
-	// The one retry of a join. It is the only place a join is sent again.
-	for (
-		let tries = 0;
-		errorOf(joined) === "rate_limited" && tries < MAX_JOIN_RETRIES;
-		tries++
-	) {
-		pause(POLL_PAUSE);
-		joined = join();
-	}
+		return errorOf(answer) === "rate_limited"
+			? new Err(answer)
+			: new Ok(answer);
+	};
+	const last = retry(join, {
+		...JOIN_BACKOFF,
+		maxAttempts: JOIN_TRIES,
+		sleep: waitMs,
+		random: Math.random,
+	}).match({ ok: (answer) => answer, err: (answer) => answer });
 	// 409 means the sale is over or sold out. That is a fair answer, not a failure.
-	return bodyOf(joined);
+	return bodyOf(last);
 }
 
 // Whether the sale has stopped letting shoppers in: it is sold out or it has ended.
@@ -276,7 +289,7 @@ function reserveItem(me: Visit): Body | undefined {
 		return undefined;
 	}
 	const held = bodyOf(hold);
-	if (held && hold.status === STATUS.created) reserved.add(1);
+	if (held && hold.status === HTTP_STATUS.created) reserved.add(1);
 	return held;
 }
 
@@ -292,19 +305,21 @@ function buy(
 	});
 }
 
-// Confirms the purchase. A declined payment is tried again, up to MAX_PAYMENT_ATTEMPTS in all. Returns the last reply.
+// Confirms the purchase. A declined payment (402) is tried again, with backoff, up to MAX_PAYMENT_ATTEMPTS in all.
+// Returns the last reply. Only a declined payment is sent again.
 function payForItem(me: Visit, reservationId: string | undefined): Answer {
-	let bought = buy(me, reservationId, "purchase");
-	// The one retry of a payment. It is the only place a confirm is sent again for a declined payment.
-	for (
-		let attempt = 1;
-		attempt < MAX_PAYMENT_ATTEMPTS && bought.status === STATUS.paymentFailed;
-		attempt++
-	) {
-		pause(BEFORE_PAYMENT_RETRY);
-		bought = buy(me, reservationId, "purchase");
-	}
-	return bought;
+	const confirm = (): Result<Answer, Answer> => {
+		const answer = buy(me, reservationId, "purchase");
+		return answer.status === HTTP_STATUS.paymentRequired
+			? new Err(answer)
+			: new Ok(answer);
+	};
+	return retry(confirm, {
+		...PAYMENT_BACKOFF,
+		maxAttempts: MAX_PAYMENT_ATTEMPTS,
+		sleep: waitMs,
+		random: Math.random,
+	}).match({ ok: (answer) => answer, err: (answer) => answer });
 }
 
 // A share of buyers (REPEAT_CONFIRM_SHARE) presses confirm again. The second confirm must give back the same purchase,
@@ -319,10 +334,10 @@ function checkRepeatPurchase(
 	const second = askForItem(me);
 	check(null, {
 		"a repeated confirm gives the same purchase": () =>
-			again.status === STATUS.ok &&
+			again.status === HTTP_STATUS.ok &&
 			bodyOf(again)?.purchaseId === firstPurchaseId,
 		"a second reserve is refused": () =>
-			second.status === STATUS.alreadyPurchased &&
+			second.status === HTTP_STATUS.conflict &&
 			errorOf(second) === "already_purchased",
 	});
 }
@@ -334,7 +349,7 @@ function checkOutcome(me: Visit, gotItem: boolean): void {
 	});
 	check(null, {
 		"the outcome agrees with the purchase": () =>
-			outcome.status === STATUS.ok &&
+			outcome.status === HTTP_STATUS.ok &&
 			(bodyOf(outcome)?.state === "purchased") === gotItem,
 	});
 }
@@ -354,7 +369,7 @@ function visit(user: string, index: number): void {
 	if (Math.random() < profile.abandonShare) return;
 	pause(THINK_BEFORE_PAYING);
 	const bought = payForItem(me, held.reservationId);
-	const gotItem = bought.status === STATUS.created;
+	const gotItem = bought.status === HTTP_STATUS.created;
 	if (gotItem) {
 		purchased.add(1);
 		if (Math.random() < REPEAT_CONFIRM_SHARE) {
