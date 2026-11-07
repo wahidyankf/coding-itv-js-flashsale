@@ -19,6 +19,7 @@ src/
   backend.ts         asks flash-be whether it is up, for the page's backend status
   router.tsx         the router, built from the generated routeTree.gen.ts
   error-text.ts      the sentence a shopper reads for each error code
+  decode-report.ts   reports a reply or stream event that failed to decode: where, which field, what was expected
   sale-page.tsx      the page itself: where the sale and the account meet
   sale/              everything about the sale and buying
     shopper-state.ts   the rules of the buying card as pure functions (phase, countdown, text, which buttons work)

@@ -39,7 +39,8 @@ a contract library until it was removed as too much structure for this size (com
 
 - It costs about 150 lines of our own code to keep, and a decoder to update when a reply changes, next to the view type.
 - It buys one place per shape where a wrong payload stops, a `Result` instead of a crash, and an error that says which
-  field was wrong.
+  field was wrong. In `flash-web` that error is reported once (`decode-report.ts`, `console.warn` by default) with the URL
+  or stream event, the path and what was expected, never the value.
 - The test oracles (the e2e apps, k6 and the smoke test) do not use the kit: they check the replies themselves.
 
 ## Revisit when
