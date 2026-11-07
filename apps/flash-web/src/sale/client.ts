@@ -2,6 +2,7 @@
 // gets this client, so a test can give it a fake. The calls go to the web server, which passes the sale routes on.
 import type { Decoder } from "@flash/flash-commons";
 import { type ApiResult, callApi, jsonPost, TICKET_HEADER } from "../api";
+import { type Reporter, reportDecodeFailure } from "../decode-report";
 import { createWatcher, type Watcher } from "./sse";
 import {
 	decodeJoinedView,
@@ -42,25 +43,38 @@ export type SaleClient = {
 	) => () => void;
 };
 
-// Hands a stream frame to the page only when it decodes. A frame that does not decode is dropped, and `false` tells the
-// watcher it was not used, so it is not counted as a sign that the stream is alive.
+// Hands a stream frame to the page only when it decodes. A frame that does not decode is reported with its source, then
+// dropped. `false` tells the watcher it was not used, so it is not counted as a sign that the stream is alive.
 function deliver<T>(
+	source: string,
 	decode: Decoder<T>,
 	data: unknown,
 	onValue: (value: T) => void,
+	report: Reporter,
 ): boolean {
 	const decoded = decode(data);
-	if (decoded.isErr()) return false;
+	if (decoded.isErr()) {
+		report({
+			source,
+			path: decoded.error.path,
+			expected: decoded.error.expected,
+		});
+		return false;
+	}
 	onValue(decoded.value);
 	return true;
 }
 
+// What a report says about a stream frame: the stream it came on, and the name of its event.
+const frameSource = (url: string, event: string) => `${url} event ${event}`;
+
 // `base` is empty in the browser and a full address in tests. The `fetcher` is the one that renews the login, so these
-// calls need not know about it.
+// calls need not know about it. `report` takes each payload that does not decode; the console is the default.
 export function createSaleClient(
 	base = "",
 	fetcher: typeof fetch = fetch,
 	watch: Watcher = createWatcher({ fetcher }),
+	report: Reporter = reportDecodeFailure,
 ): SaleClient {
 	const api = `${base}/api`;
 	const sale = (saleId: string) => `${api}/sales/${encodeURIComponent(saleId)}`;
@@ -69,13 +83,20 @@ export function createSaleClient(
 
 	return {
 		join: (saleId) =>
-			callApi(fetcher, `${sale(saleId)}/queue`, decodeJoinedView, post({})),
+			callApi(
+				fetcher,
+				`${sale(saleId)}/queue`,
+				decodeJoinedView,
+				post({}),
+				report,
+			),
 		reserve: (saleId, ticket) =>
 			callApi(
 				fetcher,
 				`${sale(saleId)}/reservations`,
 				decodeReservedView,
 				post({}, { [TICKET_HEADER]: ticket }),
+				report,
 			),
 		confirm: (saleId, reservationId) =>
 			callApi(
@@ -83,22 +104,47 @@ export function createSaleClient(
 				`${sale(saleId)}/purchases`,
 				decodePurchaseView,
 				post({ reservationId }),
+				report,
 			),
 		outcome: (saleId) =>
-			callApi(fetcher, `${sale(saleId)}/purchases/me`, decodeOutcomeView),
-		watchSale: (saleId, onSale, onGiveUp) =>
-			watch(
-				`${sale(saleId)}/events`,
+			callApi(
+				fetcher,
+				`${sale(saleId)}/purchases/me`,
+				decodeOutcomeView,
+				{},
+				report,
+			),
+		watchSale: (saleId, onSale, onGiveUp) => {
+			const url = `${sale(saleId)}/events`;
+			return watch(
+				url,
 				(event, data) =>
-					event === "sale" && deliver(decodeSaleView, data, onSale),
+					event === "sale" &&
+					deliver(
+						frameSource(url, event),
+						decodeSaleView,
+						data,
+						onSale,
+						report,
+					),
 				{ onGiveUp },
-			),
-		watchPlace: (saleId, ticket, onPlace, onGiveUp) =>
-			watch(
-				`${sale(saleId)}/queue/me/events`,
+			);
+		},
+		watchPlace: (saleId, ticket, onPlace, onGiveUp) => {
+			const url = `${sale(saleId)}/queue/me/events`;
+			return watch(
+				url,
 				(event, data) =>
-					event === "place" && deliver(decodePlaceView, data, onPlace),
+					event === "place" &&
+					deliver(
+						frameSource(url, event),
+						decodePlaceView,
+						data,
+						onPlace,
+						report,
+					),
 				{ headers: { [TICKET_HEADER]: ticket }, onGiveUp },
-			),
+			);
+		},
 	};
 }

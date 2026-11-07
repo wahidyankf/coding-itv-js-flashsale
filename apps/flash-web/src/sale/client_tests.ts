@@ -1,6 +1,7 @@
 // Unit tests for the sale client: each call's path, method and headers, and how each answer is read.
 import { Err, Ok } from "@flash/typekit";
 import { describe, expect, it, vi } from "vitest";
+import type { Reporter } from "../decode-report";
 import { createSaleClient } from "./client";
 import type { Watcher } from "./sse";
 
@@ -37,13 +38,22 @@ const SALE_VIEW = {
 	remaining: 2,
 } as const;
 
-function client(reply: () => Response | Promise<Response>) {
+function client(
+	reply: () => Response | Promise<Response>,
+	report = vi.fn<Reporter>(),
+) {
 	const fetcher = vi.fn(async (_url: unknown, _init?: RequestInit) => reply());
 	const watch = vi.fn<Watcher>(() => () => {});
 	return {
 		fetcher,
 		watch,
-		api: createSaleClient("http://web.test", fetcher as typeof fetch, watch),
+		report,
+		api: createSaleClient(
+			"http://web.test",
+			fetcher as typeof fetch,
+			watch,
+			report,
+		),
 	};
 }
 
@@ -231,5 +241,69 @@ describe("createSaleClient", () => {
 
 	it("works with the defaults", () => {
 		expect(typeof createSaleClient().join).toBe("function");
+	});
+});
+
+describe("createSaleClient, what it reports", () => {
+	it("reports a reply that does not decode, with its URL, once", async () => {
+		const { api, report } = client(() =>
+			Response.json({ userId: "ana", ticket: "t" }, { status: 201 }),
+		);
+		await api.join(SALE);
+		expect(report).toHaveBeenCalledOnce();
+		expect(report).toHaveBeenCalledWith(
+			expect.objectContaining({
+				source: `http://web.test/api/sales/${SALE}/queue`,
+				path: "state",
+			}),
+		);
+	});
+
+	it("reports a sale frame that does not decode, with its stream and event, and says it was not used", () => {
+		const { api, watch, report } = client(() => Response.json({}));
+		api.watchSale(
+			SALE,
+			() => {},
+			() => {},
+		);
+		const onEvent = watch.mock.calls[0]?.[1];
+		expect(onEvent?.("sale", { ...SALE_VIEW, stock: "10" })).toBe(false);
+		expect(report).toHaveBeenCalledOnce();
+		expect(report).toHaveBeenCalledWith({
+			source: `http://web.test/api/sales/${SALE}/events event sale`,
+			path: "stock",
+			expected: "a non-negative integer",
+		});
+	});
+
+	it("reports a place frame that does not decode, with its event name", () => {
+		const { api, watch, report } = client(() => Response.json({}));
+		api.watchPlace(
+			SALE,
+			"t1",
+			() => {},
+			() => {},
+		);
+		const onEvent = watch.mock.calls[0]?.[1];
+		expect(onEvent?.("place", { userId: "ana", state: "waiting" })).toBe(false);
+		expect(report).toHaveBeenCalledOnce();
+		expect(report).toHaveBeenCalledWith({
+			source: `http://web.test/api/sales/${SALE}/queue/me/events event place`,
+			path: "place",
+			expected: "an integer",
+		});
+	});
+
+	it("reports nothing for a frame that decodes, or for an event the stream does not use", () => {
+		const { api, watch, report } = client(() => Response.json({}));
+		api.watchSale(
+			SALE,
+			() => {},
+			() => {},
+		);
+		const onEvent = watch.mock.calls[0]?.[1];
+		expect(onEvent?.("sale", SALE_VIEW)).toBe(true);
+		expect(onEvent?.("place", { userId: "ana", state: "waiting" })).toBe(false);
+		expect(report).not.toHaveBeenCalled();
 	});
 });

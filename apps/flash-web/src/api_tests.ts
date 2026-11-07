@@ -2,7 +2,7 @@
 // a refusal is read as an error with its wait, and every answer the page cannot read is the one "unexpected" failure.
 import { integer, object } from "@flash/flash-commons";
 import { Err, Ok } from "@flash/typekit";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { callApi } from "./api";
 
 const UNEXPECTED = new Err({
@@ -22,6 +22,14 @@ const decodeCount = object({ n: integer });
 function fetcherOf(reply: () => Response | Promise<Response>) {
 	return vi.fn(async (_url: unknown, _init?: RequestInit) => reply());
 }
+
+// A failed decode is reported to the console by default. The tests that do not look at the report keep the output quiet.
+beforeEach(() => {
+	vi.spyOn(console, "warn").mockImplementation(() => {});
+});
+afterEach(() => {
+	vi.restoreAllMocks();
+});
 
 describe("callApi, a reply that succeeded", () => {
 	it("gives the decoded body, and drops keys the decoder does not name", async () => {
@@ -138,5 +146,76 @@ describe("callApi, no answer", () => {
 		expect(await callApi(fetcher as typeof fetch, COUNT, decodeCount)).toEqual(
 			NETWORK,
 		);
+	});
+});
+
+describe("callApi, what it reports", () => {
+	it("reports a 2xx body that does not decode, once, with its URL, field and expected", async () => {
+		const report = vi.fn();
+		const fetcher = fetcherOf(() => Response.json({ n: "1" }));
+		await callApi(fetcher as typeof fetch, COUNT, decodeCount, {}, report);
+		expect(report).toHaveBeenCalledOnce();
+		expect(report).toHaveBeenCalledWith({
+			source: COUNT,
+			path: "n",
+			expected: "an integer",
+		});
+	});
+
+	it("reports a missing field by its name", async () => {
+		const report = vi.fn();
+		const fetcher = fetcherOf(() => Response.json({}));
+		await callApi(fetcher as typeof fetch, COUNT, decodeCount, {}, report);
+		expect(report).toHaveBeenCalledWith({
+			source: COUNT,
+			path: "n",
+			expected: "an integer",
+		});
+	});
+
+	it("never carries the value of the body into the report", async () => {
+		const report = vi.fn();
+		const fetcher = fetcherOf(() =>
+			Response.json({ n: "1", user: "shopper-name-xyz" }),
+		);
+		await callApi(fetcher as typeof fetch, COUNT, decodeCount, {}, report);
+		expect(JSON.stringify(report.mock.calls)).not.toContain("shopper-name-xyz");
+	});
+
+	it("reports a refusal that does not decode, once", async () => {
+		const report = vi.fn();
+		const fetcher = fetcherOf(() =>
+			Response.json({ errorCode: 5, errorMessage: "x" }, { status: 400 }),
+		);
+		await callApi(fetcher as typeof fetch, COUNT, decodeCount, {}, report);
+		expect(report).toHaveBeenCalledOnce();
+		expect(report).toHaveBeenCalledWith({
+			source: COUNT,
+			path: "errorCode",
+			expected: "text",
+		});
+	});
+
+	it("does not report a reply that decodes", async () => {
+		const report = vi.fn();
+		const fetcher = fetcherOf(() => Response.json({ n: 1 }));
+		await callApi(fetcher as typeof fetch, COUNT, decodeCount, {}, report);
+		expect(report).not.toHaveBeenCalled();
+	});
+
+	it("does not report a body that is not JSON, because it names no field", async () => {
+		const report = vi.fn();
+		const fetcher = fetcherOf(() => new Response("<html>", { status: 200 }));
+		await callApi(fetcher as typeof fetch, COUNT, decodeCount, {}, report);
+		expect(report).not.toHaveBeenCalled();
+	});
+
+	it("does not report a connection that failed", async () => {
+		const report = vi.fn();
+		const fetcher = fetcherOf(() => {
+			throw new TypeError("fetch failed");
+		});
+		await callApi(fetcher as typeof fetch, COUNT, decodeCount, {}, report);
+		expect(report).not.toHaveBeenCalled();
 	});
 });

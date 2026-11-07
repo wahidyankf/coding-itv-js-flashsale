@@ -10,6 +10,7 @@ import {
 	text,
 } from "@flash/flash-commons";
 import { attempt, attemptAsync, Err, Ok, type Result } from "@flash/typekit";
+import { type Reporter, reportDecodeFailure } from "./decode-report";
 
 // The header that carries the queue ticket. The page sends it, and the proxy passes it on.
 export const TICKET_HEADER = "x-queue-ticket";
@@ -77,14 +78,26 @@ function retryAfter(
 	return Number.isFinite(fromHeader) ? fromHeader : fromBody;
 }
 
+// Reports a body that decoded to an error. A body that is not JSON has no field to name, so it is not reported.
+function reportUnreadable(
+	report: Reporter,
+	source: string,
+	error: DecodeError | SyntaxError,
+): void {
+	if (error instanceof SyntaxError) return;
+	report({ source, path: error.path, expected: error.expected });
+}
+
 // One request. A 2xx reply is the `T` the caller names only when `decode` accepts its body; a reply that does not decode is
 // "unexpected", the same as a reply that is not JSON, so the page never shows a value of the wrong shape. A refusal is read
-// with `decodeRefusal`, and one that does not decode is "unexpected" too.
+// with `decodeRefusal`, and one that does not decode is "unexpected" too. Each such body is passed once to `report`, with
+// the URL and the field, so a developer can see what was wrong; the shopper sees only "unexpected".
 export async function callApi<T>(
 	fetcher: typeof fetch,
 	url: string,
 	decode: Decoder<T>,
 	init: RequestInit = {},
+	report: Reporter = reportDecodeFailure,
 ): Promise<ApiResult<T>> {
 	const sent = await attemptAsync(async () => {
 		const reply = await fetcher(url, init);
@@ -99,11 +112,16 @@ export async function callApi<T>(
 	const { ok, wait, body } = sent.value;
 	if (ok) {
 		const decoded = readBody(body, decode);
-		return decoded.isOk() ? new Ok(decoded.value) : new Err(UNEXPECTED);
+		if (decoded.isOk()) return new Ok(decoded.value);
+		reportUnreadable(report, url, decoded.error);
+		return new Err(UNEXPECTED);
 	}
 
 	const refusal = readBody(body, decodeRefusal);
-	if (refusal.isErr()) return new Err(UNEXPECTED);
+	if (refusal.isErr()) {
+		reportUnreadable(report, url, refusal.error);
+		return new Err(UNEXPECTED);
+	}
 	return new Err({
 		errorCode: refusal.value.errorCode,
 		errorMessage: refusal.value.errorMessage,
