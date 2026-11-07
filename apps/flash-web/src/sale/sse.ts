@@ -10,6 +10,7 @@ import {
 	type RetryPolicy,
 	retryAsync,
 } from "@flash/flash-commons";
+import { sleep } from "@flash/flash-commons/timers";
 import { attempt, attemptAsync, Err, Ok, type Result } from "@flash/typekit";
 
 // What one subscription asks for: its headers, and a call when the watcher has given up on it.
@@ -69,9 +70,6 @@ export function parseFrames(buffer: string): { frames: Frame[]; rest: string } {
 	}
 	return { frames, rest };
 }
-
-const pause = (ms: number) =>
-	new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 // Reads an open stream until it ends, and hands each complete frame to the listener. A frame can be split between two
 // chunks, so the text is kept until its blank line arrives.
@@ -133,7 +131,7 @@ async function connectOnce(
 // of an outage fails, the watcher stops and tells the subscription. A refusal stops it at once.
 export function createWatcher(options: WatchOptions = {}): Watcher {
 	const policy = options.policy ?? LIVE_POLICY;
-	const sleep = options.sleep ?? pause;
+	const wait = options.sleep ?? sleep;
 	const random = options.random ?? Math.random;
 	return (url, onEvent, subscription = {}) => {
 		const controller = new AbortController();
@@ -147,7 +145,7 @@ export function createWatcher(options: WatchOptions = {}): Watcher {
 					{
 						...policy,
 						shouldRetry: (failure) => failure === "failed",
-						sleep,
+						sleep: wait,
 						random,
 						signal: controller.signal,
 					},
@@ -155,7 +153,7 @@ export function createWatcher(options: WatchOptions = {}): Watcher {
 				if (controller.signal.aborted) return;
 				if (outcome.isOk()) {
 					// The stream delivered frames and then ended. It is opened again after a short wait, counting from the first attempt.
-					await sleep(backoffDelayMs(0, policy, random));
+					await wait(backoffDelayMs(0, policy, random));
 					continue;
 				}
 				if (outcome.error === "failed") subscription.onGiveUp?.();

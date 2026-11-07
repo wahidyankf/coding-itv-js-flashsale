@@ -5,6 +5,7 @@
 // The verdict comes from Postgres and Redis, not from what k6 says it did. k6 is compared with them.
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { sleep } from "@flash/flash-commons/timers";
 import {
 	PROFILE_NAMES,
 	PROFILES,
@@ -55,8 +56,6 @@ if (!requested || !PROFILE_NAMES.includes(requested as ProfileName)) {
 }
 const name = requested as ProfileName;
 const profile: Profile = PROFILES[name];
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // The phases of the run, top to bottom. The verdict is the exit code: 0 when every check passes.
 async function main(): Promise<number> {

@@ -6,6 +6,7 @@ import {
 	backoffDelayMs,
 	retryAsync,
 } from "@flash/flash-commons";
+import { sleep } from "@flash/flash-commons/timers";
 import { attemptAsync, Err, Ok, type Result } from "@flash/typekit";
 import {
 	type GateAnswer,
@@ -70,7 +71,7 @@ const topOfRange = () => WHOLE_BOUND;
 // polling: tests replace both, so the jitter is pinned and no real time passes.
 export const defaultReservationOptions: ReservationOptions = {
 	rebuildWaitMs: DEFAULT_REBUILD_WAIT_MS,
-	wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+	wait: sleep,
 	random: Math.random,
 };
 

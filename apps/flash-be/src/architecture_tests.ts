@@ -68,6 +68,10 @@ const isNode = (target: string) => target.startsWith("node:");
 // look-alike package such as `@flash/flash-commons-extras` is still refused.
 const KERNEL_PACKAGES = ["@flash/typekit", "@flash/flash-commons"];
 const isKernel = (target: string) => KERNEL_PACKAGES.includes(target);
+// The timer helper is the one part of flash-commons that starts a timer, so it is not in the kernel. The domain refuses
+// it. The application may take it only as an injectable default (reservation-service.ts), which no rule here can check.
+const TIMERS_PACKAGE = "@flash/flash-commons/timers";
+const isTimers = (target: string) => target === TIMERS_PACKAGE;
 const isDomain = (target: string) => target.startsWith("domain/");
 const isPort = (target: string) => target.startsWith("application/ports/");
 const isWiring = (target: string) =>
@@ -82,6 +86,7 @@ function allowed(layer: Layer, target: string): boolean {
 			return (
 				isNode(target) ||
 				isKernel(target) ||
+				isTimers(target) ||
 				isDomain(target) ||
 				target.startsWith("application/")
 			);
@@ -146,6 +151,18 @@ describe("hexagonal architecture", () => {
 		expect(copies).toEqual([]);
 	});
 
+	// The wait of a timer is written once, in @flash/flash-commons/timers. A local wrapper such as
+	// `setTimeout(resolve, ms)` would be a second copy. A literal wait in a test (`setTimeout(resolve, 50)`) is allowed.
+	it("waits with sleep from @flash/flash-commons/timers, with no setTimeout wrapper of its own", () => {
+		const wrappers = files
+			.filter((file) => !file.endsWith("architecture_tests.ts"))
+			.filter((file) =>
+				/setTimeout\(resolve,\s*[a-zA-Z]/.test(readFileSync(file, "utf8")),
+			)
+			.map((file) => path.relative(SRC, file));
+		expect(wrappers).toEqual([]);
+	});
+
 	it("never erases a row: the product code has no `deleteFrom(`", () => {
 		const erasing = product
 			.filter((file) => /\bdeleteFrom\(/.test(readFileSync(file, "utf8")))
@@ -170,6 +187,11 @@ describe("hexagonal architecture", () => {
 		);
 		expect(allowed("outbound", "application/sale-service.ts")).toBe(false);
 		expect(allowed("outbound", "adapters/inbound/http/app.ts")).toBe(false);
+		// The domain reads no clock and waits on nothing, so the timer helper is refused there.
+		expect(allowed("domain", "@flash/flash-commons/timers")).toBe(false);
+		expect(allowed("application", "@flash/flash-commons/timers-extras")).toBe(
+			false,
+		);
 	});
 
 	it("accepts the imports the rules allow", () => {
@@ -178,6 +200,8 @@ describe("hexagonal architecture", () => {
 		expect(allowed("application", "@flash/typekit")).toBe(true);
 		expect(allowed("domain", "@flash/flash-commons")).toBe(true);
 		expect(allowed("application", "@flash/flash-commons")).toBe(true);
+		// The application may take the timer helper, but only as an injectable default (see reservation-service.ts).
+		expect(allowed("application", "@flash/flash-commons/timers")).toBe(true);
 		expect(allowed("inbound", "fastify")).toBe(true);
 		expect(allowed("application", "application/ports/clock.ts")).toBe(true);
 		expect(allowed("outbound", "application/ports/clock.ts")).toBe(true);

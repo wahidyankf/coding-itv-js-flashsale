@@ -3,13 +3,17 @@
 	"version": "0.1.0",
 	"private": true,
 	"type": "module",
-	"description": "Small shared behaviour and constants for the apps: retry with exponential backoff, a max attempt count and full jitter; the time units; the HTTP status numbers. Pure: no timers, randomness or I/O of its own.",
+	"description": "Small shared behaviour and constants for the apps: retry with exponential backoff, a max attempt count and full jitter; the time units; the HTTP status numbers. The main entry is pure: no timers, randomness or I/O of its own. The /timers entry holds the one timer helper, sleep.",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",
 			"default": "./dist/index.js"
+		},
+		"./timers": {
+			"types": "./dist/timers.d.ts",
+			"default": "./dist/timers.js"
 		}
 	},
 	"files": [

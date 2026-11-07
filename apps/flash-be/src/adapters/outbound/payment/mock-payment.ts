@@ -1,5 +1,6 @@
 // The payment provider of flash-be, which lives in the process: a mock with real retry and refund rules. Outbound adapter
 // for the Payment port. It stands in for a real provider, so the purchase flow can be run end to end without money.
+import { sleep } from "@flash/flash-commons/timers";
 import { Err, Ok } from "@flash/typekit";
 import type {
 	Payment,
@@ -29,9 +30,7 @@ export type MockPayment = Payment & {
 // charge is forgotten, so the shopper can try again.
 export function createMockPayment(options: MockPaymentOptions): MockPayment {
 	const random = options.random ?? Math.random;
-	const sleep =
-		options.sleep ??
-		((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+	const wait = options.sleep ?? sleep;
 	const log = options.log ?? (() => {});
 	const charges = new Map<string, Promise<PaymentResult>>();
 	const refunded: string[] = [];
@@ -48,7 +47,7 @@ export function createMockPayment(options: MockPaymentOptions): MockPayment {
 			const known = charges.get(reservationId);
 			if (known !== undefined) return known;
 			const attempt = (async (): Promise<PaymentResult> => {
-				await sleep(settings.latencyMs);
+				await wait(settings.latencyMs);
 				if (random() < settings.failureRate) {
 					charges.delete(reservationId);
 					return new Err("declined");

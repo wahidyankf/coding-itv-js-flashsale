@@ -9,6 +9,7 @@ import {
 } from "node:http";
 import type { AddressInfo } from "node:net";
 import { MS_PER_SECOND } from "@flash/flash-commons";
+import { sleep } from "@flash/flash-commons/timers";
 import {
 	cleanup,
 	fireEvent,
@@ -338,10 +339,7 @@ function pageOf(h: Harness, browserFetch: typeof fetch, backendHttp: Server) {
 			h.backend.cutOff(true);
 			backendHttp.closeAllConnections();
 		},
-		advance: (seconds: number) =>
-			new Promise<void>((resolve) =>
-				setTimeout(resolve, seconds * MS_PER_SECOND),
-			),
+		advance: (seconds: number) => sleep(seconds * MS_PER_SECOND),
 	};
 }
 

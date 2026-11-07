@@ -1,7 +1,7 @@
 // A Server-Sent Events stream as the steps read it: the events one by one, each read with a time limit, and a way to close the
 // stream. The steps that watch a sale or a place open one and close it in cleanup.
 
-import { sleep } from "./time.js";
+import { sleep } from "@flash/flash-commons/timers";
 import type { StreamEvent } from "./views.js";
 
 // An open stream: `next` reads the following event, and `close` ends the connection.

@@ -2,6 +2,7 @@
 // loss of the queue from Redis. Binds queue/joining.feature and queue/admission.feature. The join and check calls are in
 // support/shoppers.ts, because other features use them too.
 
+import { sleep } from "@flash/flash-commons/timers";
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { bodyOf, routes, send } from "./support/api.js";
@@ -9,7 +10,7 @@ import { createSale, patchSale } from "./support/operator.js";
 import { E2E_REDIS_URL, withRedis } from "./support/processes.js";
 import { currentResponse } from "./support/response.js";
 import { checkPlace, join, shoppers } from "./support/shoppers.js";
-import { pollUntil, relativeTime, sleep } from "./support/time.js";
+import { pollUntil, relativeTime } from "./support/time.js";
 import { currentSaleId } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();

@@ -2,6 +2,7 @@
 // for the API to reach a state. The units come from @flash/flash-commons, so every step says the same thing by "an hour".
 // Both e2e apps use this file.
 import { MS_PER_HOUR, MS_PER_MINUTE, retryAsync } from "@flash/flash-commons";
+import { sleep } from "@flash/flash-commons/timers";
 import { Err, Ok, type Result } from "@flash/typekit";
 
 // The longest a poll waits between two checks. Backoff doubles the wait up to here, so a change is seen within a second.
@@ -26,11 +27,6 @@ export function windowFromNow(startsInMinutes: number, minutes: number) {
 		startsAt,
 		endsAt: new Date(startsAt.getTime() + minutes * MS_PER_MINUTE),
 	};
-}
-
-// Waits for `ms` milliseconds. Steps use it to let the API move on (a queue tick, a hold running out) before they look.
-export function sleep(ms: number): Promise<void> {
-	return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
 // How many checks fit in `window` when each wait is, on average, half of its backoff bound (full jitter draws a wait

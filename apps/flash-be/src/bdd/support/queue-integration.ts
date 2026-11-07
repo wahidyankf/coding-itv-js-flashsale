@@ -3,6 +3,7 @@
 // are the same as the unit layer's (queue-world.ts), done over the stores instead of in memory.
 
 import { MS_PER_HOUR, MS_PER_SECOND } from "@flash/flash-commons";
+import { sleep } from "@flash/flash-commons/timers";
 import type { FastifyInstance } from "fastify";
 import { type Kysely, sql } from "kysely";
 import { buildApp } from "../../adapters/inbound/http/app.js";
@@ -54,8 +55,6 @@ import {
 import { QUEUE_OPTIONS } from "./queue-world.js";
 import { insertPurchase, insertSale, loginAs } from "./seed.js";
 import { switchable } from "./switchable.js";
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // The stores, services and switches the whole run shares. Each scenario reads them through `scenario()`.
 type IntegrationParts = {
