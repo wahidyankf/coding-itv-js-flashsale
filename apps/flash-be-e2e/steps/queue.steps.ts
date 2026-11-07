@@ -2,8 +2,10 @@ import { type APIRequestContext, expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { createClient } from "redis";
 import { bodyOf, routes, send, TICKET_HEADER } from "./support/api.js";
+import { changeSale, createSale } from "./support/operator.js";
 import { currentResponse, setResponse } from "./support/response.js";
-import { E2E_REDIS_URL, query, world } from "./support/world.js";
+import { relativeTime } from "./support/time.js";
+import { E2E_REDIS_URL, world } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
 
@@ -49,13 +51,25 @@ export async function check(request: Request, user: string, ticket?: string) {
 	return bodyOf(routes.checkPlace, reply);
 }
 
+// The scenario keeps talking about the running sale; the later one only has to exist.
+Given(
+	/^a later sale that opens (.+) and closes (.+)$/,
+	async ({ request }, opens: string, closes: string) => {
+		const now = new Date();
+		await createSale(request, {
+			stock: 10,
+			startsAt: relativeTime(opens, now),
+			endsAt: relativeTime(closes, now),
+		});
+	},
+);
+
 Given(
 	/^the sale admits (\d+) users per second$/,
-	async ({ request: _request }, rate: string) => {
-		await query("update sales set admit_per_second = $1 where id = $2", [
-			Number(rate),
-			world.saleId,
-		]);
+	async ({ request }, rate: string) => {
+		await changeSale(request, world.saleId ?? "", {
+			admitPerSecond: Number(rate),
+		});
 	},
 );
 

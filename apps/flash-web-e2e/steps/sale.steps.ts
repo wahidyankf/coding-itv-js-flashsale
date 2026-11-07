@@ -1,8 +1,9 @@
 import { createBdd } from "playwright-bdd";
 import {
+	changeSale,
 	cutWebServerOff,
 	ensureDatabase,
-	insertSale,
+	planSale,
 	query,
 	setApiEnv,
 	world,
@@ -14,7 +15,7 @@ Given(
 	/^a sale with stock (\d+) and (\d+) sold that opens (.+) and closes (.+)$/,
 	// biome-ignore lint/correctness/noEmptyPattern: playwright-bdd needs an object pattern as the first argument
 	async ({}, stock: string, sold: string, opens: string, closes: string) => {
-		await insertSale(Number(stock), Number(sold), opens, closes);
+		planSale(Number(stock), Number(sold), opens, closes);
 	},
 );
 
@@ -33,9 +34,7 @@ Given("the sale cannot be reached", async ({}) => {
 // biome-ignore lint/correctness/noEmptyPattern: playwright-bdd needs an object pattern as the first argument
 Given("the queue admits shoppers slowly", async ({}) => {
 	setApiEnv({ ADMISSION_TICK_MS: "5000" });
-	await query("update sales set admit_per_second = 1 where id = $1", [
-		world.saleId,
-	]);
+	await changeSale({ admitPerSecond: 1 });
 });
 
 Given(
@@ -58,13 +57,11 @@ Given(
 	/^a hold lasts (\d+) seconds$/,
 	// biome-ignore lint/correctness/noEmptyPattern: playwright-bdd needs an object pattern as the first argument
 	async ({}, seconds: string) => {
-		await query("update sales set reservation_ttl_seconds = $1 where id = $2", [
-			Number(seconds),
-			world.saleId,
-		]);
+		await changeSale({ holdSeconds: Number(seconds) });
 	},
 );
 
+// Another flash-be instance sells behind this one's back. No route sets the sold count, so it is written to the table.
 When(
 	/^the sold count changes to (\d+)$/,
 	// biome-ignore lint/correctness/noEmptyPattern: playwright-bdd needs an object pattern as the first argument
@@ -78,10 +75,7 @@ When(
 
 // biome-ignore lint/correctness/noEmptyPattern: playwright-bdd needs an object pattern as the first argument
 When("the sale ends", async ({}) => {
-	await query(
-		"update sales set ends_at = now() - interval '1 second' where id = $1",
-		[world.saleId],
-	);
+	await changeSale({ closes: new Date(Date.now() - 1000) });
 });
 
 When(/^(\d+) seconds pass$/, async ({ page }, seconds: string) => {

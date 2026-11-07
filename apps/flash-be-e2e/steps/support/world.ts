@@ -17,6 +17,9 @@ export const E2E_REDIS_URL = (() => {
 	return url.toString();
 })();
 const START_TIMEOUT_MS = 20_000;
+// The operator token of every private API, unless a step sets another one. Steps use it to set a scenario up through
+// the same routes an operator uses.
+export const E2E_ADMIN_TOKEN = "e2e-operator-token-0001";
 
 // Everything one scenario owns. Each scenario gets its own database and, when it needs one, its own API
 // process, so scenarios never share state with each other or with the shared dev stack.
@@ -49,6 +52,29 @@ export const world: {
 	// Closes the event streams this scenario opened, before its API stops.
 	streams?: Array<() => void>;
 } = {};
+
+// Changing the settings of the private API after it started would change nothing, because it reads them once. A sale
+// is now made through the API, which starts it early, so a later step that sets a payment, a limit or a cache would be
+// ignored. Setting `apiEnv` therefore retires a running API; the next request starts a new one with the new settings.
+// The database is the scenario's own, so nothing the first one wrote is lost.
+let apiEnvValue: Record<string, string> | undefined;
+Object.defineProperty(world, "apiEnv", {
+	enumerable: true,
+	configurable: false,
+	get: () => apiEnvValue,
+	set: (value: Record<string, string> | undefined) => {
+		const changed = JSON.stringify(value) !== JSON.stringify(apiEnvValue);
+		apiEnvValue = value;
+		const running = world.api;
+		// Setting what is already set must not stop the API a web server is pointed at.
+		if (!running || !changed) return;
+		delete world.api;
+		running.process.kill("SIGTERM");
+		const proxy = world.redisProxy;
+		delete world.redisProxy;
+		void proxy?.close();
+	},
+});
 
 // A TCP relay in front of Redis. `down` drops every connection and refuses new ones, as an unreachable Redis does;
 // `up` accepts again on the same port. The data in Redis is not touched.
@@ -193,6 +219,7 @@ export async function startApi(): Promise<string> {
 			SALE_CACHE_MS: "0",
 			// Event streams read often, so a scenario sees a change within a moment.
 			EVENTS_INTERVAL_MS: "100",
+			ADMIN_TOKEN: E2E_ADMIN_TOKEN,
 			...world.apiEnv,
 		}),
 		stdio: ["ignore", "pipe", "pipe"],
@@ -239,7 +266,8 @@ export async function cleanup(): Promise<void> {
 		);
 		await admin.end();
 	}
+	apiEnvValue = undefined;
 	for (const key of Object.keys(world) as Array<keyof typeof world>) {
-		delete world[key];
+		if (key !== "apiEnv") delete world[key];
 	}
 }

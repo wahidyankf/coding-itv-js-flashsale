@@ -10,6 +10,13 @@ export type SaleView = {
 	remaining: number;
 };
 
+// A sale as the operator list shows it: the public view and the numbers only an operator needs.
+export type AdminSaleView = SaleView & {
+	sold: number;
+	holdSeconds: number;
+	admitPerSecond: number;
+};
+
 // Where a user stands in a queue.
 export type PlaceView = { userId: string } & (
 	| { state: "waiting"; place: number }

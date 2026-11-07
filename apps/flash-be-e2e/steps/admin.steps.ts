@@ -62,6 +62,7 @@ Given(
 			`Bearer ${world.apiEnv?.ADMIN_TOKEN ?? ""}`,
 		);
 		expect(made.status()).toBe(201);
+		world.saleId = (await made.json()).id;
 	},
 );
 

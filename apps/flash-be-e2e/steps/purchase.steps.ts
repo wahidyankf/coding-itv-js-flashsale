@@ -142,6 +142,8 @@ When("the confirmation finishes", async ({ request: _request }) => {
 	setResponse(await world.pendingConfirm);
 });
 
+// Another instance sells the last item while this payment is still running. It is written to Postgres behind the API
+// and Redis on purpose: a shopper going through the routes would wait as long as the slow payment of this scenario.
 When(
 	/^"([^"]+)" buys the last item$/,
 	async ({ request: _request }, user: string) => {

@@ -1,26 +1,18 @@
 import { type APIRequestContext, expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { bodyOf, routes, send } from "./support/api.js";
+import { createSale } from "./support/operator.js";
 import { currentResponse, setResponse } from "./support/response.js";
+import { relativeTime } from "./support/time.js";
 import { migratedDatabase, query, world } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
-
-const HOUR_MS = 3_600_000;
-
-// Reads phrases such as "in 2 hours" and "1 hour ago" against a given moment.
-function relativeTime(phrase: string, now: Date): Date {
-	const ahead = /^in (\d+) hours?$/.exec(phrase);
-	if (ahead) return new Date(now.getTime() + Number(ahead[1]) * HOUR_MS);
-	const past = /^(\d+) hours? ago$/.exec(phrase);
-	if (past) return new Date(now.getTime() - Number(past[1]) * HOUR_MS);
-	throw new Error(`cannot read the time "${phrase}"`);
-}
 
 async function ensureDatabase(): Promise<void> {
 	if (!world.databaseUrl) await migratedDatabase();
 }
 
+// A sale made with SQL. Only for a state real traffic cannot produce, such as items sold before the sale opens.
 async function insertSale(
 	name: string,
 	startsAt: Date,
@@ -41,7 +33,7 @@ async function insertSale(
 Given(
 	/^a sale with stock (\d+) and (\d+) sold that opens (.+) and closes (.+)$/,
 	async (
-		{ request: _request },
+		{ request },
 		stock: string,
 		sold: string,
 		opens: string,
@@ -49,27 +41,37 @@ Given(
 	) => {
 		await ensureDatabase();
 		const now = new Date();
-		world.saleId = await insertSale(
-			"Flash sale",
-			relativeTime(opens, now),
-			relativeTime(closes, now),
-			Number(stock),
-			Number(sold),
-		);
+		const startsAt = relativeTime(opens, now);
+		const endsAt = relativeTime(closes, now);
+		// A sale with nothing sold is set up like an operator does it. One with items sold already needs a row.
+		world.saleId =
+			Number(sold) === 0
+				? await createSale(request, { stock: Number(stock), startsAt, endsAt })
+				: await insertSale(
+						"Flash sale",
+						startsAt,
+						endsAt,
+						Number(stock),
+						Number(sold),
+					);
 	},
 );
 
+const saleIds = new Map<string, string>();
+
 Given(
-	/^a sale named "([^"]+)" that opened (.+)$/,
-	async ({ request: _request }, name: string, opened: string) => {
+	/^a sale named "([^"]+)" that opens (.+) and closes (.+)$/,
+	async ({ request }, name: string, opens: string, closes: string) => {
 		await ensureDatabase();
-		const startsAt = relativeTime(opened, new Date());
-		await insertSale(
+		const now = new Date();
+		saleIds.set(
 			name,
-			startsAt,
-			new Date(startsAt.getTime() + 6 * HOUR_MS),
-			10,
-			0,
+			await createSale(request, {
+				name,
+				stock: 10,
+				startsAt: relativeTime(opens, now),
+				endsAt: relativeTime(closes, now),
+			}),
 		);
 	},
 );
@@ -111,6 +113,19 @@ async function saleNow(request: APIRequestContext) {
 Then(/^the sale status is "([^"]+)"$/, async ({ request }, status: string) => {
 	expect((await saleNow(request))?.status).toBe(status);
 });
+
+Then(
+	/^the sale named "([^"]+)" has the status "([^"]+)" when read by its id$/,
+	async ({ request }, name: string, status: string) => {
+		const sale = await bodyOf(
+			routes.sale,
+			await send(request, routes.sale, {
+				params: { saleId: saleIds.get(name) ?? "" },
+			}),
+		);
+		expect(sale?.status).toBe(status);
+	},
+);
 
 Then(/^(\d+) items remain$/, async ({ request }, remaining: string) => {
 	expect((await saleNow(request))?.remaining).toBe(Number(remaining));

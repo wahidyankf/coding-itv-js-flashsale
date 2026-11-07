@@ -20,6 +20,8 @@ async function exists(table: string): Promise<boolean> {
 	return rows[0]?.name === table;
 }
 
+// These scenarios test the constraints of the tables, so they write rows the API would never allow (more sold than
+// stock). That is why they use SQL.
 async function insertSale(stock: number, sold: number): Promise<string> {
 	const rows = await query<{ id: string }>(
 		`insert into sales (name, starts_at, ends_at, stock, sold)

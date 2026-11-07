@@ -3,6 +3,7 @@ import { createBdd } from "playwright-bdd";
 import { createClient } from "redis";
 import { check, join, shoppers } from "./queue.steps.js";
 import { bodyOf, errorOf, routes, send, TICKET_HEADER } from "./support/api.js";
+import { changeSale } from "./support/operator.js";
 import { currentResponse, setResponse } from "./support/response.js";
 import { E2E_REDIS_URL, query, world } from "./support/world.js";
 
@@ -39,7 +40,7 @@ export async function reserve(
 }
 
 // The private API admits on its own timer, so a shopper who just joined is admitted within a tick or two.
-async function waitUntilAdmitted(request: Request, users: string[]) {
+export async function waitUntilAdmitted(request: Request, users: string[]) {
 	const deadline = Date.now() + 8000;
 	for (const user of users) {
 		const key = user.trim().toLowerCase();
@@ -72,11 +73,10 @@ Given(
 
 Given(
 	/^the hold time of the sale is (\d+) seconds?$/,
-	async ({ request: _request }, seconds: string) => {
-		await query("update sales set reservation_ttl_seconds = $1 where id = $2", [
-			Number(seconds),
-			world.saleId,
-		]);
+	async ({ request }, seconds: string) => {
+		await changeSale(request, world.saleId ?? "", {
+			holdSeconds: Number(seconds),
+		});
 	},
 );
 

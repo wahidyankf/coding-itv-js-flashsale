@@ -2,9 +2,10 @@ import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { shoppers } from "./queue.steps.js";
 import { build, routes, send, TICKET_HEADER } from "./support/api.js";
+import { changeSale } from "./support/operator.js";
 import { setResponse } from "./support/response.js";
 import { openStream, type Stream } from "./support/stream.js";
-import { query, world } from "./support/world.js";
+import { world } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
 
@@ -82,12 +83,14 @@ When(
 	},
 );
 
-// The private API admits on its own timer, so the shopper is admitted within a tick.
-When("the sale opens", async ({ request: _request }) => {
-	await query(
-		"update sales set starts_at = now() - interval '1 hour' where id = $1",
-		[world.saleId],
-	);
+const HOUR_MS = 3_600_000;
+
+// The operator moves the start of a sale that has not opened. The private API admits on its own timer, so the shopper is
+// admitted within a tick.
+When("the sale opens", async ({ request }) => {
+	await changeSale(request, world.saleId ?? "", {
+		startsAt: new Date(Date.now() - HOUR_MS).toISOString(),
+	});
 });
 
 Then(

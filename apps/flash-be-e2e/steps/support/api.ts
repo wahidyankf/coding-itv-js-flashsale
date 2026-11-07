@@ -1,5 +1,6 @@
 import type { APIRequestContext, APIResponse } from "@playwright/test";
 import type {
+	AdminSaleView,
 	JoinedView,
 	OutcomeView,
 	PlaceView,
@@ -16,7 +17,7 @@ const FIRST_ERROR_STATUS = 400;
 
 // A route is a method and a path. `B` is the body of its success reply; it is only there for the types.
 export type Route<B = unknown> = {
-	method: "GET" | "POST";
+	method: "GET" | "POST" | "PATCH" | "DELETE";
 	path: string;
 	reply?: B;
 };
@@ -37,6 +38,9 @@ export const routes = {
 	confirm: route<PurchaseView>("POST", "/sales/:saleId/purchases"),
 	outcome: route<OutcomeView>("GET", "/sales/:saleId/purchases/:userId"),
 	createSale: route<SaleView>("POST", "/admin/sales"),
+	updateSale: route<SaleView>("PATCH", "/admin/sales/:saleId"),
+	removeSale: route<{ id: string }>("DELETE", "/admin/sales/:saleId"),
+	listSales: route<{ sales: AdminSaleView[] }>("GET", "/admin/sales"),
 };
 
 export type Input = {
