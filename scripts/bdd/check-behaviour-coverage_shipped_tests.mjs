@@ -19,11 +19,10 @@ const CHECKER = path.join(
 async function runShipped(files) {
 	const tree = await mkdtemp(path.join(tmpdir(), "bdd-shipped-"));
 	try {
-		await mkdir(path.join(tree, "scripts/bdd"), { recursive: true });
-		await cp(
-			CHECKER,
-			path.join(tree, "scripts/bdd/check-behaviour-coverage.mjs"),
-		);
+		// The checker is several modules that import each other, so the whole folder is copied.
+		await cp(path.dirname(CHECKER), path.join(tree, "scripts/bdd"), {
+			recursive: true,
+		});
 		await symlink(
 			path.join(REPO_ROOT, "node_modules"),
 			path.join(tree, "node_modules"),

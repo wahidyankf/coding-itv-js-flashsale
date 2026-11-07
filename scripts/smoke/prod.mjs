@@ -106,7 +106,8 @@ function expectRefusal(label, reply, errorCode) {
 	}
 }
 
-async function walk() {
+// Brings the stack up and checks that every API instance is healthy behind nginx.
+async function startStack() {
 	step(`building and starting the stack (api on ${bePort}, web on ${webPort})`);
 	compose("up", "-d", "--build", "--wait");
 
@@ -121,17 +122,17 @@ async function walk() {
 			`wanted ${API_INSTANCES.length} healthy API instances, found ${running.length}`,
 		);
 	}
+}
 
-	const apiUrl = `http://127.0.0.1:${bePort}`;
-	const api = (method, path, options) => call(apiUrl, method, path, options);
-	const web = (method, path, options) =>
-		call(`http://127.0.0.1:${webPort}/api`, method, path, options);
-
+async function checkReady(apiUrl) {
 	step("the API is ready");
 	const ready = await fetch(`${apiUrl}/ready`);
 	if (ready.status !== STATUS.ok)
 		throw new Error(`/ready answered ${ready.status}`);
+}
 
+// The shopper signs up through the web server and gets the cookie that logs them in.
+async function signUpShopper(web) {
 	step(
 		"a shopper signs up through the web server and is refused on the admin route",
 	);
@@ -139,13 +140,21 @@ async function walk() {
 		body: { username: SHOPPER, password },
 	});
 	expectOk("sign up", account, STATUS.created);
-	const shopperCookie = account.cookie;
-	const body = {
+	return account.cookie;
+}
+
+// The sale the walk creates: it started a minute ago and runs for an hour.
+function saleRequest() {
+	return {
 		stock: 2,
 		holdSeconds: 60,
 		startsAt: new Date(Date.now() - MINUTE_MS).toISOString(),
 		endsAt: new Date(Date.now() + 60 * MINUTE_MS).toISOString(),
 	};
+}
+
+// A shopper and a visitor with no login must both be refused by the admin route.
+async function refusedOnAdmin(api, shopperCookie, body) {
 	expectRefusal(
 		"no login",
 		await api("POST", "/admin/sales", { body }),
@@ -159,7 +168,10 @@ async function walk() {
 		}),
 		"forbidden",
 	);
+}
 
+// The operator is made with the command, logs in, and creates the sale through the API.
+async function createSaleAsOperator(api, body) {
 	step(
 		"an operator is made with the command, logs in and creates a sale through the API",
 	);
@@ -187,13 +199,17 @@ async function walk() {
 		}),
 		STATUS.created,
 	);
+	return { sale, cookie: operator.cookie };
+}
 
+// The web server must not pass the admin route on, even to an operator.
+async function checkWebBlocksAdmin(operatorCookie) {
 	step("the web server does not pass the admin route on");
 	const blocked = await fetch(`http://127.0.0.1:${webPort}/api/admin/sales`, {
 		method: "POST",
 		headers: {
 			"content-type": "application/json",
-			cookie: operator.cookie,
+			cookie: operatorCookie,
 			origin,
 		},
 		body: "{}",
@@ -201,7 +217,9 @@ async function walk() {
 	if (blocked.status !== STATUS.notFound) {
 		throw new Error(`the web server answered ${blocked.status} to /api/admin`);
 	}
+}
 
+async function checkShopperSeesSale(web, sale) {
 	step("the shopper sees the sale through the web server");
 	const current = expectOk(
 		"current sale",
@@ -210,10 +228,12 @@ async function walk() {
 	);
 	if (current.id !== sale.id)
 		throw new Error("the current sale is not the new one");
+}
 
+// The shopper joins the queue and waits to be admitted. Returns the headers that carry the queue ticket.
+async function joinAndWaitForAdmission(web, salePath, shopperCookie) {
 	step("the shopper joins the queue and is admitted");
 	const logged = { cookie: shopperCookie };
-	const salePath = `/sales/${sale.id}`;
 	const joined = expectOk(
 		"join",
 		await web("POST", `${salePath}/queue`, { headers: logged }),
@@ -234,15 +254,19 @@ async function walk() {
 		state = place.state;
 	}
 	if (state !== "admitted") throw new Error("the shopper was never admitted");
+	return headers;
+}
 
+async function holdItem(web, salePath, headers) {
 	step("the shopper holds one item");
-	const held = expectOk(
+	return expectOk(
 		"reserve",
-		await web("POST", `${salePath}/reservations`, {
-			headers,
-		}),
+		await web("POST", `${salePath}/reservations`, { headers }),
 	);
+}
 
+// Pays for the hold. A declined charge is tried again, up to MAX_PAYMENT_ATTEMPTS, and the purchase is returned.
+async function payForItem(web, salePath, shopperCookie, held) {
 	step("the shopper pays (a declined charge is tried again)");
 	let purchase;
 	for (
@@ -251,7 +275,7 @@ async function walk() {
 		attempt++
 	) {
 		const paid = await web("POST", `${salePath}/purchases`, {
-			headers: logged,
+			headers: { cookie: shopperCookie },
 			body: { reservationId: held.reservationId },
 		});
 		if (paid.status < STATUS.firstError) purchase = paid.body;
@@ -261,11 +285,17 @@ async function walk() {
 	}
 	if (purchase === undefined)
 		throw new Error("the payment was declined every time");
+	return purchase;
+}
 
+// The shopper learns they bought the item, and a second hold is refused.
+async function checkOutcome(web, salePath, shopperCookie, headers) {
 	step("the shopper asks if they got it, and cannot buy twice");
 	const outcome = expectOk(
 		"outcome",
-		await web("GET", `${salePath}/purchases/me`, { headers: logged }),
+		await web("GET", `${salePath}/purchases/me`, {
+			headers: { cookie: shopperCookie },
+		}),
 		STATUS.ok,
 	);
 	if (outcome.state !== "purchased") {
@@ -276,6 +306,32 @@ async function walk() {
 		await web("POST", `${salePath}/reservations`, { headers }),
 		"already_purchased",
 	);
+}
+
+// The whole walk, one phase after another. Each phase stops the walk by throwing when a reply is not the one expected.
+async function walk() {
+	await startStack();
+	const apiUrl = `http://127.0.0.1:${bePort}`;
+	const api = (method, path, options) => call(apiUrl, method, path, options);
+	const web = (method, path, options) =>
+		call(`http://127.0.0.1:${webPort}/api`, method, path, options);
+
+	await checkReady(apiUrl);
+	const shopperCookie = await signUpShopper(web);
+	const body = saleRequest();
+	await refusedOnAdmin(api, shopperCookie, body);
+	const { sale, cookie: operatorCookie } = await createSaleAsOperator(
+		api,
+		body,
+	);
+	await checkWebBlocksAdmin(operatorCookie);
+	await checkShopperSeesSale(web, sale);
+
+	const salePath = `/sales/${sale.id}`;
+	const headers = await joinAndWaitForAdmission(web, salePath, shopperCookie);
+	const held = await holdItem(web, salePath, headers);
+	await payForItem(web, salePath, shopperCookie, held);
+	await checkOutcome(web, salePath, shopperCookie, headers);
 }
 
 try {
