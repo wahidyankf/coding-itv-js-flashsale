@@ -56,7 +56,8 @@ The transaction first locks the sale row, which lines up everyone who confirms f
 1. If a purchase with this reservation id exists, return it.
 2. If the user already has a purchase in the sale, answer `already_purchased`.
 3. `UPDATE sales SET sold = sold + 1 WHERE id = $1 AND sold < stock`. If no row changes, answer `sold_out`.
-4. Insert the purchase and delete the reservation row.
+4. Insert the purchase and mark the reservation row deleted (`deleted_at`, `deleted_by`): the hold is spent, and the
+   row stays as a record.
 
 The lock is held for a few statements and never across the payment. The `CHECK (sold <= stock)` on the table and the
 unique constraint on `(sale_id, user_id)` stay as the last walls if a bug ever skips a step above.

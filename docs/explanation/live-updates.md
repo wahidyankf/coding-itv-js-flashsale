@@ -6,7 +6,7 @@ hold one connection per page and say something only when it changes. The API doe
 ## Why SSE
 
 SSE is one direction, from the server to the page, over plain HTTP. That is all this system needs: the sale status goes
-down, and the shopper's actions go up as normal requests. The browser reconnects by itself, there is no protocol to
+down, and the shopper's actions go up as normal requests. The page reopens a stream that drops by itself, there is no protocol to
 build, and it passes through proxies as a long response. A WebSocket would add a second protocol for a channel that
 never has to carry anything upward.
 

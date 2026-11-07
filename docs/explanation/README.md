@@ -5,6 +5,7 @@ behaviour, read the specs.
 
 ## Directory Map
 
+- [decisions/](decisions/README.md) - decision records: the choices that were hard to reverse, the alternatives that lost, and when to look again.
 - [hexagonal-architecture.md](hexagonal-architecture.md) - how `flash-be` is split into domain, application and adapters, and how the split is enforced.
 - [liveness-and-readiness.md](liveness-and-readiness.md) - why `/health` checks nothing and `/ready` checks the stores.
 - [waiting-queue.md](waiting-queue.md) - why shoppers queue before they reserve, and how the queue admits them.
