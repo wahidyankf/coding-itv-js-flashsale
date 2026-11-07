@@ -1,7 +1,7 @@
 # Handle failures with Result
 
 Use `@flash/typekit` so a failure is a value and product code has no `catch`. The names are listed in
-[the typekit reference](../reference/typekit.md).
+[the typekit README](../../libs/typekit/README.md).
 
 ## 1. Wrap a call that may throw
 
