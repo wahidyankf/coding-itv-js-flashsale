@@ -18,11 +18,8 @@ If you have five minutes, read these files in this order:
 | `apps/flash-load/k6/profiles.ts`, `apps/flash-load/scripts/verdict.ts` | the stress profiles, and the verdict that is read from the data                                                          |
 
 To show it running, follow [run the demo](docs/how-to/run-the-demo.md). To change it, the
-[code map](docs/reference/code-map.md) and each app's `README.md` say where each kind of thing goes.
-
-That is the core. The rest is support that keeps the code checked as it grows: Nx targets, the two
-libraries, the hexagon layers, the behaviour-coverage check, the docs check and the lint rules. You can ignore all of
-it to understand the system; it only matters when you change the code.
+[code map](docs/reference/code-map.md) and each app's `README.md` say where each kind of thing goes. New to the stack?
+Start at [docs/README.md](docs/README.md): run the tutorial, then read the crash courses for the tools you will touch.
 
 ### What the brief asks for, and where it is
 
@@ -44,8 +41,7 @@ it to understand the system; it only matters when you change the code.
 
 ## What is in the repository
 
-It is an npm workspace with five apps in `apps/` and two libraries in `libs/`. Each app has a `README.md` with its folder
-tree and where to add each kind of thing; the [code map](docs/reference/code-map.md) is the index.
+It is an npm workspace with five apps in `apps/` and two libraries in `libs/`.
 
 | App                                             | What it is                                                                                |
 | ----------------------------------------------- | ----------------------------------------------------------------------------------------- |
@@ -55,15 +51,16 @@ tree and where to add each kind of thing; the [code map](docs/reference/code-map
 | [`flash-web-e2e`](apps/flash-web-e2e/README.md) | Playwright tests in a browser                                                             |
 | [`flash-load`](apps/flash-load/README.md)       | k6 load test against three API instances behind nginx, with a verdict from the data       |
 
-`libs/typekit` (`@flash/typekit`) is a TypeScript port of [py-typekit](https://github.com/wahidyankf/py-typekit). It has
-`Result` and `attempt`. `flash-be` and `flash-web` use it, so a failure is a value and product code has no `catch`. The
-linter enforces that; see [failures as values](docs/explanation/failures-as-values.md). It holds types only.
+[`libs/typekit`](libs/typekit/README.md) (`@flash/typekit`) makes a failure a value: a function that can fail returns a
+`Result` (`Ok`, `Err`), so the failure is in its type and a caller cannot forget it, and `attempt` turns a call that
+throws into a `Result`. It has nothing else and no dependency. `flash-be`, `flash-web`, `flash-be-e2e`, `flash-load` and
+`flash-commons` use it, so product code has no `catch`. The linter enforces that; see [failures as values](docs/explanation/failures-as-values.md).
 
-`libs/flash-commons` (`@flash/flash-commons`) holds the behaviour and values that 3 or more places across the apps
+[`libs/flash-commons`](libs/flash-commons/README.md) (`@flash/flash-commons`) holds the behaviour and values that 3 or more places across the apps
 share: retry with exponential backoff, a max attempt count and jitter, the time units, the HTTP status numbers, the
 payload decoders, the id rule, the cookie jar of the tests, the time phrases of the scenarios and a `sleep` (on its own entry, `/timers`, so the main entry stays pure). Every
 retry in the repository goes through it ([decision 017](docs/explanation/decisions/017-retry-backoff-jitter.md),
-[policies](docs/reference/flash-commons.md)). A value repeated a third time gets one name
+[policies](docs/reference/retry-policies.md)). A value repeated a third time gets one name
 ([decision 016](docs/explanation/decisions/016-dry-rule-of-three.md)).
 
 The HTTP API is plain code: `flash-be` registers its routes in `adapters/inbound/http/routes/`, one file per area, and every route, request and reply is listed in
@@ -197,13 +194,9 @@ any request, so adding capacity is adding instances.
 | Soft delete ([011](docs/explanation/decisions/011-soft-delete-everywhere.md))                                        | Nothing is lost, and a removal says who did it                                                                                                                         | Every read and every unique index filters `deleted_at`             |
 | Retry with backoff and jitter ([017](docs/explanation/decisions/017-retry-backoff-jitter.md))                        | A retry storm cannot hit a server that is coming back, and every retry ends                                                                                            | A shopper may wait a little longer before a retry                  |
 
-Longer explanations are in [docs/explanation](docs/explanation/README.md), and the architecture diagrams are in
-[specs/apps/flash/c4](specs/apps/flash/c4/README.md). One sale runs at a time, and each sale is one type of product with a stock of units. `GET /sales/current` is the sale that
-is running, or else the next one to open. The admin routes refuse a window that overlaps another sale; the seed command
-does not check. There is no admin page: an operator logs in through the API and uses it with the cookies.
-
 Every choice has a decision record in [docs/explanation/decisions](docs/explanation/decisions/README.md), with the
-other options that were weighed and when to look at it again.
+other options that were weighed and when to look at it again. Longer explanations are in
+[docs/explanation](docs/explanation/README.md), and the architecture diagrams in [specs/apps/flash/c4](specs/apps/flash/c4/README.md).
 
 ### What was left out, and why
 
@@ -219,7 +212,7 @@ other options that were weighed and when to look at it again.
 
 ## How it scales, and where it stops
 
-**What scales.** The API tier. Instances are identical and stateless, so capacity grows by adding one. In
+**What scales.** The API tier, by adding instances (see above). In
 `compose.prod.yaml` that means one more service next to `flash-be-1..3`, one more `server` line in `nginx.prod.conf`,
 and a higher Postgres `max_connections`, since each instance opens a pool of ten. The hot path is one Redis script per
 hold, so a rush reaches Postgres only for the hold's write-through and the payment step. Reads of the sale are cached
@@ -240,9 +233,6 @@ for a second, and watchers share one read through the event stream.
 - The per-address rate limit counts the address nginx sees. Behind `flash-web` that is the web server for every shopper,
   so shoppers who buy through the page share one address limit (`RATE_LIMIT_PER_IP`, 600 writes per 10 seconds); the
   per-user limit still applies to each of them. A real deployment would put the browser's address in front of that.
-- The payment is a mock, and there is no password reset or e-mail check (see the table above).
-- The load numbers below come from one laptop where k6 and every server share the CPUs, so they show how the system
-  behaves, not how fast production would be.
 
 ## Run it
 
@@ -308,19 +298,22 @@ open localhost:3000            # the sale page
 npm run docker:prod:down       # stop the stack (volumes are kept)
 ```
 
-Production compose reads `POSTGRES_*`, `TICKET_SECRET` and the ports from `.env`, and fails when one is missing. The login cookies are `Secure`
-there (`COOKIE_SECURE`, default `true`), so put a TLS terminator in front, or set `COOKIE_SECURE=false` in `.env` to try the stack over plain HTTP.
+Production compose reads `POSTGRES_*`, `TICKET_SECRET` and the ports from `.env`. It fails when a `POSTGRES_*` value or
+`TICKET_SECRET` is missing; the ports default to 8080 and 3000. `COOKIE_SECURE` is `true` by default, so the login
+cookies are `Secure` and need a TLS terminator in front. `.env.example` sets it to `false`, so a stack started from a
+copy of that file sends the cookies over plain HTTP. Set it to `true` behind TLS.
 Three `flash-be` instances run behind nginx, which is the API port on the host. Postgres, Redis and the instances are not
 published. `npm run smoke:prod` builds the stack under its own name and walks one shopper through it
 (see [the smoke test](docs/how-to/smoke-test-the-production-stack.md)).
 
 ## Tests
 
-Every app has `typecheck`, `lint`, `test:quick` (those two plus unit tests) and `test:quick:watch`.
+Every app has `typecheck`, `lint`, `test:quick` (those two plus unit tests; only the two for the e2e apps) and
+`test:quick:watch`.
 
 ```bash
 npx nx test:quick <app>        # typecheck + lint + unit tests
-npx nx test:integration <app>  # needs the dev stack (flash-be, flash-web)
+npx nx test:integration <app>  # flash-be needs the dev stack; flash-web fakes the API
 npx nx test:e2e <app>          # Playwright (flash-be-e2e, flash-web-e2e)
 npx nx test:coverage <app>     # unit + integration, 99% floor; starts the dev stack
 npx nx test:quick typekit      # a library: typecheck + lint + unit tests (no Docker)
@@ -338,9 +331,9 @@ the scenario, with the test that proves it. A detail that only a developer would
 not a scenario (see [scenario or plain test](docs/explanation/scenario-or-plain-test.md)). Playwright needs Chromium once:
 `npx playwright install chromium`. See [test layers and coverage](docs/reference/test-layers-and-coverage.md).
 
-`git push` runs the Biome check, the docs check, the behaviour coverage check and the lint rule tests.
-It also runs typecheck, lint, unit tests and the coverage floor for the projects the change touches. Commits are checked
-with commitlint (Conventional Commits).
+`git push` runs the checks in [the pre-push hook](docs/reference/test-layers-and-coverage.md#pre-push-hook), with the
+quick tests and the coverage floor only for the projects the change touches. Commits are checked with commitlint
+(Conventional Commits).
 
 ## Load test
 
@@ -372,8 +365,7 @@ relative:
 | chaos   | 1000/1000 | 3.0 ms      | 155 ms       | 0             |
 
 **The two herd runs.** `burst` and `contention` put 700 shoppers into the system within one second, which the other runs
-never do. In all six runs every invariant held: no oversell (100/100 and 50/50 sold), no shopper bought twice, k6,
-Postgres and Redis agreed, and there were no server errors. The speed limits **did not hold** in most runs as k6 measures
+never do. In all six runs every check of the data held (100/100 and 50/50 sold, no server errors). The speed limits **did not hold** in most runs as k6 measures
 them on this machine:
 
 | Profile                        | Sold    | Reserve p95 (k6) | Purchase p95 (k6) | Reserve p95 in the API | Verdict                                                            |
@@ -383,12 +375,9 @@ them on this machine:
 | burst, after the refactor      | 100/100 | 70 ms            | 521 ms            | not logged             | invariants pass, purchase speed fails, k6 started one shopper late |
 | contention, after the refactor | 50/50   | 27 ms            | 297 ms            | not logged             | every check passes                                                 |
 
-The API logged a reserve at about 5 ms (95th percentile), and Postgres never had a session waiting for a lock, so the
-handlers and the database are not where the time goes. What k6 measures also includes 770 virtual users sharing six CPUs
-with nginx and three API instances, and the numbers swing a lot from run to run. So these runs show that the sale stays
-correct under a herd. They do not show how fast production would answer, and a faithful speed test needs the load
-generator on its own machine. The limits were not changed. See
-[what the load runs found](docs/explanation/load-test-findings.md).
+The API logged about 5 ms per reserve, so most of what k6 measures is spent outside the handlers, on a machine that k6
+shares with the servers. These runs show that the sale stays correct under a herd, not how fast production would answer
+([what the load runs found](docs/explanation/load-test-findings.md)).
 
 The chaos run found that paying while Redis was down took about two seconds, because of how the Redis client queues a
 transaction. That is fixed, with a scenario that holds the outage and requires an answer in under 500 ms. The story is
@@ -398,7 +387,7 @@ in [what the load runs found](docs/explanation/load-test-findings.md). The profi
 
 ## Documentation
 
-- [docs/](docs/README.md): a tutorial, how-to guides, reference and explanations.
+- [docs/](docs/README.md): tutorials (with a crash course on each tool and pattern), how-to guides, reference and explanations.
 - [specs/](specs/README.md): the apps' Gherkin behaviour scenarios and the C4 architecture. Specs win when they disagree with the docs.
 - [api-flash-be.http](api-flash-be.http) and [api-flash-web.http](api-flash-web.http): every route of the API and of the web server, one request each. [api-flash-demo.http](api-flash-demo.http): the demo, in order. All three are in the [kulala.nvim](https://github.com/wahidyankf/kulala.nvim) format.
 - [docs/reference/code-map.md](docs/reference/code-map.md) and the `README.md` of each app and library: where each kind of thing lives, and where to add one.

@@ -1,6 +1,7 @@
 # How-To Guides
 
-Short guides for one task each. They assume you have run the project once (see the tutorial).
+Short guides for one task each. They assume you have run the project once (see the
+[tutorial](../tutorials/run-flash-sale-locally.md)).
 
 ## Directory Map
 
