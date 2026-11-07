@@ -43,13 +43,15 @@ const MAX_POLLS = 90;
 const MAX_PAYMENT_ATTEMPTS = 3;
 // The tries of a join: the first one, then the retries.
 const JOIN_TRIES = 1 + MAX_JOIN_RETRIES;
-const JOIN_BASE_MS = 1_000;
-const JOIN_CAP_MS = 4_000;
-const PAYMENT_BASE_MS = 300;
-const PAYMENT_CAP_MS = 1_200;
+const JOIN_BASE_MS = 2_000;
+const JOIN_CAP_MS = 8_000;
+const PAYMENT_BASE_MS = 600;
+const PAYMENT_CAP_MS = 2_400;
 // The waits between retries are exponential with full jitter (flash-commons `retry`), so a crowd of refused shoppers
-// does not come back in step. A join waits about a second at first, as the old fixed pause did, and at most 4 seconds.
-// A declined payment comes back sooner, starting at 0.3 s and at most 1.2 s. The caps keep a shopper from stalling.
+// does not come back in step. Full jitter draws each wait from zero up to its bound, so the mean is half the bound. The
+// bases were doubled from the first version, when the mean of the first join wait was half a second. Now it is about a
+// second, as the old fixed pause was, and the mean of the first payment wait is about 0.3 s. The caps keep a shopper
+// from stalling: a join waits at most 8 seconds, a declined payment at most 2.4.
 const JOIN_BACKOFF = { baseMs: JOIN_BASE_MS, capMs: JOIN_CAP_MS };
 const PAYMENT_BACKOFF = { baseMs: PAYMENT_BASE_MS, capMs: PAYMENT_CAP_MS };
 // The share of buyers who press confirm a second time.
