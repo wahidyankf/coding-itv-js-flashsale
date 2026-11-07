@@ -5,15 +5,15 @@ the folder tree and a table that answers "I want to add X, where does it go?".
 
 ## Apps and libraries
 
-| Folder                                                     | What it is                                                                  | Its README tells you where to put                                 |
-| ---------------------------------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| [`apps/flash-be`](../../apps/flash-be/README.md)           | the REST API, a hexagon: domain, application and ports, adapters            | a rule, a use case, a store, a route, an error code, a table      |
-| [`apps/flash-web`](../../apps/flash-web/README.md)         | the page, and the web server that passes a fixed list of routes on          | a rule of the buying card, a sentence, a call to a new route      |
-| [`apps/flash-be-e2e`](../../apps/flash-be-e2e/README.md)   | Playwright tests of the running API                                         | a step, a shared helper, a wait                                   |
-| [`apps/flash-web-e2e`](../../apps/flash-web-e2e/README.md) | Playwright tests of the page in a browser                                   | a step, a helper only the page needs                              |
-| [`apps/flash-load`](../../apps/flash-load/README.md)       | the k6 stress test and the runner that judges it from the data              | a profile, a check, a step of a shopper, a command on the stack   |
-| [`libs/typekit`](../../libs/typekit/README.md)             | `@flash/typekit`: `Result` and `attempt`, types only                        | nothing new unless it is a type every app needs                   |
-| [`libs/flash-commons`](../../libs/flash-commons/README.md) | `@flash/flash-commons`: retry with backoff and jitter, time units, statuses | a value or a pure helper used in 3 or more places across the apps |
+| Folder                                                     | What it is                                                                                        | Its README tells you where to put                                 |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| [`apps/flash-be`](../../apps/flash-be/README.md)           | the REST API, a hexagon: domain, application and ports, adapters                                  | a rule, a use case, a store, a route, an error code, a table      |
+| [`apps/flash-web`](../../apps/flash-web/README.md)         | the page, and the web server that passes a fixed list of routes on                                | a rule of the buying card, a sentence, a call to a new route      |
+| [`apps/flash-be-e2e`](../../apps/flash-be-e2e/README.md)   | Playwright tests of the running API                                                               | a step, a shared helper, a wait                                   |
+| [`apps/flash-web-e2e`](../../apps/flash-web-e2e/README.md) | Playwright tests of the page in a browser                                                         | a step, a helper only the page needs                              |
+| [`apps/flash-load`](../../apps/flash-load/README.md)       | the k6 stress test and the runner that judges it from the data                                    | a profile, a check, a step of a shopper, a command on the stack   |
+| [`libs/typekit`](../../libs/typekit/README.md)             | `@flash/typekit`: `Result` and `attempt`, types only                                              | nothing new unless it is a type every app needs                   |
+| [`libs/flash-commons`](../../libs/flash-commons/README.md) | `@flash/flash-commons`: retry with backoff and jitter, time units, statuses; `sleep` on `/timers` | a value or a pure helper used in 3 or more places across the apps |
 
 ## Outside the apps
 

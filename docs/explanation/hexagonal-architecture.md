@@ -6,7 +6,7 @@ know about Redis or Fastify cannot break when they change.
 
 ```text
 src/
-  domain/          rules and values; imports only Node built-ins, @flash/typekit and @flash/flash-commons
+  domain/          rules and values; imports only Node built-ins, @flash/typekit and @flash/flash-commons (not /timers)
   application/     services (use cases) and ports/
   adapters/
     inbound/       http (routes/ one file per area, errors, cookies, SSE), cli (seed and create-operator options)
@@ -73,7 +73,8 @@ flowchart LR
 Dependencies point inward: adapters know the application and the domain, the application knows the domain, and the
 domain knows nothing. The only packages the inner layers may import are [`@flash/typekit`](../reference/typekit.md)
 (see [failures as values](failures-as-values.md)) and [`@flash/flash-commons`](../reference/flash-commons.md). Both are
-pure: no I/O, no timer and no randomness of their own. The HTTP words (error codes, statuses, sentences, cookies) live in
+pure: no I/O, no timer and no randomness of their own. The one timer helper, `@flash/flash-commons/timers`, is refused
+in the domain; the application uses it only as the default of a wait that a test replaces. The HTTP words (error codes, statuses, sentences, cookies) live in
 the inbound HTTP adapter, and the rules the domain needs, such as the user id rule, live in the domain.
 Inbound adapters never import outbound adapters, and outbound adapters import only ports and the
 domain. Only `composition.ts` and the entry points see both sides.

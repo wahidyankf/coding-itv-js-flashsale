@@ -1,7 +1,8 @@
 # flash-commons
 
-`@flash/flash-commons` in `libs/flash-commons` holds the small behaviour and values that several apps share. It is
-pure: no timers, no randomness and no I/O of its own, so the same code runs in Node, the browser and k6. Its API, with
+`@flash/flash-commons` in `libs/flash-commons` holds the small behaviour and values that several apps share. Its main
+entry is pure: no timers, no randomness and no I/O of its own, so the same code runs in Node, the browser and k6. The one
+timer helper, `sleep`, is on its own entry, `@flash/flash-commons/timers`. Its API, with
 examples, is in [its README](../../libs/flash-commons/README.md). This page lists what it exports and where each retry
 policy is set. Why every retry backs off with jitter is in
 [decision 017](../explanation/decisions/017-retry-backoff-jitter.md).
@@ -12,11 +13,12 @@ import { HTTP_STATUS, MS_PER_SECOND, retryAsync } from "@flash/flash-commons";
 
 ## Exports
 
-| Module           | Exports                                                                                                      |
-| ---------------- | ------------------------------------------------------------------------------------------------------------ |
-| `retry.ts`       | `backoffDelayMs`, `retry`, `retryAsync`, `BackoffPolicy`, `RetryPolicy`, `RetryOptions`, `RetryAsyncOptions` |
-| `time.ts`        | `MS_PER_SECOND`, `MS_PER_MINUTE`, `MS_PER_HOUR`                                                              |
-| `http-status.ts` | `HTTP_STATUS`, `FIRST_ERROR_STATUS`, `FIRST_SERVER_ERROR_STATUS`                                             |
+| Module           | Exports                                                                                                               |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `retry.ts`       | `backoffDelayMs`, `retry`, `retryAsync`, `BackoffPolicy`, `RetryPolicy`, `RetryOptions`, `RetryAsyncOptions`          |
+| `time.ts`        | `MS_PER_SECOND`, `MS_PER_MINUTE`, `MS_PER_HOUR`                                                                       |
+| `http-status.ts` | `HTTP_STATUS`, `FIRST_ERROR_STATUS`, `FIRST_SERVER_ERROR_STATUS`                                                      |
+| `timers.ts`      | `sleep(ms, signal?)`, imported from `@flash/flash-commons/timers`; resolves early when `signal` aborts, never rejects |
 
 The wait before try `n` (from 0) is `random() * min(capMs, baseMs * 2 ** n)`, the "full jitter" scheme. A `maxAttempts`
 that is not a finite number of at least 1 means one try.

@@ -15,8 +15,9 @@ more places before this rule.
 - **Three places make one piece.** The same logic or value in 3 or more places gets one name. Two copies stay as they are.
 - **Start inside the app,** in the layer or folder that owns it. Count again afterwards: if it is still used in 3 or more
   places across apps (places, not apps), it moves to `libs/`.
-- **`libs/flash-commons`** (`@flash/flash-commons`) is the shared behaviour library. It is pure: no timers, randomness or
-  I/O of its own. `libs/typekit` stays a kit of `Result` and the `attempt` wrappers. They are
+- **`libs/flash-commons`** (`@flash/flash-commons`) is the shared behaviour library. Its main entry is pure: no timers,
+  randomness or I/O of its own. `sleep`, used in seven places across four apps, is the one timer helper, on its own
+  entry `@flash/flash-commons/timers`, so the pure entry stays pure. `libs/typekit` stays a kit of `Result` and the `attempt` wrappers. They are
   runtime code, but only the shape of a failure; typekit never gets a rule, a value or a helper of the apps.
 - **Test oracles are the exception.** The e2e steps, the k6 script and the prod smoke script write the API's paths, header
   names, error codes and expected statuses themselves. Values that are not our contract (time units, the standard HTTP

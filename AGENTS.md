@@ -5,7 +5,7 @@ Guidance for AI coding agents working in this repository. For setup and run comm
 ## Project
 
 Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `flash-be` (Fastify REST API), `flash-web` (TanStack Start client, styled with Tailwind CSS),
-`flash-be-e2e` and `flash-web-e2e` (Playwright), and `flash-load` (k6 load test). `libs/typekit` (`@flash/typekit`) holds `Result` and `attempt` and nothing else: the type of a failure and the wrappers that make one, with no rule of any app and no shared helper. `libs/flash-commons` (`@flash/flash-commons`) holds the pure behaviour and values that several apps share: retry with backoff and jitter, time units and HTTP status numbers. Data lives in Postgres (Kysely, no ORM) and Redis. [docs/reference/code-map.md](docs/reference/code-map.md) says where each kind of thing lives, and each app's `README.md` says where to add one.
+`flash-be-e2e` and `flash-web-e2e` (Playwright), and `flash-load` (k6 load test). `libs/typekit` (`@flash/typekit`) holds `Result` and `attempt` and nothing else: the type of a failure and the wrappers that make one, with no rule of any app and no shared helper. `libs/flash-commons` (`@flash/flash-commons`) holds the behaviour and values that several apps share: retry with backoff and jitter, time units and HTTP status numbers on its pure main entry, and `sleep` on `@flash/flash-commons/timers`. Data lives in Postgres (Kysely, no ORM) and Redis. [docs/reference/code-map.md](docs/reference/code-map.md) says where each kind of thing lives, and each app's `README.md` says where to add one.
 
 ## Docs and specs
 
@@ -81,7 +81,7 @@ Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `fla
 - Every source file starts with a header comment that says what the module is for and where it sits. Every export has a doc comment that says
   why it exists and what it promises, not what the code does. Biome has no rule for this, so `swe-reviewer` checks it.
 - DRY by the rule of three: two copies are fine, and the third use gets one named constant or function in the app, in the folder that owns it.
-  When 3 or more places across the apps use it, it goes in `libs/flash-commons`, and it must stay pure. The exception is the test oracles: the
+  When 3 or more places across the apps use it, it goes in `libs/flash-commons`. Its main entry stays pure; a helper that starts a timer or does I/O goes on its own entry, as `sleep` does on `/timers`. The exception is the test oracles: the
   e2e apps and `flash-load` write the API's paths, headers, error codes and statuses themselves, so a renamed route fails a test. A rule that only
   `flash-be` and `flash-web` share stays copied and is guarded by `same_as_be_tests.ts` in `flash-web`. See
   `docs/explanation/decisions/016-dry-rule-of-three.md`.
@@ -132,7 +132,7 @@ Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `fla
   `{queue,queue-seq,admitted,admit-lead}` for the queue. Sessions are cached under `session:<access hash>`. Every command on the sale path must fail at
   once when Redis is down. Use single scripts, not `MULTI`, which waits for the connection.
 - `flash-be` is a hexagon (see `docs/explanation/hexagonal-architecture.md`). Rules go in `src/domain` (no I/O, only Node
-  built-ins, `@flash/typekit` and `@flash/flash-commons`). Use cases go in `src/application`, which reach stores only through `src/application/ports`. Adapters go in
+  built-ins, `@flash/typekit` and the main entry of `@flash/flash-commons`, never `/timers`). Use cases go in `src/application`, which reach stores only through `src/application/ports`. Adapters go in
   `src/adapters/inbound` (HTTP, CLI) and `src/adapters/outbound` (Postgres, Redis, memory, payment, clock). Only
   `composition.ts` and the entry points pick an adapter for a port. `architecture_tests.ts` fails on a wrong import.
   Put a new rule in the domain with a unit test first, not in a service or a route.

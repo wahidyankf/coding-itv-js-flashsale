@@ -29,7 +29,7 @@ makes them retry in step and hit a recovering server together. A retry that neve
 
 - It costs a policy to choose for each caller, and a Redis reconnect that never ends. In the Redis outage the API keeps
   trying every two seconds at most, which is cheap when the connection is closed.
-- It buys no synchronised retry waves, a bounded wait for every caller but one, and one tested implementation instead of copies. The library holds no timer: the caller passes `sleep` and `random`.
+- It buys no synchronised retry waves, a bounded wait for every caller but one, and one tested implementation instead of copies. The retry holds no timer: the caller passes `sleep` and `random` (in Node and the browser, `sleep` from `@flash/flash-commons/timers`).
 
 ## Revisit when
 

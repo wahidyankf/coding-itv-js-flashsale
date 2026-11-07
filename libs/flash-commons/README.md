@@ -1,19 +1,22 @@
 # @flash/flash-commons
 
-Small behaviour and constants shared by several apps. The library is pure: it has no timers, no randomness and no I/O of
-its own. The caller passes in the wait and the random numbers, so the same code runs in Node, the browser and k6.
+Small behaviour and constants shared by several apps. The main entry, `@flash/flash-commons`, is pure: it has no
+timers, no randomness and no I/O of its own. The caller passes in the wait and the random numbers, so the same code runs
+in Node, the browser and k6, and flash-be's domain may import it. The one timer helper, `sleep`, sits on its own entry,
+`@flash/flash-commons/timers`, so a module that imports the main entry never starts a timer by accident.
 `@flash/typekit` stays `Result` and `attempt` only; shared helpers and values go here.
 
 It is a workspace package. Build it with `npx nx build flash-commons`. Its Nx targets build `typekit` first. The apps
 that import it (all five) build it first too, as they do for typekit.
 
-The library has three modules, one per concern:
+The library has four modules, one per concern:
 
-| Module           | What it holds                                                    | Used by                                                                                                                          |
-| ---------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `retry.ts`       | the backoff, `retry` and `retryAsync`                            | flash-be (rebuild wait, Redis reconnect), flash-web (live streams), flash-be-e2e (`pollUntil`), flash-load (k6 join and payment) |
-| `time.ts`        | `MS_PER_SECOND`, `MS_PER_MINUTE`, `MS_PER_HOUR`                  | flash-be, flash-web, flash-be-e2e, flash-web-e2e, flash-load                                                                     |
-| `http-status.ts` | `HTTP_STATUS`, `FIRST_ERROR_STATUS`, `FIRST_SERVER_ERROR_STATUS` | flash-be, flash-web, flash-load, flash-be-e2e                                                                                    |
+| Module                  | What it holds                                                    | Used by                                                                                                                          |
+| ----------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `retry.ts`              | the backoff, `retry` and `retryAsync`                            | flash-be (rebuild wait, Redis reconnect), flash-web (live streams), flash-be-e2e (`pollUntil`), flash-load (k6 join and payment) |
+| `time.ts`               | `MS_PER_SECOND`, `MS_PER_MINUTE`, `MS_PER_HOUR`                  | flash-be, flash-web, flash-be-e2e, flash-web-e2e, flash-load                                                                     |
+| `http-status.ts`        | `HTTP_STATUS`, `FIRST_ERROR_STATUS`, `FIRST_SERVER_ERROR_STATUS` | flash-be, flash-web, flash-load, flash-be-e2e                                                                                    |
+| `timers.ts` (`/timers`) | `sleep`, the one timer helper                                    | flash-be (mock payment, rebuild wait), flash-web (live streams), flash-be-e2e, flash-load (runner)                               |
 
 ## Time units
 
@@ -48,7 +51,7 @@ Every retry in this repository uses exponential backoff, a max attempt count and
 implementation keeps that rule in one place, so the apps, the e2e tests and the k6 script do not each copy it and drift.
 
 The wait before try `n` is `random() * min(capMs, baseMs * 2 ** n)`, where `n` counts from 0 for the wait after the
-first failure. That is the "full jitter" scheme. The library holds no timer: `sleep` and `random` come from the caller.
+first failure. That is the "full jitter" scheme. The retry holds no timer: `sleep` and `random` come from the caller, so a test can pin every wait.
 
 ### API
 
@@ -76,9 +79,7 @@ The rules, which the tests pin down:
 
 ```ts
 import { retryAsync } from "@flash/flash-commons";
-
-const sleep = (ms: number): Promise<void> =>
-	new Promise((resolve) => setTimeout(resolve, ms));
+import { sleep } from "@flash/flash-commons/timers";
 
 const result = await retryAsync((attempt) => readSale(attempt), {
 	baseMs: 100,
@@ -95,8 +96,15 @@ result.match({
 });
 ```
 
-The `setTimeout` lives in the caller's `sleep`, not in the library. In k6, the caller passes a `sleep` that calls k6's
-own sleep, and `random` can be `Math.random` as well.
+The caller picks the `sleep`. In Node and the browser it is `sleep` from `@flash/flash-commons/timers`; in a test it is a
+fake that records the waits. k6 passes a `sleep` that calls k6's own sleep, and never imports `/timers`.
+
+## Waiting
+
+`timers.ts`, imported as `@flash/flash-commons/timers`, has `sleep(ms, signal?)`: a promise that resolves after `ms`
+milliseconds. When `signal` aborts, it resolves at once and clears its timer, so nothing is left running. It never
+rejects; a caller that needs to know whether the wait was cut short checks `signal.aborted`. Four apps used to write this
+wrapper themselves, in seven places. flash-be's architecture test refuses it in the domain, which waits on nothing.
 
 ## Commands
 
@@ -107,5 +115,5 @@ npx nx test:coverage flash-commons   # unit tests with the 99% floor
 ```
 
 Its tests are plain Vitest tests next to the source (`src/retry_tests.ts`, `src/time_tests.ts`,
-`src/http-status_tests.ts`, `src/index_tests.ts`). They have no Gherkin scenario, because a retry rule or a constant is a
+`src/http-status_tests.ts`, `src/timers_tests.ts`, `src/index_tests.ts`). They have no Gherkin scenario, because a retry rule or a constant is a
 developer's concern, not a shopper's.
