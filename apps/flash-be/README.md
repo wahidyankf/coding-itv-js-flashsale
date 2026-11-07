@@ -34,8 +34,10 @@ src/
   config.ts              the config, read once from process.env; local-defaults.ts holds the local addresses
   main.ts, migrate.ts, seed-sale.ts, create-operator.ts   the entry points; with-db.ts opens and closes the database
                          for one command
-  bdd/                   the Gherkin bindings of specs/apps/flash/be; bdd/support holds the worlds and the memory copies
-                         of the ports that let a scenario run at unit level
+  bdd/                   the Gherkin bindings of specs/apps/flash/be: <area>_tests.ts (unit) and
+                         <area>_integration_tests.ts name the scenarios; bdd/support holds the worlds, the memory copies
+                         of the ports that let a scenario run at unit level, the shared steps (steps.ts, shop-steps.ts,
+                         auth-steps.ts, operator-steps.ts) and one bind-<area>.ts per feature that both layers run
 ```
 
 Port names follow one rule: a **Repository** is the Postgres record of a thing, a **Store** holds keyed state, and a

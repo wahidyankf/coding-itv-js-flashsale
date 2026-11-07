@@ -58,6 +58,29 @@ describeFeature(
 );
 ```
 
+When the unit and integration layers run the same steps, write the steps once in
+`apps/flash-be/src/bdd/support/bind-<area>.ts`. A binder takes a function that builds the layer's world and returns
+one step function per scenario. Each test file then names the scenarios and passes the steps in, as
+`queue_joining_tests.ts` does:
+
+```ts
+const steps = bindQueueJoining(unitShopLayer());
+
+describeFeature(
+	await loadFeature(specFile("flash/be/behaviours/queue/joining.feature")),
+	({ Scenario }) => {
+		Scenario(
+			"Joining the queue returns a ticket and a place",
+			steps.returnsTicket,
+		);
+	},
+);
+```
+
+The shared checks (`statusIs`, `errorIs`) are in `support/steps.ts`, and the shared Given steps of a sale and a
+shopper are in `support/shop-steps.ts`, `auth-steps.ts` and `operator-steps.ts`. Keep a step in the test file when
+the two layers check different things, as the `db` and `seeding` bindings do.
+
 Run the unit tests:
 
 ```bash
