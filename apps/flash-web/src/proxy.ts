@@ -2,7 +2,7 @@
 // is streamed back. Only the routes the browser needs get through, each with its one method, and a POST must come from
 // this site. The address of flash-be is read here, on the server, and never reaches the page.
 // Decision: docs/explanation/decisions/006-browser-talks-to-web-server-only.md.
-import { HTTP_STATUS } from "@flash/flash-commons";
+import { HTTP_STATUS, isUuid } from "@flash/flash-commons";
 import { attempt, attemptAsync } from "@flash/typekit";
 import { RETRY_AFTER_HEADER, TICKET_HEADER } from "./api";
 import { buildConfig } from "./config";
@@ -25,8 +25,6 @@ const ALLOWED: Array<[method: string, path: RegExp]> = [
 	["GET", /^\/sales\/(?<saleId>[^/]+)\/purchases\/me$/],
 ];
 
-// A copy of the sale id rule of flash-be (`isUuid`); `same_as_be_tests.ts` checks it.
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Headers that carry something the API needs, or something the browser needs back. The API limits by address, so it
 // needs the browser's address (`x-forwarded-for`) and not this server's.
 const SENT = [
@@ -71,7 +69,7 @@ export function isAllowed(method: string, path: string): boolean {
 		const found = pattern.exec(path);
 		if (!found) continue;
 		const saleId = decode(found.groups?.saleId);
-		return saleId === undefined || UUID.test(saleId);
+		return saleId === undefined || isUuid(saleId);
 	}
 	return false;
 }

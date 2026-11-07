@@ -8,6 +8,7 @@
 // It sits in the pure main entry of @flash/flash-commons, beside retry and the time units.
 
 import { Err, Ok, type Result } from "@flash/typekit";
+import { isUuid } from "./uuid.js";
 
 // The one error a decoder returns. It names the field that was wrong, so a log or a message can say where without the
 // payload itself. `path` is dotted, such as `sale.stock`; the root value has the empty path, and `expected` is a short
@@ -49,7 +50,6 @@ type BranchOf<B> = {
 const MIN_COUNT = 0;
 const ISO_DATE =
 	/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // The failure of a value at the root. An enclosing object adds the name of the field it sits in.
 const fail = (expected: string) =>
@@ -93,9 +93,7 @@ export const isoDate: Decoder<string> = (value) =>
 
 // A UUID in either case, the form Postgres and `crypto.randomUUID` write.
 export const uuid: Decoder<string> = (value) =>
-	typeof value === "string" && UUID.test(value)
-		? new Ok(value)
-		: fail("a UUID");
+	typeof value === "string" && isUuid(value) ? new Ok(value) : fail("a UUID");
 
 // A value that a decoder reads, then a rule of the app makes into the typed value. The rule returns `undefined` to refuse
 // the value, and `expected` names what it wanted. The rule belongs to the app; the kit only runs it after the decoder, so

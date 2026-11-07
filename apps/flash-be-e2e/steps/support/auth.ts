@@ -2,6 +2,7 @@
 // is made once per scenario and its cookie is reused. The web e2e app logs in through fetch, so the login itself is passed
 // in; the parsing and the caching are shared.
 
+import { applySetCookies, cookieHeaderOf } from "@flash/flash-commons";
 import type { APIRequestContext } from "@playwright/test";
 import { expect } from "@playwright/test";
 import { routes, send } from "./api.js";
@@ -31,12 +32,9 @@ export function usernameKey(username: string): string {
 }
 
 // The `cookie` header a client sends next, from the Set-Cookie values of a reply. A cookie the reply cleared (Max-Age=0) is
-// left out, because a client that has cleared it sends nothing.
+// left out, because a client that has cleared it sends nothing. The whole login is sent, whatever each cookie's path.
 export function cookieHeaderFrom(setCookies: readonly string[]): string {
-	return setCookies
-		.filter((value) => !value.includes("Max-Age=0"))
-		.map((value) => value.split(";")[0] ?? "")
-		.join("; ");
+	return cookieHeaderOf(applySetCookies(new Map(), setCookies));
 }
 
 // The cookie header of each login the scenario holds, by usernameKey, and of the operator by E2E_OPERATOR.

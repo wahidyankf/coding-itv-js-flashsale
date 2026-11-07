@@ -2,6 +2,7 @@
 // HttpOnly on the right path, the body must not hold a token, and a request from another site must not reach the API.
 // Binds proxy/api.feature.
 
+import { parseSetCookie } from "@flash/flash-commons";
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { E2E_PASSWORD } from "../../flash-be-e2e/steps/support/auth.js";
@@ -66,9 +67,7 @@ Then(
 			value.startsWith(`${name}=`),
 		);
 		expect(cookie, `a cookie named ${name}`).toBeDefined();
-		expect((cookie ?? "").split(";").map((part) => part.trim())).toContain(
-			`Path=${path}`,
-		);
+		expect(parseSetCookie(cookie ?? "").path).toBe(path);
 	},
 );
 
@@ -76,16 +75,16 @@ Then("both cookies are HttpOnly", async ({ request: _request }) => {
 	const cookies = setCookiesOf(currentResponse());
 	expect(cookies).toHaveLength(2);
 	for (const cookie of cookies) {
-		expect(cookie.split(";").map((part) => part.trim())).toContain("HttpOnly");
+		expect(parseSetCookie(cookie).httpOnly).toBe(true);
 	}
 });
 
 Then("the body holds neither token", async ({ request: _request }) => {
 	const body = await currentResponse().text();
 	for (const cookie of setCookiesOf(currentResponse())) {
-		const token = cookie.split(";")[0]?.split("=")[1] ?? "";
-		expect(token).not.toBe("");
-		expect(body).not.toContain(token);
+		const { value } = parseSetCookie(cookie);
+		expect(value).not.toBe("");
+		expect(body).not.toContain(value);
 	}
 });
 

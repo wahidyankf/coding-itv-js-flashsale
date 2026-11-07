@@ -1,6 +1,6 @@
 // A sale as the rules see it: its window, its stock and what has been bought. Each function takes the sale and the
 // moment `now`, and returns a value. Services decide on the Sale with these functions, never on the public view.
-import { MS_PER_SECOND } from "@flash/flash-commons";
+import { isUuid, MS_PER_SECOND } from "@flash/flash-commons";
 
 // The sale the rules judge: its window, its stock and what has sold. Services decide on this type; the public view is
 // built from it, never the other way round.
@@ -120,11 +120,6 @@ export function hasRoom(
 	return sold + liveHolds < stock;
 }
 
-const UUID_PATTERN =
-	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-// Whether the text can be the id of a sale, a reservation or a product. A malformed id can never match a row, so a
-// lookup is skipped instead of failing in Postgres.
-export function isUuid(value: string): boolean {
-	return UUID_PATTERN.test(value);
-}
+// The id check of the sale rules is the one shared in flash-commons: whether the text can be the id of a sale, a reservation
+// or a product. It is re-exported here, so the rules keep one import for their callers.
+export { isUuid };

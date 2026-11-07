@@ -1,24 +1,16 @@
-// Time for the e2e steps: the reading of phrases such as "in 2 hours", the windows of a sale, the pauses, and the waits
-// for the API to reach a state. The units come from @flash/flash-commons, so every step says the same thing by "an hour".
-// Both e2e apps use this file.
-import { MS_PER_HOUR, MS_PER_MINUTE, retryAsync } from "@flash/flash-commons";
+// Time for the e2e steps: the reading of phrases such as "in 2 hours" (re-exported from @flash/flash-commons, where the
+// reader is shared), the windows of a sale, the pauses, and the waits for the API to reach a state. The units come from
+// @flash/flash-commons, so every step says the same thing by "an hour". Both e2e apps use this file.
+import { MS_PER_MINUTE, retryAsync } from "@flash/flash-commons";
 import { sleep } from "@flash/flash-commons/timers";
 import { Err, Ok, type Result } from "@flash/typekit";
+
+export { relativeTime } from "@flash/flash-commons";
 
 // The longest a poll waits between two checks. Backoff doubles the wait up to here, so a change is seen within a second.
 const POLL_CAP_MS = 1000;
 // The reason a check did not pass yet. It is never shown: the caller's failure message is what a reader sees.
 const NOT_YET = "not yet";
-
-// Reads phrases such as "in 2 hours" and "1 hour ago" against a given moment. Any other phrase is a mistake in a scenario,
-// so it throws rather than guessing.
-export function relativeTime(phrase: string, now: Date): Date {
-	const ahead = /^in (\d+) hours?$/.exec(phrase);
-	if (ahead) return new Date(now.getTime() + Number(ahead[1]) * MS_PER_HOUR);
-	const past = /^(\d+) hours? ago$/.exec(phrase);
-	if (past) return new Date(now.getTime() - Number(past[1]) * MS_PER_HOUR);
-	throw new Error(`cannot read the time "${phrase}"`);
-}
 
 // The window of a sale that starts `startsInMinutes` from now (negative for a start in the past) and lasts `minutes`.
 export function windowFromNow(startsInMinutes: number, minutes: number) {

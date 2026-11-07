@@ -7,6 +7,7 @@ import type {
 } from "../../../application/ports/rate-limit-store.js";
 import type { UnreadableReply } from "../../../application/ports/reply.js";
 import type { RedisClient } from "./redis-client.js";
+import { arrayReply, UNREADABLE } from "./reply.js";
 
 // The first hit creates the key and sets its expiry, so the window starts at that hit and the key disappears with it.
 const HIT = `
@@ -15,17 +16,14 @@ if count == 1 then redis.call('PEXPIRE', KEYS[1], ARGV[1]) end
 return {count, redis.call('PTTL', KEYS[1])}
 `;
 
-// The failure of a reply that the hit script does not write.
-const UNREADABLE: UnreadableReply = "unreadable_reply";
-
 // Reads the reply of HIT: the hits so far, and the time left in the window. Redis answers a negative time for a key with
 // no expiry left, which counts as no time left.
 export function hitReplyOf(
 	reply: unknown,
 ): Result<RateLimitCount, UnreadableReply> {
-	if (!Array.isArray(reply)) return new Err(UNREADABLE);
-	const parts: unknown[] = reply;
-	const [count, ttl] = parts;
+	const read = arrayReply(reply);
+	if (read.isErr()) return new Err(read.error);
+	const [count, ttl] = read.value;
 	if (typeof count !== "number" || typeof ttl !== "number") {
 		return new Err(UNREADABLE);
 	}

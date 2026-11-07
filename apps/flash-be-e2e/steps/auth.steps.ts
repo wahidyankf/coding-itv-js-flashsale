@@ -3,6 +3,7 @@
 // shopper's cookie jar is kept here, as a browser would keep it. Binds auth/accounts.feature and auth/sessions.feature.
 
 import { createHash } from "node:crypto";
+import { applySetCookies, cookieHeader } from "@flash/flash-commons";
 import type { APIRequestContext } from "@playwright/test";
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
@@ -26,29 +27,14 @@ function jar(): Jar {
 	return world.jar;
 }
 
-// Keeps what the last reply set, as a browser does: a cookie with a value is stored, a cookie cleared is forgotten.
-function remember(into: Jar) {
-	for (const cookie of setCookiesOf(currentResponse())) {
-		const [pair = "", ...attributes] = cookie.split(";").map((p) => p.trim());
-		const at = pair.indexOf("=");
-		const name = pair.slice(0, at);
-		const path =
-			attributes.find((a) => a.startsWith("Path="))?.slice("Path=".length) ??
-			"/";
-		if (attributes.includes("Max-Age=0")) into.delete(name);
-		else into.set(name, { value: pair.slice(at + 1), path });
-	}
+// Keeps what the last reply set, as a browser does: a cookie with a value is stored, a cookie cleared is forgotten. The
+// rules are the shared cookie jar's, so the e2e jar and the API's scenarios read a reply the same way.
+function remember() {
+	world.jar = applySetCookies(jar(), setCookiesOf(currentResponse()));
 }
 
-// The cookies a browser would send to this path, from the jar it holds.
-function cookiesSentTo(from: Jar, path: string): string {
-	return [...from]
-		.filter(([, cookie]) => path.startsWith(cookie.path))
-		.map(([name, cookie]) => `${name}=${cookie.value}`)
-		.join("; ");
-}
-
-// One request with a jar. A reply is kept in the jar unless the request came from a copy of it.
+// One request with a jar. A reply is kept in the jar unless the request came from a copy of it. The cookies sent are the
+// ones a browser would send to this path, from the jar it holds.
 async function go(
 	request: APIRequestContext,
 	route: Parameters<typeof send>[1],
@@ -58,11 +44,11 @@ async function go(
 	const path = route.path;
 	setResponse(
 		await send(request, route, {
-			headers: { cookie: cookiesSentTo(options.from ?? jar(), path) },
+			headers: { cookie: cookieHeader(options.from ?? jar(), path) ?? "" },
 			body: options.body,
 		}),
 	);
-	if (options.record !== false) remember(jar());
+	if (options.record !== false) remember();
 }
 
 const hash = (token: string) =>

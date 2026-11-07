@@ -1,5 +1,10 @@
 // The shopper's side of the accounts scenarios: a cookie jar that keeps cookies the way a browser does, and the requests
 // a shopper sends. Each layer supplies its app, how an access token ends, and what the stores hold.
+import {
+	applySetCookies,
+	type CookieJar,
+	cookieHeader,
+} from "@flash/flash-commons";
 import type { FastifyInstance } from "fastify";
 import { sendRequest } from "./http.js";
 import type { Response } from "./response.js";
@@ -16,7 +21,7 @@ export type AuthLayer = {
 	stored: () => Promise<{ passwordHashes: string[]; tokenHashes: string[] }>;
 };
 
-type Jar = Map<string, { value: string; path: string }>;
+type Jar = CookieJar;
 
 // The cookies of a reply, one per `set-cookie` header.
 const setCookiesOf = (reply: Response): string[] => {
@@ -33,32 +38,15 @@ export function authWorld(layer: AuthLayer) {
 
 	const take = (reply: Response, record = true) => {
 		last = reply;
-		if (!record) return reply;
-		for (const cookie of setCookiesOf(reply)) {
-			const [pair = "", ...attributes] = cookie.split(";").map((p) => p.trim());
-			const at = pair.indexOf("=");
-			const name = pair.slice(0, at);
-			const value = pair.slice(at + 1);
-			const path =
-				attributes.find((a) => a.startsWith("Path="))?.slice("Path=".length) ??
-				"/";
-			if (attributes.includes("Max-Age=0")) jar.delete(name);
-			else jar.set(name, { value, path });
-		}
+		if (record) jar = applySetCookies(jar, setCookiesOf(reply));
 		return reply;
-	};
-	const cookieFor = (from: Jar, url: string): string | undefined => {
-		const sent = [...from]
-			.filter(([, { path }]) => url.startsWith(path))
-			.map(([name, { value }]) => `${name}=${value}`);
-		return sent.length === 0 ? undefined : sent.join("; ");
 	};
 	const send = (
 		method: "GET" | "POST",
 		url: string,
 		options: { payload?: unknown; from?: Jar; record?: boolean } = {},
 	) => {
-		const cookie = cookieFor(options.from ?? jar, url);
+		const cookie = cookieHeader(options.from ?? jar, url);
 		return sendRequest(layer.app(), method, url, {
 			cookie,
 			payload: options.payload,

@@ -6,6 +6,7 @@ import type { UnreadableReply } from "../../../application/ports/reply.js";
 import type { GateAnswer, HoldSnapshot } from "../../../domain/reservation.js";
 import type { RedisClient } from "./redis-client.js";
 import { saleKey } from "./redis-keys.js";
+import { arrayReply, UNREADABLE } from "./reply.js";
 
 // The first number that each reply of the scripts below carries, by name.
 const GATE_CODE = {
@@ -15,9 +16,6 @@ const GATE_CODE = {
 	held: 3,
 	notReady: 4,
 } as const;
-
-// The failure of a reply that the scripts below do not write. Named once, so every reader says the same thing.
-const UNREADABLE: UnreadableReply = "unreadable_reply";
 
 // Every script below runs as one Redis call, so no other command can run between its read and its write. Do not use
 // MULTI for them: while Redis is down, node-redis holds a MULTI until its own timeout, which slowed every payment during
@@ -118,8 +116,9 @@ export function restoreArguments(snapshot: HoldSnapshot): string[] {
 export function gateAnswerOf(
 	reply: unknown,
 ): Result<GateAnswer, UnreadableReply> {
-	const parts: unknown[] = Array.isArray(reply) ? reply : [];
-	const [code, id, until] = parts;
+	const read = arrayReply(reply);
+	if (read.isErr()) return new Err(read.error);
+	const [code, id, until] = read.value;
 	if (typeof code !== "number") return new Err(UNREADABLE);
 	if (code === GATE_CODE.soldOut) return new Ok({ kind: "sold_out" });
 	if (code === GATE_CODE.purchased) return new Ok({ kind: "purchased" });

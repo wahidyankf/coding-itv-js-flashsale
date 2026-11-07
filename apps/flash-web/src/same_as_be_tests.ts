@@ -6,14 +6,13 @@ import {
 } from "../../flash-be/src/adapters/inbound/http/errors";
 import { TICKET_HEADER as BACKEND_TICKET_HEADER } from "../../flash-be/src/adapters/inbound/http/headers";
 import { usablePassword } from "../../flash-be/src/domain/auth";
-import { isUuid } from "../../flash-be/src/domain/sale";
 import { normalizeUser } from "../../flash-be/src/domain/user";
 import { TICKET_HEADER } from "./api";
 import { cleanPassword, cleanUser } from "./auth/messages";
-import { isAllowed, proxyToBackend } from "./proxy";
+import { proxyToBackend } from "./proxy";
 
 // The two apps share @flash/typekit and @flash/flash-commons, but not flash-be's domain. flash-web still copies its
-// user name and password rules, its sale id rule, the queue-ticket header name and the proxy's error replies. Each copy
+// user name and password rules, the queue-ticket header name and the proxy's error replies. Each copy
 // is used by flash-web alone, so the rule of three keeps it here (docs/explanation/decisions/016-dry-rule-of-three.md).
 // These tests are the guard: when flash-be changes one of them, the copy here must change too.
 describe("what flash-web copies from flash-be", () => {
@@ -42,16 +41,6 @@ describe("what flash-web copies from flash-be", () => {
 		"x".repeat(129),
 	])("reads the password %j as flash-be does", (raw) => {
 		expect(cleanPassword(raw)).toBe(usablePassword(raw));
-	});
-
-	it.each([
-		"0f8fad5b-d9cb-469f-a165-70867728950e",
-		"0F8FAD5B-D9CB-469F-A165-70867728950E",
-		"not-a-uuid",
-		"0f8fad5b-d9cb-469f-a165-70867728950",
-		"",
-	])("passes the sale id %j on only when flash-be accepts it", (saleId) => {
-		expect(isAllowed("GET", `/sales/${saleId}`)).toBe(isUuid(saleId));
 	});
 
 	it("names the queue-ticket header as flash-be does", () => {

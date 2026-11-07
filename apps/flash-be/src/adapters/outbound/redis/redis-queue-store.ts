@@ -9,6 +9,7 @@ import type { QueuePlace } from "../../../domain/queue.js";
 import { storedUsername, type Username } from "../../../domain/user.js";
 import type { RedisClient } from "./redis-client.js";
 import { saleKey } from "./redis-keys.js";
+import { arrayReply, UNREADABLE } from "./reply.js";
 
 // KEYS: queue (waiting shoppers, scored by arrival), admitted (scored by when the admission ends), queue-seq (the arrival
 // counter). ARGV: user, now. Replies {code, value}: 0 a new place, 1 already waiting, 2 admitted, see the codes below.
@@ -50,16 +51,13 @@ return users
 // The codes the scripts answer with, by name. A place is the number that goes with a waiting code.
 const CODE = { newPlace: 0, waiting: 1, admitted: 2, absent: 3 } as const;
 
-// The failure of a reply that the scripts below do not write.
-const UNREADABLE: UnreadableReply = "unreadable_reply";
-
 // A `[code, value]` reply, read as numbers. Anything else is not a reply the scripts write.
 function codeAndValue(
 	reply: unknown,
 ): Result<[number, number], UnreadableReply> {
-	if (!Array.isArray(reply)) return new Err(UNREADABLE);
-	const parts: unknown[] = reply;
-	const [code, value] = parts;
+	const read = arrayReply(reply);
+	if (read.isErr()) return new Err(read.error);
+	const [code, value] = read.value;
 	return typeof code === "number" && typeof value === "number"
 		? new Ok([code, value])
 		: new Err(UNREADABLE);
@@ -101,8 +99,9 @@ const isName = (value: unknown): value is string => typeof value === "string";
 
 // The names the admit script returns: a list of text, one name per admitted shopper.
 export function usersOf(reply: unknown): Result<Username[], UnreadableReply> {
-	if (!Array.isArray(reply)) return new Err(UNREADABLE);
-	const names: unknown[] = reply;
+	const read = arrayReply(reply);
+	if (read.isErr()) return new Err(read.error);
+	const names = read.value;
 	return names.every(isName)
 		? new Ok(names.map(storedUsername))
 		: new Err(UNREADABLE);
