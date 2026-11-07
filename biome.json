@@ -10,6 +10,7 @@
 		"includes": [
 			"**",
 			"!.serena",
+			"!.claude",
 			"!package-lock.json",
 			"!**/routeTree.gen.ts",
 			"!**/dist",

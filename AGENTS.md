@@ -12,6 +12,23 @@ Flash sale monorepo with five apps in `apps/` and one library in `libs/`: `flash
 - `docs/` is the documentation for users and developers, split into Diátaxis modes. Start at [docs/README.md](docs/README.md).
 - `specs/` holds the apps' behaviour scenarios (`specs/apps/flash/be` and `web`), their C4 model, and the load test rules (`specs/apps/flash/load/`). Start at [specs/README.md](specs/README.md). Specs win when they disagree with `docs/`.
 
+## Claude Code agents and skills
+
+`.claude/` holds Claude Code config only, with no copy for other tools. Each file is complete in itself and takes its rules from this file.
+
+- Skill `grill-me` (`.claude/skills/grill-me/SKILL.md`): asks a real decision as options with one recommendation, through `AskUserQuestion`, and records the answer.
+- Subagents in `.claude/agents/`:
+  - `swe-developer` (Haiku): builds behaviour test-first, or applies findings.
+  - `swe-debugger`: fixes failing checks at their cause.
+  - `swe-reviewer`: audits source and bindings, read-only.
+  - `swe-architect`: designs before building and reviews after; it writes only decision records, in `docs/explanation/decisions/`.
+  - `swe-api-tester`: tests the running API at `localhost:8080`.
+  - `swe-web-tester`: tests the running page at `localhost:3000` in a browser.
+  - `swe-orchestrator`: dispatches the others. Run it as the main thread (`claude --agent swe-orchestrator`), because a subagent cannot start agents.
+- All of them except `swe-developer` run on Sonnet. None of them commits. Their scratch records go to `local-tmp/`, which git ignores.
+- Biome skips `.claude/` (`biome.json`): its Markdown formatter would break the YAML frontmatter. `npm run docs:check` still checks these files.
+- When a rule here changes and an agent repeats it (checks, ports, paths), update that agent too.
+
 ## Repository rules
 
 - Default branch is `main`. Do not commit or push unless the user asks.
