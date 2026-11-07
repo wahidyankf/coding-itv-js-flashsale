@@ -42,7 +42,7 @@ flowchart LR
 - **Application** (`application/`) has one service per use case: the sale status with its read cache, the waiting queue,
   reserving, paying, the rate limiter, the operator's sale service (create, change, remove, list), the auth service (sign up, log in, refresh, log out, and who a cookie is) and the admission step that serves the current sale. A service orders the steps and calls ports. Its ports are in
   `application/ports/`: `SaleRepository`, `QueueStore`, `HoldGate`, `ReservationRepository`, `PurchaseRepository`,
-  `RateLimitStore`, `Payment`, `Clock`, `SaleSeeder`, `SaleAdmin`, `AccountStore`, `SessionStore`, `PasswordHasher` and `TokenSource`.
+  `RateLimitStore`, `Payment`, `Clock`, `SaleSeeder`, `SaleAdmin`, `AccountRepository`, `SessionRepository`, `PasswordHasher` and `TokenSource`.
 - **Domain** (`domain/`) holds the rules and imports nothing else: when a sale is upcoming, active, sold out or
   ended, who may queue or reserve, how long a hold lives, how many shoppers one tick admits, what a user name, a
   password, a token and a role are, who is an operator, and whether a new sale has a usable window and overlaps another.
@@ -60,6 +60,6 @@ flowchart LR
   application imports the domain and its own ports. An inbound adapter never imports an outbound adapter, and an outbound adapter imports only ports and the
   domain. `apps/flash-be/src/architecture_tests.ts` fails the unit tests when an import breaks this.
 - The same rules run against memory in unit tests, because the ports `QueueStore`, `HoldGate`,
-  `ReservationRepository`, `PurchaseRepository`, `SaleAdmin`, `AccountStore` and `SessionStore` have in-memory copies in `src/bdd/support/`. They are
+  `ReservationRepository`, `PurchaseRepository`, `SaleAdmin`, `AccountRepository` and `SessionRepository` have in-memory copies in `src/bdd/support/`. They are
   test code. `RateLimitStore` has an in-memory adapter that product code also uses, when Redis fails, and `Payment` is
   a mock.

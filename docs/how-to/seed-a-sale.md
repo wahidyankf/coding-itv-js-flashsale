@@ -20,14 +20,15 @@ seeded sale ea6856b4-0cee-40c5-9cc9-deb80867039a
 | Option                | Meaning                                 | Default      |
 | --------------------- | --------------------------------------- | ------------ |
 | `--stock`             | items for sale; a positive integer      | required     |
-| `--name`              | name of the sale                        | `Flash sale` |
+| `--name`              | name of the sale; spaces around it are dropped | `Flash sale` |
 | `--starts-in-minutes` | minutes from now until the sale opens   | `0`          |
 | `--duration-minutes`  | minutes the sale stays open             | `60`         |
 | `--hold-seconds`      | how long a reservation holds an item    | `120`        |
 | `--admit-per-second`  | users let in from the queue each second | `50`         |
 
 A bad value stops the command with a message and exit code `1`, and nothing is written. For example, `--stock=0`
-fails with `stock must be a positive integer`.
+fails with `stock must be a positive integer`. A name of only spaces, or a window that ends past the dates Postgres
+keeps, fails with `the sale is not usable: its name, window or holds are out of range`.
 
 ## Read it back
 

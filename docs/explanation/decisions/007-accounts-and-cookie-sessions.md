@@ -40,4 +40,4 @@ the place, the hold or the purchase of another shopper, and the operator routes 
 ## Related
 
 - [Authentication](../authentication.md) and [admin and sale windows](../admin-and-sale-windows.md).
-- Code: [`auth-service.ts`](../../../apps/flash-be/src/application/auth-service.ts), [`session-store.ts`](../../../apps/flash-be/src/adapters/outbound/postgres/session-store.ts), [`crypto/`](../../../apps/flash-be/src/adapters/outbound/crypto/).
+- Code: [`auth-service.ts`](../../../apps/flash-be/src/application/auth-service.ts), [`session-repository.ts`](../../../apps/flash-be/src/adapters/outbound/postgres/session-repository.ts), [`crypto/`](../../../apps/flash-be/src/adapters/outbound/crypto/).
