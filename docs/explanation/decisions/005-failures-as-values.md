@@ -21,7 +21,7 @@ thrown error is invisible in a function's type, so a caller can forget it, and n
 
 - **Exceptions with one error handler.** The types do not list the errors, and a new error code can be missed without a build failure.
 - **A Result library from npm (neverthrow, fp-ts, Effect).** They would work. The code needs only `Ok`, `Err`, `map`, `match`
-  and `attempt`, so it carries a small port of the author's own library with no dependency, which the domain layer may import.
+  and `attempt`, so it carries a small library of its own with no dependency, which the domain layer may import.
 - **A convention in the style guide, without a lint rule.** Conventions drift, so the rule is a check that fails the push.
 - **An `Option` type for absence.** It would be a second way to say what `T | undefined` already says under strict TypeScript.
 
@@ -29,7 +29,7 @@ thrown error is invisible in a function's type, so a caller can forget it, and n
 
 - It costs a few more allocations on the hot path (the load limits did not change), and steps that check each result and
   return early, because `await` and `Result` do not chain by themselves. `try ... finally` is still allowed, because it only cleans up.
-- It buys error cases that are in the type, so a route must map every one. The library is small, and its types are the part that matters.
+- It buys error cases that are in the type, so a route must map every one.
 
 ## Revisit when
 
@@ -38,5 +38,5 @@ thrown error is invisible in a function's type, so a caller can forget it, and n
 
 ## Related
 
-- [Failures as values](../failures-as-values.md) and the [typekit reference](../../reference/typekit.md).
+- [Failures as values](../failures-as-values.md) and the [typekit README](../../../libs/typekit/README.md).
 - Code: [`libs/typekit/src/`](../../../libs/typekit/src/), [`no-catch.grit`](../../../.biome/no-catch.grit), [`errors.ts`](../../../apps/flash-be/src/adapters/inbound/http/errors.ts).

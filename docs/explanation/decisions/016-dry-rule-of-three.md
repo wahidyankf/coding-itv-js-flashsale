@@ -4,6 +4,9 @@
 
 Accepted. Logic or a value used in three or more places becomes one named piece. Two copies are fine.
 
+Amended 2026-11-07: the count of `sleep` users is dropped, and the copies guarded by `same_as_be_tests.ts` include the
+proxy's `not_found` reply.
+
 ## Context
 
 A copy that drifts is a bug that no test sees. But a shared piece used twice is often the wrong shape, and a shared
@@ -16,15 +19,15 @@ more places before this rule.
 - **Start inside the app,** in the layer or folder that owns it. Count again afterwards: if it is still used in 3 or more
   places across apps (places, not apps), it moves to `libs/`.
 - **`libs/flash-commons`** (`@flash/flash-commons`) is the shared behaviour library. Its main entry is pure: no timers,
-  randomness or I/O of its own. `sleep`, used in seven places across four apps, is the one timer helper, on its own
+  randomness or I/O of its own. `sleep`, used across four apps, is the one timer helper, on its own
   entry `@flash/flash-commons/timers`, so the pure entry stays pure. `libs/typekit` stays a kit of `Result` and the `attempt` wrappers. They are
   runtime code, but only the shape of a failure; typekit never gets a rule, a value or a helper of the apps.
 - **Test oracles are the exception.** The e2e steps, the k6 script and the prod smoke script write the API's paths, header
   names, error codes and expected statuses themselves. Values that are not our contract (time units, the standard HTTP
   status numbers) are shared from `flash-commons`.
-- **Two places stay copied.** The password limits, the user name rule and the ticket header are used by `flash-be` and
-  `flash-web` only. `apps/flash-web/src/same_as_be_tests.ts` fails if a copy drifts. The sale id rule (`isUuid`) was
-  in this list until the uuid decoder made it a third place; it now lives in `flash-commons`.
+- **Two places stay copied.** The password limits, the user name rule, the ticket header and the proxy's `not_found`
+  reply are used by `flash-be` and `flash-web` only. `apps/flash-web/src/same_as_be_tests.ts` fails if a copy drifts. The sale id rule (`isUuid`) has a
+  third user, the uuid decoder, so it lives in `flash-commons`.
 
 ## Alternatives considered
 
@@ -47,5 +50,5 @@ more places before this rule.
 
 ## Related
 
-- [`libs/flash-commons/README.md`](../../../libs/flash-commons/README.md), the [typekit reference](../../reference/typekit.md) and [004](004-hexagon-in-the-api-only.md).
+- [`libs/flash-commons/README.md`](../../../libs/flash-commons/README.md), the [typekit README](../../../libs/typekit/README.md) and [004](004-hexagon-in-the-api-only.md).
 - Code: [`libs/flash-commons/`](../../../libs/flash-commons/), [`same_as_be_tests.ts`](../../../apps/flash-web/src/same_as_be_tests.ts).

@@ -2,7 +2,9 @@
 
 A decision record states one choice that was hard to reverse or that would surprise the next reader. It gives the
 context, the decision, the alternatives that were weighed and why they lost, what the choice costs and buys, and the
-signal that would make us look again. A record is not edited once it is accepted. A later record replaces it and says so.
+signal that would make us look again. The decision of an accepted record is never changed: a later record replaces it and says so. A fact in it that is no
+longer true of the code (a path, a name, a count) is corrected in place, and a line in its Status says so:
+`Amended YYYY-MM-DD: what changed`.
 
 The pages in the [explanation](../README.md) folder say how each part works. These records say why it was chosen over
 the other options, and link to those pages.

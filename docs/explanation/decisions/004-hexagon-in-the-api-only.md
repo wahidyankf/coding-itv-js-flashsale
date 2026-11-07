@@ -4,6 +4,8 @@
 
 Accepted. The API is split into domain, application and adapters. The web app is a plain React app.
 
+Amended 2026-11-07: the copies guarded by `same_as_be_tests.ts` include the proxy's `not_found` reply.
+
 ## Context
 
 The sale rules must hold whatever sits behind them: Redis can be empty or down, and the payment is a mock. `flash-be` has two
@@ -29,8 +31,8 @@ stores and many rules. `flash-web` has no store and no sale rules. It shows the 
 - It costs more files and one place of wiring. A change to a port touches the port, its adapters and its memory copy.
   Most ports have one real implementation, on purpose: they keep a service from naming Redis or Postgres.
 - It buys rules that are unit-tested without stores, and scenarios that run the production services against memory ports.
-- `flash-web` copies a few small rules of the API that only the two of them use (the user name rule, the password limits and
-  the ticket header). `same_as_be_tests.ts` fails if a copy drifts. Time units, HTTP status numbers and the id rule
+- `flash-web` copies a few small rules of the API that only the two of them use (the user name rule, the password limits, the
+  ticket header and the proxy's `not_found` reply). `same_as_be_tests.ts` fails if a copy drifts. Time units, HTTP status numbers and the id rule
   (`isUuid`) are not copied:
   they come from `@flash/flash-commons` (see [016](016-dry-rule-of-three.md)).
 

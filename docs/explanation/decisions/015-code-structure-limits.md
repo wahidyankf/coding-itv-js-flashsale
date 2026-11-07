@@ -4,11 +4,13 @@
 
 Accepted. Size and nesting limits are set in `biome.json` with built-in rules. File headers and doc comments are kept by a rule in AGENTS.md and by review.
 
+Amended 2026-11-07: migrations are exempt from the function line limit only; the routes file has been split.
+
 ## Context
 
 The code is read by people who did not write it. The checks already stop wrong types, wrong imports and swallowed
-errors. Nothing stopped a function or a file from growing. The file of HTTP routes reached about 690 lines, and is
-now being split into a folder.
+errors. Nothing stopped a function or a file from growing. The file of HTTP routes reached about 690 lines before it was
+split into a folder.
 
 ## Decision
 
@@ -19,7 +21,7 @@ now being split into a folder.
   - `noExcessiveNestedCallbacks`: 4 levels.
   - `noNestedTernary`.
   - `noExcessiveLinesPerFile`: 400 lines.
-- Test bodies and migrations are exempt from the line limits. A scenario binding is one long callback by nature, and a migration reads best as one script.
+- Test files are exempt from both line limits, because a scenario binding is one long callback by nature. Migrations are exempt from the function line limit only, because a migration reads best as one script.
 - Every file starts with a header comment, and every export has a doc comment. Biome has no built-in rule that requires a doc comment: its only JSDoc rule, `useSingleJsDocAsterisk`, checks the style of a comment that exists. So AGENTS.md states the rule and `swe-reviewer` checks it.
 - A limit is never raised to pass a check. A function over a limit is split.
 

@@ -4,6 +4,8 @@
 
 Accepted. Nx runs commands. It has no plugins, and every target is written by hand in a `project.json`.
 
+Amended 2026-11-07: the apps build both libraries first, `flash-commons` as well as `typekit`.
+
 ## Context
 
 The repository has five apps and two libraries in one npm workspace. People and tools need one way to say "typecheck this
@@ -13,7 +15,7 @@ app", "test that one", and "check only what my change touches". The pre-push hoo
 
 - Every target is `"executor": "nx:run-commands"` in the project's `project.json`, and it calls an npm script or a command.
 - Every app has `typecheck`, `lint`, `test:quick` and `test:quick:watch`. The same names mean the same things in each app.
-- The apps' targets build `libs/typekit` first (`dependsOn`). The e2e apps depend on the app they test (`implicitDependencies`).
+- The apps' targets build `libs/typekit` and `libs/flash-commons` first (`dependsOn`). The e2e apps depend on the app they test (`implicitDependencies`).
 - The pre-push hook uses `nx affected` against `origin/main`.
 - No `@nx/*` or `nx-*` plugin, and no `nx init`. AGENTS.md states this.
 
@@ -28,8 +30,8 @@ app", "test that one", and "check only what my change touches". The pre-push hoo
 ## Consequences
 
 - It costs duplicated target config in each project, no generators, and no inferred targets. A new app copies the targets of another.
-- It buys targets that read as plain commands, a pre-push hook that runs only the affected projects, the library built
-  before its users, and no plugin upgrades to follow. Nx is a thin layer: the apps' scripts also run without it.
+- It buys targets that read as plain commands, a pre-push hook that runs only the affected projects, the libraries built
+  before their users, and no plugin upgrades to follow. Nx is a thin layer: the apps' scripts also run without it.
 
 ## Revisit when
 
