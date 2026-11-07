@@ -1,6 +1,9 @@
+// The reservation hold gate in memory for the unit layer. Its answers and its counting follow the Redis script, so one
+// scenario gives the same reply in both layers.
 import type { Clock } from "../../application/ports/clock.js";
 import type { HoldGate } from "../../application/ports/hold-gate.js";
 import type { GateAnswer } from "../../domain/reservation.js";
+import { hasRoom } from "../../domain/sale.js";
 
 type SaleState = {
 	ready: boolean;
@@ -41,10 +44,11 @@ export function memoryHoldGate(clock: Clock): MemoryHoldGate {
 					expiresAt: new Date(own.expiresAt),
 				};
 			}
+			// Inclusive, as the Redis script counts holds from now on, so a hold ending this very millisecond still counts.
 			const live = [...state.holds.values()].filter(
 				(hold) => hold.expiresAt >= now,
 			).length;
-			if (state.buyers.size + live >= request.stock) {
+			if (!hasRoom(state.buyers.size, live, request.stock)) {
 				return { kind: "sold_out" };
 			}
 			state.holds.set(request.user, {

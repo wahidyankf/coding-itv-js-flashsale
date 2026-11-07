@@ -1,3 +1,4 @@
+// The sale read cache: concurrent reads share one lookup, a read after the cache time goes again, and a zero time keeps nothing.
 import { expect, it } from "vitest";
 import { fakeSale } from "../bdd/support/fake-sales.js";
 import type { SaleRepository } from "./ports/sale-repository.js";

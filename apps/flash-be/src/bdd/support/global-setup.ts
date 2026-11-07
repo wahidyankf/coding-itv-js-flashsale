@@ -1,3 +1,5 @@
+// The setup of one integration run, which Vitest calls once: a fresh Postgres database, migrated, and the test Redis
+// index emptied. The function it returns drops the database when the run ends.
 import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { createClient } from "redis";

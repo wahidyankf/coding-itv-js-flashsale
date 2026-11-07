@@ -1,7 +1,9 @@
+// Making and changing a sale: the rules an operator's input must meet, and the rules for a sale that already exists.
+// The window is absolute here; the seed command turns minutes into one.
 import { Err, Ok, type Result } from "@flash/typekit";
 import { isSaleId, type Sale } from "./sale.js";
 
-// A sale to create. The window is absolute; the seed command works it out from minutes.
+// A sale ready to store. Its window is absolute, and the stock, hold and rate are whole and positive.
 export type NewSale = {
 	// The product to sell. Left out, the store finds the product of this name or makes it.
 	productId?: string | undefined;
@@ -9,17 +11,18 @@ export type NewSale = {
 	stock: number;
 	startsAt: Date;
 	endsAt: Date;
-	reservationTtlSeconds: number;
+	holdSeconds: number;
 	admitPerSecond: number;
 };
 
+// The defaults an operator gets for what they leave out. The seed command and the operator routes share them.
 export const DEFAULT_SALE_NAME = "Flash sale";
 export const DEFAULT_HOLD_SECONDS = 120;
 export const DEFAULT_ADMIT_PER_SECOND = 50;
 export const DEFAULT_SALE_DURATION_MINUTES = 60;
 const NAME_MAX_LENGTH = 120;
 
-// What an operator sends, before any rule has looked at it.
+// What an operator sends, before any rule has looked at it. The dates are the text the client sent.
 export type SaleDraft = {
 	productId?: string | undefined;
 	name?: string | undefined;
@@ -39,7 +42,7 @@ export function newSaleFrom(draft: SaleDraft): Result<NewSale, "invalid_sale"> {
 	const name = (draft.name ?? DEFAULT_SALE_NAME).trim();
 	const startsAt = new Date(draft.startsAt);
 	const endsAt = new Date(draft.endsAt);
-	const reservationTtlSeconds = draft.holdSeconds ?? DEFAULT_HOLD_SECONDS;
+	const holdSeconds = draft.holdSeconds ?? DEFAULT_HOLD_SECONDS;
 	const admitPerSecond = draft.admitPerSecond ?? DEFAULT_ADMIT_PER_SECOND;
 
 	const usable =
@@ -47,7 +50,7 @@ export function newSaleFrom(draft: SaleDraft): Result<NewSale, "invalid_sale"> {
 		name.length >= 1 &&
 		name.length <= NAME_MAX_LENGTH &&
 		positiveInteger(draft.stock) &&
-		positiveInteger(reservationTtlSeconds) &&
+		positiveInteger(holdSeconds) &&
 		positiveInteger(admitPerSecond) &&
 		!Number.isNaN(startsAt.getTime()) &&
 		!Number.isNaN(endsAt.getTime()) &&
@@ -59,10 +62,27 @@ export function newSaleFrom(draft: SaleDraft): Result<NewSale, "invalid_sale"> {
 				stock: draft.stock,
 				startsAt,
 				endsAt,
-				reservationTtlSeconds,
+				holdSeconds,
 				admitPerSecond,
 			})
 		: new Err("invalid_sale");
+}
+
+// The sale as stored, with nothing sold yet. The store gives the id and the product it chose.
+export function newSale(
+	draft: NewSale & { id: string; productId: string },
+): Sale {
+	return {
+		id: draft.id,
+		productId: draft.productId,
+		name: draft.name,
+		startsAt: draft.startsAt,
+		endsAt: draft.endsAt,
+		stock: draft.stock,
+		sold: 0,
+		holdSeconds: draft.holdSeconds,
+		admitPerSecond: draft.admitPerSecond,
+	};
 }
 
 // What an operator sends to change a sale. A field that is left out stays as it is.
@@ -90,7 +110,7 @@ export function changeSaleFrom(
 		stock: patch.stock ?? sale.stock,
 		startsAt: patch.startsAt ?? sale.startsAt.toISOString(),
 		endsAt: patch.endsAt ?? sale.endsAt.toISOString(),
-		holdSeconds: patch.holdSeconds ?? sale.reservationTtlSeconds,
+		holdSeconds: patch.holdSeconds ?? sale.holdSeconds,
 		admitPerSecond: patch.admitPerSecond ?? sale.admitPerSecond,
 	});
 	if (changed.isErr()) return new Err(changed.error);

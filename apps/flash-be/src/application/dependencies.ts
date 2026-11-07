@@ -1,3 +1,5 @@
+// What the HTTP adapter needs from the application, in one object. It is injected, so a unit test can fake any part
+// without a real database or Redis.
 import type { AuthService } from "./auth-service.js";
 import type { PurchaseService } from "./purchase-service.js";
 import type { QueueService } from "./queue-service.js";
@@ -6,8 +8,8 @@ import type { ReservationService } from "./reservation-service.js";
 import type { SaleAdminService } from "./sale-admin-service.js";
 import type { SaleService } from "./sale-service.js";
 
-// Everything a driving adapter (HTTP) needs from the application. It is injected, so unit tests can fake it without a
-// real database or Redis.
+// Everything the driving adapter (HTTP) calls. The two health checks are here too, so `/health` and `/ready` never
+// reach into a store themselves.
 export type Dependencies = {
 	checkDatabase: () => Promise<void>;
 	checkRedis: () => Promise<void>;

@@ -1,11 +1,15 @@
+// The operator's writes to sales: create, change, remove and list. The rules that decide a write are in the domain
+// (sale-window); this service asks the store, and shapes the reply. Seeding is a different use case (sale-seed-service).
 import { Err, Ok, type Result } from "@flash/typekit";
-import { isSaleId, type Sale } from "../domain/sale.js";
+import { isSaleId } from "../domain/sale.js";
 import {
 	changeSaleFrom,
+	newSale,
 	newSaleFrom,
 	type SaleDraft,
 	type SalePatch,
 } from "../domain/sale-window.js";
+import type { UserId } from "../domain/user.js";
 import type { Clock } from "./ports/clock.js";
 import type {
 	RemoveSaleError,
@@ -19,24 +23,29 @@ import {
 	type SaleView,
 } from "./sale-view.js";
 
+// Why an operator's sale cannot be created: the input is not usable, the window overlaps a sale, or the product named
+// does not exist.
 export type CreateSaleError =
 	| "invalid_sale"
 	| "sale_overlaps"
 	| "product_not_found";
 
 export type SaleAdminService = {
+	// Creates a sale. `actor` is the operator who made it, recorded as the author.
 	create: (
 		draft: SaleDraft,
-		actor: string,
+		actor: UserId,
 	) => Promise<Result<SaleView, CreateSaleError>>;
 	// A sale that has not started can change in every field. Once it has started it keeps its start and can only get more
 	// stock; a sale that is over cannot change (see `changeSaleFrom`).
 	update: (
 		id: string,
 		patch: SalePatch,
-		actor: string,
+		actor: UserId,
 	) => Promise<Result<SaleView, UpdateSaleError>>;
-	remove: (id: string, actor: string) => Promise<Result<true, RemoveSaleError>>;
+	// Removes a sale that nobody bought from.
+	remove: (id: string, actor: UserId) => Promise<Result<true, RemoveSaleError>>;
+	// Every sale, for the operator's list.
 	list: () => Promise<AdminSaleView[]>;
 };
 
@@ -50,12 +59,7 @@ export function createSaleAdminService(
 			if (input.isErr()) return new Err(input.error);
 			const stored = await store.create(input.value, actor);
 			if (stored.isErr()) return new Err(stored.error);
-			const sale: Sale = {
-				...input.value,
-				id: stored.value.id,
-				productId: stored.value.productId,
-				sold: 0,
-			};
+			const sale = newSale({ ...input.value, ...stored.value });
 			return new Ok(describeSale(sale, clock()));
 		},
 		update: async (id, patch, actor) => {

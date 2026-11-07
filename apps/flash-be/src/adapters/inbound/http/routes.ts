@@ -4,20 +4,22 @@ import type { Login } from "../../../application/auth-service.js";
 import type { Dependencies } from "../../../application/dependencies.js";
 import type { SaleView } from "../../../application/sale-view.js";
 import {
-	ACCESS_COOKIE,
 	ACCESS_TTL_SECONDS,
-	cookieValue,
-	cutUserAgent,
 	type Principal,
-	REFRESH_COOKIE,
-	REFRESH_COOKIE_PATH,
 	REFRESH_TTL_SECONDS,
-	setCookie,
 } from "../../../domain/auth.js";
 import type { Purchase } from "../../../domain/purchase.js";
 import type { QueuePlace } from "../../../domain/queue.js";
 import type { SaleDraft, SalePatch } from "../../../domain/sale-window.js";
 import { MS_PER_SECOND } from "../../../domain/time.js";
+import {
+	ACCESS_COOKIE,
+	cookieValue,
+	cutUserAgent,
+	REFRESH_COOKIE,
+	REFRESH_COOKIE_PATH,
+	setCookie,
+} from "./cookies.js";
 import {
 	ERROR_STATUS,
 	errorPayload,
@@ -150,10 +152,13 @@ export function registerRoutes(
 
 	// Only an operator may pass; a shopper who is logged in is refused as such.
 	const needOperator = async (request: FastifyRequest, reply: FastifyReply) => {
-		const who = await identify(request);
-		if (who.isErr()) return refuseLogin(reply);
-		if (who.value.role !== "operator") {
-			return reply.code(ERROR_STATUS.forbidden).send(errorPayload("forbidden"));
+		const who = await deps.auth.authorizeOperator(
+			cookieValue(request.headers.cookie, ACCESS_COOKIE),
+		);
+		if (who.isErr()) {
+			return who.error === "forbidden"
+				? reply.code(ERROR_STATUS.forbidden).send(errorPayload("forbidden"))
+				: refuseLogin(reply);
 		}
 		principals.set(request, who.value);
 	};

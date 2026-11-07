@@ -1,3 +1,4 @@
+// The admission timer's use case: it ticks the queue of the current sale, and does nothing when there is none.
 import { describe, expect, it, vi } from "vitest";
 import { admitCurrentSale } from "./admission.js";
 

@@ -1,3 +1,5 @@
+// Sales in memory for the unit layer: a sale with sensible defaults, a repository over a list of sales, and the app
+// built on them.
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../../adapters/inbound/http/app.js";
@@ -17,7 +19,7 @@ export function fakeSale(overrides: Partial<Sale>): Sale {
 		endsAt: new Date("2026-06-01T13:00:00Z"),
 		stock: 10,
 		sold: 0,
-		reservationTtlSeconds: 120,
+		holdSeconds: 120,
 		admitPerSecond: 50,
 		...overrides,
 	};

@@ -1,3 +1,5 @@
+// The admission timer's one tick, for the sale shoppers are shown now. Every instance runs it; the queue store lets one
+// instance win each tick, so the line moves at the sale's rate and not faster.
 import type { QueueService } from "./queue-service.js";
 import type { SaleService } from "./sale-service.js";
 

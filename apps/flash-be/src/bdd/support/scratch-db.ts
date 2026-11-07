@@ -1,3 +1,5 @@
+// A throwaway Postgres database for one scenario that must start with no tables. The caller drops it when the scenario
+// ends.
 import { randomUUID } from "node:crypto";
 import pg from "pg";
 

@@ -1,3 +1,4 @@
+// The reservation use case, against fake stores: the answers of the gate, the rebuild from Postgres, and the replies.
 import { Err } from "@flash/typekit";
 import { describe, expect, it } from "vitest";
 import { queueWorld } from "../bdd/support/queue-world.js";
@@ -49,14 +50,14 @@ function gateWith(answers: GateAnswer[], overrides: Partial<HoldGate> = {}) {
 async function reserveWith(gate: HoldGate) {
 	const guarded = createGuardedGate(gate);
 	const { world, saleId, ticket } = await admittedAna();
-	const service = createReservationService(
-		guarded,
-		world.repository,
-		world.saleService,
-		world.queue,
+	const service = createReservationService({
+		gate: guarded,
+		repository: world.repository,
+		sales: world.saleService,
+		queue: world.queue,
 		clock,
-		{ rebuildWaitMs: 100, wait: async () => {} },
-	);
+		options: { rebuildWaitMs: 100, wait: async () => {} },
+	});
 	return service.reserve(saleId, "ana", ticket);
 }
 

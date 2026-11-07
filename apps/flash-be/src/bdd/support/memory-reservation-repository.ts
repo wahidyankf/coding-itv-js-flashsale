@@ -1,5 +1,9 @@
+// The reservation rows in memory for the unit layer. The rules are the ones the SQL keeps: a purchase, a live hold, the
+// stock, and a failed write when Postgres is down.
 import type { ReservationRepository } from "../../application/ports/reservation-repository.js";
 import type { HoldSnapshot, Reservation } from "../../domain/reservation.js";
+import { hasRoom } from "../../domain/sale.js";
+import { isLive } from "../../domain/time.js";
 
 export type MemoryReservationRepository = ReservationRepository & {
 	// While broken, saving a reservation fails, as when Postgres is unreachable.
@@ -32,7 +36,7 @@ export function memoryReservationRepository(
 			const buyers = buyersOf(request.saleId);
 			if (buyers.includes(request.user)) return { kind: "purchased" };
 			const own = repository.rows.get(`${request.saleId}:${request.user}`);
-			if (own && own.expiresAt > request.now) {
+			if (own && isLive({ expiresAt: own.expiresAt }, request.now)) {
 				return {
 					kind: "held",
 					reservationId: own.reservationId,
@@ -43,9 +47,10 @@ export function memoryReservationRepository(
 				(row) =>
 					row.saleId === request.saleId &&
 					row.user !== request.user &&
-					row.expiresAt > request.now,
+					isLive(row, request.now),
 			).length;
-			if (buyers.length + live >= request.stock) return { kind: "sold_out" };
+			if (!hasRoom(buyers.length, live, request.stock))
+				return { kind: "sold_out" };
 			repository.rows.set(`${request.saleId}:${request.user}`, {
 				saleId: request.saleId,
 				user: request.user,
@@ -63,7 +68,7 @@ export function memoryReservationRepository(
 			const snapshot: HoldSnapshot = {
 				buyers: buyersOf(saleId),
 				holds: [...repository.rows.values()]
-					.filter((row) => row.saleId === saleId && row.expiresAt > now)
+					.filter((row) => row.saleId === saleId && isLive(row, now))
 					.map((row) => ({
 						user: row.user,
 						reservationId: row.reservationId,

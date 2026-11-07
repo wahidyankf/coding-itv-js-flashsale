@@ -1,3 +1,5 @@
+// Purchases in memory for the unit layer. `commit` gives the answers the Postgres transaction gives: the same purchase
+// for the same reservation, a refusal for a second purchase, and sold out when the stock is gone.
 import type { PurchaseRepository } from "../../application/ports/purchase-repository.js";
 import type { Purchase } from "../../domain/purchase.js";
 import type { Reservation } from "../../domain/reservation.js";

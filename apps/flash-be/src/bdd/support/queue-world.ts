@@ -1,3 +1,6 @@
+// The unit layer of a queue scenario: the app over in-memory stores, a clock that moves only when a scenario says so,
+// and payment timers that fire only as that clock moves. The integration layer runs the same steps over Postgres and
+// Redis (queue-integration.ts). The steps themselves are the request helpers in queue-requests.ts.
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../../adapters/inbound/http/app.js";
 import { createMemoryRateLimitStore } from "../../adapters/outbound/memory/memory-rate-limit-store.js";
@@ -5,16 +8,25 @@ import { createMockPayment } from "../../adapters/outbound/payment/mock-payment.
 import { admitCurrentSale } from "../../application/admission.js";
 import { createGuardedGate } from "../../application/guarded-gate.js";
 import type { Clock } from "../../application/ports/clock.js";
+import type { PurchaseService } from "../../application/purchase-service.js";
 import { createPurchaseService } from "../../application/purchase-service.js";
+import type { QueueService } from "../../application/queue-service.js";
 import { createQueueService } from "../../application/queue-service.js";
+import type {
+	RateLimiter,
+	RateLimits,
+} from "../../application/rate-limiter.js";
 import { createRateLimiter } from "../../application/rate-limiter.js";
+import type { ReservationService } from "../../application/reservation-service.js";
 import { createReservationService } from "../../application/reservation-service.js";
+import type { SaleService } from "../../application/sale-service.js";
 import { createSaleService } from "../../application/sale-service.js";
 import type { Sale } from "../../domain/sale.js";
+import { MS_PER_SECOND } from "../../domain/time.js";
 import { normalizeUser } from "../../domain/user.js";
 import { healthyDeps } from "./deps.js";
 import { fakeRepository, fakeSale } from "./fake-sales.js";
-import { memoryAuth } from "./memory-auth.js";
+import { type MemoryAuth, memoryAuth } from "./memory-auth.js";
 import { type MemoryHoldGate, memoryHoldGate } from "./memory-hold-gate.js";
 import {
 	type MemoryPurchaseRepository,
@@ -28,368 +40,80 @@ import {
 	type MemoryReservationRepository,
 	memoryReservationRepository,
 } from "./memory-reservation-repository.js";
+import { eventRequests } from "./queue-events.js";
+import {
+	limitRequests,
+	purchaseRequests,
+	queueRequests,
+	reserveRequests,
+	saleRequests,
+} from "./queue-requests.js";
+import {
+	ADMIT_EVERYONE_WAITING,
+	LIMITS_OUT_OF_REACH,
+	notWired,
+	type ShopScenario,
+} from "./queue-scenario.js";
 import { switchable } from "./switchable.js";
+import { HOUR_MS } from "./time.js";
 
-// A Server-Sent Events stream as a scenario reads it: the status of the opening reply, and the events one by one.
-export type EventWatcher = {
-	status: number;
-	// The JSON body of a refusal. Empty for a stream that opened.
-	body: { errorCode?: string };
-	next: () => Promise<{ event: string; data: Record<string, unknown> }>;
-	close: () => void;
-};
+export type {
+	EventWatcher,
+	QueueScenario,
+	Response,
+	ShopScenario,
+} from "./queue-scenario.js";
 
-export type Response = Awaited<ReturnType<FastifyInstance["inject"]>>;
-
-// What a queue scenario does, whatever the layer. Unit tests answer it in memory; integration tests use
-// Postgres and Redis.
-export type QueueScenario = {
-	saleId: string;
-	response: Response | undefined;
-	tickets: Map<string, string>;
-	// The cookie header of a shopper who is logged in (an account is made the first time).
-	login: (user: string) => Promise<string>;
-	addSale: (overrides: Partial<Sale>) => Promise<string>;
-	setAdmitRate: (perSecond: number) => Promise<void>;
-	join: (user: string, saleId?: string) => Promise<Response>;
-	check: (user: string, ticket?: string) => Promise<Response>;
-	admit: (saleId?: string) => Promise<void>;
-	loseQueue: () => Promise<void>;
-};
-
-// The same, for reserving. A scenario that reserves also joins and admits shoppers, so it extends the queue scenario.
-export type ShopScenario = QueueScenario & {
-	holds: Map<string, { reservationId: string; expiresAt: string }>;
-	setHoldSeconds: (seconds: number) => Promise<void>;
-	// Joins the queue and gets admitted at once, without waiting for the timer.
-	admitted: (user: string) => Promise<void>;
-	admitMany: (users: string[]) => Promise<void>;
-	reserve: (
-		user: string,
-		options?: { ticket?: string; saleId?: string },
-	) => Promise<Response>;
-	reserveAll: (users: string[]) => Promise<Response[]>;
-	// Time passes: the unit clock moves; other layers really wait.
-	advance: (seconds: number) => Promise<void>;
-	loseReservationState: () => Promise<void>;
-	breakWrites: () => Promise<void>;
-	fixWrites: () => Promise<void>;
-	purchases: Map<string, { purchaseId: string }>;
-	confirm: (
-		user: string,
-		options?: { reservationId?: string; saleId?: string; owner?: string },
-	) => Promise<Response>;
-	// Confirms without waiting for the answer; `finishConfirm` waits for it.
-	startConfirm: (user: string) => Promise<void>;
-	finishConfirm: () => Promise<void>;
-	confirmAllHolders: (users: string[]) => Promise<Response[]>;
-	outcome: (user: string, saleId?: string) => Promise<Response>;
-	saleView: () => Promise<{ status: string; remaining: number }>;
-	setPaymentDeclines: () => Promise<void>;
-	setPaymentDuration: (seconds: number) => Promise<void>;
-	// Another instance sells the last item to this user, behind the back of the scenario.
-	sellLastItemTo: (user: string) => Promise<void>;
-	wasRefunded: (user: string) => Promise<boolean>;
-	// The sale read cache: its time, a change behind its back, and the public reads.
-	setSaleCache: (ms: number) => Promise<void>;
-	setSold: (sold: number) => Promise<void>;
-	readSale: () => Promise<Response>;
-	readCurrentSale: () => Promise<Response>;
-	// Live updates: a watcher per stream, and the sale opening while a shopper is already waiting.
-	watcher: EventWatcher | undefined;
-	watchSale: (saleId?: string) => Promise<EventWatcher>;
-	watchPlace: (user: string, ticket?: string) => Promise<EventWatcher>;
-	openSale: () => Promise<void>;
-	// Redis stops answering, and answers again. What it held is untouched; `loseQueue` and
-	// `loseReservationState` take the data away.
-	breakRedis: () => Promise<void>;
-	fixRedis: () => Promise<void>;
-	setUserLimit: (requests: number, seconds: number) => Promise<void>;
-	setAddressLimit: (requests: number, seconds: number) => Promise<void>;
-	// Sends the same kind of write request several times, one after the other.
-	repeat: (kind: string, user: string, times: number) => Promise<Response[]>;
-	joinMany: (count: number) => Promise<Response[]>;
-	replies: Response[];
-};
-
+// The queue settings the unit layer runs with: a short tick, and an admission that lasts ten minutes.
 export const QUEUE_OPTIONS = {
 	ticketSecret: "unit-secret",
 	admissionTickMs: 1000,
 	admissionTtlSeconds: 600,
 };
 
-// The requests every layer sends the same way. `saleId` is read when the request is sent.
-export function queueRequests(app: FastifyInstance, scenario: QueueScenario) {
-	return {
-		async join(user: string, saleId = scenario.saleId): Promise<Response> {
-			const reply = await app.inject({
-				method: "POST",
-				url: `/sales/${saleId}/queue`,
-				headers: { cookie: await scenario.login(user) },
-			});
-			scenario.response = reply;
-			const ticket = reply.json().ticket;
-			const key = user.trim().toLowerCase();
-			if (ticket && !scenario.tickets.has(key)) {
-				scenario.tickets.set(key, ticket);
-			}
-			return reply;
-		},
-		async check(user: string, ticket?: string): Promise<Response> {
-			scenario.response = await app.inject({
-				method: "GET",
-				url: `/sales/${scenario.saleId}/queue/me`,
-				headers: {
-					cookie: await scenario.login(user),
-					...(ticket === undefined ? {} : { "x-queue-ticket": ticket }),
-				},
-			});
-			return scenario.response;
-		},
-	};
-}
-
-// The reserve request, the same at every layer.
-export function reserveRequests(app: FastifyInstance, scenario: ShopScenario) {
-	const send = async (
-		user: string,
-		options: { ticket?: string; saleId?: string } = {},
-	): Promise<Response> => {
-		const key = user.trim().toLowerCase();
-		const ticket = options.ticket ?? scenario.tickets.get(key);
-		const reply = await app.inject({
-			method: "POST",
-			url: `/sales/${options.saleId ?? scenario.saleId}/reservations`,
-			headers: {
-				cookie: await scenario.login(user),
-				...(ticket === undefined ? {} : { "x-queue-ticket": ticket }),
-			},
-		});
-		scenario.response = reply;
-		if (
-			(reply.statusCode === 201 || reply.statusCode === 200) &&
-			!scenario.holds.has(key)
-		) {
-			scenario.holds.set(key, reply.json());
-		}
-		return reply;
-	};
-	return {
-		reserve: send,
-		reserveAll: (users: string[]) =>
-			Promise.all(users.map((user) => send(user))),
-	};
-}
-
-// The purchase requests, the same at every layer.
-export function purchaseRequests(app: FastifyInstance, scenario: ShopScenario) {
-	let pending: Promise<Response> | undefined;
-	const send = async (
-		user: string,
-		options: { reservationId?: string; saleId?: string; owner?: string } = {},
-	): Promise<Response> => {
-		const key = user.trim().toLowerCase();
-		const owner = (options.owner ?? user).trim().toLowerCase();
-		const reservationId =
-			options.reservationId ?? scenario.holds.get(owner)?.reservationId;
-		const reply = await app.inject({
-			method: "POST",
-			url: `/sales/${options.saleId ?? scenario.saleId}/purchases`,
-			headers: { cookie: await scenario.login(user) },
-			payload: { reservationId },
-		});
-		scenario.response = reply;
-		if (
-			(reply.statusCode === 201 || reply.statusCode === 200) &&
-			!scenario.purchases.has(key)
-		) {
-			scenario.purchases.set(key, reply.json());
-		}
-		return reply;
-	};
-	return {
-		confirm: send,
-		async startConfirm(user: string) {
-			pending = send(user);
-		},
-		async finishConfirm() {
-			if (!pending) throw new Error("no confirmation was started");
-			scenario.response = await pending;
-		},
-		confirmAllHolders: (users: string[]) =>
-			Promise.all(
-				users
-					.filter((user) => scenario.holds.has(user))
-					.map((user) => send(user)),
-			),
-		async outcome(user: string, saleId = scenario.saleId) {
-			scenario.response = await app.inject({
-				method: "GET",
-				url: `/sales/${saleId}/purchases/me`,
-				headers: { cookie: await scenario.login(user) },
-			});
-			return scenario.response;
-		},
-		async saleView() {
-			const reply = await app.inject({
-				method: "GET",
-				url: `/sales/${scenario.saleId}`,
-			});
-			return reply.json();
-		},
-	};
-}
-
-// The public sale reads, the same at every layer.
-export function saleRequests(app: FastifyInstance, scenario: ShopScenario) {
-	return {
-		async readSale() {
-			scenario.response = await app.inject({
-				method: "GET",
-				url: `/sales/${scenario.saleId}`,
-			});
-			return scenario.response;
-		},
-		async readCurrentSale() {
-			scenario.response = await app.inject({
-				method: "GET",
-				url: "/sales/current",
-			});
-			return scenario.response;
-		},
-	};
-}
-
-const origins = new WeakMap<FastifyInstance, string>();
-
-// The event streams, the same at every layer. The app listens on a free port, because a stream needs a real socket.
-export function eventRequests(app: FastifyInstance, scenario: ShopScenario) {
-	const watch = async (
-		path: string,
-		headers: Record<string, string> = {},
-	): Promise<EventWatcher> => {
-		let origin = origins.get(app);
-		if (!origin) {
-			origin = await app.listen({ host: "127.0.0.1", port: 0 });
-			origins.set(app, origin);
-		}
-		const controller = new AbortController();
-		const reply = await fetch(`${origin}${path}`, {
-			headers,
-			signal: controller.signal,
-		});
-		if (!reply.ok || !reply.body) {
-			const refusal: EventWatcher = {
-				status: reply.status,
-				body: await reply.json(),
-				next: () => Promise.reject(new Error("the stream did not open")),
-				close: () => {},
-			};
-			scenario.watcher = refusal;
-			return refusal;
-		}
-		const reader = reply.body.getReader();
-		const decoder = new TextDecoder();
-		let buffer = "";
-		const frames: Array<{ event: string; data: Record<string, unknown> }> = [];
-		const fill = async (): Promise<void> => {
-			const chunk = await reader.read();
-			if (chunk.done) throw new Error("the stream ended");
-			buffer += decoder.decode(chunk.value, { stream: true });
-			for (
-				let end = buffer.indexOf("\n\n");
-				end >= 0;
-				end = buffer.indexOf("\n\n")
-			) {
-				const frame = buffer.slice(0, end);
-				buffer = buffer.slice(end + 2);
-				// A line that starts with a colon is a keep-alive comment.
-				if (frame.startsWith(":")) continue;
-				const event = /^event: (.*)$/m.exec(frame)?.[1] ?? "message";
-				const data = JSON.parse(/^data: (.*)$/m.exec(frame)?.[1] ?? "null");
-				frames.push({ event, data });
-			}
-		};
-		const watcher: EventWatcher = {
-			status: reply.status,
-			body: {},
-			async next() {
-				const deadline = Date.now() + 5000;
-				while (frames.length === 0) {
-					if (Date.now() > deadline) throw new Error("no event in time");
-					await Promise.race([
-						fill(),
-						new Promise<void>((resolve) => setTimeout(resolve, 200)),
-					]);
-				}
-				const frame = frames.shift();
-				if (!frame) throw new Error("no event");
-				return frame;
-			},
-			close: () => controller.abort(),
-		};
-		scenario.watcher = watcher;
-		return watcher;
-	};
-	return {
-		watchSale: (saleId = scenario.saleId) => watch(`/sales/${saleId}/events`),
-		watchPlace: async (user: string, ticket?: string) => {
-			const given = ticket ?? scenario.tickets.get(user.trim().toLowerCase());
-			return watch(`/sales/${scenario.saleId}/queue/me/events`, {
-				cookie: await scenario.login(user),
-				...(given === undefined ? {} : { "x-queue-ticket": given }),
-			});
-		},
-	};
-}
-
-// Write requests by the name a scenario uses for them, for the rate limit scenarios.
-export function limitRequests(scenario: ShopScenario) {
-	const send = async (kind: string, user: string): Promise<Response> => {
-		if (kind === "join the queue") return scenario.join(user);
-		if (kind === "reserve an item") return scenario.reserve(user);
-		if (kind === "confirm a purchase") {
-			return scenario.confirm(user, { reservationId: "not-an-id" });
-		}
-		throw new Error(`unknown request "${kind}"`);
-	};
-	return {
-		async repeat(kind: string, user: string, times: number) {
-			scenario.replies = [];
-			for (let attempt = 0; attempt < times; attempt++) {
-				scenario.replies.push(await send(kind, user));
-			}
-			return scenario.replies;
-		},
-		async joinMany(count: number) {
-			scenario.replies = [];
-			for (let index = 0; index < count; index++) {
-				scenario.replies.push(await scenario.join(`visitor${index}`));
-			}
-			return scenario.replies;
-		},
-	};
-}
-
 export type UnitQueueScenario = ShopScenario & {
 	app: FastifyInstance;
 	store: MemoryQueueStore;
 	gate: MemoryHoldGate;
 	repository: MemoryReservationRepository;
-	queue: ReturnType<typeof createQueueService>;
-	reservations: ReturnType<typeof createReservationService>;
-	saleService: ReturnType<typeof createSaleService>;
+	queue: QueueService;
+	reservations: ReservationService;
+	saleService: SaleService;
 	sales: Sale[];
 };
 
-// One scenario in memory: sales, a queue store, a reservation gate and repository, a clock that only moves when
-// the scenario says so, and the app over them.
-export function queueWorld(start: Date): UnitQueueScenario {
-	let now = start;
-	const clock: Clock = () => now;
+// Everything one unit scenario is built from. The actions below read and change these, and the app is built over them.
+type UnitParts = {
+	time: { now: Date };
+	clock: Clock;
+	sales: Sale[];
+	redis: { down: boolean };
+	timers: Array<{ at: number; resolve: () => void }>;
+	store: MemoryQueueStore;
+	memoryGate: MemoryHoldGate;
+	repository: MemoryReservationRepository;
+	purchased: MemoryPurchaseRepository;
+	payment: ReturnType<typeof createMockPayment>;
+	cache: { ttlMs: number };
+	limits: RateLimits;
+	saleService: SaleService;
+	queue: QueueService;
+	reservations: ReservationService;
+	purchases: PurchaseService;
+	rateLimiter: RateLimiter;
+	auth: MemoryAuth;
+};
+
+// Lets the pending promises run once, so an answer that is already due is seen.
+const settle = () => new Promise((resolve) => setImmediate(resolve));
+
+// The stores, services and switches of one unit scenario, wired as the production app wires them.
+function unitParts(start: Date): UnitParts {
+	const time = { now: start };
+	const clock: Clock = () => time.now;
 	const sales: Sale[] = [];
-	const redisState = { down: false };
-	const isDown = () => redisState.down;
+	const redis = { down: false };
+	const isDown = () => redis.down;
 	const store = memoryQueueStore(clock);
 	const memoryGate = memoryHoldGate(clock);
 	const gate = createGuardedGate(switchable(memoryGate, isDown));
@@ -399,8 +123,8 @@ export function queueWorld(start: Date): UnitQueueScenario {
 	);
 	const purchased = memoryPurchaseRepository(sales, repository.rows);
 	purchaseRepository = purchased;
-	// Time in memory: a payment that "takes 3 seconds" waits on a timer that only `advance` can fire.
-	const timers: Array<{ at: number; resolve: () => void }> = [];
+	// Time in memory: a payment that "takes 3 seconds" waits on a timer that only the clock can fire.
+	const timers: UnitParts["timers"] = [];
 	const payment = createMockPayment({
 		latencyMs: 0,
 		failureRate: 0,
@@ -408,7 +132,7 @@ export function queueWorld(start: Date): UnitQueueScenario {
 			ms <= 0
 				? Promise.resolve()
 				: new Promise((resolve) => {
-						timers.push({ at: now.getTime() + ms, resolve });
+						timers.push({ at: time.now.getTime() + ms, resolve });
 					}),
 	});
 	const cache = { ttlMs: 0 };
@@ -419,14 +143,14 @@ export function queueWorld(start: Date): UnitQueueScenario {
 		clock,
 		QUEUE_OPTIONS,
 	);
-	const reservations = createReservationService(
+	const reservations = createReservationService({
 		gate,
 		repository,
-		saleService,
+		sales: saleService,
 		queue,
 		clock,
-		{ rebuildWaitMs: 100, wait: async () => {} },
-	);
+		options: { rebuildWaitMs: 100, wait: async () => {} },
+	});
 	const purchases = createPurchaseService(
 		purchased,
 		payment,
@@ -435,12 +159,7 @@ export function queueWorld(start: Date): UnitQueueScenario {
 		clock,
 	);
 	// Limits start far out of reach, so only the rate limit scenarios ever meet them.
-	const limits = {
-		windowSeconds: 60,
-		perUser: 100_000,
-		perIp: 100_000,
-		authPerIp: 100_000,
-	};
+	const limits: RateLimits = { ...LIMITS_OUT_OF_REACH };
 	const rateLimiter = createRateLimiter(
 		switchable(createMemoryRateLimitStore(), isDown),
 		createMemoryRateLimitStore(),
@@ -449,159 +168,227 @@ export function queueWorld(start: Date): UnitQueueScenario {
 	);
 	// Logins keep their own clock, so a scenario that moves time does not end them.
 	const auth = memoryAuth(() => start);
-	const app = buildApp(
-		{
-			...healthyDeps,
-			auth: auth.service,
-			checkRedis: async () => {
-				if (redisState.down) throw new Error("redis is down");
-			},
-			sales: saleService,
-			queue,
-			reservations,
-			purchases,
-			rateLimiter,
-		},
-		// Streams read often in tests, so a change shows within a few milliseconds.
-		{ events: { intervalMs: 20, heartbeatMs: 15_000 } },
-	);
-	const settle = () => new Promise((resolve) => setImmediate(resolve));
-	const scenario: UnitQueueScenario = {
-		app,
+	return {
+		time,
+		clock,
+		sales,
+		redis,
+		timers,
 		store,
-		gate: memoryGate,
+		memoryGate,
 		repository,
+		purchased,
+		payment,
+		cache,
+		limits,
+		saleService,
 		queue,
 		reservations,
-		saleService,
-		sales,
-		saleId: "",
-		response: undefined,
-		tickets: new Map(),
-		holds: new Map(),
-		purchases: new Map(),
-		login: (user) => auth.login(normalizeUser(user) ?? user),
-		async addSale(overrides) {
-			const sale = fakeSale(overrides);
-			sales.push(sale);
-			scenario.saleId = sale.id;
-			return sale.id;
+		purchases,
+		rateLimiter,
+		auth,
+	};
+}
+
+// The app over the unit parts. Streams read often in tests, so a change shows within a few milliseconds.
+function unitApp(parts: UnitParts): FastifyInstance {
+	return buildApp(
+		{
+			...healthyDeps,
+			auth: parts.auth.service,
+			checkRedis: async () => {
+				if (parts.redis.down) throw new Error("redis is down");
+			},
+			sales: parts.saleService,
+			queue: parts.queue,
+			reservations: parts.reservations,
+			purchases: parts.purchases,
+			rateLimiter: parts.rateLimiter,
 		},
-		async setAdmitRate(perSecond) {
-			for (const sale of sales) sale.admitPerSecond = perSecond;
-		},
-		async setHoldSeconds(seconds) {
-			for (const sale of sales) sale.reservationTtlSeconds = seconds;
-		},
+		{ events: { intervalMs: 20, heartbeatMs: 15_000 } },
+	);
+}
+
+// The request methods start as placeholders; the request helpers replace them once the scenario exists.
+function placeholders() {
+	return {
 		join: notWired,
 		check: notWired,
 		reserve: notWired,
 		reserveAll: notWired,
-		// With no sale named, it is the tick the server runs: for the sale shoppers are shown now.
-		async admit(saleId) {
-			if (saleId === undefined) await admitCurrentSale(saleService, queue);
-			else await queue.admitTick(saleId);
-		},
-		async admitted(user) {
-			await scenario.join(user);
-			await store.admit(
-				scenario.saleId,
-				1000,
-				now,
-				QUEUE_OPTIONS.admissionTtlSeconds,
-			);
-		},
-		async admitMany(users) {
-			for (const user of users) await scenario.join(user);
-			await store.admit(
-				scenario.saleId,
-				1000,
-				now,
-				QUEUE_OPTIONS.admissionTtlSeconds,
-			);
-		},
-		async advance(seconds) {
-			now = new Date(now.getTime() + seconds * 1000);
-			for (const timer of timers.splice(0)) {
-				if (timer.at <= now.getTime()) timer.resolve();
-				else timers.push(timer);
-			}
-			await settle();
-		},
-		async loseQueue() {
-			store.clear();
-		},
-		async loseReservationState() {
-			memoryGate.forget(scenario.saleId);
-		},
-		async breakWrites() {
-			repository.broken = true;
-		},
-		async fixWrites() {
-			repository.broken = false;
-		},
-		replies: [],
 		repeat: notWired,
 		joinMany: notWired,
-		async setUserLimit(requests, seconds) {
-			limits.perUser = requests;
-			limits.windowSeconds = seconds;
-		},
-		async setAddressLimit(requests, seconds) {
-			limits.perIp = requests;
-			limits.windowSeconds = seconds;
-		},
-		async breakRedis() {
-			redisState.down = true;
-		},
-		async fixRedis() {
-			redisState.down = false;
-		},
-		async setSaleCache(ms) {
-			cache.ttlMs = ms;
-		},
-		async setSold(sold) {
-			for (const sale of sales) sale.sold = sold;
-		},
 		readSale: notWired,
 		readCurrentSale: notWired,
-		watcher: undefined,
 		watchSale: notWired,
 		watchPlace: notWired,
-		async openSale() {
-			for (const sale of sales) {
-				sale.startsAt = new Date(now.getTime() - 3_600_000);
-			}
-			await queue.admitTick(scenario.saleId);
-		},
 		confirm: notWired,
 		startConfirm: notWired,
 		finishConfirm: notWired,
 		confirmAllHolders: notWired,
 		outcome: notWired,
 		saleView: notWired,
-		async setPaymentDeclines() {
-			payment.settings.failureRate = 1;
+	};
+}
+
+// The sales, the line and the admission, as a scenario changes them. `current` returns the scenario being built, so
+// an action can use the requests that are added after it.
+function saleActions(parts: UnitParts, current: () => UnitQueueScenario) {
+	return {
+		async addSale(overrides: Partial<Sale>) {
+			const sale = fakeSale(overrides);
+			parts.sales.push(sale);
+			current().saleId = sale.id;
+			return sale.id;
 		},
-		async setPaymentDuration(seconds) {
-			payment.settings.latencyMs = seconds * 1000;
+		async setAdmitRate(perSecond: number) {
+			for (const sale of parts.sales) sale.admitPerSecond = perSecond;
 		},
-		async sellLastItemTo(user) {
-			const sale = sales.find((candidate) => candidate.id === scenario.saleId);
+		async setHoldSeconds(seconds: number) {
+			for (const sale of parts.sales) sale.holdSeconds = seconds;
+		},
+		async setSold(sold: number) {
+			for (const sale of parts.sales) sale.sold = sold;
+		},
+		async setSaleCache(ms: number) {
+			parts.cache.ttlMs = ms;
+		},
+		// With no sale named, it is the tick the server runs: for the sale shoppers are shown now.
+		async admit(saleId?: string) {
+			if (saleId === undefined) {
+				await admitCurrentSale(parts.saleService, parts.queue);
+			} else {
+				await parts.queue.admitTick(saleId);
+			}
+		},
+		async admitted(user: string) {
+			await current().join(user);
+			await parts.store.admit(
+				current().saleId,
+				ADMIT_EVERYONE_WAITING,
+				parts.time.now,
+				QUEUE_OPTIONS.admissionTtlSeconds,
+			);
+		},
+		async admitMany(users: string[]) {
+			for (const user of users) await current().join(user);
+			await parts.store.admit(
+				current().saleId,
+				ADMIT_EVERYONE_WAITING,
+				parts.time.now,
+				QUEUE_OPTIONS.admissionTtlSeconds,
+			);
+		},
+		async loseQueue() {
+			parts.store.clear();
+		},
+		async loseReservationState() {
+			parts.memoryGate.forget(current().saleId);
+		},
+		async openSale() {
+			for (const sale of parts.sales) {
+				sale.startsAt = new Date(parts.time.now.getTime() - HOUR_MS);
+			}
+			await parts.queue.admitTick(current().saleId);
+		},
+		async sellLastItemTo(user: string) {
+			const sale = parts.sales.find(
+				(candidate) => candidate.id === current().saleId,
+			);
 			if (sale) sale.sold = sale.stock - 1;
-			purchased.sellTo(scenario.saleId, user);
+			parts.purchased.sellTo(current().saleId, user);
 		},
-		async wasRefunded(user) {
-			const id = scenario.holds.get(user)?.reservationId;
-			return payment.refunded.includes(`mock-${id}`);
+	};
+}
+
+// Time and payment: the clock moves, and the payment answers as the clock says.
+function timeAndPaymentActions(
+	parts: UnitParts,
+	current: () => UnitQueueScenario,
+) {
+	return {
+		async advance(seconds: number) {
+			parts.time.now = new Date(
+				parts.time.now.getTime() + seconds * MS_PER_SECOND,
+			);
+			for (const timer of parts.timers.splice(0)) {
+				if (timer.at <= parts.time.now.getTime()) timer.resolve();
+				else parts.timers.push(timer);
+			}
+			await settle();
 		},
+		async setPaymentDeclines() {
+			parts.payment.settings.failureRate = 1;
+		},
+		async setPaymentDuration(seconds: number) {
+			parts.payment.settings.latencyMs = seconds * MS_PER_SECOND;
+		},
+		async wasRefunded(user: string) {
+			const id = current().holds.get(user)?.reservationId;
+			return parts.payment.refunded.includes(`mock-${id}`);
+		},
+	};
+}
+
+// Faults and limits: the stores stop answering, the writes break, and the limits move.
+function faultActions(parts: UnitParts) {
+	return {
+		async breakWrites() {
+			parts.repository.broken = true;
+		},
+		async fixWrites() {
+			parts.repository.broken = false;
+		},
+		async breakRedis() {
+			parts.redis.down = true;
+		},
+		async fixRedis() {
+			parts.redis.down = false;
+		},
+		async setUserLimit(requests: number, seconds: number) {
+			parts.limits.perUser = requests;
+			parts.limits.windowSeconds = seconds;
+		},
+		async setAddressLimit(requests: number, seconds: number) {
+			parts.limits.perIp = requests;
+			parts.limits.windowSeconds = seconds;
+		},
+	};
+}
+
+// One scenario in memory: sales, a queue store, a reservation gate and repository, a clock that only moves when
+// the scenario says so, and the app over them.
+export function queueWorld(start: Date): UnitQueueScenario {
+	const parts = unitParts(start);
+	const app = unitApp(parts);
+	const scenario: UnitQueueScenario = {
+		app,
+		store: parts.store,
+		gate: parts.memoryGate,
+		repository: parts.repository,
+		queue: parts.queue,
+		reservations: parts.reservations,
+		saleService: parts.saleService,
+		sales: parts.sales,
+		saleId: "",
+		response: undefined,
+		tickets: new Map(),
+		holds: new Map(),
+		purchases: new Map(),
+		login: (user) => parts.auth.login(normalizeUser(user) ?? user),
+		replies: [],
+		watcher: undefined,
+		...placeholders(),
+		...saleActions(parts, () => scenario),
+		...timeAndPaymentActions(parts, () => scenario),
+		...faultActions(parts),
 	};
 	const requests = purchaseRequests(app, scenario);
 	// Starting a confirmation in memory means waiting until it is inside the payment, before the clock moves.
 	const begin = requests.startConfirm;
 	requests.startConfirm = async (user) => {
 		await begin(user);
-		for (let turn = 0; turn < 100 && timers.length === 0; turn++) {
+		for (let turn = 0; turn < 100 && parts.timers.length === 0; turn++) {
 			await settle();
 		}
 	};
@@ -626,8 +413,4 @@ export function queueWorld(start: Date): UnitQueueScenario {
 		eventRequests(app, scenario),
 	);
 	return Object.assign(scenario, limitRequests(scenario));
-}
-
-function notWired(): never {
-	throw new Error("replaced when the scenario is built");
 }

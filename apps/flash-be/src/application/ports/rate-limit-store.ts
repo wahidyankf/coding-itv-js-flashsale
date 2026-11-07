@@ -1,6 +1,9 @@
-// Counts hits per key in a fixed window. Redis counts for all instances; a memory copy covers an outage.
+// The counter behind the rate limit. Redis counts for every instance; a memory copy counts when Redis is down, so an
+// outage never switches the limit off.
+
+// Counts the hits of one key in a fixed window.
 export type RateLimitStore = {
-	// Adds one hit to `key` for the window that holds `now`, and returns the count and the time left in the window.
+	// Adds one hit to `key` for the window that holds `now`. Returns the count so far and the time left in the window.
 	hit(
 		key: string,
 		windowMs: number,

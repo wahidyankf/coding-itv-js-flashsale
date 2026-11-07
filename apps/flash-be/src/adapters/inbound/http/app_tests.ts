@@ -2,7 +2,7 @@ import { Err, Ok } from "@flash/typekit";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Dependencies } from "../../../application/dependencies.js";
 import { healthyDeps } from "../../../bdd/support/deps.js";
-import type { Principal } from "../../../domain/auth.js";
+import { isOperator, type Principal } from "../../../domain/auth.js";
 import { buildApp } from "./app.js";
 import { errorPayload } from "./errors.js";
 
@@ -36,6 +36,11 @@ const auth: Dependencies["auth"] = {
 	authenticate: async (token) => {
 		const found = token === undefined ? undefined : principals[token];
 		return found ? new Ok(found) : new Err("not_authenticated" as const);
+	},
+	authorizeOperator: async (token) => {
+		const found = token === undefined ? undefined : principals[token];
+		if (!found) return new Err("not_authenticated" as const);
+		return isOperator(found) ? new Ok(found) : new Err("forbidden" as const);
 	},
 };
 const loggedIn = { ...healthyDeps, auth };

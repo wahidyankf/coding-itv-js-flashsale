@@ -1,13 +1,25 @@
+// The purchase use case: a shopper pays for the item their hold keeps, and asks whether they got it. The charge goes to
+// the payment port. The commit is a transaction in Postgres, which has the last word on the stock; Redis is told after.
 import { attemptAsync, Err, Ok, type Result } from "@flash/typekit";
-import { isPurchaseOf, type Purchase } from "../domain/purchase.js";
-import { isLive } from "../domain/reservation.js";
-import { isSaleId } from "../domain/sale.js";
+import {
+	isPurchaseOf,
+	type Outcome,
+	outcomeOf,
+	type Purchase,
+} from "../domain/purchase.js";
+import { confirmBlock, isSaleId, type Sale } from "../domain/sale.js";
+import { isLive } from "../domain/time.js";
+import type { Username } from "../domain/user.js";
 import type { Clock } from "./ports/clock.js";
 import type { HoldGate } from "./ports/hold-gate.js";
 import type { Payment } from "./ports/payment.js";
-import type { PurchaseRepository } from "./ports/purchase-repository.js";
-import type { SaleDetails, SaleService } from "./sale-service.js";
+import type {
+	CommitResult,
+	PurchaseRepository,
+} from "./ports/purchase-repository.js";
+import type { SaleService } from "./sale-service.js";
 
+// Why a purchase is refused. Each one says which step of the flow failed, so a client can tell a retry from a stop.
 export type ConfirmError =
 	| "sale_not_found"
 	| "invalid_reservation"
@@ -18,39 +30,41 @@ export type ConfirmError =
 	| "sold_out"
 	| "payment_failed";
 
+// `created` is false when the same reservation was already paid for: the shopper gets the same purchase back.
 export type Confirmed = { created: boolean; purchase: Purchase };
 
 export type ConfirmResult = Result<Confirmed, ConfirmError>;
 
-export type Outcome =
-	| { state: "purchased"; purchase: Purchase }
-	| { state: "holding"; reservationId: string; expiresAt: Date }
-	| { state: "none" };
-
 export type OutcomeError = "sale_not_found";
 
 export type OutcomeResult = Result<
-	{ user: string; outcome: Outcome },
+	{ user: Username; outcome: Outcome },
 	OutcomeError
 >;
 
-type Request = { details: SaleDetails; user: string; reservationId: string };
+export type PurchaseService = {
+	// Pays for a held item. The reservation id is the idempotency key: confirming again returns the same purchase.
+	confirm: (
+		saleId: string,
+		user: Username,
+		reservationId: unknown,
+	) => Promise<ConfirmResult>;
+	// "Did I get it?": a purchase, a live hold, or nothing.
+	outcome: (saleId: string, user: Username) => Promise<OutcomeResult>;
+};
 
-// What a confirmation must be before any store is asked: a known sale and a well-formed reservation id. The user is the
-// name of the account that is logged in, so it is already a valid name.
+// The first check of a confirmation: the sale exists and the reservation id is well formed. The text is checked as an
+// id, because it arrives from a client and is only ever looked up.
 function wellFormed(
-	found: SaleDetails | undefined,
-	user: string,
+	found: Sale | undefined,
 	reservationId: unknown,
-): Result<Request, ConfirmError> {
+): Result<{ sale: Sale; reservationId: string }, ConfirmError> {
 	if (found === undefined) return new Err("sale_not_found");
 	if (typeof reservationId !== "string" || !isSaleId(reservationId)) {
 		return new Err("invalid_reservation");
 	}
-	return new Ok({ details: found, user, reservationId });
+	return new Ok({ sale: found, reservationId });
 }
-
-export type PurchaseService = ReturnType<typeof createPurchaseService>;
 
 export function createPurchaseService(
 	repository: PurchaseRepository,
@@ -58,85 +72,88 @@ export function createPurchaseService(
 	gate: HoldGate,
 	sales: SaleService,
 	clock: Clock,
-) {
-	return {
-		// Pays for a held item. The reservation id is the idempotency key: confirming again returns the same purchase.
-		async confirm(
-			saleId: string,
-			user: string,
-			reservationId: unknown,
-		): Promise<ConfirmResult> {
-			const request = wellFormed(
-				await sales.details(saleId),
-				user,
-				reservationId,
-			);
-			if (request.isErr()) return new Err(request.error);
-			const { details, reservationId: held } = request.value;
+): PurchaseService {
+	// A reservation that was already paid for answers with its purchase again, so a retry is safe. It answers "not found"
+	// when the purchase is someone else's. Returns nothing when this reservation was never paid for.
+	async function paidEarlier(
+		saleId: string,
+		user: Username,
+		reservationId: string,
+	): Promise<ConfirmResult | undefined> {
+		const same = await repository.findByReservation(reservationId);
+		if (same === undefined) return undefined;
+		return isPurchaseOf(same, saleId, user)
+			? new Ok({ created: false, purchase: same })
+			: new Err("reservation_not_found");
+	}
 
-			const same = await repository.findByReservation(held);
-			if (same) {
-				return isPurchaseOf(same, saleId, user)
-					? new Ok({ created: false, purchase: same })
-					: new Err("reservation_not_found");
-			}
+	// Why the hold cannot be paid for now, or nothing when it is this shopper's hold and it is still live.
+	async function holdRefusal(
+		saleId: string,
+		user: Username,
+		reservationId: string,
+	): Promise<ConfirmError | undefined> {
+		const hold = await repository.findReservation(saleId, user);
+		if (!hold || hold.reservationId !== reservationId) {
+			return "reservation_not_found";
+		}
+		return isLive(hold, clock()) ? undefined : "hold_expired";
+	}
+
+	// Charges the hold, then writes the purchase in the database. A declined charge ends here. A commit that finds the sale
+	// sold out, or the shopper already bought, refunds the charge.
+	async function chargeAndCommit(
+		saleId: string,
+		user: Username,
+		reservationId: string,
+	): Promise<ConfirmResult> {
+		// The hold was checked before the charge. If it runs out during the charge, the commit decides.
+		const charge = await payment.charge(reservationId);
+		if (charge.isErr()) return new Err("payment_failed");
+		const { ref } = charge.value;
+
+		const committed: CommitResult = await repository.commit({
+			saleId,
+			user,
+			reservationId,
+			paymentRef: ref,
+		});
+		if (committed.kind !== "purchased") {
+			await payment.refund(ref);
+			return new Err(committed.kind);
+		}
+
+		// Redis learns about the purchase after the commit. If this fails, a rebuild from Postgres fixes it.
+		await attemptAsync(() => gate.confirm(saleId, user), Error);
+		return new Ok({ created: committed.created, purchase: committed.purchase });
+	}
+
+	return {
+		async confirm(saleId, user, reservationId) {
+			const request = wellFormed(await sales.details(saleId), reservationId);
+			if (request.isErr()) return new Err(request.error);
+			const held = request.value.reservationId;
+
+			const earlier = await paidEarlier(saleId, user, held);
+			if (earlier !== undefined) return earlier;
 			if (await repository.findByUser(saleId, user)) {
 				return new Err("already_purchased");
 			}
-			if (details.view.status === "ended") return new Err("sale_ended");
+			const ended = confirmBlock(request.value.sale, clock());
+			if (ended !== undefined) return new Err(ended);
+			const refused = await holdRefusal(saleId, user, held);
+			if (refused !== undefined) return new Err(refused);
 
-			const hold = await repository.findReservation(saleId, user);
-			if (!hold || hold.reservationId !== held) {
-				return new Err("reservation_not_found");
-			}
-			if (!isLive(hold, clock())) return new Err("hold_expired");
-
-			// The hold is checked before the charge. If it runs out during the charge, the database decides below.
-			const charge = await payment.charge(held);
-			if (charge.isErr()) return new Err("payment_failed");
-			const { ref } = charge.value;
-
-			const committed = await repository.commit({
-				saleId,
-				user,
-				reservationId: held,
-				paymentRef: ref,
-			});
-			if (committed.kind !== "purchased") {
-				await payment.refund(ref);
-				return new Err(committed.kind);
-			}
-
-			// Redis learns about the purchase after the commit. If this fails, a rebuild from Postgres fixes it.
-			await attemptAsync(() => gate.confirm(saleId, user), Error);
-			return new Ok({
-				created: committed.created,
-				purchase: committed.purchase,
-			});
+			return chargeAndCommit(saleId, user, held);
 		},
 
-		// "Did I get it?": a purchase, a live hold, or nothing.
-		async outcome(saleId: string, user: string): Promise<OutcomeResult> {
+		async outcome(saleId, user) {
 			if ((await sales.byId(saleId)) === undefined) {
 				return new Err("sale_not_found");
 			}
-
 			const purchase = await repository.findByUser(saleId, user);
-			if (purchase) {
-				return new Ok({ user, outcome: { state: "purchased", purchase } });
-			}
 			const hold = await repository.findReservation(saleId, user);
-			if (hold && isLive(hold, clock())) {
-				return new Ok({
-					user,
-					outcome: {
-						state: "holding",
-						reservationId: hold.reservationId,
-						expiresAt: hold.expiresAt,
-					},
-				});
-			}
-			return new Ok({ user, outcome: { state: "none" } });
+			return new Ok({ user, outcome: outcomeOf(purchase, hold, clock()) });
 		},
 	};
 }

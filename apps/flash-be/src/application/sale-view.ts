@@ -1,3 +1,5 @@
+// The sale as the API shows it: the public view that shoppers read, and the operator's view with the numbers only an
+// operator needs. Dates are ISO text, as JSON carries them. The wire names here are part of the HTTP contract.
 import {
 	remaining,
 	type Sale,
@@ -5,7 +7,7 @@ import {
 	saleStatus,
 } from "../domain/sale.js";
 
-// A sale as the API shows it. Dates are ISO strings, as JSON carries them.
+// A sale as shoppers see it.
 export type SaleView = {
 	id: string;
 	productId: string;
@@ -24,15 +26,17 @@ export type AdminSaleView = SaleView & {
 	admitPerSecond: number;
 };
 
+// The operator's view of a sale at `now`.
 export function describeAdminSale(sale: Sale, now: Date): AdminSaleView {
 	return {
 		...describeSale(sale, now),
 		sold: sale.sold,
-		holdSeconds: sale.reservationTtlSeconds,
+		holdSeconds: sale.holdSeconds,
 		admitPerSecond: sale.admitPerSecond,
 	};
 }
 
+// The public view of a sale at `now`: its status is worked out from the window and the stock at that moment.
 export function describeSale(sale: Sale, now: Date): SaleView {
 	return {
 		id: sale.id,

@@ -1,6 +1,9 @@
+// Inserts a sale and, when the sale names none, its product. The seed command and the operator's create both write
+// through `seedSale`; the operator's create checks the overlap first, the seed command does not (see SaleSeeder).
 import { randomUUID } from "node:crypto";
 import type { Kysely } from "kysely";
-import type { NewSale } from "../../../application/ports/sale-seeder.js";
+import type { SaleSeeder } from "../../../application/ports/sale-seeder.js";
+import type { NewSale } from "../../../domain/sale-window.js";
 import type { Database } from "./database.js";
 
 // The live product of this name, made if there is none. Two products may share a name, so the oldest one is taken.
@@ -45,10 +48,18 @@ export async function seedSale(
 			starts_at: input.startsAt,
 			ends_at: input.endsAt,
 			stock: input.stock,
-			reservation_ttl_seconds: input.reservationTtlSeconds,
+			reservation_ttl_seconds: input.holdSeconds,
 			admit_per_second: input.admitPerSecond,
 			created_by: actor,
 		})
 		.execute();
 	return { id, productId };
+}
+
+// The seeder port over Postgres: the product and the sale are written in one transaction.
+export function createSaleSeeder(db: Kysely<Database>): SaleSeeder {
+	return {
+		seed: (input, actor) =>
+			db.transaction().execute((trx) => seedSale(trx, input, actor)),
+	};
 }

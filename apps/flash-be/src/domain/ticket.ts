@@ -1,21 +1,24 @@
+// The queue ticket: proof that a shopper went through the queue for a sale. It is a signature, so any instance can make
+// and check it with the shared secret, and it needs no storage that a Redis restart could lose.
 import { createHmac, timingSafeEqual } from "node:crypto";
+import type { Username } from "./user.js";
 
-// A ticket is a signature of the sale and the user. Any instance can issue and check it with the shared secret, so it
-// needs no storage and survives a Redis restart. It proves the shopper went through the queue, not who they are.
+// The ticket of this shopper in this sale. It proves the queue let them in, not who they are.
 export function issueTicket(
 	secret: string,
 	saleId: string,
-	user: string,
+	user: Username,
 ): string {
 	return createHmac("sha256", secret)
 		.update(`${saleId}:${user}`)
 		.digest("base64url");
 }
 
+// Whether the ticket the client sent is the one this sale and shopper would get. A missing ticket never matches.
 export function ticketMatches(
 	secret: string,
 	saleId: string,
-	user: string,
+	user: Username,
 	ticket: string | undefined,
 ): boolean {
 	if (!ticket) return false;

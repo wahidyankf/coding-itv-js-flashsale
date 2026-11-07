@@ -12,7 +12,7 @@ export function toSale(row: Selectable<Database["sales"]>): Sale {
 		endsAt: row.ends_at,
 		stock: row.stock,
 		sold: row.sold,
-		reservationTtlSeconds: row.reservation_ttl_seconds,
+		holdSeconds: row.reservation_ttl_seconds,
 		admitPerSecond: row.admit_per_second,
 	};
 }

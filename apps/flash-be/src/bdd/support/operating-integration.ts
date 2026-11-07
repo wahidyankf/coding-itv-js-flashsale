@@ -1,3 +1,5 @@
+// The operator's steps over the real database and the app built on it. A bought item is a purchase row and one more sold
+// in Postgres, and the reads skip the rows that were deleted.
 import type { FastifyInstance } from "fastify";
 import { type Kysely, sql } from "kysely";
 import type { Database } from "../../adapters/outbound/postgres/database.js";

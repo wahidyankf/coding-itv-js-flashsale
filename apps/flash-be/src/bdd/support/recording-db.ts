@@ -1,3 +1,5 @@
+// A Kysely instance that records SQL and never connects. A unit test uses it to check what a migration or a seed would
+// send to Postgres.
 import {
 	DummyDriver,
 	Kysely,

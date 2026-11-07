@@ -1,2 +1,4 @@
-// Time is injected so tests can fix it. Production code reads the clock through this type only.
+// Time, as the application reads it. Tests fix it; production code reads the clock through this type only.
+
+// Returns the current moment.
 export type Clock = () => Date;

@@ -1,3 +1,4 @@
+// The rate limits: the in-process store, and the limiter that checks each user and each address.
 import { describe, expect, it } from "vitest";
 import { createMemoryRateLimitStore } from "../adapters/outbound/memory/memory-rate-limit-store.js";
 import type { RateLimitStore } from "./ports/rate-limit-store.js";

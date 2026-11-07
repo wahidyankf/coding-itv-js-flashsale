@@ -1,8 +1,11 @@
+// A short in-process cache in front of the sale reads. It only ever answers reads for shoppers' pages; the rules that
+// decide a write always read the sale fresh (see sale-service).
 import type { Sale } from "../domain/sale.js";
 import type { Clock } from "./ports/clock.js";
 import type { SaleRepository } from "./ports/sale-repository.js";
 
-// The knob a scenario or the server turns. Zero turns the cache off.
+// How long a read may be kept. Zero turns the cache off. The server reads it from the environment; a scenario turns it
+// on and off while the app runs.
 export type SaleCacheSettings = { ttlMs: number };
 
 type Entry = { sale: Sale; expiresAt: number };

@@ -1,5 +1,5 @@
 import { parseArgs } from "node:util";
-import type { NewSale } from "../../../application/ports/sale-seeder.js";
+import type { NewSale } from "../../../domain/sale-window.js";
 import {
 	DEFAULT_ADMIT_PER_SECOND,
 	DEFAULT_HOLD_SECONDS,
@@ -60,7 +60,7 @@ export function parseSeedArgs(argv: string[], now: Date): NewSale {
 		stock,
 		startsAt,
 		endsAt: new Date(startsAt.getTime() + duration * MINUTE_MS),
-		reservationTtlSeconds: integer(
+		holdSeconds: integer(
 			"hold-seconds",
 			values["hold-seconds"],
 			DEFAULT_HOLD_SECONDS,

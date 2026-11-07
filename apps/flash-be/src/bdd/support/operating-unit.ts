@@ -1,3 +1,5 @@
+// The operator's steps in memory: the sales, products and logins live in the scenario, and the app is built on them.
+// Removed sales are kept in a map, so the scenario can ask who removed one.
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../../adapters/inbound/http/app.js";

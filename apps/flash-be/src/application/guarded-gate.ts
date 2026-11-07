@@ -1,11 +1,13 @@
+// The hold gate with a memory of trouble. When a call to Redis fails, Postgres may have decided something Redis did not
+// see: a hold taken without it, or a purchase it was not told about. Such a sale is marked stale, and the next
+// reservation on it first rebuilds Redis from Postgres.
 import { attemptAsync } from "@flash/typekit";
 import type { HoldGate } from "./ports/hold-gate.js";
 
-// A gate that remembers which sales Redis may have fallen behind on. When a call fails, Postgres may have decided
-// something that Redis did not see (a hold taken without it, a purchase it was not told about). The next
-// reservation on that sale marks the Redis state as not ready, which makes one instance rebuild it from Postgres.
+// The gate, plus the means to mark a sale stale when a write elsewhere failed.
 export type GuardedGate = HoldGate & { markStale: (saleId: string) => void };
 
+// Wraps the Redis gate. A failed call re-throws, so the caller can fall back to Postgres.
 export function createGuardedGate(inner: HoldGate): GuardedGate {
 	const stale = new Set<string>();
 	// If the invalidation fails, the sale stays stale and the next call tries again.

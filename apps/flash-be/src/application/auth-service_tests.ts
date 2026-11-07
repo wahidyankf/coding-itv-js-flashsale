@@ -1,5 +1,7 @@
-import { Err } from "@flash/typekit";
+// The auth service: the branches no shopper scenario reaches by itself, the operator checks, and the refresh and logout edges.
+import { Err, Ok } from "@flash/typekit";
 import { describe, expect, it } from "vitest";
+import { randomTokenSource } from "../adapters/outbound/crypto/token-source.js";
 import { memoryAuth, plainHasher } from "../bdd/support/memory-auth.js";
 import { ACCESS_TTL_SECONDS, REFRESH_TTL_SECONDS } from "../domain/auth.js";
 import { createAuthService } from "./auth-service.js";
@@ -7,6 +9,8 @@ import { createAuthService } from "./auth-service.js";
 // The branches of the auth service that no scenario of a shopper reaches by itself.
 const START = new Date("2026-06-01T12:00:00Z");
 const PASSWORD = "a long password";
+// The system user that makes the first operator. Only the id matters here, so any id will do.
+const SYSTEM_ID = "system-user-id";
 
 function world() {
 	let now = START;
@@ -117,6 +121,7 @@ describe("recognising a login", () => {
 			},
 			plainHasher,
 			() => START,
+			randomTokenSource,
 		);
 		const found = await service.authenticate("any");
 		expect(found.isErr() && found.error).toBe("not_authenticated");
@@ -189,6 +194,7 @@ describe("logging out", () => {
 			},
 			plainHasher,
 			() => START,
+			randomTokenSource,
 		);
 		await service.logout({});
 		expect(asked).toEqual({ accessHash: undefined, refreshHash: undefined });
@@ -202,5 +208,70 @@ describe("refreshing", () => {
 		expect(refreshed.isErr()).toBe(true);
 		if (refreshed.isOk()) return;
 		expect(refreshed.error).toBe("invalid_refresh_token");
+	});
+});
+
+describe("who may manage sales", () => {
+	it("refuses no login as not_authenticated, and a shopper as forbidden", async () => {
+		const { service } = world();
+		const shopper = await service.register("ana", PASSWORD);
+		if (shopper.isErr()) throw new Error("no login");
+		const none = await service.authorizeOperator(undefined);
+		expect(none.isErr() && none.error).toBe("not_authenticated");
+		const refused = await service.authorizeOperator(shopper.value.accessToken);
+		expect(refused.isErr() && refused.error).toBe("forbidden");
+	});
+
+	it("lets through the operator that createOperator made", async () => {
+		const { service } = world();
+		const made = await service.createOperator("boss", PASSWORD, SYSTEM_ID);
+		expect(made.isOk() && made.value.role).toBe("operator");
+		const login = await service.login("boss", PASSWORD);
+		if (login.isErr()) throw new Error("no login");
+		const who = await service.authorizeOperator(login.value.accessToken);
+		expect(who.isOk() && who.value.username).toBe("boss");
+	});
+
+	it("records the system user as the one who made the operator", async () => {
+		let recorded: unknown;
+		const service = createAuthService(
+			{
+				register: async (account) => {
+					recorded = account;
+					return new Ok({
+						userId: "u",
+						username: account.username,
+						role: account.role,
+					});
+				},
+				findCredentials: async () => undefined,
+			},
+			{
+				create: async () => {},
+				findByAccess: async () => undefined,
+				rotate: async () => ({ principal: undefined, ended: [] }),
+				revoke: async () => [],
+			},
+			plainHasher,
+			() => START,
+			randomTokenSource,
+		);
+		await service.createOperator("boss", PASSWORD, SYSTEM_ID);
+		expect(recorded).toMatchObject({
+			username: "boss",
+			role: "operator",
+			createdBy: SYSTEM_ID,
+		});
+	});
+
+	it("refuses a name that is not usable, a short password, and a name that is taken", async () => {
+		const { service } = world();
+		const noName = await service.createOperator(undefined, PASSWORD, SYSTEM_ID);
+		expect(noName.isErr() && noName.error).toBe("invalid_user");
+		const short = await service.createOperator("boss", "short", SYSTEM_ID);
+		expect(short.isErr() && short.error).toBe("invalid_password");
+		await service.createOperator("boss", PASSWORD, SYSTEM_ID);
+		const taken = await service.createOperator("boss", PASSWORD, SYSTEM_ID);
+		expect(taken.isErr() && taken.error).toBe("username_taken");
 	});
 });

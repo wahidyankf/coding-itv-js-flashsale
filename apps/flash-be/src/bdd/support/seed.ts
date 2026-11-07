@@ -1,14 +1,14 @@
+// Test data written straight to Postgres, past the API: products, sales, purchases and logins. Only tests use these
+// helpers, because the API never deletes a row.
 import { randomUUID } from "node:crypto";
 import { type Kysely, sql } from "kysely";
+import { ACCESS_COOKIE } from "../../adapters/inbound/http/cookies.js";
+import { randomTokenSource } from "../../adapters/outbound/crypto/token-source.js";
 import type { Database } from "../../adapters/outbound/postgres/database.js";
 import { actorId, ensureUser } from "../../adapters/outbound/postgres/users.js";
 import { SYSTEM_USERNAME } from "../../domain/actors.js";
-import {
-	ACCESS_COOKIE,
-	hashToken,
-	newToken,
-	type Role,
-} from "../../domain/auth.js";
+import { hashToken, type Role } from "../../domain/auth.js";
+import { HOUR_MS } from "./time.js";
 
 export type SaleSeed = {
 	name?: string | undefined;
@@ -95,15 +95,15 @@ export async function loginAs(
 			.where("id", "=", userId)
 			.execute();
 	}
-	const token = newToken();
-	const hour = 3_600_000;
+	const token = randomTokenSource();
+	const hour = HOUR_MS;
 	await db
 		.insertInto("sessions")
 		.values({
 			user_id: userId,
 			access_hash: hashToken(token),
 			access_expires_at: new Date(Date.now() + hour),
-			refresh_hash: hashToken(newToken()),
+			refresh_hash: hashToken(randomTokenSource()),
 			refresh_expires_at: new Date(Date.now() + 24 * hour),
 			created_by: userId,
 		})

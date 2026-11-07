@@ -1,7 +1,8 @@
 import { afterAll, beforeEach, expect, it } from "vitest";
 import { resetSales } from "../../../bdd/support/seed.js";
 import { config } from "../../../config.js";
-import { hashToken, newToken } from "../../../domain/auth.js";
+import { hashToken } from "../../../domain/auth.js";
+import { randomTokenSource } from "../crypto/token-source.js";
 import { createDb } from "./database.js";
 import { createSessionStore } from "./session-store.js";
 import { ensureUser } from "./users.js";
@@ -22,11 +23,11 @@ const HOUR_MS = 3_600_000;
 
 it("does not rotate a refresh token that has ended, and ends nothing", async () => {
 	const userId = await ensureUser(db, "ana");
-	const refresh = newToken();
+	const refresh = randomTokenSource();
 	const now = new Date();
 	await sessions.create({
 		userId,
-		accessHash: hashToken(newToken()),
+		accessHash: hashToken(randomTokenSource()),
 		accessExpiresAt: new Date(now.getTime() + HOUR_MS),
 		refreshHash: hashToken(refresh),
 		refreshExpiresAt: new Date(now.getTime() - HOUR_MS),
@@ -34,9 +35,9 @@ it("does not rotate a refresh token that has ended, and ends nothing", async () 
 
 	const rotated = await sessions.rotate({
 		presentedRefreshHash: hashToken(refresh),
-		accessHash: hashToken(newToken()),
+		accessHash: hashToken(randomTokenSource()),
 		accessExpiresAt: new Date(now.getTime() + HOUR_MS),
-		refreshHash: hashToken(newToken()),
+		refreshHash: hashToken(randomTokenSource()),
 		refreshExpiresAt: new Date(now.getTime() + HOUR_MS),
 		now,
 	});

@@ -1,3 +1,5 @@
+// The queue store in memory for the unit layer: the waiting line, the admitted shoppers with the time each admission
+// ends, and the lease one instance takes to admit. It follows the Redis queue store.
 import type { Clock } from "../../application/ports/clock.js";
 import type { QueueStore } from "../../application/ports/queue-store.js";
 import type { QueuePlace } from "../../domain/queue.js";

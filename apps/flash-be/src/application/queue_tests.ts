@@ -1,3 +1,4 @@
+// The queue use case: the rules for a user name, the tickets, and joining, checking and admitting shoppers.
 import { Err } from "@flash/typekit";
 import { describe, expect, it } from "vitest";
 import { queueWorld } from "../bdd/support/queue-world.js";

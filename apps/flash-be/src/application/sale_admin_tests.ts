@@ -1,3 +1,4 @@
+// The operator's sale use case: creating, changing, removing and listing sales, with the checks on each step.
 import { Err, Ok } from "@flash/typekit";
 import { describe, expect, it } from "vitest";
 import { fakeSale } from "../bdd/support/fake-sales.js";

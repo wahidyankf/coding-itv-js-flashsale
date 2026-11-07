@@ -11,7 +11,7 @@ describe("parseSeedArgs", () => {
 			stock: 10,
 			startsAt: NOW,
 			endsAt: new Date("2026-06-01T13:00:00Z"),
-			reservationTtlSeconds: 120,
+			holdSeconds: 120,
 			admitPerSecond: 50,
 		});
 	});
@@ -37,7 +37,7 @@ describe("parseSeedArgs", () => {
 		expect(input.name).toBe("Mug drop");
 		expect(input.startsAt).toEqual(new Date("2026-06-01T12:05:00Z"));
 		expect(input.endsAt).toEqual(new Date("2026-06-01T12:35:00Z"));
-		expect(input.reservationTtlSeconds).toBe(90);
+		expect(input.holdSeconds).toBe(90);
 		expect(input.admitPerSecond).toBe(20);
 	});
 

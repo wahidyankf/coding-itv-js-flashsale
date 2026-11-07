@@ -1,3 +1,4 @@
+// The purchase use case, against fake stores: what a confirm and an outcome answer, in the order the checks run.
 import { describe, expect, it } from "vitest";
 import { queueWorld } from "../bdd/support/queue-world.js";
 import { relativeTime } from "../bdd/support/time.js";

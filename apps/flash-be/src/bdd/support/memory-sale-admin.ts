@@ -1,8 +1,10 @@
+// The sales store in memory for the unit layer. It refuses overlapping sales and unknown products. A removed sale is
+// kept in a map with who removed it, as the soft delete keeps it in Postgres.
 import { randomUUID } from "node:crypto";
 import { Err, Ok } from "@flash/typekit";
 import type { SaleAdmin } from "../../application/ports/sale-admin.js";
 import type { Sale } from "../../domain/sale.js";
-import { overlaps } from "../../domain/sale-window.js";
+import { newSale, overlaps } from "../../domain/sale-window.js";
 
 // A sale store in memory, for scenarios that need no database. It changes the list a scenario also reads from.
 // `products` maps a product id to its name: the products that exist, which a sale can name.
@@ -30,12 +32,7 @@ export function memorySaleAdmin(
 			}
 			const productId = productFor(input.name, input.productId);
 			if (productId === undefined) return new Err("product_not_found" as const);
-			const sale: Sale = {
-				...input,
-				id: randomUUID(),
-				productId,
-				sold: 0,
-			};
+			const sale = newSale({ ...input, id: randomUUID(), productId });
 			sales.push(sale);
 			return new Ok({ id: sale.id, productId });
 		},

@@ -1,3 +1,4 @@
+// The sale windows: a new sale from a draft or a change, overlaps between sales, and a new sale with its id and no sold items.
 import { describe, expect, it } from "vitest";
 import type { Sale } from "./sale.js";
 import {
@@ -5,6 +6,7 @@ import {
 	DEFAULT_ADMIT_PER_SECOND,
 	DEFAULT_HOLD_SECONDS,
 	DEFAULT_SALE_NAME,
+	newSale,
 	newSaleFrom,
 	overlaps,
 	type SaleDraft,
@@ -24,7 +26,7 @@ describe("newSaleFrom", () => {
 			stock: 5,
 			startsAt: new Date("2026-06-01T12:00:00Z"),
 			endsAt: new Date("2026-06-01T13:00:00Z"),
-			reservationTtlSeconds: DEFAULT_HOLD_SECONDS,
+			holdSeconds: DEFAULT_HOLD_SECONDS,
 			admitPerSecond: DEFAULT_ADMIT_PER_SECOND,
 		});
 	});
@@ -38,7 +40,7 @@ describe("newSaleFrom", () => {
 		});
 		expect(sale.isOk() && sale.value).toMatchObject({
 			name: "Spring drop",
-			reservationTtlSeconds: 30,
+			holdSeconds: 30,
 			admitPerSecond: 7,
 		});
 	});
@@ -74,7 +76,7 @@ describe("changeSaleFrom", () => {
 		endsAt: new Date("2026-06-01T13:00:00Z"),
 		stock: 5,
 		sold: 2,
-		reservationTtlSeconds: 120,
+		holdSeconds: 120,
 		admitPerSecond: 50,
 	};
 	const before = new Date("2026-06-01T11:00:00Z");
@@ -99,7 +101,7 @@ describe("changeSaleFrom", () => {
 			stock: 3,
 			startsAt: new Date("2026-06-01T14:00:00Z"),
 			endsAt: new Date("2026-06-01T15:00:00Z"),
-			reservationTtlSeconds: 30,
+			holdSeconds: 30,
 			admitPerSecond: 7,
 		});
 	});
@@ -111,7 +113,7 @@ describe("changeSaleFrom", () => {
 			stock: 9,
 			startsAt: sale.startsAt,
 			endsAt: sale.endsAt,
-			reservationTtlSeconds: 120,
+			holdSeconds: 120,
 			admitPerSecond: 50,
 		});
 	});
@@ -132,7 +134,7 @@ describe("changeSaleFrom", () => {
 			stock: 8,
 			endsAt: new Date("2026-06-01T14:00:00Z"),
 			name: "Extended",
-			reservationTtlSeconds: 60,
+			holdSeconds: 60,
 			admitPerSecond: 10,
 		});
 	});
@@ -201,5 +203,29 @@ describe("overlaps", () => {
 	])("does not see %s", (_why, a, b) => {
 		expect(overlaps(a, b)).toBe(false);
 		expect(overlaps(b, a)).toBe(false);
+	});
+});
+
+describe("newSale", () => {
+	it("makes a stored sale with nothing sold yet, from the checked sale and its ids", () => {
+		const checked = newSaleFrom(draft);
+		if (checked.isErr()) throw new Error("the draft should be usable");
+		expect(
+			newSale({
+				...checked.value,
+				id: "00000000-0000-4000-8000-0000000000c1",
+				productId: "00000000-0000-4000-8000-0000000000c2",
+			}),
+		).toEqual({
+			id: "00000000-0000-4000-8000-0000000000c1",
+			productId: "00000000-0000-4000-8000-0000000000c2",
+			name: DEFAULT_SALE_NAME,
+			stock: 5,
+			startsAt: new Date("2026-06-01T12:00:00Z"),
+			endsAt: new Date("2026-06-01T13:00:00Z"),
+			sold: 0,
+			holdSeconds: DEFAULT_HOLD_SECONDS,
+			admitPerSecond: DEFAULT_ADMIT_PER_SECOND,
+		});
 	});
 });

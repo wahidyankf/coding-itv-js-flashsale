@@ -1,8 +1,11 @@
+// Entry point: the seed command. It stores one sale for the demo and the tests, through the seed use case, and it does
+// not check for overlap: that check belongs to an operator's create.
 import { attemptAsync } from "@flash/typekit";
 import { parseSeedArgs } from "./adapters/inbound/cli/seed-args.js";
 import { createDb } from "./adapters/outbound/postgres/database.js";
-import { seedSale } from "./adapters/outbound/postgres/sale-seeder.js";
+import { createSaleSeeder } from "./adapters/outbound/postgres/sale-seeder.js";
 import { actorId } from "./adapters/outbound/postgres/users.js";
+import { createSaleSeedService } from "./application/sale-seed-service.js";
 import { config } from "./config.js";
 import { SYSTEM_USERNAME } from "./domain/actors.js";
 
@@ -13,12 +16,11 @@ const seeded = await attemptAsync(async () => {
 	const db = createDb(config.databaseUrl);
 	try {
 		// The product and the sale are made together, by the system.
-		const seededSale = await db
-			.transaction()
-			.execute(async (trx) =>
-				seedSale(trx, input, await actorId(trx, SYSTEM_USERNAME)),
-			);
-		console.log(`seeded sale ${seededSale.id}`);
+		const sale = await createSaleSeedService(createSaleSeeder(db)).seed(
+			input,
+			await actorId(db, SYSTEM_USERNAME),
+		);
+		console.log(`seeded sale ${sale.id}`);
 	} finally {
 		await db.destroy();
 	}

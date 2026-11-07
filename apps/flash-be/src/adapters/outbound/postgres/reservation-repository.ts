@@ -2,6 +2,8 @@ import { attemptAsync } from "@flash/typekit";
 import { type Kysely, sql } from "kysely";
 import type { ReservationRepository } from "../../../application/ports/reservation-repository.js";
 import type { FallbackAnswer } from "../../../domain/reservation.js";
+import { hasRoom } from "../../../domain/sale.js";
+import { isLive } from "../../../domain/time.js";
 import type { Database } from "./database.js";
 import { ensureUser } from "./users.js";
 
@@ -95,7 +97,7 @@ export function createReservationRepository(
 					.where("user_id", "=", userId)
 					.where("deleted_at", "is", null)
 					.executeTakeFirst();
-				if (own && own.expires_at > request.now) {
+				if (own && isLive({ expiresAt: own.expires_at }, request.now)) {
 					return {
 						kind: "held",
 						reservationId: own.id,
@@ -111,7 +113,7 @@ export function createReservationRepository(
 					.where("expires_at", ">", request.now)
 					.where("user_id", "!=", userId)
 					.executeTakeFirstOrThrow();
-				if (sale.sold + Number(live.count) >= request.stock) {
+				if (!hasRoom(sale.sold, Number(live.count), request.stock)) {
 					return { kind: "sold_out" };
 				}
 

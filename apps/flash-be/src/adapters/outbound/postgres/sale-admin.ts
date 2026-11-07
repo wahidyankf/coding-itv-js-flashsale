@@ -79,7 +79,7 @@ export function createPostgresSaleAdmin(db: Kysely<Database>): SaleAdmin {
 							starts_at: next.value.startsAt,
 							ends_at: next.value.endsAt,
 							stock: next.value.stock,
-							reservation_ttl_seconds: next.value.reservationTtlSeconds,
+							reservation_ttl_seconds: next.value.holdSeconds,
 							admit_per_second: next.value.admitPerSecond,
 							updated_at: sql<Date>`now()`,
 							updated_by: actor,

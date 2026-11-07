@@ -1,3 +1,5 @@
+// The dependencies of an app that answers as healthy, with no sale and no login. Tests that need no database or Redis
+// use them, and a scenario overrides the part it tests.
 import { Err } from "@flash/typekit";
 import type { Dependencies } from "../../application/dependencies.js";
 
@@ -14,6 +16,8 @@ export const healthyDeps: Dependencies = {
 		refresh: async () => new Err("invalid_refresh_token"),
 		logout: async () => {},
 		authenticate: async () => new Err("not_authenticated"),
+		authorizeOperator: async () => new Err("not_authenticated"),
+		createOperator: async () => new Err("invalid_user"),
 	},
 	admin: {
 		create: async () => new Err("sale_overlaps"),

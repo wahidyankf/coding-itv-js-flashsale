@@ -1,6 +1,10 @@
+// The sale rules: the status of a sale, the blocks on reserving, queueing and confirming, the room left for holds, and
+// the current sale.
 import { describe, expect, it } from "vitest";
 import {
 	admissionsPerTick,
+	confirmBlock,
+	hasRoom,
 	pickCurrent,
 	queueBlock,
 	remaining,
@@ -17,17 +21,17 @@ const sale: Sale = {
 	endsAt: new Date("2026-01-01T11:00:00Z"),
 	stock: 3,
 	sold: 1,
-	reservationTtlSeconds: 120,
+	holdSeconds: 120,
 	admitPerSecond: 50,
 };
+
+const OPEN = new Date("2026-01-01T10:30:00Z");
 
 describe("sale rules", () => {
 	it("derives the status from the window first and the stock second", () => {
 		expect(saleStatus(sale, new Date("2026-01-01T09:59:59Z"))).toBe("upcoming");
-		expect(saleStatus(sale, new Date("2026-01-01T10:30:00Z"))).toBe("active");
-		expect(
-			saleStatus({ ...sale, sold: 3 }, new Date("2026-01-01T10:30:00Z")),
-		).toBe("sold_out");
+		expect(saleStatus(sale, OPEN)).toBe("active");
+		expect(saleStatus({ ...sale, sold: 3 }, OPEN)).toBe("sold_out");
 		expect(
 			saleStatus({ ...sale, sold: 3 }, new Date("2026-01-01T11:00:00Z")),
 		).toBe("ended");
@@ -57,41 +61,41 @@ describe("sale rules", () => {
 		expect(admissionsPerTick(sale, 200)).toBe(10);
 		expect(admissionsPerTick({ ...sale, admitPerSecond: 1 }, 100)).toBe(1);
 	});
-});
 
-describe("pickCurrent", () => {
-	const at = (name: string, from: string, to: string): Sale => ({
-		...sale,
-		id: name,
-		name,
-		startsAt: new Date(from),
-		endsAt: new Date(to),
-	});
-	const ended = at("ended", "2026-01-01T08:00:00Z", "2026-01-01T09:00:00Z");
-	const running = at("running", "2026-01-01T10:00:00Z", "2026-01-01T11:00:00Z");
-	const next = at("next", "2026-01-01T12:00:00Z", "2026-01-01T13:00:00Z");
-	const later = at("later", "2026-01-01T14:00:00Z", "2026-01-01T15:00:00Z");
-	const now = new Date("2026-01-01T10:30:00Z");
-
-	it("prefers the running sale over one that opens later", () => {
-		expect(pickCurrent([later, next, running, ended], now)?.name).toBe(
-			"running",
+	it("confirms a purchase of a hold until the sale is over, even when sold out", () => {
+		expect(
+			confirmBlock(sale, new Date("2026-01-01T09:59:00Z")),
+		).toBeUndefined();
+		expect(confirmBlock(sale, OPEN)).toBeUndefined();
+		expect(confirmBlock({ ...sale, sold: 3 }, OPEN)).toBeUndefined();
+		expect(confirmBlock(sale, new Date("2026-01-01T11:00:00Z"))).toBe(
+			"sale_ended",
 		);
 	});
 
-	it("takes the sale that opens next when none is running", () => {
+	it("has room for one more hold while sold and live holds stay under the stock", () => {
+		expect(hasRoom(1, 1, 3)).toBe(true);
+		expect(hasRoom(1, 2, 3)).toBe(false);
+		expect(hasRoom(3, 0, 3)).toBe(false);
+		expect(hasRoom(0, 0, 1)).toBe(true);
+	});
+});
+
+describe("pickCurrent", () => {
+	it("picks the sale whose window holds now, else the next to open", () => {
+		const later = {
+			...sale,
+			id: "later",
+			startsAt: new Date("2026-01-01T12:00:00Z"),
+			endsAt: new Date("2026-01-01T13:00:00Z"),
+		};
+		expect(pickCurrent([later, sale], OPEN)?.id).toBe(sale.id);
 		expect(
-			pickCurrent([later, next, ended], new Date("2026-01-01T11:30:00Z"))?.name,
-		).toBe("next");
-	});
-
-	it("counts a sale that opens at this moment as running, and one that closes at this moment as over", () => {
-		expect(pickCurrent([running], running.startsAt)?.name).toBe("running");
-		expect(pickCurrent([running], running.endsAt)).toBeUndefined();
-	});
-
-	it("finds nothing when every sale is over or there is none", () => {
-		expect(pickCurrent([ended], now)).toBeUndefined();
-		expect(pickCurrent([], now)).toBeUndefined();
+			pickCurrent([later, sale], new Date("2026-01-01T09:00:00Z"))?.id,
+		).toBe(sale.id);
+		expect(pickCurrent([later], OPEN)?.id).toBe("later");
+		expect(
+			pickCurrent([sale], new Date("2026-01-01T11:00:00Z")),
+		).toBeUndefined();
 	});
 });

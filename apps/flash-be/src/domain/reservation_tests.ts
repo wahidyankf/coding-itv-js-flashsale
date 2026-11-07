@@ -1,5 +1,6 @@
+// The hold request: the time a hold ends, counted from the hold time the sale sets.
 import { describe, expect, it } from "vitest";
-import { holdRequest, isLive } from "./reservation.js";
+import { holdRequest } from "./reservation.js";
 import type { Sale } from "./sale.js";
 
 const sale: Sale = {
@@ -10,7 +11,7 @@ const sale: Sale = {
 	endsAt: new Date("2026-01-01T11:00:00Z"),
 	stock: 3,
 	sold: 0,
-	reservationTtlSeconds: 90,
+	holdSeconds: 90,
 	admitPerSecond: 50,
 };
 
@@ -26,11 +27,5 @@ describe("reservation rules", () => {
 			expiresAt: new Date("2026-01-01T10:01:30Z"),
 			stock: 3,
 		});
-	});
-
-	it("counts a hold only until its end time", () => {
-		const hold = { expiresAt: new Date("2026-01-01T10:01:00Z") };
-		expect(isLive(hold, new Date("2026-01-01T10:00:59Z"))).toBe(true);
-		expect(isLive(hold, new Date("2026-01-01T10:01:00Z"))).toBe(false);
 	});
 });

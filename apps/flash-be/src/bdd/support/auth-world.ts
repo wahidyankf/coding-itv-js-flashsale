@@ -1,6 +1,9 @@
+// The shopper's side of the accounts scenarios: a cookie jar that keeps cookies the way a browser does, and the requests
+// a shopper sends. Each layer supplies its app, how an access token ends, and what the stores hold.
 import type { FastifyInstance } from "fastify";
+import type { Response } from "./response.js";
 
-export type Response = Awaited<ReturnType<FastifyInstance["inject"]>>;
+export type { Response };
 
 // What differs between layers: the app, how an access token ends, and what the stores hold.
 export type AuthLayer = {

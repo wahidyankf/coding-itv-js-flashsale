@@ -1,3 +1,5 @@
+// Where the feature files live, for the bindings that read them. The path is found from this folder, so it works from
+// any working directory.
 import path from "node:path";
 
 // Resolves a path under the repository's specs/ tree, from this support folder.

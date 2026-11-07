@@ -1,3 +1,5 @@
+// The reserve use case: an admitted shopper asks for one item of a sale. The sale must be selling and the queue must have
+// admitted the shopper. Then the fast gate decides, and when the gate is down the reservation repository decides alone.
 import { randomUUID } from "node:crypto";
 import { attemptAsync, Err, Ok, type Result } from "@flash/typekit";
 import {
@@ -6,12 +8,14 @@ import {
 	type ReserveRequest,
 } from "../domain/reservation.js";
 import { reserveBlock } from "../domain/sale.js";
+import type { Username } from "../domain/user.js";
 import type { GuardedGate } from "./guarded-gate.js";
 import type { Clock } from "./ports/clock.js";
 import type { ReservationRepository } from "./ports/reservation-repository.js";
 import type { QueueService } from "./queue-service.js";
-import type { SaleDetails, SaleService } from "./sale-service.js";
+import { actionableSale, type SaleService } from "./sale-service.js";
 
+// Why a reservation is refused. Each one tells the shopper what to do next: wait, come back, or stop.
 export type ReserveError =
 	| "sale_not_found"
 	| "invalid_ticket"
@@ -22,49 +26,88 @@ export type ReserveError =
 	| "already_purchased"
 	| "unavailable";
 
+// The hold of a shopper. `created` is true for a new hold and false when the shopper already held one, so a retry
+// gets the same hold back and nothing is written twice.
 export type Reserved = {
 	created: boolean;
-	user: string;
+	user: Username;
 	reservationId: string;
 	expiresAt: Date;
 };
 
 export type ReserveResult = Result<Reserved, ReserveError>;
 
+// How a request waits for another instance that is rebuilding the sale's reservation state.
 export type ReservationOptions = {
-	// How long to wait for another instance that is rebuilding the sale's reservation state.
+	// How long to wait before the request gives up with `unavailable`.
 	rebuildWaitMs: number;
+	// How to wait; tests replace it so no real time passes.
 	wait: (ms: number) => Promise<void>;
 };
 
+// Long enough for a rebuild of one sale's holds, and short enough that a shopper is not left hanging.
+const DEFAULT_REBUILD_WAIT_MS = 3000;
+// The rebuild lock outlives a normal rebuild, and expires by itself if the instance that holds it dies.
+const REBUILD_LOCK_MS = 10_000;
+// How often a waiting request checks whether the rebuild has finished.
+const POLL_MS = 25;
+
 export const defaultReservationOptions: ReservationOptions = {
-	rebuildWaitMs: 3000,
+	rebuildWaitMs: DEFAULT_REBUILD_WAIT_MS,
 	wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 };
 
-const REBUILD_LOCK_MS = 10_000;
-const POLL_MS = 25;
+// What the reservation service is built from. `options` may be left out; the defaults then apply.
+export type ReservationDeps = {
+	gate: GuardedGate;
+	repository: ReservationRepository;
+	sales: SaleService;
+	queue: QueueService;
+	clock: Clock;
+	options?: ReservationOptions;
+};
 
-// What must hold before the queue or a store is asked: the sale exists and is selling.
-function selling(
-	found: SaleDetails | undefined,
-): Result<SaleDetails, ReserveError> {
-	if (found === undefined) return new Err("sale_not_found");
-	// A sale that is not selling answers first, so a shopper learns it without a valid ticket.
-	const block = reserveBlock(found.view.status);
-	return block === undefined ? new Ok(found) : new Err(block);
+export type ReservationService = {
+	// One shopper's attempt to hold an item. `ticket` is the queue ticket the client sent, if any.
+	reserve: (
+		saleId: string,
+		user: Username,
+		ticket: string | undefined,
+	) => Promise<ReserveResult>;
+};
+
+// The reply for each answer of the gate. A refusal names its reason; a hold that already exists comes back as it was.
+function replyFor(answer: GateAnswer, user: Username): ReserveResult {
+	switch (answer.kind) {
+		case "reserved":
+			return new Ok({
+				created: true,
+				user,
+				reservationId: answer.reservationId,
+				expiresAt: answer.expiresAt,
+			});
+		case "held":
+			return new Ok({
+				created: false,
+				user,
+				reservationId: answer.reservationId,
+				expiresAt: answer.expiresAt,
+			});
+		case "purchased":
+			return new Err("already_purchased");
+		case "sold_out":
+			return new Err("sold_out");
+		case "not_ready":
+			return new Err("unavailable");
+	}
 }
 
-export type ReservationService = ReturnType<typeof createReservationService>;
-
 export function createReservationService(
-	gate: GuardedGate,
-	repository: ReservationRepository,
-	sales: SaleService,
-	queue: QueueService,
-	clock: Clock,
-	options: ReservationOptions = defaultReservationOptions,
-) {
+	deps: ReservationDeps,
+): ReservationService {
+	const { gate, repository, sales, queue, clock } = deps;
+	const options = deps.options ?? defaultReservationOptions;
+
 	// Rebuilds the sale's reservation state in Redis from Postgres. One instance does it; the others wait for it.
 	async function ensureReady(saleId: string): Promise<boolean> {
 		if (await gate.isReady(saleId)) return true;
@@ -114,7 +157,7 @@ export function createReservationService(
 	// Without its Postgres row a hold could not be rebuilt, so when the write fails the item goes back.
 	async function remember(
 		saleId: string,
-		user: string,
+		user: Username,
 		answer: Extract<GateAnswer, { kind: "reserved" }>,
 	): Promise<void> {
 		const saved = await attemptAsync(
@@ -133,52 +176,42 @@ export function createReservationService(
 		}
 	}
 
+	// Whether the queue lets this shopper reserve now. The queue lives in Redis and can be lost, so a shopper who already
+	// bought is told so, rather than sent back to the queue.
+	async function admitted(
+		saleId: string,
+		user: Username,
+		ticket: string | undefined,
+	): Promise<Result<true, ReserveError>> {
+		const entry = await queue.check(saleId, user, ticket);
+		if (entry.isErr()) {
+			if (entry.error !== "not_in_queue") return new Err(entry.error);
+			const bought = await repository.hasPurchase(saleId, user);
+			return new Err(bought ? "already_purchased" : "not_admitted");
+		}
+		return entry.value.place.state === "admitted"
+			? new Ok(true)
+			: new Err("not_admitted");
+	}
+
 	return {
-		async reserve(
-			saleId: string,
-			user: string,
-			ticket: string | undefined,
-		): Promise<ReserveResult> {
-			const open = selling(await sales.details(saleId));
+		async reserve(saleId, user, ticket) {
+			const open = actionableSale(
+				await sales.details(saleId),
+				clock(),
+				reserveBlock,
+			);
 			if (open.isErr()) return new Err(open.error);
-			const { sale } = open.value;
 
-			const entry = await queue.check(saleId, user, ticket);
-			if (entry.isErr()) {
-				if (entry.error !== "not_in_queue") return new Err(entry.error);
-				// The queue is only in Redis and can be lost. A shopper who already bought is told so, not sent back.
-				const bought = await repository.hasPurchase(saleId, user);
-				return new Err(bought ? "already_purchased" : "not_admitted");
-			}
-			const { place } = entry.value;
-			if (place.state !== "admitted") return new Err("not_admitted");
+			const inLine = await admitted(saleId, user, ticket);
+			if (inLine.isErr()) return new Err(inLine.error);
 
-			const request = holdRequest(sale, user, randomUUID(), clock());
+			const request = holdRequest(open.value, user, randomUUID(), clock());
 			const { answer, written } = await decide(request);
-
-			switch (answer.kind) {
-				case "reserved":
-					if (!written) await remember(saleId, user, answer);
-					return new Ok({
-						created: true,
-						user,
-						reservationId: answer.reservationId,
-						expiresAt: answer.expiresAt,
-					});
-				case "held":
-					return new Ok({
-						created: false,
-						user,
-						reservationId: answer.reservationId,
-						expiresAt: answer.expiresAt,
-					});
-				case "purchased":
-					return new Err("already_purchased");
-				case "sold_out":
-					return new Err("sold_out");
-				case "not_ready":
-					return new Err("unavailable");
+			if (answer.kind === "reserved" && !written) {
+				await remember(saleId, user, answer);
 			}
+			return replyFor(answer, user);
 		},
 	};
 }

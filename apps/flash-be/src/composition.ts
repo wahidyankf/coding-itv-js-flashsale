@@ -1,5 +1,6 @@
 import { type Kysely, sql } from "kysely";
 import { createScryptHasher } from "./adapters/outbound/crypto/scrypt-hasher.js";
+import { randomTokenSource } from "./adapters/outbound/crypto/token-source.js";
 import { createMemoryRateLimitStore } from "./adapters/outbound/memory/memory-rate-limit-store.js";
 import { createMockPayment } from "./adapters/outbound/payment/mock-payment.js";
 import { createAccountStore } from "./adapters/outbound/postgres/account-store.js";
@@ -15,7 +16,10 @@ import { createRedisQueueStore } from "./adapters/outbound/redis/redis-queue-sto
 import { createRedisRateLimitStore } from "./adapters/outbound/redis/redis-rate-limit-store.js";
 import { createCachedSessionStore } from "./adapters/outbound/redis/redis-session-cache.js";
 import { systemClock } from "./adapters/outbound/system/system-clock.js";
-import { createAuthService } from "./application/auth-service.js";
+import {
+	type AuthService,
+	createAuthService,
+} from "./application/auth-service.js";
 import type { Dependencies } from "./application/dependencies.js";
 import { createGuardedGate } from "./application/guarded-gate.js";
 import type { Clock } from "./application/ports/clock.js";
@@ -80,17 +84,18 @@ export function dependenciesFrom(
 			createCachedSessionStore(createSessionStore(db), redis),
 			createScryptHasher(),
 			clock,
+			randomTokenSource,
 		),
 		sales,
 		admin: createSaleAdminService(createPostgresSaleAdmin(db), clock),
 		queue,
-		reservations: createReservationService(
+		reservations: createReservationService({
 			gate,
-			createReservationRepository(db),
+			repository: createReservationRepository(db),
 			sales,
 			queue,
 			clock,
-		),
+		}),
 		purchases: createPurchaseService(
 			createPurchaseRepository(db),
 			createMockPayment({
@@ -109,6 +114,18 @@ export function dependenciesFrom(
 			rateLimitsFrom(settings),
 		),
 	};
+}
+
+// The login and account rules over Postgres alone, for the command that makes an operator. That command runs without
+// Redis, so it gets no cached session store.
+export function postgresAuth(db: Kysely<Database>): AuthService {
+	return createAuthService(
+		createAccountStore(db),
+		createSessionStore(db),
+		createScryptHasher(),
+		systemClock,
+		randomTokenSource,
+	);
 }
 
 function rateLimitsFrom(settings: RateLimitSettings): RateLimits {
