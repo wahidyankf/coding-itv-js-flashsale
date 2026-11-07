@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	admissionsPerTick,
+	pickCurrent,
 	queueBlock,
 	remaining,
 	reserveBlock,
@@ -54,5 +55,42 @@ describe("sale rules", () => {
 		expect(admissionsPerTick(sale, 1000)).toBe(50);
 		expect(admissionsPerTick(sale, 200)).toBe(10);
 		expect(admissionsPerTick({ ...sale, admitPerSecond: 1 }, 100)).toBe(1);
+	});
+});
+
+describe("pickCurrent", () => {
+	const at = (name: string, from: string, to: string): Sale => ({
+		...sale,
+		id: name,
+		name,
+		startsAt: new Date(from),
+		endsAt: new Date(to),
+	});
+	const ended = at("ended", "2026-01-01T08:00:00Z", "2026-01-01T09:00:00Z");
+	const running = at("running", "2026-01-01T10:00:00Z", "2026-01-01T11:00:00Z");
+	const next = at("next", "2026-01-01T12:00:00Z", "2026-01-01T13:00:00Z");
+	const later = at("later", "2026-01-01T14:00:00Z", "2026-01-01T15:00:00Z");
+	const now = new Date("2026-01-01T10:30:00Z");
+
+	it("prefers the running sale over one that opens later", () => {
+		expect(pickCurrent([later, next, running, ended], now)?.name).toBe(
+			"running",
+		);
+	});
+
+	it("takes the sale that opens next when none is running", () => {
+		expect(
+			pickCurrent([later, next, ended], new Date("2026-01-01T11:30:00Z"))?.name,
+		).toBe("next");
+	});
+
+	it("counts a sale that opens at this moment as running, and one that closes at this moment as over", () => {
+		expect(pickCurrent([running], running.startsAt)?.name).toBe("running");
+		expect(pickCurrent([running], running.endsAt)).toBeUndefined();
+	});
+
+	it("finds nothing when every sale is over or there is none", () => {
+		expect(pickCurrent([ended], now)).toBeUndefined();
+		expect(pickCurrent([], now)).toBeUndefined();
 	});
 });

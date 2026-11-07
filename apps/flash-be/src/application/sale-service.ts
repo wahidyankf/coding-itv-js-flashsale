@@ -31,7 +31,7 @@ export function createSaleService(
 	return {
 		cacheMs: () => cache.ttlMs,
 		current: async () => {
-			const sale = await reads.findCurrent();
+			const sale = await reads.findCurrent(clock());
 			return sale === undefined ? undefined : view(sale);
 		},
 		byId: async (id) => {

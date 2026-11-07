@@ -104,6 +104,46 @@ describeFeature(
 		);
 
 		Scenario(
+			"The queue of the running sale is admitted while a later sale is scheduled",
+			({ Given, And, When, Then }) => {
+				const world = newWorld();
+
+				Given(
+					"a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour",
+					async () => {
+						await openSale(world);
+					},
+				);
+
+				And(
+					"a later sale that opens in 2 hours and closes in 3 hours",
+					async () => {
+						// The scenario keeps talking about the running sale; the later one only has to exist.
+						const running = world.saleId;
+						await world.addSale({
+							startsAt: relativeTime("in 2 hours", NOW),
+							endsAt: relativeTime("in 3 hours", NOW),
+						});
+						world.saleId = running;
+					},
+				);
+
+				And('"ana" has joined the queue', async () => {
+					await world.join("ana");
+				});
+
+				When("admission runs once", async () => {
+					await world.admit();
+				});
+
+				Then('"ana" is admitted', async () => {
+					const reply = await world.check("ana", world.tickets.get("ana"));
+					expect(reply.json().state).toBe("admitted");
+				});
+			},
+		);
+
+		Scenario(
 			"A shopper reads their place with their ticket",
 			({ Given, And, When, Then }) => {
 				const world = newWorld();

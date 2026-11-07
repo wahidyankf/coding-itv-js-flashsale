@@ -1,9 +1,9 @@
-import type { Kysely, Selectable } from "kysely";
+import { type Kysely, type Selectable, sql } from "kysely";
 import type { SaleRepository } from "../../../application/ports/sale-repository.js";
 import type { Sale } from "../../../domain/sale.js";
 import type { Database } from "./database.js";
 
-function toSale(row: Selectable<Database["sales"]>): Sale {
+export function toSale(row: Selectable<Database["sales"]>): Sale {
 	return {
 		id: row.id,
 		name: row.name,
@@ -26,11 +26,14 @@ export function createSaleRepository(db: Kysely<Database>): SaleRepository {
 				.executeTakeFirst();
 			return row === undefined ? undefined : toSale(row);
 		},
-		findCurrent: async () => {
+		// Same rule as `pickCurrent`: the running sale first, else the one that opens next; a sale that is over is skipped.
+		findCurrent: async (now) => {
 			const row = await db
 				.selectFrom("sales")
 				.selectAll()
-				.orderBy("starts_at", "desc")
+				.where("ends_at", ">", now)
+				.orderBy(sql<boolean>`starts_at <= ${now}`, "desc")
+				.orderBy("starts_at", "asc")
 				.limit(1)
 				.executeTakeFirst();
 			return row === undefined ? undefined : toSale(row);

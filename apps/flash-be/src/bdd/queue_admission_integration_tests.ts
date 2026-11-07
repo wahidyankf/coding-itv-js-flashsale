@@ -3,6 +3,7 @@ import { afterAll, expect } from "vitest";
 import { specFile } from "./support/paths.js";
 import { openQueueIntegration } from "./support/queue-integration.js";
 import type { QueueScenario } from "./support/queue-world.js";
+import { resetSales } from "./support/seed.js";
 import { relativeTime } from "./support/time.js";
 
 const NOW = new Date();
@@ -29,7 +30,12 @@ async function openSale(world: QueueScenario) {
 
 describeFeature(
 	await loadFeature(specFile("flash/be/behaviours/queue/admission.feature")),
-	({ Scenario }) => {
+	({ Scenario, BeforeEachScenario }) => {
+		// The server admits the sale shoppers are shown, so sales left by an earlier scenario must not be there.
+		BeforeEachScenario(async () => {
+			await resetSales(real.db);
+		});
+
 		Scenario(
 			"The queue admits shoppers in order at the sale's rate",
 			({ Given, And, When, Then }) => {
@@ -103,6 +109,46 @@ describeFeature(
 				Then('"ana" is waiting at place 1', async () => {
 					const reply = await world.check("ana", world.tickets.get("ana"));
 					expect(reply.json()).toMatchObject({ state: "waiting", place: 1 });
+				});
+			},
+		);
+
+		Scenario(
+			"The queue of the running sale is admitted while a later sale is scheduled",
+			({ Given, And, When, Then }) => {
+				const world = newWorld();
+
+				Given(
+					"a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour",
+					async () => {
+						await openSale(world);
+					},
+				);
+
+				And(
+					"a later sale that opens in 2 hours and closes in 3 hours",
+					async () => {
+						// The scenario keeps talking about the running sale; the later one only has to exist.
+						const running = world.saleId;
+						await world.addSale({
+							startsAt: relativeTime("in 2 hours", NOW),
+							endsAt: relativeTime("in 3 hours", NOW),
+						});
+						world.saleId = running;
+					},
+				);
+
+				And('"ana" has joined the queue', async () => {
+					await world.join("ana");
+				});
+
+				When("admission runs once", async () => {
+					await world.admit();
+				});
+
+				Then('"ana" is admitted', async () => {
+					const reply = await world.check("ana", world.tickets.get("ana"));
+					expect(reply.json().state).toBe("admitted");
 				});
 			},
 		);

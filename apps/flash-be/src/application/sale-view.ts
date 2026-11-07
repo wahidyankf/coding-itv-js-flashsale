@@ -16,6 +16,22 @@ export type SaleView = {
 	remaining: number;
 };
 
+// What the operator sees of a sale: the public view and the numbers only an operator needs.
+export type AdminSaleView = SaleView & {
+	sold: number;
+	holdSeconds: number;
+	admitPerSecond: number;
+};
+
+export function describeAdminSale(sale: Sale, now: Date): AdminSaleView {
+	return {
+		...describeSale(sale, now),
+		sold: sale.sold,
+		holdSeconds: sale.reservationTtlSeconds,
+		admitPerSecond: sale.admitPerSecond,
+	};
+}
+
 export function describeSale(sale: Sale, now: Date): SaleView {
 	return {
 		id: sale.id,

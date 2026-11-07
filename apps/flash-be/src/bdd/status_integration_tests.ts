@@ -71,26 +71,32 @@ describeFeature(
 		);
 
 		Scenario(
-			"The current sale is the one that opens last",
+			"The current sale is the one that is running, even when a later sale is scheduled",
 			({ Given, And, When, Then }) => {
 				let response: Response;
-				const seed = async (name: string, opened: string) => {
-					const startsAt = relativeTime(opened, new Date());
-					await insertSale(db, {
+				const ids = new Map<string, string>();
+				const seed = async (name: string, opens: string, closes: string) => {
+					const now = new Date();
+					ids.set(
 						name,
-						startsAt,
-						endsAt: new Date(startsAt.getTime() + 6 * 3_600_000),
-					});
+						await insertSale(db, {
+							name,
+							startsAt: relativeTime(opens, now),
+							endsAt: relativeTime(closes, now),
+						}),
+					);
 				};
 
 				Given(
-					"a sale named {string} that opened {any}",
-					async (_ctx, name: string, opened: string) => seed(name, opened),
+					"a sale named {string} that opens {any} and closes {any}",
+					async (_ctx, name: string, opens: string, closes: string) =>
+						seed(name, opens, closes),
 				);
 
 				And(
-					"a sale named {string} that opened {any}",
-					async (_ctx, name: string, opened: string) => seed(name, opened),
+					"a sale named {string} that opens {any} and closes {any}",
+					async (_ctx, name: string, opens: string, closes: string) =>
+						seed(name, opens, closes),
 				);
 
 				When("a client asks for the current sale", async () => {
@@ -104,6 +110,97 @@ describeFeature(
 				And("the sale name is {string}", (_ctx, name: string) => {
 					expect(response.json().name).toBe(name);
 				});
+			},
+		);
+
+		Scenario(
+			"With no running sale the current sale is the one that opens next",
+			({ Given, And, When, Then }) => {
+				let response: Response;
+				const ids = new Map<string, string>();
+				const seed = async (name: string, opens: string, closes: string) => {
+					const now = new Date();
+					ids.set(
+						name,
+						await insertSale(db, {
+							name,
+							startsAt: relativeTime(opens, now),
+							endsAt: relativeTime(closes, now),
+						}),
+					);
+				};
+
+				Given(
+					"a sale named {string} that opens {any} and closes {any}",
+					async (_ctx, name: string, opens: string, closes: string) =>
+						seed(name, opens, closes),
+				);
+
+				And(
+					"a sale named {string} that opens {any} and closes {any}",
+					async (_ctx, name: string, opens: string, closes: string) =>
+						seed(name, opens, closes),
+				);
+
+				When("a client asks for the current sale", async () => {
+					response = await app.inject({ method: "GET", url: "/sales/current" });
+				});
+
+				Then("the response status is 200", () => {
+					expect(response.statusCode).toBe(200);
+				});
+
+				And("the sale name is {string}", (_ctx, name: string) => {
+					expect(response.json().name).toBe(name);
+				});
+			},
+		);
+
+		Scenario(
+			"A sale that is over is not the current sale, but it can still be read by its id",
+			({ Given, And, When, Then }) => {
+				let response: Response;
+				const ids = new Map<string, string>();
+				const seed = async (name: string, opens: string, closes: string) => {
+					const now = new Date();
+					ids.set(
+						name,
+						await insertSale(db, {
+							name,
+							startsAt: relativeTime(opens, now),
+							endsAt: relativeTime(closes, now),
+						}),
+					);
+				};
+
+				Given(
+					"a sale named {string} that opens {any} and closes {any}",
+					async (_ctx, name: string, opens: string, closes: string) =>
+						seed(name, opens, closes),
+				);
+
+				When("a client asks for the current sale", async () => {
+					response = await app.inject({ method: "GET", url: "/sales/current" });
+				});
+
+				Then("the response status is 404", () => {
+					expect(response.statusCode).toBe(404);
+				});
+
+				And("the error is {string}", (_ctx, error: string) => {
+					expect(response.json().errorCode).toBe(error);
+				});
+
+				And(
+					"the sale named {string} has the status {string} when read by its id",
+					async (_ctx, name: string, status: string) => {
+						const read = await app.inject({
+							method: "GET",
+							url: `/sales/${ids.get(name)}`,
+						});
+						expect(read.json().status).toBe(status);
+					},
+				);
 			},
 		);
 

@@ -15,7 +15,7 @@ flowchart LR
   migrate["flash-be-migrate<br/>container, one-off job"]
   pg[("Postgres 18<br/>data store")]
   redis[("Redis 8<br/>data store")]
-  operator -->|POST /admin/sales| lb
+  operator -->|/admin/sales| lb
   web -->|sale routes, /health| lb
   lb -->|least connections| be
   be -->|SQL queries over TCP| pg
@@ -37,7 +37,7 @@ flowchart LR
   read only on the server. In production that address is nginx.
 - `nginx` is the one door to the API. It sends each request to the instance with the fewest open requests and sets
   `X-Forwarded-For` to the address it sees, so a caller cannot choose its own address for the rate limit. The operator
-  creates a sale through it with `POST /admin/sales`; the web server never passes that route on.
+  manages sales through it with the `/admin/sales` routes (create, list, change, remove); the web server never passes them on.
 - The three `flash-be` instances are identical. A queue ticket is signed with a shared secret, the state lives in
   Postgres and Redis, and one instance wins each admission tick, so any instance can serve any request.
 - `flash-be` runs SQL queries against Postgres over TCP through its Kysely query builder.

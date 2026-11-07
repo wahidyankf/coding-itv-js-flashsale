@@ -1,4 +1,5 @@
 import { Err, Ok, type Result } from "@flash/typekit";
+import type { Sale } from "./sale.js";
 
 // A sale to create. The window is absolute; the seed command works it out from minutes.
 export type NewSale = {
@@ -57,6 +58,42 @@ export function newSaleFrom(draft: SaleDraft): Result<NewSale, "invalid_sale"> {
 				admitPerSecond,
 			})
 		: new Err("invalid_sale");
+}
+
+// What an operator sends to change a sale. A field that is left out stays as it is.
+export type SalePatch = {
+	[Field in keyof SaleDraft]?: SaleDraft[Field] | undefined;
+};
+
+export type ChangeSaleError = "invalid_sale" | "sale_locked";
+
+// The sale after a change, or why it cannot change. The same rules as a new sale apply to the result. On top of that,
+// a sale that is over is closed for good, and one that has started keeps its start and can only get more stock.
+export function changeSaleFrom(
+	sale: Sale,
+	patch: SalePatch,
+	now: Date,
+): Result<NewSale, ChangeSaleError> {
+	if (Object.values(patch).every((value) => value === undefined)) {
+		return new Err("invalid_sale");
+	}
+	const changed = newSaleFrom({
+		name: patch.name ?? sale.name,
+		stock: patch.stock ?? sale.stock,
+		startsAt: patch.startsAt ?? sale.startsAt.toISOString(),
+		endsAt: patch.endsAt ?? sale.endsAt.toISOString(),
+		holdSeconds: patch.holdSeconds ?? sale.reservationTtlSeconds,
+		admitPerSecond: patch.admitPerSecond ?? sale.admitPerSecond,
+	});
+	if (changed.isErr()) return new Err(changed.error);
+	if (now >= sale.endsAt) return new Err("sale_locked");
+	const started = now >= sale.startsAt;
+	const movesStart =
+		changed.value.startsAt.getTime() !== sale.startsAt.getTime();
+	if (started && (movesStart || changed.value.stock < sale.stock)) {
+		return new Err("sale_locked");
+	}
+	return changed;
 }
 
 type Window = { startsAt: Date; endsAt: Date };

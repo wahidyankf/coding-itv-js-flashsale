@@ -4,7 +4,7 @@ import type { Dependencies } from "../../../application/dependencies.js";
 import type { SaleView } from "../../../application/sale-view.js";
 import type { Purchase } from "../../../domain/purchase.js";
 import type { QueuePlace } from "../../../domain/queue.js";
-import type { SaleDraft } from "../../../domain/sale-window.js";
+import type { SaleDraft, SalePatch } from "../../../domain/sale-window.js";
 import { MS_PER_SECOND } from "../../../domain/time.js";
 import {
 	ADMIN_AUTH_HEADER,
@@ -69,6 +69,29 @@ function saleDraftOf(body: unknown): SaleDraft | undefined {
 		holdSeconds: holdSeconds as number | undefined,
 		admitPerSecond: admitPerSecond as number | undefined,
 	};
+}
+
+// The type each field of a sale change must have, if it is there.
+const PATCH_FIELD_TYPE = {
+	name: "string",
+	startsAt: "string",
+	endsAt: "string",
+	stock: "number",
+	holdSeconds: "number",
+	admitPerSecond: "number",
+} as const;
+
+// A change to a sale, if every field that is there has the right type. A body with no field at all gives an empty
+// change, which the domain refuses.
+function salePatchOf(body: unknown): SalePatch | undefined {
+	const patch: Record<string, unknown> = {};
+	for (const [name, type] of Object.entries(PATCH_FIELD_TYPE)) {
+		const value = fieldOf(body, name);
+		if (value === undefined) continue;
+		if (typeof value !== type) return undefined;
+		patch[name] = value;
+	}
+	return patch as SalePatch;
 }
 
 // All routes are registered here. The paths, what each route takes and the replies are in docs/reference/http-endpoints.md.
@@ -176,7 +199,7 @@ export function registerRoutes(
 		},
 	});
 
-	// The sale a shopper sees. "current" is the sale that opens last.
+	// The sale a shopper sees. "current" is the running sale, else the one that opens next, else none.
 	app.route({
 		method: "GET",
 		url: "/sales/current",
@@ -391,6 +414,53 @@ export function registerRoutes(
 					.send(errorPayload(created.error));
 			}
 			return reply.code(HTTP_STATUS.created).send(created.value);
+		},
+	});
+
+	// An operator reads every sale, with the numbers that only an operator needs.
+	app.route({
+		method: "GET",
+		url: "/admin/sales",
+		onRequest: [limitAdmin, authorizeAdmin],
+		handler: async (_request, reply) =>
+			reply.code(HTTP_STATUS.ok).send({ sales: await deps.admin.list() }),
+	});
+
+	// An operator changes a sale. What may change depends on whether the sale has started (see `changeSaleFrom`).
+	app.route<{ Params: SaleParams }>({
+		method: "PATCH",
+		url: "/admin/sales/:saleId",
+		onRequest: [limitAdmin, authorizeAdmin],
+		handler: async (request, reply) => {
+			const patch = salePatchOf(request.body);
+			if (patch === undefined) {
+				return reply
+					.code(ERROR_STATUS.invalid_sale)
+					.send(errorPayload("invalid_sale"));
+			}
+			const changed = await deps.admin.update(request.params.saleId, patch);
+			if (changed.isErr()) {
+				return reply
+					.code(ERROR_STATUS[changed.error])
+					.send(errorPayload(changed.error));
+			}
+			return reply.code(HTTP_STATUS.ok).send(changed.value);
+		},
+	});
+
+	// An operator removes a sale that nobody has bought from.
+	app.route<{ Params: SaleParams }>({
+		method: "DELETE",
+		url: "/admin/sales/:saleId",
+		onRequest: [limitAdmin, authorizeAdmin],
+		handler: async (request, reply) => {
+			const removed = await deps.admin.remove(request.params.saleId);
+			if (removed.isErr()) {
+				return reply
+					.code(ERROR_STATUS[removed.error])
+					.send(errorPayload(removed.error));
+			}
+			return reply.code(HTTP_STATUS.ok).send({ id: request.params.saleId });
 		},
 	});
 

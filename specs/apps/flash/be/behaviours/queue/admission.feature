@@ -19,6 +19,13 @@ Feature: Admission from the queue
     When admission runs once
     Then "ana" is waiting at place 1
 
+  Scenario: The queue of the running sale is admitted while a later sale is scheduled
+    Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
+    And a later sale that opens in 2 hours and closes in 3 hours
+    And "ana" has joined the queue
+    When admission runs once
+    Then "ana" is admitted
+
   Scenario: A shopper reads their place with their ticket
     Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
     And "ana" has joined the queue

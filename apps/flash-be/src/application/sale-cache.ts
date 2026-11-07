@@ -57,11 +57,11 @@ export function createCachedSaleRepository(
 			if (entry) byId.set(id, entry);
 			return sale;
 		},
-		findCurrent: async () => {
-			if (off()) return inner.findCurrent();
+		findCurrent: async (now) => {
+			if (off()) return inner.findCurrent(now);
 			const hit = fresh(current);
 			if (hit) return hit;
-			const sale = await once("current", () => inner.findCurrent());
+			const sale = await once("current", () => inner.findCurrent(now));
 			current = remember(sale);
 			return sale;
 		},

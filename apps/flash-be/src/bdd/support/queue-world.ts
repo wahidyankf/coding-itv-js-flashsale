@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { buildApp } from "../../adapters/inbound/http/app.js";
 import { createMemoryRateLimitStore } from "../../adapters/outbound/memory/memory-rate-limit-store.js";
 import { createMockPayment } from "../../adapters/outbound/payment/mock-payment.js";
+import { admitCurrentSale } from "../../application/admission.js";
 import { createGuardedGate } from "../../application/guarded-gate.js";
 import type { Clock } from "../../application/ports/clock.js";
 import { createPurchaseService } from "../../application/purchase-service.js";
@@ -476,8 +477,10 @@ export function queueWorld(start: Date): UnitQueueScenario {
 		check: notWired,
 		reserve: notWired,
 		reserveAll: notWired,
-		async admit(saleId = scenario.saleId) {
-			await queue.admitTick(saleId);
+		// With no sale named, it is the tick the server runs: for the sale shoppers are shown now.
+		async admit(saleId) {
+			if (saleId === undefined) await admitCurrentSale(saleService, queue);
+			else await queue.admitTick(saleId);
 		},
 		async admitted(user) {
 			await scenario.join(user);

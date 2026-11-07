@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import type { Sale } from "./sale.js";
 import {
+	changeSaleFrom,
 	DEFAULT_ADMIT_PER_SECOND,
 	DEFAULT_HOLD_SECONDS,
 	DEFAULT_SALE_NAME,
@@ -60,6 +62,117 @@ describe("newSaleFrom", () => {
 
 	it("accepts the longest name", () => {
 		expect(newSaleFrom({ ...draft, name: "x".repeat(120) }).isOk()).toBe(true);
+	});
+});
+
+describe("changeSaleFrom", () => {
+	const sale: Sale = {
+		id: "00000000-0000-4000-8000-000000000000",
+		name: "Flash sale",
+		startsAt: new Date("2026-06-01T12:00:00Z"),
+		endsAt: new Date("2026-06-01T13:00:00Z"),
+		stock: 5,
+		sold: 2,
+		reservationTtlSeconds: 120,
+		admitPerSecond: 50,
+	};
+	const before = new Date("2026-06-01T11:00:00Z");
+	const during = new Date("2026-06-01T12:30:00Z");
+	const after = new Date("2026-06-01T13:00:00Z");
+
+	it("changes any field of a sale that has not started", () => {
+		const changed = changeSaleFrom(
+			sale,
+			{
+				name: "Spring",
+				stock: 3,
+				startsAt: "2026-06-01T14:00:00.000Z",
+				endsAt: "2026-06-01T15:00:00.000Z",
+				holdSeconds: 30,
+				admitPerSecond: 7,
+			},
+			before,
+		);
+		expect(changed.isOk() && changed.value).toEqual({
+			name: "Spring",
+			stock: 3,
+			startsAt: new Date("2026-06-01T14:00:00Z"),
+			endsAt: new Date("2026-06-01T15:00:00Z"),
+			reservationTtlSeconds: 30,
+			admitPerSecond: 7,
+		});
+	});
+
+	it("keeps what the patch leaves out", () => {
+		const changed = changeSaleFrom(sale, { stock: 9 }, before);
+		expect(changed.isOk() && changed.value).toMatchObject({
+			name: "Flash sale",
+			stock: 9,
+			startsAt: sale.startsAt,
+			endsAt: sale.endsAt,
+			reservationTtlSeconds: 120,
+			admitPerSecond: 50,
+		});
+	});
+
+	it("lets a running sale get more stock, a later end, a new name, hold time and rate", () => {
+		const changed = changeSaleFrom(
+			sale,
+			{
+				stock: 8,
+				endsAt: "2026-06-01T14:00:00.000Z",
+				name: "Extended",
+				holdSeconds: 60,
+				admitPerSecond: 10,
+			},
+			during,
+		);
+		expect(changed.isOk() && changed.value).toMatchObject({
+			stock: 8,
+			endsAt: new Date("2026-06-01T14:00:00Z"),
+			name: "Extended",
+			reservationTtlSeconds: 60,
+			admitPerSecond: 10,
+		});
+	});
+
+	it("accepts the same start and the same stock on a running sale", () => {
+		const changed = changeSaleFrom(
+			sale,
+			{ startsAt: sale.startsAt.toISOString(), stock: sale.stock },
+			during,
+		);
+		expect(changed.isOk()).toBe(true);
+	});
+
+	it.each([
+		["a later start", { startsAt: "2026-06-01T12:45:00.000Z" }],
+		["an earlier start", { startsAt: "2026-06-01T12:10:00.000Z" }],
+		["less stock", { stock: 4 }],
+	])("locks a running sale against %s", (_why, patch) => {
+		const changed = changeSaleFrom(sale, patch, during);
+		expect(changed.isErr() && changed.error).toBe("sale_locked");
+	});
+
+	it("locks a sale that is over, even for a change that would be valid", () => {
+		const changed = changeSaleFrom(sale, { stock: 9 }, after);
+		expect(changed.isErr() && changed.error).toBe("sale_locked");
+	});
+
+	it.each([
+		["nothing to change", {}],
+		["only fields that are left out", { stock: undefined }],
+		["a stock of zero", { stock: 0 }],
+		["an end before the start", { endsAt: "2026-06-01T11:00:00.000Z" }],
+		["an empty name", { name: " " }],
+	])("refuses %s", (_why, patch) => {
+		const changed = changeSaleFrom(sale, patch, before);
+		expect(changed.isErr() && changed.error).toBe("invalid_sale");
+	});
+
+	it("reports a value that is not valid before it reports a lock", () => {
+		const changed = changeSaleFrom(sale, { stock: 0 }, after);
+		expect(changed.isErr() && changed.error).toBe("invalid_sale");
 	});
 });
 

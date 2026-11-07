@@ -38,13 +38,13 @@ it("reads again once the time is over, for one sale and for the current sale", a
 	const { inner, reads, sale } = counting();
 	const cache = createCachedSaleRepository(inner, { ttlMs: 1000 }, () => now);
 	await cache.findById(sale.id);
-	await cache.findCurrent();
+	await cache.findCurrent(START);
 	await cache.findById(sale.id);
-	await cache.findCurrent();
+	await cache.findCurrent(START);
 	expect(reads).toEqual({ byId: 1, current: 1 });
 	now = new Date(START.getTime() + 1000);
 	await cache.findById(sale.id);
-	await cache.findCurrent();
+	await cache.findCurrent(START);
 	expect(reads).toEqual({ byId: 2, current: 2 });
 });
 
@@ -63,8 +63,8 @@ it("keeps nothing when the sale is not found", async () => {
 	const cache = createCachedSaleRepository(inner, { ttlMs: 1000 }, () => START);
 	await cache.findById("a");
 	await cache.findById("a");
-	await cache.findCurrent();
-	await cache.findCurrent();
+	await cache.findCurrent(START);
+	await cache.findCurrent(START);
 	expect(reads).toBe(4);
 });
 
@@ -76,8 +76,8 @@ it("goes to the repository every time when the time is zero, and forgets what it
 	settings.ttlMs = 0;
 	await cache.findById(sale.id);
 	await cache.findById(sale.id);
-	await cache.findCurrent();
-	await cache.findCurrent();
+	await cache.findCurrent(START);
+	await cache.findCurrent(START);
 	expect(reads).toEqual({ byId: 3, current: 2 });
 	settings.ttlMs = 1000;
 	await cache.findById(sale.id);

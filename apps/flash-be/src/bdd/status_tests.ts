@@ -67,23 +67,30 @@ describeFeature(
 		);
 
 		Scenario(
-			"The current sale is the one that opens last",
+			"The current sale is the one that is running, even when a later sale is scheduled",
 			({ Given, And, When, Then }) => {
 				const sales: Sale[] = [];
 				let response: Response;
+				const add = (name: string, opens: string, closes: string) => {
+					sales.push(
+						fakeSale({
+							name,
+							startsAt: relativeTime(opens, NOW),
+							endsAt: relativeTime(closes, NOW),
+						}),
+					);
+				};
 
 				Given(
-					"a sale named {string} that opened {any}",
-					(_ctx, name: string, opened: string) => {
-						sales.push(fakeSale({ name, startsAt: relativeTime(opened, NOW) }));
-					},
+					"a sale named {string} that opens {any} and closes {any}",
+					(_ctx, name: string, opens: string, closes: string) =>
+						add(name, opens, closes),
 				);
 
 				And(
-					"a sale named {string} that opened {any}",
-					(_ctx, name: string, opened: string) => {
-						sales.push(fakeSale({ name, startsAt: relativeTime(opened, NOW) }));
-					},
+					"a sale named {string} that opens {any} and closes {any}",
+					(_ctx, name: string, opens: string, closes: string) =>
+						add(name, opens, closes),
 				);
 
 				When("a client asks for the current sale", async () => {
@@ -100,6 +107,100 @@ describeFeature(
 				And("the sale name is {string}", (_ctx, name: string) => {
 					expect(response.json().name).toBe(name);
 				});
+			},
+		);
+
+		Scenario(
+			"With no running sale the current sale is the one that opens next",
+			({ Given, And, When, Then }) => {
+				const sales: Sale[] = [];
+				let response: Response;
+				const add = (name: string, opens: string, closes: string) => {
+					sales.push(
+						fakeSale({
+							name,
+							startsAt: relativeTime(opens, NOW),
+							endsAt: relativeTime(closes, NOW),
+						}),
+					);
+				};
+
+				Given(
+					"a sale named {string} that opens {any} and closes {any}",
+					(_ctx, name: string, opens: string, closes: string) =>
+						add(name, opens, closes),
+				);
+
+				And(
+					"a sale named {string} that opens {any} and closes {any}",
+					(_ctx, name: string, opens: string, closes: string) =>
+						add(name, opens, closes),
+				);
+
+				When("a client asks for the current sale", async () => {
+					response = await appFor(sales).inject({
+						method: "GET",
+						url: "/sales/current",
+					});
+				});
+
+				Then("the response status is 200", () => {
+					expect(response.statusCode).toBe(200);
+				});
+
+				And("the sale name is {string}", (_ctx, name: string) => {
+					expect(response.json().name).toBe(name);
+				});
+			},
+		);
+
+		Scenario(
+			"A sale that is over is not the current sale, but it can still be read by its id",
+			({ Given, And, When, Then }) => {
+				const sales: Sale[] = [];
+				let response: Response;
+				const add = (name: string, opens: string, closes: string) => {
+					sales.push(
+						fakeSale({
+							name,
+							startsAt: relativeTime(opens, NOW),
+							endsAt: relativeTime(closes, NOW),
+						}),
+					);
+				};
+
+				Given(
+					"a sale named {string} that opens {any} and closes {any}",
+					(_ctx, name: string, opens: string, closes: string) =>
+						add(name, opens, closes),
+				);
+
+				When("a client asks for the current sale", async () => {
+					response = await appFor(sales).inject({
+						method: "GET",
+						url: "/sales/current",
+					});
+				});
+
+				Then("the response status is 404", () => {
+					expect(response.statusCode).toBe(404);
+				});
+
+				And("the error is {string}", (_ctx, error: string) => {
+					expect(response.json().errorCode).toBe(error);
+				});
+
+				And(
+					"the sale named {string} has the status {string} when read by its id",
+					async (_ctx, name: string, status: string) => {
+						const sale = sales.find((candidate) => candidate.name === name);
+						const read = await appFor(sales).inject({
+							method: "GET",
+							url: `/sales/${sale?.id}`,
+						});
+						expect(read.json().status).toBe(status);
+					},
+				);
 			},
 		);
 

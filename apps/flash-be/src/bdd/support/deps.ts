@@ -11,6 +11,9 @@ export const healthyDeps: Dependencies = {
 	admin: {
 		authorize: () => new Err("not_found"),
 		create: async () => new Err("sale_overlaps"),
+		update: async () => new Err("sale_not_found"),
+		remove: async () => new Err("sale_not_found"),
+		list: async () => [],
 	},
 	queue: {
 		join: async () => new Err("sale_not_found"),

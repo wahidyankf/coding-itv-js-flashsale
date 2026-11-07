@@ -21,6 +21,19 @@ export function saleStatus(sale: Sale, now: Date): SaleStatus {
 	return sale.sold >= sale.stock ? "sold_out" : "active";
 }
 
+// The sale shoppers are shown: the one whose window holds `now`, else the one that opens next, else none. A sale that
+// has ended is not current any more (it can still be read by its id). Windows never overlap, so at most one is running.
+export function pickCurrent(
+	sales: readonly Sale[],
+	now: Date,
+): Sale | undefined {
+	const notOver = sales.filter((sale) => now < sale.endsAt);
+	return (
+		notOver.find((sale) => sale.startsAt <= now) ??
+		[...notOver].sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime())[0]
+	);
+}
+
 // The items nobody holds or bought yet, counting only sales.
 export function remaining(sale: Sale): number {
 	return Math.max(sale.stock - sale.sold, 0);

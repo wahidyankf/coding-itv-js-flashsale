@@ -18,12 +18,26 @@ Feature: Sale status
       | 10    | 3    | 2 hours ago | 1 hour ago | ended    | 7         |
       | 10    | 10   | 1 hour ago  | in 1 hour  | sold_out | 0         |
 
-  Scenario: The current sale is the one that opens last
-    Given a sale named "Earlier" that opened 2 hours ago
-    And a sale named "Later" that opened 1 hour ago
+  Scenario: The current sale is the one that is running, even when a later sale is scheduled
+    Given a sale named "Running" that opens 1 hour ago and closes in 1 hour
+    And a sale named "Later" that opens in 2 hours and closes in 3 hours
     When a client asks for the current sale
     Then the response status is 200
-    And the sale name is "Later"
+    And the sale name is "Running"
+
+  Scenario: With no running sale the current sale is the one that opens next
+    Given a sale named "Later" that opens in 3 hours and closes in 4 hours
+    And a sale named "Soon" that opens in 1 hour and closes in 2 hours
+    When a client asks for the current sale
+    Then the response status is 200
+    And the sale name is "Soon"
+
+  Scenario: A sale that is over is not the current sale, but it can still be read by its id
+    Given a sale named "Over" that opens 3 hours ago and closes 2 hours ago
+    When a client asks for the current sale
+    Then the response status is 404
+    And the error is "sale_not_found"
+    And the sale named "Over" has the status "ended" when read by its id
 
   Scenario: There is no current sale before one is created
     Given no sale exists

@@ -3,6 +3,7 @@ import { buildApp } from "./adapters/inbound/http/app.js";
 import { DEFAULT_STREAM_OPTIONS } from "./adapters/inbound/http/event-stream.js";
 import { createDb } from "./adapters/outbound/postgres/database.js";
 import { createRedis } from "./adapters/outbound/redis/redis-client.js";
+import { admitCurrentSale } from "./application/admission.js";
 import { dependenciesFrom } from "./composition.js";
 import { config, describeConfig } from "./config.js";
 
@@ -19,10 +20,10 @@ const app = buildApp(deps, {
 
 // Admits the next shoppers of the current sale. Every instance runs this; the store lets one win each tick.
 const admitter = setInterval(async () => {
-	const ticked = await attemptAsync(async () => {
-		const sale = await deps.sales.current();
-		if (sale) await deps.queue.admitTick(sale.id);
-	}, Error);
+	const ticked = await attemptAsync(
+		() => admitCurrentSale(deps.sales, deps.queue),
+		Error,
+	);
 	if (ticked.isErr()) {
 		app.log.error({ err: ticked.error }, "admission tick failed");
 	}

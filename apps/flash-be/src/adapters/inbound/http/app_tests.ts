@@ -17,6 +17,7 @@ function appWith(deps: Dependencies = healthyDeps) {
 }
 
 const json = { "content-type": "application/json" };
+const MISSING_SALE = "00000000-0000-4000-8000-000000000000";
 const QUEUE = "/sales/00000000-0000-4000-8000-000000000000/queue";
 
 describe("the errors of the HTTP edge", () => {
@@ -155,6 +156,18 @@ describe("the admin route at the edge", () => {
 		const reply = await app.inject({
 			method: "POST",
 			url: "/admin/sales",
+			headers: { ...json, authorization: `Bearer ${TOKEN}` },
+			payload: JSON.stringify({ stock: "many" }),
+		});
+		expect(reply.statusCode).toBe(400);
+		expect(reply.json()).toEqual(errorPayload("invalid_sale"));
+	});
+
+	it("refuses a change with a field of the wrong type as `invalid_sale`", async () => {
+		const app = appWith({ ...healthyDeps, admin: open });
+		const reply = await app.inject({
+			method: "PATCH",
+			url: `/admin/sales/${MISSING_SALE}`,
 			headers: { ...json, authorization: `Bearer ${TOKEN}` },
 			payload: JSON.stringify({ stock: "many" }),
 		});
