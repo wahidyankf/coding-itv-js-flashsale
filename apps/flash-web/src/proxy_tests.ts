@@ -24,6 +24,10 @@ describe("isAllowed", () => {
 		["GET", `/sales/${ID}/queue`],
 		["GET", `/sales/${ID}/reservations`],
 		["DELETE", `/sales/${ID}`],
+		["POST", "/admin/sales"],
+		["GET", "/admin/sales"],
+		["PATCH", `/admin/sales/${ID}`],
+		["DELETE", `/admin/sales/${ID}`],
 		["GET", "/sales/../ready"],
 		["GET", "/ready"],
 		["GET", "/health"],
@@ -108,24 +112,32 @@ describe("proxyToBackend", () => {
 		expect(fetcher).not.toHaveBeenCalled();
 	});
 
-	it("never passes an operator route on to the API", async () => {
-		const fetcher = vi.fn<typeof fetch>();
-		const reply = await proxyToBackend(
-			new Request("http://web.test/api/admin/sales", {
-				method: "POST",
-				headers: { authorization: "Bearer operator-secret-0001" },
-				body: "{}",
-			}),
-			ENV,
-			fetcher,
-		);
-		expect(reply.status).toBe(404);
-		expect(await reply.json()).toEqual({
-			errorCode: "not_found",
-			errorMessage: "Nothing was found at this address.",
-		});
-		expect(fetcher).not.toHaveBeenCalled();
-	});
+	it.each([
+		["POST", "/api/admin/sales", "{}"],
+		["GET", "/api/admin/sales", undefined],
+		["PATCH", `/api/admin/sales/${ID}`, '{"stock":9}'],
+		["DELETE", `/api/admin/sales/${ID}`, undefined],
+	])(
+		"never passes the operator route %s %s on to the API",
+		async (method, path, body) => {
+			const fetcher = vi.fn<typeof fetch>();
+			const reply = await proxyToBackend(
+				new Request(`http://web.test${path}`, {
+					method,
+					headers: { authorization: "Bearer operator-secret-0001" },
+					...(body === undefined ? {} : { body }),
+				}),
+				ENV,
+				fetcher,
+			);
+			expect(reply.status).toBe(404);
+			expect(await reply.json()).toEqual({
+				errorCode: "not_found",
+				errorMessage: "Nothing was found at this address.",
+			});
+			expect(fetcher).not.toHaveBeenCalled();
+		},
+	);
 
 	it("answers 502 when the API cannot be reached", async () => {
 		const reply = await proxyToBackend(

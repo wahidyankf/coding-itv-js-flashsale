@@ -4,6 +4,7 @@ import {
 	errorText,
 	holdingText,
 	STATUS_LABEL,
+	STATUS_NOTE,
 	TEXT,
 	waitingText,
 } from "./messages";
@@ -59,6 +60,14 @@ describe("sentences", () => {
 	it("names the place and the seconds", () => {
 		expect(waitingText(4)).toContain("Your place: 4.");
 		expect(holdingText(30)).toContain("within 30 seconds");
+	});
+
+	it("says something plain for every status", () => {
+		expect(Object.keys(STATUS_NOTE).sort()).toEqual(
+			Object.keys(STATUS_LABEL).sort(),
+		);
+		for (const note of Object.values(STATUS_NOTE))
+			expect(note.length).toBeGreaterThan(0);
 	});
 
 	it("labels every status", () => {

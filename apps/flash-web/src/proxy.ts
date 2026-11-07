@@ -3,7 +3,8 @@ import { RETRY_AFTER_HEADER, STATUS, TICKET_HEADER } from "./api";
 import { buildConfig } from "./config";
 
 // The routes the browser may reach, each with its one method. Anything else is not the browser's. In particular the
-// operator route (`POST /admin/sales`) is not here, and `/sales/current` comes first so it is not taken for a sale.
+// operator routes (`GET /admin/sales`, `POST /admin/sales`, `PATCH` and `DELETE /admin/sales/:saleId`) are not here, and
+// `/sales/current` comes first so it is not taken for a sale.
 const ALLOWED: Array<[method: string, path: RegExp]> = [
 	["GET", /^\/sales\/current$/],
 	["GET", /^\/sales\/(?<saleId>[^/]+)$/],

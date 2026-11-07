@@ -7,6 +7,14 @@ export const STATUS_LABEL: Record<SaleStatus, string> = {
 	ended: "Ended",
 };
 
+// One plain sentence under the status: what the shopper can do now. The times of the window are shown next to it.
+export const STATUS_NOTE: Record<SaleStatus, string> = {
+	upcoming: "Buying opens when the sale starts.",
+	active: "The sale is open. Enter your name and press Buy Now.",
+	sold_out: "All items have been bought.",
+	ended: "This sale is over.",
+};
+
 // The same rule the API uses for a user id (trimmed, lowercased), so a bad name is refused before anything is sent.
 // A copy of `normalizeUser` in flash-be; `same_as_be_tests.ts` fails when the two differ.
 const USER_ID = /^[a-z0-9][a-z0-9._@+-]{0,63}$/;
@@ -27,7 +35,11 @@ export const TEXT = {
 	nothing: "You have no purchase and no hold.",
 	placeLost: "Your place was lost. Press Buy Now to join again.",
 	noSale: "No sale is open right now.",
+	noSaleHint: "Check back later, and reload this page to see a new sale.",
 	loadFailed: "The sale could not be loaded.",
+	loadFailedHint: "Reload the page to try again.",
+	waitingHint: "You can keep this page open. It updates by itself.",
+	pending: "Loading the sale…",
 	paymentFailed:
 		"Payment failed. Your item is still held. Press Confirm purchase to try again.",
 };

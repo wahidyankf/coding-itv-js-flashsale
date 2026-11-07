@@ -47,6 +47,45 @@ describeFeature(
 		);
 
 		Scenario(
+			"The page says so when the last sale is over",
+			({ Given, When, Then }) => {
+				Given(
+					"a sale with stock 10 and 3 sold that opens 2 hours ago and closes 1 hour ago",
+					async () => openSale(world, 10, 3, "2 hours ago", "1 hour ago"),
+				);
+
+				When("a visitor opens the page", async () => world.openPage());
+
+				Then("the page says {string}", async (_ctx, text: string) =>
+					world.expectPageSays(text),
+				);
+			},
+		);
+
+		Scenario(
+			"The page follows the sale to its end",
+			({ Given, And, When, Then }) => {
+				Given(SALE_WITH_3, async () =>
+					openSale(world, 10, 3, "1 hour ago", "in 1 hour"),
+				);
+
+				And("a visitor has the page open", async () => world.openPage());
+
+				When("the sale ends", async () => world.endSale());
+
+				Then(
+					"the page shows the status {string}",
+					async (_ctx, label: string) =>
+						world.expectPageSays(`Status: ${label}`),
+				);
+
+				And('the "Buy Now" button is disabled', async () =>
+					world.expectButton("Buy Now", "disabled"),
+				);
+			},
+		);
+
+		Scenario(
 			"The page says so when no sale exists",
 			({ Given, When, Then }) => {
 				Given("no sale exists", () => {});

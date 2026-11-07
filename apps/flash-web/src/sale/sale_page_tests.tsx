@@ -9,7 +9,14 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SaleClient } from "./client";
 import { SalePage } from "./sale-page";
-import type { Place, SaleView } from "./types";
+import type {
+	ApiResult,
+	JoinedView,
+	OutcomeView,
+	Place,
+	PurchaseView,
+	SaleView,
+} from "./types";
 
 const SALE: SaleView = {
 	id: "11111111-1111-4111-8111-111111111111",
@@ -165,5 +172,139 @@ describe("SalePage", () => {
 	it("builds its own client when none is given", () => {
 		render(<SalePage load={{ state: "none" }} />);
 		expect(screen.getByText("No sale is open right now.")).toBeTruthy();
+	});
+
+	it("explains a missing sale calmly, and an unreadable one as an alert", () => {
+		const { unmount } = render(<SalePage load={{ state: "none" }} />);
+		expect(screen.getByText(/Check back later/)).toBeTruthy();
+		expect(screen.queryByRole("alert")).toBeNull();
+		unmount();
+		render(<SalePage load={{ state: "error" }} />);
+		const alert = screen.getByRole("alert");
+		expect(alert.textContent).toContain("The sale could not be loaded.");
+		expect(alert.textContent).toContain("Reload the page to try again.");
+	});
+
+	it("shows the window of the sale and a plain line for its status", () => {
+		const { container } = render(
+			<SalePage
+				load={{ state: "ok", sale: { ...SALE, status: "upcoming" } }}
+				client={stubClient().client}
+			/>,
+		);
+		expect(screen.getByText("Buying opens when the sale starts.")).toBeTruthy();
+		const times = [...container.querySelectorAll("time")].map((time) =>
+			time.getAttribute("datetime"),
+		);
+		expect(times).toEqual([SALE.startsAt, SALE.endsAt]);
+	});
+});
+
+// A request that stays open until the test answers it.
+function deferred<T>() {
+	let resolve: (value: T) => void = () => {};
+	const promise = new Promise<T>((done) => {
+		resolve = done;
+	});
+	return { promise, answer: (value: T) => resolve(value) };
+}
+
+// The spinner is a ring with no words, so it is found by its animation class.
+const spinners = (root: ParentNode = document.body) =>
+	root.querySelectorAll('[class*="animate-spin"]');
+
+describe("loading indicators", () => {
+	it("shows a spinner on Buy Now, and keeps its name, while the queue is joined", async () => {
+		const request = deferred<ApiResult<JoinedView>>();
+		const { client } = stubClient({
+			join: vi.fn(() => request.promise),
+		});
+		render(<SalePage load={{ state: "ok", sale: SALE }} client={client} />);
+		expect(spinners()).toHaveLength(0);
+		fireEvent.change(screen.getByLabelText(/Your name/), {
+			target: { value: "ana" },
+		});
+		await press("Buy Now");
+		const buy = screen.getByRole("button", { name: "Buy Now" });
+		expect(spinners(buy)).toHaveLength(1);
+		expect(
+			spinners(screen.getByRole("button", { name: "Check my status" })),
+		).toHaveLength(0);
+		expect(screen.getByRole("status").getAttribute("aria-busy")).toBe("true");
+		expect(screen.getByRole("status").textContent).toContain(
+			"Joining the queue",
+		);
+		await act(async () =>
+			request.answer(
+				new Ok({ userId: "ana", ticket: "t", state: "admitted" as const }),
+			),
+		);
+		expect(spinners()).toHaveLength(0);
+		expect(screen.getByRole("status").getAttribute("aria-busy")).toBe("false");
+	});
+
+	it("keeps a spinner and says the page updates by itself while the shopper waits in the queue", async () => {
+		const { client } = stubClient();
+		render(<SalePage load={{ state: "ok", sale: SALE }} client={client} />);
+		await buyAs("ana");
+		expect(
+			spinners(screen.getByRole("button", { name: "Buy Now" })),
+		).toHaveLength(1);
+		expect(screen.getByRole("status").textContent).toContain("Your place: 2");
+		expect(screen.getByRole("status").textContent).toContain(
+			"updates by itself",
+		);
+	});
+
+	it("shows a spinner on Check my status while it asks", async () => {
+		const request = deferred<ApiResult<OutcomeView>>();
+		const { client } = stubClient({
+			outcome: vi.fn(() => request.promise),
+		});
+		render(<SalePage load={{ state: "ok", sale: SALE }} client={client} />);
+		fireEvent.change(screen.getByLabelText(/Your name/), {
+			target: { value: "ana" },
+		});
+		await press("Check my status");
+		expect(
+			spinners(screen.getByRole("button", { name: "Check my status" })),
+		).toHaveLength(1);
+		expect(
+			spinners(screen.getByRole("button", { name: "Buy Now" })),
+		).toHaveLength(0);
+		await act(async () =>
+			request.answer(new Ok({ userId: "ana", state: "none" as const })),
+		);
+		expect(spinners()).toHaveLength(0);
+	});
+
+	it("shows a spinner on Confirm purchase while the payment runs", async () => {
+		const request = deferred<ApiResult<PurchaseView>>();
+		const { client } = stubClient({
+			join: vi.fn(
+				async () =>
+					new Ok({ userId: "ana", ticket: "t", state: "admitted" as const }),
+			),
+			confirm: vi.fn(() => request.promise),
+		});
+		render(<SalePage load={{ state: "ok", sale: SALE }} client={client} />);
+		await buyAs("ana");
+		expect(spinners()).toHaveLength(0);
+		await press("Confirm purchase");
+		expect(
+			spinners(screen.getByRole("button", { name: "Confirm purchase" })),
+		).toHaveLength(1);
+		expect(screen.getByRole("status").textContent).toContain("Paying");
+		await act(async () =>
+			request.answer(
+				new Ok({
+					userId: "ana",
+					purchaseId: "p",
+					reservationId: "r1",
+					purchasedAt: "2026-06-01T12:00:00.000Z",
+				}),
+			),
+		);
+		expect(spinners()).toHaveLength(0);
 	});
 });

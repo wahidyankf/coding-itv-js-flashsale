@@ -15,8 +15,19 @@ Feature: Sale status on the page
       | sold | opens       | closes     | label        | left | button   |
       | 3    | 1 hour ago  | in 1 hour  | On sale      | 7    | enabled  |
       | 3    | in 1 hour   | in 2 hours | Not open yet | 7    | disabled |
-      | 3    | 2 hours ago | 1 hour ago | Ended        | 7    | disabled |
       | 10   | 1 hour ago  | in 1 hour  | Sold out     | 0    | disabled |
+
+  Scenario: The page says so when the last sale is over
+    Given a sale with stock 10 and 3 sold that opens 2 hours ago and closes 1 hour ago
+    When a visitor opens the page
+    Then the page says "No sale is open right now."
+
+  Scenario: The page follows the sale to its end
+    Given a sale with stock 10 and 3 sold that opens 1 hour ago and closes in 1 hour
+    And a visitor has the page open
+    When the sale ends
+    Then the page shows the status "Ended"
+    And the "Buy Now" button is disabled
 
   Scenario: The page says so when no sale exists
     Given no sale exists

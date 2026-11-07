@@ -10,10 +10,13 @@ import {
 } from "./messages";
 import type { ApiFailure, Place, SaleStatus } from "./types";
 
+// What the shopper asked for, so the page can show the spinner on the button that was pressed.
+export type Action = "buy" | "check" | "confirm";
+
 // Where the shopper is. `busy` is a request in flight; `message` is a result the shopper reads and moves on from.
 export type Phase =
 	| { kind: "idle" }
-	| { kind: "busy"; text: string }
+	| { kind: "busy"; action: Action; text: string }
 	| { kind: "waiting"; place: number }
 	| {
 			kind: "holding";
@@ -81,7 +84,7 @@ export function useShopper(
 		});
 
 	const reserve = async (id: string, name: string, ticket: string) => {
-		setPhase({ kind: "busy", text: TEXT.reserving });
+		setPhase({ kind: "busy", action: "buy", text: TEXT.reserving });
 		const reserved = await client.reserve(id, name, ticket);
 		if (reserved.isErr()) return fail(reserved.error);
 		const expiresAt = Date.parse(reserved.value.expiresAt);
@@ -99,7 +102,7 @@ export function useShopper(
 			return setPhase({ kind: "message", text: TEXT.invalidUser });
 		stop();
 		user.current = name;
-		setPhase({ kind: "busy", text: TEXT.joining });
+		setPhase({ kind: "busy", action: "buy", text: TEXT.joining });
 		const joined = await client.join(saleId, name);
 		if (joined.isErr()) return fail(joined.error);
 
@@ -124,7 +127,7 @@ export function useShopper(
 	const confirm = async () => {
 		if (phase.kind !== "holding") return;
 		const held = phase;
-		setPhase({ kind: "busy", text: TEXT.paying });
+		setPhase({ kind: "busy", action: "confirm", text: TEXT.paying });
 		const confirmed = await client.confirm(
 			saleId,
 			user.current,
@@ -143,7 +146,7 @@ export function useShopper(
 			return setPhase({ kind: "message", text: TEXT.invalidUser });
 		stop();
 		user.current = name;
-		setPhase({ kind: "busy", text: TEXT.checking });
+		setPhase({ kind: "busy", action: "check", text: TEXT.checking });
 		const outcome = await client.outcome(saleId, name);
 		if (outcome.isErr()) return fail(outcome.error);
 		const found = outcome.value;

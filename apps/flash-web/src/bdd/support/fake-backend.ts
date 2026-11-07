@@ -343,7 +343,10 @@ export function createFakeBackend(now: () => number) {
 			if (!match) return refuse("not_found");
 			const { name: route, params } = match;
 			if (route === "currentSale") {
-				return sale ? reply(200, view()) : refuse("sale_not_found");
+				// Like the real API: a sale that is over is no longer the current sale.
+				return sale && view().status !== "ended"
+					? reply(200, view())
+					: refuse("sale_not_found");
 			}
 			if (params.saleId !== SALE_ID || !sale) return refuse("sale_not_found");
 			const name = String(body.userId ?? params.userId ?? "")
