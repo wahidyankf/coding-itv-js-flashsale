@@ -110,13 +110,13 @@ listed here as name, type and note. The six audit columns of every table are in 
 
 ### purchases
 
-| column_name      | data_type | note                                                           |
-| ---------------- | --------- | -------------------------------------------------------------- |
-| `id`             | `uuid`    | Primary key. Default `gen_random_uuid()`.                      |
-| `sale_id`        | `uuid`    | Not null. Foreign key to `sales.id`, `ON DELETE RESTRICT`.     |
-| `user_id`        | `uuid`    | Not null. Foreign key to `users.id`.                           |
-| `reservation_id` | `uuid`    | Not null. Unique. The key that makes a repeat confirm a no-op. |
-| `payment_ref`    | `text`    | Not null. The payment reference.                               |
+| column_name      | data_type | note                                                                              |
+| ---------------- | --------- | --------------------------------------------------------------------------------- |
+| `id`             | `uuid`    | Primary key. Default `gen_random_uuid()`. The shopper sees it as the Purchase ID. |
+| `sale_id`        | `uuid`    | Not null. Foreign key to `sales.id`, `ON DELETE RESTRICT`.                        |
+| `user_id`        | `uuid`    | Not null. Foreign key to `users.id`.                                              |
+| `reservation_id` | `uuid`    | Not null. Unique. The key that makes a repeat confirm a no-op.                    |
+| `payment_ref`    | `text`    | Not null. The payment reference, used to refund. Never sent to the shopper.       |
 
 ### reservations
 

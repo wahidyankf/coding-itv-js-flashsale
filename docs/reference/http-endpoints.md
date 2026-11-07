@@ -276,6 +276,9 @@ from the reservation reply: `{ "reservationId" }`.
 The reservation id is the idempotency key. Sending the same request again returns `200` with the same purchase, and the
 shopper is charged once.
 
+`purchaseId` is the id of the purchase row. flash-web shows it to the shopper as the **Purchase ID**, the number to keep.
+The payment reference stays in the database for refunds and is not in any reply.
+
 | Status | `errorCode`             | When                                                                                              |
 | ------ | ----------------------- | ------------------------------------------------------------------------------------------------- |
 | `400`  | `invalid_reservation`   | the reservation id is missing or is not an id                                                     |
