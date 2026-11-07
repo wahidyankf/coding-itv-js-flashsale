@@ -60,8 +60,8 @@ tree and where to add each kind of thing; the [code map](docs/reference/code-map
 linter enforces that; see [failures as values](docs/explanation/failures-as-values.md). It holds types only.
 
 `libs/flash-commons` (`@flash/flash-commons`) holds the behaviour and values that 3 or more places across the apps
-share: retry with exponential backoff, a max attempt count and jitter, the time units, the HTTP status numbers and a
-`sleep` (on its own entry, `/timers`, so the main entry stays pure). Every
+share: retry with exponential backoff, a max attempt count and jitter, the time units, the HTTP status numbers, the
+payload decoders, the id rule, the cookie jar of the tests, the time phrases of the scenarios and a `sleep` (on its own entry, `/timers`, so the main entry stays pure). Every
 retry in the repository goes through it ([decision 017](docs/explanation/decisions/017-retry-backoff-jitter.md),
 [policies](docs/reference/flash-commons.md)). A value repeated a third time gets one name
 ([decision 016](docs/explanation/decisions/016-dry-rule-of-three.md)).

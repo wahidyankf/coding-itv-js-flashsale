@@ -25,7 +25,7 @@ src/
     outbound/postgres/   the repositories, the shared queries, health.ts (the /ready check), and migrations/
                          (hand-written; the SQL of one that has run never changes)
     outbound/redis/      the hold gate, the queue, the rate limit counters and the session cache, as single scripts;
-                         redis-health.ts (the /ready check)
+                         redis-health.ts (the /ready check), reply.ts (reading a script's reply)
     outbound/crypto/     scrypt password hashes and random tokens
     outbound/payment/    the in-process mock payment
     outbound/memory/     the rate limit store used when Redis is down

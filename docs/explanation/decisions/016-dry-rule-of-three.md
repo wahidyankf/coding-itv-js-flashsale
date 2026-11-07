@@ -22,8 +22,9 @@ more places before this rule.
 - **Test oracles are the exception.** The e2e steps, the k6 script and the prod smoke script write the API's paths, header
   names, error codes and expected statuses themselves. Values that are not our contract (time units, the standard HTTP
   status numbers) are shared from `flash-commons`.
-- **Two places stay copied.** The sale id rule, the password limits and the ticket header are used by `flash-be` and
-  `flash-web` only. `apps/flash-web/src/same_as_be_tests.ts` fails if a copy drifts.
+- **Two places stay copied.** The password limits, the user name rule and the ticket header are used by `flash-be` and
+  `flash-web` only. `apps/flash-web/src/same_as_be_tests.ts` fails if a copy drifts. The sale id rule (`isUuid`) was
+  in this list until the uuid decoder made it a third place; it now lives in `flash-commons`.
 
 ## Alternatives considered
 

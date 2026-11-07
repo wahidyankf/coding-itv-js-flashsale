@@ -29,8 +29,9 @@ stores and many rules. `flash-web` has no store and no sale rules. It shows the 
 - It costs more files and one place of wiring. A change to a port touches the port, its adapters and its memory copy.
   Most ports have one real implementation, on purpose: they keep a service from naming Redis or Postgres.
 - It buys rules that are unit-tested without stores, and scenarios that run the production services against memory ports.
-- `flash-web` copies a few small rules of the API that only the two of them use (the sale id rule, the password limits and
-  the ticket header). `same_as_be_tests.ts` fails if a copy drifts. Time units and HTTP status numbers are not copied:
+- `flash-web` copies a few small rules of the API that only the two of them use (the user name rule, the password limits and
+  the ticket header). `same_as_be_tests.ts` fails if a copy drifts. Time units, HTTP status numbers and the id rule
+  (`isUuid`) are not copied:
   they come from `@flash/flash-commons` (see [016](016-dry-rule-of-three.md)).
 
 ## Revisit when

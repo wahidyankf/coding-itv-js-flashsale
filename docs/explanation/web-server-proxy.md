@@ -58,8 +58,8 @@ A waiting shopper is told when the sale ends or sells out. The queue stops admit
 would show the last place forever.
 
 Names are checked in the page with the same pattern the API uses, so a bad name never leaves the browser. The web app
-keeps its own copy of that rule, and of the sale id rule and the `not_found` reply; `same_as_be_tests.ts` fails if a
-copy drifts from `flash-be`.
+keeps its own copy of that rule and of the `not_found` reply; `same_as_be_tests.ts` fails if a copy drifts from
+`flash-be`. The sale id rule is not copied: both apps take `isUuid` from `@flash/flash-commons`.
 
 ## Related
 

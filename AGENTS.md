@@ -5,7 +5,7 @@ Guidance for AI coding agents working in this repository. For setup and run comm
 ## Project
 
 Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `flash-be` (Fastify REST API), `flash-web` (TanStack Start client, styled with Tailwind CSS),
-`flash-be-e2e` and `flash-web-e2e` (Playwright), and `flash-load` (k6 load test). `libs/typekit` (`@flash/typekit`) holds `Result` and `attempt` and nothing else: the type of a failure and the wrappers that make one, with no rule of any app and no shared helper. `libs/flash-commons` (`@flash/flash-commons`) holds the behaviour and values that several apps share: retry with backoff and jitter, time units and HTTP status numbers on its pure main entry, and `sleep` on `@flash/flash-commons/timers`. Data lives in Postgres (Kysely, no ORM) and Redis. [docs/reference/code-map.md](docs/reference/code-map.md) says where each kind of thing lives, and each app's `README.md` says where to add one.
+`flash-be-e2e` and `flash-web-e2e` (Playwright), and `flash-load` (k6 load test). `libs/typekit` (`@flash/typekit`) holds `Result` and `attempt` and nothing else: the type of a failure and the wrappers that make one, with no rule of any app and no shared helper. `libs/flash-commons` (`@flash/flash-commons`) holds the behaviour and values that several apps share: retry with backoff and jitter, time units, HTTP status numbers, the payload decoders, the id rule (`isUuid`), the cookie jar and the time phrases of the scenarios on its pure main entry, and `sleep` on `@flash/flash-commons/timers`. Data lives in Postgres (Kysely, no ORM) and Redis. [docs/reference/code-map.md](docs/reference/code-map.md) says where each kind of thing lives, and each app's `README.md` says where to add one.
 
 ## Docs and specs
 

@@ -9,15 +9,18 @@ in Node, the browser and k6, and flash-be's domain may import it. The one timer 
 It is a workspace package. Build it with `npx nx build flash-commons`. Its Nx targets build `typekit` first. The apps
 that import it (all five) build it first too, as they do for typekit.
 
-The library has five modules, one per concern:
+The library has eight modules, one per concern:
 
-| Module                  | What it holds                                                                                                                               | Used by                                                                                                                          |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `retry.ts`              | the backoff, `retry` and `retryAsync`                                                                                                       | flash-be (rebuild wait, Redis reconnect), flash-web (live streams), flash-be-e2e (`pollUntil`), flash-load (k6 join and payment) |
-| `time.ts`               | `MS_PER_SECOND`, `MS_PER_MINUTE`, `MS_PER_HOUR`                                                                                             | flash-be, flash-web, flash-be-e2e, flash-web-e2e, flash-load                                                                     |
-| `http-status.ts`        | `HTTP_STATUS`, `FIRST_ERROR_STATUS`, `FIRST_SERVER_ERROR_STATUS`                                                                            | flash-be, flash-web, flash-load, flash-be-e2e                                                                                    |
-| `timers.ts` (`/timers`) | `sleep`, the one timer helper                                                                                                               | flash-be (mock payment, rebuild wait), flash-web (live streams), flash-be-e2e, flash-load (runner)                               |
-| `decode.ts`             | the decoder kit: `Decoder`, `DecodeError`, `text`, `integer`, `isoDate`, `uuid`, `literal`, `oneOf`, `optional`, `object`, `tagged`, `both` | flash-web (every reply and stream event); flash-be (request bodies)                                                              |
+| Module                  | What it holds                                                                                                                                         | Used by                                                                                                                          |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `retry.ts`              | the backoff, `retry` and `retryAsync`                                                                                                                 | flash-be (rebuild wait, Redis reconnect), flash-web (live streams), flash-be-e2e (`pollUntil`), flash-load (k6 join and payment) |
+| `time.ts`               | `MS_PER_SECOND`, `MS_PER_MINUTE`, `MS_PER_HOUR`                                                                                                       | flash-be, flash-web, flash-be-e2e, flash-web-e2e, flash-load                                                                     |
+| `http-status.ts`        | `HTTP_STATUS`, `FIRST_ERROR_STATUS`, `FIRST_SERVER_ERROR_STATUS`                                                                                      | flash-be, flash-web, flash-load, flash-be-e2e                                                                                    |
+| `timers.ts` (`/timers`) | `sleep`, the one timer helper                                                                                                                         | flash-be (mock payment, rebuild wait), flash-web (live streams), flash-be-e2e, flash-load (runner)                               |
+| `decode.ts`             | the decoder kit: `Decoder`, `DecodeError`, `text`, `integer`, `isoDate`, `uuid`, `literal`, `oneOf`, `optional`, `object`, `tagged`, `both`, `refine` | flash-web (every reply and stream event); flash-be (request bodies)                                                              |
+| `uuid.ts`               | `isUuid`, the id rule (sales, holds, products)                                                                                                        | flash-be (domain), flash-web (proxy), `decode.ts` (`uuid`)                                                                       |
+| `cookies.ts`            | `parseSetCookie`, `applySetCookies`, `cookieHeader`, `cookieHeaderOf`: a cookie jar with RFC 6265 path matching                                       | the test worlds of flash-be and flash-web, flash-be-e2e, flash-web-e2e                                                           |
+| `relative-time.ts`      | `relativeTime`, the time phrases of the scenarios ("in 2 hours", "1 hour ago")                                                                        | the test support of flash-be, flash-web and flash-be-e2e (flash-web-e2e through it)                                              |
 
 ## Time units
 
@@ -125,6 +128,14 @@ decodeSale(JSON.parse(text)).match({
 });
 ```
 
+## Test helpers
+
+`cookies.ts` and `relative-time.ts` serve the tests of several apps. The cookie jar keeps the cookies a reply sets and
+sends each one only to the paths RFC 6265 allows, so `/auth` reaches `/auth/refresh` but not `/authx`; the jars of the
+apps used to differ on that. `relativeTime` reads a scenario's "in 2 hours" against the moment the layer picks, and
+throws on a phrase it does not know, because that is a mistake in the scenario, not a failure to handle. The cookie
+names and paths a test expects stay written in the test: they are the API's contract.
+
 ## Waiting
 
 `timers.ts`, imported as `@flash/flash-commons/timers`, has `sleep(ms, signal?)`: a promise that resolves after `ms`
@@ -141,5 +152,6 @@ npx nx test:coverage flash-commons   # unit tests with the 99% floor
 ```
 
 Its tests are plain Vitest tests next to the source (`src/retry_tests.ts`, `src/time_tests.ts`,
-`src/http-status_tests.ts`, `src/timers_tests.ts`, `src/decode_tests.ts`, `src/index_tests.ts`). They have no Gherkin scenario, because a retry rule or a constant is a
+`src/http-status_tests.ts`, `src/timers_tests.ts`, `src/decode_tests.ts`, `src/uuid_tests.ts`, `src/cookies_tests.ts`,
+`src/relative-time_tests.ts`, `src/index_tests.ts`). They have no Gherkin scenario, because a retry rule or a constant is a
 developer's concern, not a shopper's.

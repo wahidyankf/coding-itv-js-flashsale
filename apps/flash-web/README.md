@@ -29,8 +29,10 @@ src/
     *.tsx              the cards: status, stock meter, buy actions
   auth/              everything about the account: the form, its checks, its words, the account hook and client
   components/        look and parts shared by sale/ and auth/ (ui.ts holds the Tailwind class lists)
-  bdd/               the Gherkin bindings of specs/apps/flash/web; bdd/support holds the worlds and the fake backend
-  same_as_be_tests.ts  fails when a rule copied from flash-be drifts (user name, password, sale id, ticket header, two replies)
+  bdd/               the Gherkin bindings of specs/apps/flash/web: each <feature>_tests.tsx (unit) and
+                     <feature>_integration_tests.tsx names the scenarios; bdd/support holds the worlds, the fake backend,
+                     one bind-<feature>.ts per feature that both layers run, and the shared steps (web-steps.ts)
+  same_as_be_tests.ts  fails when a rule copied from flash-be drifts (user name, password, ticket header, two replies)
 ```
 
 `sale/` and `auth/` never import each other. What both need lives directly in `src/`.
