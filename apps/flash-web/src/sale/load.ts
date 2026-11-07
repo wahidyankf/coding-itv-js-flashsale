@@ -2,7 +2,7 @@
 // tells "no sale" apart from "could not read it", so the page can say which.
 import { callApi } from "../api";
 import { buildConfig } from "../config";
-import type { SaleView } from "./types";
+import { decodeSaleView, type SaleView } from "./types";
 
 // What the server knows when the page is first rendered: the sale, no sale yet, or a sale that could not be read.
 export type SaleLoad =
@@ -15,9 +15,10 @@ export async function loadSale(
 	env: NodeJS.ProcessEnv,
 	fetcher: typeof fetch = fetch,
 ): Promise<SaleLoad> {
-	const found = await callApi<SaleView>(
+	const found = await callApi(
 		fetcher,
 		`${buildConfig(env).backendUrl}/sales/current`,
+		decodeSaleView,
 	);
 	return found.match({
 		ok: (sale): SaleLoad => ({ state: "ok", sale }),

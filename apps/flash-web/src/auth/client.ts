@@ -1,7 +1,11 @@
 // The browser's calls for the account: who am I, sign up, log in, and log out. Each one goes to the web server, which
 // passes it on to flash-be and carries the cookies. The page gets this client, so a test can give it a fake.
+import { object } from "@flash/flash-commons";
 import { type ApiResult, callApi, jsonPost } from "../api";
-import type { Account } from "./types";
+import { type Account, decodeAccount } from "./types";
+
+// The logout reply is an empty object. The page does not read it, but it must still be an object.
+const decodeLoggedOut = object({});
 
 // What the page asks of the account, in one place.
 export type AuthClient = {
@@ -20,15 +24,21 @@ export function createAuthClient(
 	const post = (body?: object) =>
 		jsonPost(body === undefined ? "{}" : JSON.stringify(body));
 	return {
-		me: () => callApi<Account>(fetcher, `${auth}/me`),
+		me: () => callApi(fetcher, `${auth}/me`, decodeAccount),
 		register: (username, password) =>
-			callApi<Account>(
+			callApi(
 				fetcher,
 				`${auth}/register`,
+				decodeAccount,
 				post({ username, password }),
 			),
 		login: (username, password) =>
-			callApi<Account>(fetcher, `${auth}/login`, post({ username, password })),
-		logout: () => callApi<unknown>(fetcher, `${auth}/logout`, post()),
+			callApi(
+				fetcher,
+				`${auth}/login`,
+				decodeAccount,
+				post({ username, password }),
+			),
+		logout: () => callApi(fetcher, `${auth}/logout`, decodeLoggedOut, post()),
 	};
 }

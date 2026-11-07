@@ -3,9 +3,9 @@
 // the account imports the other for it.
 import { HTTP_STATUS } from "@flash/flash-commons";
 import { attemptAsync } from "@flash/typekit";
-import { callApi, jsonPost } from "./api";
+import { callApi, decodeRefusal, jsonPost, readBody } from "./api";
 import { type AuthClient, createAuthClient } from "./auth/client";
-import type { Account } from "./auth/types";
+import { decodeAccount } from "./auth/types";
 import { createSaleClient, type SaleClient } from "./sale/client";
 import { createWatcher, type Watcher, type WatchOptions } from "./sale/sse";
 
@@ -28,9 +28,10 @@ export function withRefresh(
 	let refreshing: Promise<boolean> | undefined;
 	const refresh = (): Promise<boolean> => {
 		refreshing ??= (async () => {
-			const traded = await callApi<Account>(
+			const traded = await callApi(
 				fetcher,
 				`${base}/api/auth/refresh`,
+				decodeAccount,
 				jsonPost("{}"),
 			);
 			return traded.isOk();
@@ -39,14 +40,14 @@ export function withRefresh(
 		});
 		return refreshing;
 	};
-	// Only a 401 that names `not_authenticated` means the login is gone; any other failure is passed back as it is.
+	// Only a 401 whose body is a refusal that names `not_authenticated` means the login is gone; any other failure, and a
+	// body that does not decode, is passed back as it is.
 	const isLoginLost = async (reply: Response): Promise<boolean> => {
 		if (reply.status !== HTTP_STATUS.unauthorized) return false;
-		const body = await attemptAsync(
-			async () => (await reply.clone().json()) as { errorCode?: unknown },
-			Error,
-		);
-		return body.isOk() && body.value.errorCode === "not_authenticated";
+		const body = await attemptAsync(() => reply.clone().text(), Error);
+		if (body.isErr()) return false;
+		const refusal = readBody(body.value, decodeRefusal);
+		return refusal.isOk() && refusal.value.errorCode === "not_authenticated";
 	};
 	return async (input, init) => {
 		const reply = await fetcher(input, init);

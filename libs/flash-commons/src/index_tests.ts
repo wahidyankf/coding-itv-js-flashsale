@@ -13,8 +13,20 @@ describe("public surface", () => {
 			"MS_PER_MINUTE",
 			"MS_PER_SECOND",
 			"backoffDelayMs",
+			"both",
+			"integer",
+			"isoDate",
+			"literal",
+			"nonEmptyText",
+			"nonNegativeInteger",
+			"object",
+			"oneOf",
+			"optional",
 			"retry",
 			"retryAsync",
+			"tagged",
+			"text",
+			"uuid",
 		]);
 	});
 

@@ -20,10 +20,12 @@ export type Subscription = {
 	onGiveUp?: () => void;
 };
 
-// Starts reading a stream and calls `onEvent` for each event. Returns a way to stop it.
+// Starts reading a stream and calls `onEvent` for each event. `onEvent` returns true when it used the event, and false when
+// it dropped it (for example, a frame that does not decode). Only a used frame shows that the stream is alive. Returns a
+// way to stop it.
 export type Watcher = (
 	url: string,
-	onEvent: (event: string, data: unknown) => void,
+	onEvent: (event: string, data: unknown) => boolean,
 	subscription?: Subscription,
 ) => () => void;
 
@@ -49,7 +51,7 @@ const LIVE_POLICY: RetryPolicy = {
 };
 
 type Frame = { event: string; data: unknown };
-type Listener = (event: string, data: unknown) => void;
+type Listener = (event: string, data: unknown) => boolean;
 // `refused`: asking again would get the same answer, so the watcher stops. `failed`: no frame came, so the try counts.
 type Failure = "refused" | "failed";
 
@@ -91,9 +93,9 @@ async function readFrames(
 }
 
 // One connection: asks for the stream. A refusal (401, 404) is Err "refused". Any other failure, and a stream that ends
-// or breaks before it delivered a frame, is Err "failed". A stream that delivered a frame is Ok, whether it then ends or
-// breaks. A keep-alive is not a frame: flash-be sends the first event on connect, so a stream that carries none is not
-// healthy, and it must not reset the count.
+// or breaks before it delivered a used frame, is Err "failed". A stream that delivered one is Ok, whether it then ends or
+// breaks. A keep-alive is not a frame, and neither is a frame the listener drops: flash-be sends the first event on
+// connect, so a stream that carries none the page can use is not healthy, and it must not reset the count.
 async function connectOnce(
 	fetcher: typeof fetch,
 	url: string,
@@ -117,8 +119,9 @@ async function connectOnce(
 	const body = response.body;
 	const received = { frame: false };
 	const onFrame: Listener = (event, data) => {
-		received.frame = true;
-		onEvent(event, data);
+		const used = onEvent(event, data);
+		if (used) received.frame = true;
+		return used;
 	};
 	// A drop mid-stream is not reported: whether a frame came is what decides the try. The error is not needed.
 	if (body) await attemptAsync(() => readFrames(body, onFrame), Error);
@@ -126,9 +129,10 @@ async function connectOnce(
 }
 
 // The watcher keeps a stream open until it is stopped. Each outage gets up to `maxAttempts` tries, waiting a jittered
-// backoff between them. A try that delivers a frame starts a fresh count after a short wait. A try that ends or breaks
-// with no frame is a failure, so a server that keeps accepting and closing still reaches the give-up. When the last try
-// of an outage fails, the watcher stops and tells the subscription. A refusal stops it at once.
+// backoff between them. A try that delivers a frame the listener used starts a fresh count after a short wait. A try
+// that ends or breaks with no such frame is a failure, so a server that keeps accepting and closing, or that sends only
+// frames the page cannot read, still reaches the give-up. When the last try of an outage fails, the watcher stops and
+// tells the subscription. A refusal stops it at once.
 export function createWatcher(options: WatchOptions = {}): Watcher {
 	const policy = options.policy ?? LIVE_POLICY;
 	const wait = options.sleep ?? sleep;

@@ -59,6 +59,16 @@ describe("createAuthClient", () => {
 		);
 	});
 
+	it("calls an account that does not decode unexpected", async () => {
+		const { api } = client(() => Response.json({ username: "ana" }));
+		expect(await api.me()).toEqual(
+			new Err({
+				errorCode: "unexpected",
+				errorMessage: "The server sent a reply that this app cannot read.",
+			}),
+		);
+	});
+
 	it("works with the defaults", () => {
 		expect(typeof createAuthClient().me).toBe("function");
 	});

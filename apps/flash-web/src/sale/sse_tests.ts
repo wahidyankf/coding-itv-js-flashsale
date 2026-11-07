@@ -68,7 +68,10 @@ describe("createWatcher", () => {
 		});
 		const stop = createWatcher({ fetcher, sleep: tick, random: noJitter })(
 			"/api/sales/x/events",
-			(event, data) => events.push([event, data]),
+			(event, data) => {
+				events.push([event, data]);
+				return true;
+			},
 			{ headers: { "x-queue-ticket": "t" } },
 		);
 		// The stream ends at once and is opened again, so the same frame may come more than once; the first is enough.
@@ -86,7 +89,7 @@ describe("createWatcher", () => {
 			const onGiveUp = vi.fn();
 			createWatcher({ fetcher, sleep: tick, random: noJitter })(
 				"/x",
-				() => {},
+				() => true,
 				{ onGiveUp },
 			);
 			await vi.waitFor(() => expect(fetcher).toHaveBeenCalled());
@@ -115,7 +118,10 @@ describe("createWatcher", () => {
 		const seen: unknown[] = [];
 		const stop = createWatcher({ fetcher, sleep: tick, random: noJitter })(
 			"/x",
-			(_event, data) => seen.push(data),
+			(_event, data) => {
+				seen.push(data);
+				return true;
+			},
 		);
 		await vi.waitFor(() =>
 			expect(seen).toEqual(expect.arrayContaining([{ n: 2 }])),
@@ -128,7 +134,7 @@ describe("createWatcher", () => {
 		const fetcher = vi.fn(async () => new Response(body()));
 		const stop = createWatcher({ fetcher, sleep: tick, random: noJitter })(
 			"/x",
-			() => {},
+			() => true,
 		);
 		await vi.waitFor(() => expect(fetcher).toHaveBeenCalled());
 		stop();
@@ -147,18 +153,30 @@ describe("createWatcher", () => {
 			policy: { baseMs: 100, capMs: 300, maxAttempts: 4 },
 			sleep,
 			random: halfOfBound,
-		})("/x", () => {}, { onGiveUp });
+		})("/x", () => true, { onGiveUp });
 		await vi.waitFor(() => expect(onGiveUp).toHaveBeenCalledOnce());
 		expect(fetcher).toHaveBeenCalledTimes(4);
 		// The bounds are 100, 200 and then the cap of 300; each wait is half of its bound.
 		expect(waits).toEqual([50, 100, 150]);
 	});
 
+	it("counts a 200 with no body as a failed try, so it gives up", async () => {
+		const { waits, sleep } = recordWaits();
+		const fetcher = vi.fn(async () => new Response(null, { status: 200 }));
+		const onGiveUp = vi.fn();
+		createWatcher({ fetcher, sleep, random: topOfBound })("/x", () => true, {
+			onGiveUp,
+		});
+		await vi.waitFor(() => expect(onGiveUp).toHaveBeenCalledOnce());
+		expect(fetcher).toHaveBeenCalledTimes(8);
+		expect(waits).toEqual([1_000, 2_000, 4_000, 8_000, 16_000, 30_000, 30_000]);
+	});
+
 	it("makes eight attempts by default, waiting from 1 s up to 30 s apart", async () => {
 		const { waits, sleep } = recordWaits();
 		const fetcher = vi.fn(async () => new Response("busy", { status: 503 }));
 		const onGiveUp = vi.fn();
-		createWatcher({ fetcher, sleep, random: topOfBound })("/x", () => {}, {
+		createWatcher({ fetcher, sleep, random: topOfBound })("/x", () => true, {
 			onGiveUp,
 		});
 		await vi.waitFor(() => expect(onGiveUp).toHaveBeenCalledOnce());
@@ -176,7 +194,7 @@ describe("createWatcher", () => {
 			const { waits, sleep } = recordWaits();
 			const fetcher = vi.fn(async () => new Response(makeBody()));
 			const onGiveUp = vi.fn();
-			createWatcher({ fetcher, sleep, random: topOfBound })("/x", () => {}, {
+			createWatcher({ fetcher, sleep, random: topOfBound })("/x", () => true, {
 				onGiveUp,
 			});
 			await vi.waitFor(() => expect(onGiveUp).toHaveBeenCalledOnce());
@@ -194,9 +212,13 @@ describe("createWatcher", () => {
 			async () => plan.shift() ?? new Response("late", { status: 503 }),
 		);
 		const onGiveUp = vi.fn();
-		createWatcher({ fetcher, sleep: tick, random: noJitter })("/x", () => {}, {
-			onGiveUp,
-		});
+		createWatcher({ fetcher, sleep: tick, random: noJitter })(
+			"/x",
+			() => true,
+			{
+				onGiveUp,
+			},
+		);
 		await vi.waitFor(() => expect(onGiveUp).toHaveBeenCalledOnce());
 		expect(fetcher).toHaveBeenCalledTimes(16);
 	});
@@ -213,7 +235,10 @@ describe("createWatcher", () => {
 		const onGiveUp = vi.fn();
 		createWatcher({ fetcher, sleep: tick, random: noJitter })(
 			"/x",
-			(_event, data) => seen.push(data),
+			(_event, data) => {
+				seen.push(data);
+				return true;
+			},
 			{ onGiveUp },
 		);
 		await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
@@ -221,6 +246,18 @@ describe("createWatcher", () => {
 		await tick();
 		expect(seen).toEqual([{ n: 1 }]);
 		expect(onGiveUp).not.toHaveBeenCalled();
+	});
+
+	it("does not count a frame the listener refuses as a live stream, so a stream of refused frames gives up", async () => {
+		const fetcher = vi.fn(async () => new Response(body(SALE_FRAME)));
+		const onGiveUp = vi.fn();
+		createWatcher({ fetcher, sleep: tick, random: noJitter })(
+			"/x",
+			() => false,
+			{ onGiveUp },
+		);
+		await vi.waitFor(() => expect(onGiveUp).toHaveBeenCalledOnce());
+		expect(fetcher).toHaveBeenCalledTimes(8);
 	});
 
 	it("gives up at once when it is stopped during a wait, and reports nothing", async () => {
@@ -233,7 +270,7 @@ describe("createWatcher", () => {
 				stopWatching();
 			},
 			random: noJitter,
-		})("/x", () => {}, { onGiveUp });
+		})("/x", () => true, { onGiveUp });
 		await vi.waitFor(() => expect(fetcher).toHaveBeenCalled());
 		await tick();
 		await tick();
@@ -245,7 +282,7 @@ describe("createWatcher", () => {
 		const fetcher = vi.fn(async () => new Response("no", { status: 404 }));
 		vi.stubGlobal("fetch", fetcher);
 		try {
-			createWatcher()("/x", () => {});
+			createWatcher()("/x", () => true);
 			await vi.waitFor(() => expect(fetcher).toHaveBeenCalled());
 		} finally {
 			vi.unstubAllGlobals();

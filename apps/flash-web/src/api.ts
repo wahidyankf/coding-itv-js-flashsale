@@ -1,6 +1,14 @@
 // What the web app knows about the HTTP API of flash-be: the header names, the failure a reply can carry, and `callApi`,
-// the one call that turns a reply into a `Result`. Every error of the API has the shape
-// `{ errorCode, errorMessage }`, plus `retryAfterSeconds` on a rate limit.
+// the one call that turns a reply into a `Result`. Every error of the API has the shape `{ errorCode, errorMessage }`,
+// plus `retryAfterSeconds` on a rate limit. Every reply is decoded before the page uses it.
+import {
+	type DecodeError,
+	type Decoder,
+	integer,
+	object,
+	optional,
+	text,
+} from "@flash/flash-commons";
 import { attempt, attemptAsync, Err, Ok, type Result } from "@flash/typekit";
 
 // The header that carries the queue ticket. The page sends it, and the proxy passes it on.
@@ -29,6 +37,14 @@ const UNEXPECTED: ApiFailure = {
 	errorMessage: "The server sent a reply that this app cannot read.",
 };
 
+// The body of every refusal. The wait is whole seconds, as the API counts them; the header that carries it wins (see
+// `retryAfter`). A body with a field of the wrong type is a reply this app cannot read, not a refusal it can show.
+export const decodeRefusal = object({
+	errorCode: text,
+	errorMessage: text,
+	retryAfterSeconds: optional(integer),
+});
+
 // A POST whose body is JSON. The caller passes the body already as text: "{}" when there is nothing to send.
 export function jsonPost(
 	body: string,
@@ -41,22 +57,33 @@ export function jsonPost(
 	};
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-	typeof value === "object" && value !== null;
-
-// The wait the API asks for: the header first, then the body.
-function retryAfter(header: string | null, body: Record<string, unknown>) {
-	const fromHeader = header === null ? Number.NaN : Number(header);
-	if (Number.isFinite(fromHeader)) return fromHeader;
-	const fromBody = Number(body.retryAfterSeconds);
-	return Number.isFinite(fromBody) ? fromBody : undefined;
+// Reads the text of a body as JSON, then checks the value with the decoder. A text that is not JSON gives a SyntaxError;
+// a value that does not decode gives a DecodeError that names the field.
+export function readBody<T>(
+	body: string,
+	decode: Decoder<T>,
+): Result<T, DecodeError | SyntaxError> {
+	const json = attempt(() => JSON.parse(body) as unknown, SyntaxError);
+	if (json.isErr()) return new Err(json.error);
+	return decode(json.value);
 }
 
-// One request. A reply with a 2xx status is trusted to be the `T` the caller names: there is no schema check, because
-// flash-be and this app ship together.
+// The wait the API asks for: the header first, then the body. A header that is not a number does not count.
+function retryAfter(
+	header: string | null,
+	fromBody: number | undefined,
+): number | undefined {
+	const fromHeader = header === null ? Number.NaN : Number(header);
+	return Number.isFinite(fromHeader) ? fromHeader : fromBody;
+}
+
+// One request. A 2xx reply is the `T` the caller names only when `decode` accepts its body; a reply that does not decode is
+// "unexpected", the same as a reply that is not JSON, so the page never shows a value of the wrong shape. A refusal is read
+// with `decodeRefusal`, and one that does not decode is "unexpected" too.
 export async function callApi<T>(
 	fetcher: typeof fetch,
 	url: string,
+	decode: Decoder<T>,
 	init: RequestInit = {},
 ): Promise<ApiResult<T>> {
 	const sent = await attemptAsync(async () => {
@@ -64,27 +91,22 @@ export async function callApi<T>(
 		return {
 			ok: reply.ok,
 			wait: reply.headers.get(RETRY_AFTER_HEADER),
-			text: await reply.text(),
+			body: await reply.text(),
 		};
 	}, Error);
 	if (sent.isErr()) return new Err(NETWORK);
 
-	const { ok, wait, text } = sent.value;
-	const json = attempt(() => JSON.parse(text) as unknown, SyntaxError);
-	if (json.isErr()) return new Err(UNEXPECTED);
-	if (ok) return new Ok(json.value as T);
-
-	const body = json.value;
-	if (
-		!isRecord(body) ||
-		typeof body.errorCode !== "string" ||
-		typeof body.errorMessage !== "string"
-	) {
-		return new Err(UNEXPECTED);
+	const { ok, wait, body } = sent.value;
+	if (ok) {
+		const decoded = readBody(body, decode);
+		return decoded.isOk() ? new Ok(decoded.value) : new Err(UNEXPECTED);
 	}
+
+	const refusal = readBody(body, decodeRefusal);
+	if (refusal.isErr()) return new Err(UNEXPECTED);
 	return new Err({
-		errorCode: body.errorCode,
-		errorMessage: body.errorMessage,
-		retryAfterSeconds: retryAfter(wait, body),
+		errorCode: refusal.value.errorCode,
+		errorMessage: refusal.value.errorMessage,
+		retryAfterSeconds: retryAfter(wait, refusal.value.retryAfterSeconds),
 	});
 }

@@ -89,6 +89,22 @@ describe("withRefresh", () => {
 					{ status: 403 },
 				),
 		],
+		[
+			"a 401 that names no sentence",
+			() => Response.json({ errorCode: "not_authenticated" }, { status: 401 }),
+		],
+		[
+			"a 401 whose body cannot be read",
+			() =>
+				new Response(
+					new ReadableStream({
+						pull(controller) {
+							controller.error(new TypeError("connection reset"));
+						},
+					}),
+					{ status: 401 },
+				),
+		],
 		["a 500", () => new Response("no", { status: 500 })],
 	])("does not refresh for %s", async (_name, answer) => {
 		const fetcher = fetcherOf({ "/api/a": [answer] });

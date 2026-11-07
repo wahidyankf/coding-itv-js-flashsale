@@ -2,6 +2,22 @@
 // Only the names below are public; a module's helpers stay private to it.
 
 export {
+	both,
+	type DecodeError,
+	type Decoder,
+	integer,
+	isoDate,
+	literal,
+	nonEmptyText,
+	nonNegativeInteger,
+	object,
+	oneOf,
+	optional,
+	tagged,
+	text,
+	uuid,
+} from "./decode.js";
+export {
 	FIRST_ERROR_STATUS,
 	FIRST_SERVER_ERROR_STATUS,
 	HTTP_STATUS,

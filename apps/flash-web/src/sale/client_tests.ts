@@ -14,14 +14,16 @@ const rateLimited = {
 };
 
 const SALE = "11111111-1111-4111-8111-111111111111";
+const RESERVATION = "33333333-3333-4333-8333-333333333333";
+const PURCHASE_ID = "44444444-4444-4444-8444-444444444444";
 const WHEN = "2026-06-01T12:00:00.000Z";
 
 const JOINED = { userId: "ana", ticket: "t", state: "admitted" } as const;
-const RESERVED = { userId: "ana", reservationId: "r1", expiresAt: WHEN };
+const RESERVED = { userId: "ana", reservationId: RESERVATION, expiresAt: WHEN };
 const PURCHASE = {
 	userId: "ana",
-	purchaseId: "p1",
-	reservationId: "r1",
+	purchaseId: PURCHASE_ID,
+	reservationId: RESERVATION,
 	purchasedAt: WHEN,
 };
 const SALE_VIEW = {
@@ -179,6 +181,52 @@ describe("createSaleClient", () => {
 		watch.mock.calls[1]?.[2]?.onGiveUp?.();
 		expect(giveUpSale).toHaveBeenCalledOnce();
 		expect(giveUpPlace).toHaveBeenCalledOnce();
+	});
+
+	it("calls a join reply that does not decode unexpected", async () => {
+		const { api } = client(() =>
+			Response.json({ userId: "ana", ticket: "t" }, { status: 201 }),
+		);
+		expect(await api.join(SALE)).toEqual(unexpected);
+	});
+
+	it("calls a reservation with a bad expiry unexpected", async () => {
+		const { api } = client(() =>
+			Response.json(
+				{ userId: "ana", reservationId: RESERVATION, expiresAt: "soon" },
+				{ status: 201 },
+			),
+		);
+		expect(await api.reserve(SALE, "t1")).toEqual(unexpected);
+	});
+
+	it("passes a sale frame on only when it decodes, and says it was used", () => {
+		const { api, watch } = client(() => Response.json({}));
+		const seen: unknown[] = [];
+		api.watchSale(
+			SALE,
+			(sale) => seen.push(sale),
+			() => {},
+		);
+		const onEvent = watch.mock.calls[0]?.[1];
+		expect(onEvent?.("sale", { ...SALE_VIEW, stock: "10" })).toBe(false);
+		expect(onEvent?.("sale", SALE_VIEW)).toBe(true);
+		expect(seen).toEqual([SALE_VIEW]);
+	});
+
+	it("drops a place frame that does not decode, and does not count it as used", () => {
+		const { api, watch } = client(() => Response.json({}));
+		const seen: unknown[] = [];
+		api.watchPlace(
+			SALE,
+			"t1",
+			(place) => seen.push(place),
+			() => {},
+		);
+		const onEvent = watch.mock.calls[0]?.[1];
+		expect(onEvent?.("place", { userId: "ana", state: "waiting" })).toBe(false);
+		expect(onEvent?.("place", { userId: "ana", state: "admitted" })).toBe(true);
+		expect(seen).toEqual([{ userId: "ana", state: "admitted" }]);
 	});
 
 	it("works with the defaults", () => {

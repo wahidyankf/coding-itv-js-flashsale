@@ -5,8 +5,8 @@ import type { SaleView } from "./types";
 
 const ENV = { FLASH_BE_URL: "http://flash-be.test" };
 const SALE: SaleView = {
-	id: "s1",
-	productId: "p1",
+	id: "11111111-1111-4111-8111-111111111111",
+	productId: "22222222-2222-4222-8222-222222222222",
 	name: "Drop",
 	status: "active",
 	startsAt: "2026-06-01T11:00:00.000Z",
@@ -42,6 +42,12 @@ describe("loadSale", () => {
 		expect(await loadSale(ENV, none)).toEqual({ state: "none" });
 		expect(await loadSale(ENV, broken)).toEqual({ state: "error" });
 		expect(await loadSale(ENV, down)).toEqual({ state: "error" });
+	});
+
+	it("calls a sale that does not decode a sale that cannot be read", async () => {
+		const broken: typeof fetch = async () =>
+			Response.json({ ...SALE, status: "closed" });
+		expect(await loadSale(ENV, broken)).toEqual({ state: "error" });
 	});
 
 	it("uses the global fetch by default", async () => {
