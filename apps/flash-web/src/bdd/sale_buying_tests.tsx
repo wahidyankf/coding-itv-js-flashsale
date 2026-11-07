@@ -1,15 +1,13 @@
-// Runs the buying scenarios (`flash/web/behaviours/sale/buying.feature`) in the unit world.
+// Runs the buying scenarios of specs/apps/flash/web/behaviours/sale/buying.feature at the unit layer, in the unit world. The
+// steps are in support/bind-sale-buying.ts, shared with the integration layer. The titles stay here, where the behaviour
+// checker reads them.
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
-import { openSale } from "./support/open-sale";
+import { bindSaleBuying } from "./support/bind-sale-buying";
 import { specFile } from "./support/paths";
 import { unitWorld } from "./support/unit-world";
 
 const world = unitWorld();
-
-const SALE_10 =
-	"a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour";
-const SALE_1 =
-	"a sale with stock 1 and 0 sold that opens 1 hour ago and closes in 1 hour";
+const steps = bindSaleBuying(world);
 
 describeFeature(
 	await loadFeature(specFile("flash/web/behaviours/sale/buying.feature")),
@@ -17,261 +15,31 @@ describeFeature(
 		BeforeEachScenario(() => world.reset());
 		AfterEachScenario(() => world.clear());
 
-		Scenario("A shopper buys the item", ({ Given, And, When, Then }) => {
-			Given(SALE_10, async () =>
-				openSale(world, 10, 0, "1 hour ago", "in 1 hour"),
-			);
+		Scenario("A shopper buys the item", steps.buysItem);
 
-			And("{string} is logged in", async (_ctx, name: string) =>
-				world.loggedIn(name),
-			);
+		Scenario("A waiting shopper sees their place", steps.waitingSeesPlace);
 
-			And("a visitor has the page open", async () => world.openPage());
+		Scenario("A shopper who is told the item is gone", steps.toldGone);
 
-			When("she presses Buy Now", async () => world.pressBuyNow());
-
-			Then("the page says {string}", async (_ctx, text: string) =>
-				world.expectPageSays(text),
-			);
-
-			And("the {string} button is enabled", async (_ctx, name: string) =>
-				world.expectButton(name, "enabled"),
-			);
-
-			When("she confirms the purchase", async () => world.pressConfirm());
-
-			Then(
-				'the page says "You got it! Your purchase is confirmed."',
-				async () =>
-					world.expectPageSays("You got it! Your purchase is confirmed."),
-			);
-
-			And("the page shows {int} items left", async (_ctx, left: number) =>
-				world.expectPageSays(`Items left: ${left}`),
-			);
-		});
-
-		Scenario(
-			"A waiting shopper sees their place",
-			({ Given, And, When, Then }) => {
-				Given(SALE_10, async () =>
-					openSale(world, 10, 0, "1 hour ago", "in 1 hour"),
-				);
-
-				And("the queue admits shoppers slowly", () => world.slowAdmission());
-
-				And("{int} shoppers are ahead in the queue", (_ctx, count: number) =>
-					world.queueAhead(count),
-				);
-
-				And("{string} is logged in", async (_ctx, name: string) =>
-					world.loggedIn(name),
-				);
-
-				And("a visitor has the page open", async () => world.openPage());
-
-				When("she presses Buy Now", async () => world.pressBuyNow());
-
-				Then("the page says {string}", async (_ctx, text: string) =>
-					world.expectPageSays(text),
-				);
-			},
-		);
-
-		Scenario(
-			"A shopper who is told the item is gone",
-			({ Given, And, When, Then }) => {
-				Given(SALE_1, async () =>
-					openSale(world, 1, 0, "1 hour ago", "in 1 hour"),
-				);
-
-				And('"ben" holds the last item', () => world.holdsLastItem("ben"));
-
-				And("{string} is logged in", async (_ctx, name: string) =>
-					world.loggedIn(name),
-				);
-
-				And("a visitor has the page open", async () => world.openPage());
-
-				When("she presses Buy Now", async () => world.pressBuyNow());
-
-				Then("the page says {string}", async (_ctx, text: string) =>
-					world.expectPageSays(text),
-				);
-			},
-		);
-
-		Scenario(
-			"A shopper who already bought is told so",
-			({ Given, And, When, Then }) => {
-				Given(SALE_10, async () =>
-					openSale(world, 10, 0, "1 hour ago", "in 1 hour"),
-				);
-
-				And('"ana" has bought an item', () => world.hasBought("ana"));
-
-				And("{string} is logged in", async (_ctx, name: string) =>
-					world.loggedIn(name),
-				);
-
-				And("a visitor has the page open", async () => world.openPage());
-
-				When("she presses Buy Now", async () => world.pressBuyNow());
-
-				Then("the page says {string}", async (_ctx, text: string) =>
-					world.expectPageSays(text),
-				);
-			},
-		);
+		Scenario("A shopper who already bought is told so", steps.alreadyBought);
 
 		Scenario(
 			"A shopper who waits while the sale ends is told so",
-			({ Given, And, When, Then }) => {
-				Given(SALE_10, async () =>
-					openSale(world, 10, 0, "1 hour ago", "in 1 hour"),
-				);
-
-				And("the queue admits shoppers slowly", () => world.slowAdmission());
-
-				And("{int} shoppers are ahead in the queue", (_ctx, count: number) =>
-					world.queueAhead(count),
-				);
-
-				And("{string} is logged in", async (_ctx, name: string) =>
-					world.loggedIn(name),
-				);
-
-				And("a visitor has the page open", async () => world.openPage());
-
-				And("she presses Buy Now", async () => world.pressBuyNow());
-
-				When("the sale ends", async () => world.endSale());
-
-				Then("the page says {string}", async (_ctx, text: string) =>
-					world.expectPageSays(text),
-				);
-			},
+			steps.waitsSaleEnds,
 		);
 
 		Scenario(
 			"A shopper who waits while the last items are sold is told so",
-			({ Given, And, When, Then }) => {
-				Given(SALE_10, async () =>
-					openSale(world, 10, 0, "1 hour ago", "in 1 hour"),
-				);
-
-				And("the queue admits shoppers slowly", () => world.slowAdmission());
-
-				And("{int} shoppers are ahead in the queue", (_ctx, count: number) =>
-					world.queueAhead(count),
-				);
-
-				And("{string} is logged in", async (_ctx, name: string) =>
-					world.loggedIn(name),
-				);
-
-				And("a visitor has the page open", async () => world.openPage());
-
-				And("she presses Buy Now", async () => world.pressBuyNow());
-
-				When("the sold count changes to {int}", async (_ctx, sold: number) =>
-					world.setSold(sold),
-				);
-
-				Then("the page says {string}", async (_ctx, text: string) =>
-					world.expectPageSays(text),
-				);
-			},
+			steps.waitsLastItemsSold,
 		);
 
 		Scenario(
 			"A shopper who sends too many requests is told to wait",
-			({ Given, And, When, Then }) => {
-				Given(SALE_10, async () =>
-					openSale(world, 10, 0, "1 hour ago", "in 1 hour"),
-				);
-
-				And(
-					"each user may send {int} write request in each {int} seconds",
-					(_ctx, count: number) => world.writeLimit(count),
-				);
-
-				And("{string} is logged in", async (_ctx, name: string) =>
-					world.loggedIn(name),
-				);
-
-				And("a visitor has the page open", async () => world.openPage());
-
-				When("she presses Buy Now", async () => world.pressBuyNow());
-
-				Then("the page says {string}", async (_ctx, text: string) =>
-					world.expectPageSays(text),
-				);
-			},
+			steps.tooManyRequests,
 		);
 
-		Scenario(
-			"A declined payment keeps the hold",
-			({ Given, And, When, Then }) => {
-				Given(SALE_10, async () =>
-					openSale(world, 10, 0, "1 hour ago", "in 1 hour"),
-				);
+		Scenario("A declined payment keeps the hold", steps.declinedKeepsHold);
 
-				And("the payment provider declines every charge", () =>
-					world.paymentDeclines(),
-				);
-
-				And("{string} is logged in", async (_ctx, name: string) =>
-					world.loggedIn(name),
-				);
-
-				And("a visitor has the page open", async () => world.openPage());
-
-				And("she presses Buy Now", async () => world.pressBuyNow());
-
-				When("she confirms the purchase", async () => world.pressConfirm());
-
-				Then("the page says {string}", async (_ctx, text: string) =>
-					world.expectPageSays(text),
-				);
-
-				And("the {string} button is enabled", async (_ctx, name: string) =>
-					world.expectButton(name, "enabled"),
-				);
-			},
-		);
-
-		Scenario(
-			"A hold that runs out is shown as ended",
-			({ Given, And, When, Then }) => {
-				Given(SALE_10, async () =>
-					openSale(world, 10, 0, "1 hour ago", "in 1 hour"),
-				);
-
-				And("a hold lasts {int} seconds", (_ctx, seconds: number) =>
-					world.holdSeconds(seconds),
-				);
-
-				And("{string} is logged in", async (_ctx, name: string) =>
-					world.loggedIn(name),
-				);
-
-				And("a visitor has the page open", async () => world.openPage());
-
-				When("she presses Buy Now", async () => world.pressBuyNow());
-
-				And("{int} seconds pass", async (_ctx, seconds: number) =>
-					world.advance(seconds),
-				);
-
-				Then("the page says {string}", async (_ctx, text: string) =>
-					world.expectPageSays(text),
-				);
-
-				And("the {string} button is disabled", async (_ctx, name: string) =>
-					world.expectButton(name, "disabled"),
-				);
-			},
-		);
+		Scenario("A hold that runs out is shown as ended", steps.holdEnds);
 	},
 );

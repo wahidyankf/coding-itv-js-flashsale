@@ -1,15 +1,16 @@
 // @vitest-environment jsdom
+// Runs the checking scenarios of specs/apps/flash/web/behaviours/sale/checking.feature at the integration layer, in the
+// integration world: real HTTP and real time. The steps are in support/bind-sale-checking.ts, shared with the unit layer.
+// The titles stay here, where the behaviour checker reads them.
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import { afterAll } from "vitest";
+import { bindSaleChecking } from "./support/bind-sale-checking";
 import { integrationWorld } from "./support/integration-world";
-import { openSale } from "./support/open-sale";
 import { specFile } from "./support/paths";
 
 const world = await integrationWorld();
 afterAll(() => world.close());
-
-const SALE_10 =
-	"a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour";
+const steps = bindSaleChecking(world);
 
 describeFeature(
 	await loadFeature(specFile("flash/web/behaviours/sale/checking.feature")),
@@ -17,55 +18,11 @@ describeFeature(
 		BeforeEachScenario(() => world.reset());
 		AfterEachScenario(() => world.clear());
 
-		ScenarioOutline(
-			"A shopper checks the outcome",
-			({ Given, And, When, Then }, examples) => {
-				Given(SALE_10, async () =>
-					openSale(world, 10, 0, "1 hour ago", "in 1 hour"),
-				);
-
-				And('"ana" <history>', () => {
-					if (examples.history === "has bought an item") world.hasBought("ana");
-					if (examples.history === "holds an item") world.holds("ana");
-				});
-
-				And("{string} is logged in", async (_ctx, name: string) =>
-					world.loggedIn(name),
-				);
-
-				And("a visitor has the page open", async () => world.openPage());
-
-				When("she presses Check my status", async () => world.pressCheck());
-
-				Then('the page says "<message>"', async () =>
-					world.expectPageSays(String(examples.message)),
-				);
-			},
-		);
+		ScenarioOutline("A shopper checks the outcome", steps.checksOutcome);
 
 		Scenario(
 			"A shopper who holds an item can confirm after checking",
-			({ Given, And, When, Then }) => {
-				Given(SALE_10, async () =>
-					openSale(world, 10, 0, "1 hour ago", "in 1 hour"),
-				);
-
-				And('"ana" holds an item', () => world.holds("ana"));
-
-				And("{string} is logged in", async (_ctx, name: string) =>
-					world.loggedIn(name),
-				);
-
-				And("a visitor has the page open", async () => world.openPage());
-
-				And("she presses Check my status", async () => world.pressCheck());
-
-				When("she confirms the purchase", async () => world.pressConfirm());
-
-				Then("the page says {string}", async (_ctx, text: string) =>
-					world.expectPageSays(text),
-				);
-			},
+			steps.confirmsAfterChecking,
 		);
 	},
 );
