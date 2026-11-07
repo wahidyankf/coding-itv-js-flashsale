@@ -2,7 +2,7 @@
 // which the write routes decide on, is always read fresh.
 import { Err, Ok, type Result } from "@flash/typekit";
 import {
-	isSaleId,
+	isUuid,
 	type Sale,
 	type SaleStatus,
 	saleStatus,
@@ -31,7 +31,7 @@ async function lookup(
 	id: string,
 	read: (id: string) => Promise<Sale | undefined>,
 ): Promise<Sale | undefined> {
-	return isSaleId(id) ? read(id) : undefined;
+	return isUuid(id) ? read(id) : undefined;
 }
 
 // The sale a write may act on: it exists, and its status does not block the action. When it cannot, the first reason

@@ -4,12 +4,13 @@ import type { PurchaseRepository } from "../../application/ports/purchase-reposi
 import type { Purchase } from "../../domain/purchase.js";
 import type { Reservation } from "../../domain/reservation.js";
 import type { Sale } from "../../domain/sale.js";
+import type { Username } from "../../domain/user.js";
 
 export type MemoryPurchaseRepository = PurchaseRepository & {
 	purchases: Purchase[];
-	buyersOf: (saleId: string) => string[];
+	buyersOf: (saleId: string) => Username[];
 	// Another instance sold an item: the same effect as a committed purchase.
-	sellTo: (saleId: string, user: string) => void;
+	sellTo: (saleId: string, user: Username) => void;
 };
 
 // Purchases in memory, for unit tests. `commit` follows the transaction in the Postgres repository.

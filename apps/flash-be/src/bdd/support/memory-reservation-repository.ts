@@ -8,6 +8,7 @@ import {
 	type Reservation,
 } from "../../domain/reservation.js";
 import { isLive } from "../../domain/time.js";
+import type { Username } from "../../domain/user.js";
 
 export type MemoryReservationRepository = ReservationRepository & {
 	// While broken, saving a reservation fails, as when Postgres is unreachable.
@@ -17,7 +18,7 @@ export type MemoryReservationRepository = ReservationRepository & {
 
 // The reservation rows in memory, for unit tests.
 export function memoryReservationRepository(
-	buyersOf: (saleId: string) => string[] = () => [],
+	buyersOf: (saleId: string) => Username[] = () => [],
 ): MemoryReservationRepository {
 	const repository: MemoryReservationRepository = {
 		broken: false,

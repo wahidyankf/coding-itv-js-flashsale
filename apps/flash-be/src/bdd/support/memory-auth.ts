@@ -13,7 +13,8 @@ import type { Clock } from "../../application/ports/clock.js";
 import type { PasswordHasher } from "../../application/ports/password-hasher.js";
 import type { SessionStore } from "../../application/ports/session-store.js";
 import type { Principal, Role } from "../../domain/auth.js";
-import type { UserId, Username } from "../../domain/user.js";
+import { type UserId, type Username, userIdOf } from "../../domain/user.js";
+import { usernameOf } from "./users.js";
 
 // A password check that costs nothing, so a scenario with many shoppers is not slowed down by hashing.
 export const plainHasher: PasswordHasher = {
@@ -56,7 +57,7 @@ function memoryAccounts(users: Map<Username, Account>): AccountStore {
 				return new Err("username_taken" as const);
 			}
 			const principal: Principal = {
-				userId: randomUUID(),
+				userId: userIdOf(randomUUID()),
 				username: account.username,
 				role: account.role,
 			};
@@ -169,17 +170,18 @@ export function memoryAuth(
 			passwordHashes: [...users.values()].map((user) => user.passwordHash),
 			tokenHashes: rows.flatMap((row) => [row.accessHash, row.refreshHash]),
 		}),
-		idOf: (username) => users.get(username)?.principal.userId,
+		idOf: (username) => users.get(usernameOf(username))?.principal.userId,
 		login: async (username, role = "shopper") => {
 			const known = cookies.get(username);
 			if (known !== undefined) return known;
+			const name = usernameOf(username);
 			const registered = await accounts.register({
-				username,
+				username: name,
 				passwordHash: await hasher.hash(SCENARIO_PASSWORD),
 				role,
 			});
 			if (registered.isErr()) throw new Error(`${username} already exists`);
-			const login = await service.login(username, SCENARIO_PASSWORD);
+			const login = await service.login(name, SCENARIO_PASSWORD);
 			if (login.isErr()) throw new Error("the login failed");
 			const cookie = `${ACCESS_COOKIE}=${login.value.accessToken}`;
 			cookies.set(username, cookie);

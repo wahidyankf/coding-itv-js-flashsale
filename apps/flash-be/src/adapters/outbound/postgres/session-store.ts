@@ -8,6 +8,7 @@ import type {
 	SessionStore,
 } from "../../../application/ports/session-store.js";
 import type { Principal } from "../../../domain/auth.js";
+import { storedUsername, userIdOf } from "../../../domain/user.js";
 import type { Database } from "./database.js";
 
 const now = sql<Date>`now()`;
@@ -28,7 +29,11 @@ async function principalOf(
 		.executeTakeFirst();
 	return user === undefined
 		? undefined
-		: { userId: user.id, username: user.username, role: user.role };
+		: {
+				userId: userIdOf(user.id),
+				username: storedUsername(user.username),
+				role: user.role,
+			};
 }
 
 // Records a login, and stamps the user's last login, in one transaction.
@@ -82,8 +87,8 @@ async function findLiveSession(
 		? undefined
 		: {
 				principal: {
-					userId: row.id,
-					username: row.username,
+					userId: userIdOf(row.id),
+					username: storedUsername(row.username),
 					role: row.role,
 				},
 				expiresAt: row.access_expires_at,

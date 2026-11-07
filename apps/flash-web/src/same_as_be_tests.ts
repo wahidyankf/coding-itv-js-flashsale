@@ -6,7 +6,7 @@ import {
 	errorPayload,
 } from "../../flash-be/src/adapters/inbound/http/errors";
 import { usablePassword } from "../../flash-be/src/domain/auth";
-import { isSaleId } from "../../flash-be/src/domain/sale";
+import { isUuid } from "../../flash-be/src/domain/sale";
 import { normalizeUser } from "../../flash-be/src/domain/user";
 import { TICKET_HEADER } from "./api";
 import { cleanPassword, cleanUser } from "./auth/messages";
@@ -51,7 +51,7 @@ describe("what flash-web copies from flash-be", () => {
 		"0f8fad5b-d9cb-469f-a165-70867728950",
 		"",
 	])("passes the sale id %j on only when flash-be accepts it", (saleId) => {
-		expect(isAllowed("GET", `/sales/${saleId}`)).toBe(isSaleId(saleId));
+		expect(isAllowed("GET", `/sales/${saleId}`)).toBe(isUuid(saleId));
 	});
 
 	it("names the queue-ticket header as flash-be does", () => {

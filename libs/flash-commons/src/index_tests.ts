@@ -22,6 +22,7 @@ describe("public surface", () => {
 			"object",
 			"oneOf",
 			"optional",
+			"refine",
 			"retry",
 			"retryAsync",
 			"tagged",

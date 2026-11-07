@@ -119,8 +119,8 @@ export function hasRoom(
 const UUID_PATTERN =
 	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Whether the text can be the id of a sale or a reservation. A malformed id can never match a row, so a lookup is
-// skipped instead of failing in Postgres.
-export function isSaleId(value: string): boolean {
+// Whether the text can be the id of a sale, a reservation or a product. A malformed id can never match a row, so a
+// lookup is skipped instead of failing in Postgres.
+export function isUuid(value: string): boolean {
 	return UUID_PATTERN.test(value);
 }

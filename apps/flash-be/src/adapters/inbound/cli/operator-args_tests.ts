@@ -1,34 +1,36 @@
+import { Err, Ok } from "@flash/typekit";
 import { describe, expect, it } from "vitest";
+import { normalizeUser } from "../../../domain/user.js";
 import {
-	operatorArgsRefusal,
+	operatorInputOf,
 	parseOperatorArgs,
 	refusalMessage,
 } from "./operator-args.js";
 
-describe("operatorArgsRefusal", () => {
+describe("operatorInputOf", () => {
 	// These run before the database is touched, so a bad argument is not reported as a database failure.
 	it("refuses a missing or unusable name", () => {
 		expect(
-			operatorArgsRefusal({ username: undefined, password: "a long phrase" }),
-		).toBe("invalid_user");
+			operatorInputOf({ username: undefined, password: "a long phrase" }),
+		).toEqual(new Err("invalid_user"));
 		expect(
-			operatorArgsRefusal({ username: "  ", password: "a long phrase" }),
-		).toBe("invalid_user");
+			operatorInputOf({ username: "  ", password: "a long phrase" }),
+		).toEqual(new Err("invalid_user"));
 	});
 
 	it("refuses a password outside the length rules, or none", () => {
-		expect(operatorArgsRefusal({ username: "ana", password: "short" })).toBe(
-			"invalid_password",
+		expect(operatorInputOf({ username: "ana", password: "short" })).toEqual(
+			new Err("invalid_password"),
 		);
-		expect(operatorArgsRefusal({ username: "ana", password: undefined })).toBe(
-			"invalid_password",
+		expect(operatorInputOf({ username: "ana", password: undefined })).toEqual(
+			new Err("invalid_password"),
 		);
 	});
 
-	it("lets well-formed arguments through", () => {
+	it("gives the use case the name in its usable form, and the password as it was given", () => {
 		expect(
-			operatorArgsRefusal({ username: "Ana", password: "a long phrase" }),
-		).toBeUndefined();
+			operatorInputOf({ username: "Ana", password: "a long phrase" }),
+		).toEqual(new Ok({ username: "ana", password: "a long phrase" }));
 	});
 });
 
@@ -37,13 +39,13 @@ describe("refusalMessage", () => {
 		expect(refusalMessage("invalid_user", undefined)).toBe(
 			"--username is missing or not a valid name",
 		);
-		expect(refusalMessage("invalid_password", "ana")).toBe(
+		expect(refusalMessage("invalid_password", undefined)).toBe(
 			"--password must have 8 to 128 characters",
 		);
 	});
 
 	it("names the user who already exists, in the form it is stored", () => {
-		expect(refusalMessage("username_taken", " Ana ")).toBe(
+		expect(refusalMessage("username_taken", normalizeUser(" Ana "))).toBe(
 			"the user ana already exists",
 		);
 	});

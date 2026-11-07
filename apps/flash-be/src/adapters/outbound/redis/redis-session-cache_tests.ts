@@ -1,12 +1,19 @@
 // Unit tests for the Redis session cache (adapter layer, outbound). An entry that cannot be read is refused, never guessed.
+
 import { describe, expect, it } from "vitest";
 import type { SessionStore } from "../../../application/ports/session-store.js";
+import { usernameOf } from "../../../bdd/support/users.js";
 import type { Principal } from "../../../domain/auth.js";
+import { userIdOf } from "../../../domain/user.js";
 import type { RedisClient } from "./redis-client.js";
 import { createRedisSessionCache } from "./redis-session-cache.js";
 
 const NOW = new Date("2026-06-01T12:00:00Z");
-const ANA: Principal = { userId: "user-1", username: "ana", role: "shopper" };
+const ANA: Principal = {
+	userId: userIdOf("user-1"),
+	username: usernameOf("ana"),
+	role: "shopper",
+};
 const ENDS = new Date(NOW.getTime() + 600_000);
 
 // A Redis with the three commands the cache uses. `down` makes every command fail, as a lost connection does.
@@ -206,7 +213,7 @@ describe("the cache of logins", () => {
 			fakeRedis().client,
 		);
 		await cached.create({
-			userId: "u",
+			userId: userIdOf("u"),
 			accessHash: "a",
 			accessExpiresAt: ENDS,
 			refreshHash: "r",

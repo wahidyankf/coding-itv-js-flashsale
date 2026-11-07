@@ -2,6 +2,7 @@
 // stand-in. Outbound Postgres adapter; a user is never erased (see decision 011).
 import { randomUUID } from "node:crypto";
 import type { Kysely } from "kysely";
+import { type UserId, userIdOf } from "../../../domain/user.js";
 import type { Database } from "./database.js";
 
 // The id of the live user with this name. A user who is logged in has a row from the sign-up, so this is one read. The
@@ -42,12 +43,12 @@ export async function ensureUser(
 export async function actorId(
 	db: Kysely<Database>,
 	username: string,
-): Promise<string> {
+): Promise<UserId> {
 	const row = await db
 		.selectFrom("users")
 		.select("id")
 		.where("username", "=", username)
 		.where("deleted_at", "is", null)
 		.executeTakeFirstOrThrow();
-	return row.id;
+	return userIdOf(row.id);
 }

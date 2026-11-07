@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { insertSale } from "../../../bdd/support/seed.js";
+import { usernameOf } from "../../../bdd/support/users.js";
 import { config } from "../../../config.js";
 import { createDb } from "./database.js";
 import { createPurchaseRepository } from "./purchase-repository.js";
@@ -27,7 +28,7 @@ const input = (
 	reservationId = crypto.randomUUID(),
 ) => ({
 	saleId,
-	user,
+	user: usernameOf(user),
 	reservationId,
 	paymentRef: `pay-${user}`,
 });

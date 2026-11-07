@@ -4,7 +4,7 @@
 
 import { MS_PER_SECOND } from "@flash/flash-commons";
 import { attemptAsync } from "@flash/typekit";
-import { normalizeUser } from "../domain/user.js";
+import type { Username } from "../domain/user.js";
 import type { Clock } from "./ports/clock.js";
 import type {
 	LocalRateLimitStore,
@@ -31,10 +31,11 @@ export type RateLimitVerdict =
 export type RateLimiter = {
 	// The auth routes: counted by address alone, with a limit of their own, apart from any sale.
 	checkAuth: (request: { ip: string }) => Promise<RateLimitVerdict>;
-	// The sale routes: counted by address and by shopper, within one sale. `user` is what the client sent, not yet checked.
+	// The sale routes: counted by address and by shopper, within one sale. `user` is the login of the request, and is
+	// undefined when there is none; the request still counts against its address.
 	check: (request: {
 		saleId: string;
-		user: unknown;
+		user: Username | undefined;
 		ip: string;
 	}) => Promise<RateLimitVerdict>;
 };
@@ -85,11 +86,11 @@ export function createRateLimiter(
 				`address:${request.saleId}:${request.ip}`,
 				windowMs(),
 			);
-			// A request with no usable user name still counts against its address. The route answers the bad name.
-			const user = normalizeUser(request.user);
-			const person = user
-				? await hit(`user:${request.saleId}:${user}`, windowMs())
-				: undefined;
+			// A request with no login still counts against its address; the guard refuses it after this check.
+			const person =
+				request.user === undefined
+					? undefined
+					: await hit(`user:${request.saleId}:${request.user}`, windowMs());
 
 			const over: Counted[] = [];
 			if (address.count > limits.perIp) over.push(address);

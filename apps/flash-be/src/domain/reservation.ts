@@ -68,23 +68,37 @@ export type ReservationState = {
 // The answers a decision can give. `not_ready` is left out: only the fast store can have no state.
 export type ReserveDecision = Exclude<GateAnswer, { kind: "not_ready" }>;
 
-// The one order of the checks that every store follows: a purchase first, then the shopper's own live hold, then the
-// stock that the live holds of the others and the sold items take. The Redis script (RESERVE in redis-hold-gate.ts)
-// makes the same decision in Lua, because it runs in one call, so keep the two in step. The Postgres fallback and the
-// memory reservation repository call this function.
-export function decideReservation(
-	state: ReservationState,
+// What a store reads about the shopper: whether they bought in the sale, and their own hold, live or not.
+export type ShopperState = Pick<ReservationState, "purchased" | "ownHold">;
+
+// What a store reads about the stock: the items sold, and the live holds of the other shoppers.
+export type StockState = Pick<ReservationState, "sold" | "othersHolding">;
+
+// The early answers, which need only the shopper's own state: a purchase first, then the shopper's own live hold. The
+// Postgres fallback reads the shopper's state first and counts the other holds only when this gives no answer, so a
+// buyer or a holder costs no count. Undefined when the stock decides.
+export function earlyReservationAnswer(
+	shopper: ShopperState,
 	request: ReserveRequest,
-): ReserveDecision {
-	if (state.purchased) return { kind: "purchased" };
-	if (state.ownHold && isLive(state.ownHold, request.now)) {
+): ReserveDecision | undefined {
+	if (shopper.purchased) return { kind: "purchased" };
+	if (shopper.ownHold && isLive(shopper.ownHold, request.now)) {
 		return {
 			kind: "held",
-			reservationId: state.ownHold.reservationId,
-			expiresAt: state.ownHold.expiresAt,
+			reservationId: shopper.ownHold.reservationId,
+			expiresAt: shopper.ownHold.expiresAt,
 		};
 	}
-	if (!hasRoom(state.sold, state.othersHolding, request.stock)) {
+	return undefined;
+}
+
+// The answer of the stock, once the early answers gave none: a new hold while the sold items and the live holds of the
+// others leave an item free, and sold out otherwise.
+export function roomReservationAnswer(
+	stock: StockState,
+	request: ReserveRequest,
+): ReserveDecision {
+	if (!hasRoom(stock.sold, stock.othersHolding, request.stock)) {
 		return { kind: "sold_out" };
 	}
 	return {
@@ -92,6 +106,19 @@ export function decideReservation(
 		reservationId: request.reservationId,
 		expiresAt: request.expiresAt,
 	};
+}
+
+// The one order of the checks that every store follows: the early answers, then the stock. The Redis script (RESERVE in
+// redis-hold-gate.ts) makes the same decision in Lua, because it runs in one call, so keep the two in step. The memory
+// reservation repository calls this function; the Postgres fallback calls the two steps, so it can skip the count.
+export function decideReservation(
+	state: ReservationState,
+	request: ReserveRequest,
+): ReserveDecision {
+	return (
+		earlyReservationAnswer(state, request) ??
+		roomReservationAnswer(state, request)
+	);
 }
 
 // What a shopper asks for when they reserve: one item, held for the time the sale sets.

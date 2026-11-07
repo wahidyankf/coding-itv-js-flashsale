@@ -1,5 +1,7 @@
 // The auth rules: a password's length, the hash of a token, the lifetimes of a login, and who is an operator.
+
 import { describe, expect, it } from "vitest";
+import { usernameOf } from "../bdd/support/users.js";
 import {
 	ACCESS_TTL_SECONDS,
 	hashToken,
@@ -10,10 +12,11 @@ import {
 	REFRESH_TTL_SECONDS,
 	usablePassword,
 } from "./auth.js";
+import { userIdOf } from "./user.js";
 
 const person = (role: Principal["role"]): Principal => ({
-	userId: "00000000-0000-4000-8000-000000000001",
-	username: "ana",
+	userId: userIdOf("00000000-0000-4000-8000-000000000001"),
+	username: usernameOf("ana"),
 	role,
 });
 
@@ -24,11 +27,9 @@ describe("usablePassword", () => {
 		expect(usablePassword("x".repeat(PASSWORD_MAX_LENGTH))).toBeDefined();
 	});
 
-	it("refuses a password outside the lengths, and anything that is not text", () => {
+	it("refuses a password outside the lengths", () => {
 		expect(usablePassword("x".repeat(PASSWORD_MIN_LENGTH - 1))).toBeUndefined();
 		expect(usablePassword("x".repeat(PASSWORD_MAX_LENGTH + 1))).toBeUndefined();
-		expect(usablePassword(12345678)).toBeUndefined();
-		expect(usablePassword(undefined)).toBeUndefined();
 	});
 });
 

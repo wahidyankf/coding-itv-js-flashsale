@@ -13,6 +13,7 @@ export {
 	object,
 	oneOf,
 	optional,
+	refine,
 	tagged,
 	text,
 	uuid,

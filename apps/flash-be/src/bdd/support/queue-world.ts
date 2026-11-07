@@ -59,6 +59,7 @@ import {
 } from "./queue-scenario.js";
 import { sharedCounter } from "./shared-counter.js";
 import { switchable } from "./switchable.js";
+import { usernameOf } from "./users.js";
 
 export type {
 	EventWatcher,
@@ -303,7 +304,7 @@ function saleActions(parts: UnitParts, current: () => UnitQueueScenario) {
 				(candidate) => candidate.id === current().saleId,
 			);
 			if (sale) sale.sold = sale.stock - 1;
-			parts.purchased.sellTo(current().saleId, user);
+			parts.purchased.sellTo(current().saleId, usernameOf(user));
 		},
 	};
 }

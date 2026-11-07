@@ -1,27 +1,85 @@
-// Reading a request body. A body is client text, so nothing in it is trusted until it is checked: `fieldOf` hands a field
-// back as `unknown`, and each route checks the type it needs. Inbound HTTP adapter.
+// The request bodies of the HTTP API, decoded at the edge. A route decodes its body with one decoder from this file, and a
+// refusal is answered with the code of its field (`refusalCode`). A use case takes the typed values, never the raw body.
+// The rules a value must meet (a usable name, a usable password) are the domain's, and the decoders call them here.
+// Inbound HTTP adapter. Decision: docs/explanation/decisions/018-decode-payloads-at-the-edge.md.
+import {
+	type DecodeError,
+	type Decoder,
+	integer,
+	object,
+	optional,
+	refine,
+	text,
+} from "@flash/flash-commons";
+import {
+	PASSWORD_MAX_LENGTH,
+	PASSWORD_MIN_LENGTH,
+	usablePassword,
+} from "../../../../domain/auth.js";
+import { normalizeUser, type Username } from "../../../../domain/user.js";
 import type { ErrorCode } from "../errors.js";
 
-// A field of a value that has not been checked yet, such as a body. It is undefined when the value is not an object or
-// has no such field.
-export const fieldOf = (source: unknown, name: string): unknown =>
-	typeof source === "object" && source !== null && name in source
-		? Reflect.get(source, name)
-		: undefined;
+// A user name in a body: text that the domain's rule makes usable. The use case receives the `Username` it makes.
+const userName: Decoder<Username> = refine(text, normalizeUser, "a user name");
 
-// The error for a body field that is missing or not text. Only the reservation id is checked this way.
-const FIELD_ERROR = {
-	reservationId: "invalid_reservation",
+// A password of a sign-up: text of a usable length, by the domain's rule.
+const newPassword: Decoder<string> = refine(
+	text,
+	usablePassword,
+	`a password of ${PASSWORD_MIN_LENGTH} to ${PASSWORD_MAX_LENGTH} characters`,
+);
+
+// The body of a sign-up. The name is checked before the password, as the API has always answered: `object` stops at the
+// first field that is refused.
+export const signUpBody = object({ username: userName, password: newPassword });
+
+// The body of a login. A name the rule refuses is refused as a wrong login, not as a bad name, so a reply never says
+// which part was wrong. The password is only read as text: any wrong password is a wrong login.
+export const loginBody = object({ username: userName, password: text });
+
+// The body of a purchase. The id is read as text here; its shape is checked after the sale is found, as it always was.
+export const reservationBody = object({ reservationId: text });
+
+// The body of a new sale. The types are checked here; the window, the stock and the rates are the domain's rules, and
+// the dates stay text so the domain reads them as it always has.
+export const saleDraftBody = object({
+	productId: optional(text),
+	name: optional(text),
+	stock: integer,
+	startsAt: text,
+	endsAt: text,
+	holdSeconds: optional(integer),
+	admitPerSecond: optional(integer),
+});
+
+// The body of a sale change. A field that is left out stays as it is; the domain refuses a change with no field at all.
+export const salePatchBody = object({
+	name: optional(text),
+	startsAt: optional(text),
+	endsAt: optional(text),
+	stock: optional(integer),
+	holdSeconds: optional(integer),
+	admitPerSecond: optional(integer),
+});
+
+// The code each field of a sign-up answers with when it is refused. A name is refused before a password is looked at.
+const SIGN_UP_FIELDS = {
+	username: "invalid_user",
+	password: "invalid_password",
 } as const;
 
-// The error of the first of `fields` that is missing or not text, checked before anything else is looked at. Nothing is
-// returned when all of them are there.
-export function missingFieldError(
-	body: unknown,
-	fields: ReadonlyArray<keyof typeof FIELD_ERROR>,
-): ErrorCode | undefined {
-	const missing = fields.find(
-		(name) => typeof fieldOf(body, name) !== "string",
-	);
-	return missing === undefined ? undefined : FIELD_ERROR[missing];
+// The code a refused sign-up answers with: the field's own code, or the name's code for a body that is not an object.
+export const signUpRefusal = (error: DecodeError): ErrorCode =>
+	refusalCode(error, SIGN_UP_FIELDS, "invalid_user");
+
+// The code a refused body answers with. The first part of the error's path names the field, and that field's code is
+// used when `fields` has one. Any other refusal, such as a body that is not an object, gets the code of the whole body.
+export function refusalCode(
+	error: DecodeError,
+	fields: Partial<Record<string, ErrorCode>>,
+	whole: ErrorCode,
+): ErrorCode {
+	const dot = error.path.indexOf(".");
+	const field = dot < 0 ? error.path : error.path.slice(0, dot);
+	return fields[field] ?? whole;
 }

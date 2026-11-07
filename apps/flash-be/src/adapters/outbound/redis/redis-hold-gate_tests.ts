@@ -1,7 +1,9 @@
 // Unit tests for the Redis hold gate's reply reading, the arguments it sends, and its owner-checked rebuild lock. A fake
 // client stands in for Redis: the scripts run in Redis, so their end-to-end behaviour is in the integration tests.
+
 import { Err, Ok } from "@flash/typekit";
 import { describe, expect, it } from "vitest";
+import { usernameOf } from "../../../bdd/support/users.js";
 import type { RedisClient } from "./redis-client.js";
 import {
 	createRedisHoldGate,
@@ -55,9 +57,13 @@ describe("the arguments of the restore script", () => {
 	it("counts the buyers, then the holds with their reservation ids and expiry", () => {
 		expect(
 			restoreArguments({
-				buyers: ["ana"],
+				buyers: [usernameOf("ana")],
 				holds: [
-					{ user: "ben", reservationId: "r-b", expiresAt: new Date(1000) },
+					{
+						user: usernameOf("ben"),
+						reservationId: "r-b",
+						expiresAt: new Date(1000),
+					},
 				],
 			}),
 		).toEqual(["1", "ana", "1", "ben", "r-b", "1000"]);

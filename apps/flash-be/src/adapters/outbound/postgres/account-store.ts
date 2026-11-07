@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { Err, Ok } from "@flash/typekit";
 import type { Kysely } from "kysely";
 import type { AccountStore } from "../../../application/ports/account-store.js";
+import { storedUsername, userIdOf } from "../../../domain/user.js";
 import type { Database } from "./database.js";
 
 // The accounts of the app over Postgres. A name is taken once by a live account; the unique index decides a race.
@@ -33,7 +34,7 @@ export function createAccountStore(db: Kysely<Database>): AccountStore {
 			return row === undefined
 				? new Err("username_taken" as const)
 				: new Ok({
-						userId: row.id,
+						userId: userIdOf(row.id),
 						username: account.username,
 						role: account.role,
 					});
@@ -48,7 +49,11 @@ export function createAccountStore(db: Kysely<Database>): AccountStore {
 				.executeTakeFirst();
 			if (row === undefined || row.password_hash === null) return undefined;
 			return {
-				principal: { userId: row.id, username: row.username, role: row.role },
+				principal: {
+					userId: userIdOf(row.id),
+					username: storedUsername(row.username),
+					role: row.role,
+				},
 				passwordHash: row.password_hash,
 			};
 		},

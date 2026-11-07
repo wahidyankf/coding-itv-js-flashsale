@@ -18,7 +18,7 @@ import {
 	REFRESH_COOKIE_PATH,
 	setCookie,
 } from "../cookies.js";
-import { fieldOf } from "./bodies.js";
+import { loginBody, signUpBody, signUpRefusal } from "./bodies.js";
 import { createGuards, principalOf } from "./guards.js";
 import { sendError, sendResult } from "./reply.js";
 
@@ -78,12 +78,16 @@ export function registerAuthRoutes(
 		method: "POST",
 		url: "/auth/register",
 		onRequest: limitAuth,
-		handler: async (request, reply) =>
-			sendResult(
+		handler: async (request, reply) => {
+			const body = signUpBody(request.body);
+			if (body.isErr()) {
+				return sendError(reply, signUpRefusal(body.error));
+			}
+			return sendResult(
 				reply,
 				await deps.auth.register(
-					fieldOf(request.body, "username"),
-					fieldOf(request.body, "password"),
+					body.value.username,
+					body.value.password,
 					clientOf(request),
 				),
 				(login) =>
@@ -91,19 +95,23 @@ export function registerAuthRoutes(
 						.header("set-cookie", loginCookies(login))
 						.code(HTTP_STATUS.created)
 						.send(accountView(login.principal)),
-			),
+			);
+		},
 	});
 
+	// A body that does not decode, or a name the rule refuses, is the same answer as a wrong login.
 	app.route({
 		method: "POST",
 		url: "/auth/login",
 		onRequest: limitAuth,
-		handler: async (request, reply) =>
-			sendResult(
+		handler: async (request, reply) => {
+			const body = loginBody(request.body);
+			if (body.isErr()) return sendError(reply, "invalid_credentials");
+			return sendResult(
 				reply,
 				await deps.auth.login(
-					fieldOf(request.body, "username"),
-					fieldOf(request.body, "password"),
+					body.value.username,
+					body.value.password,
 					clientOf(request),
 				),
 				(login) =>
@@ -111,7 +119,8 @@ export function registerAuthRoutes(
 						.header("set-cookie", loginCookies(login))
 						.code(HTTP_STATUS.ok)
 						.send(accountView(login.principal)),
-			),
+			);
+		},
 	});
 
 	// Trades the refresh token (sent only to /auth) for a new pair. The old refresh token stops working.

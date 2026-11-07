@@ -5,7 +5,8 @@
 import { MS_PER_SECOND } from "@flash/flash-commons";
 import { attempt, attemptAsync, Err, Ok, type Result } from "@flash/typekit";
 import type { SessionStore } from "../../../application/ports/session-store.js";
-import type { Principal } from "../../../domain/auth.js";
+import type { Principal, Role } from "../../../domain/auth.js";
+import { storedUsername, userIdOf } from "../../../domain/user.js";
 import type { RedisClient } from "./redis-client.js";
 
 // How long an answer is kept, at most. A short time keeps a deleted user or a changed role from lingering.
@@ -17,13 +18,19 @@ type Cached = {
 	expiresAt: string;
 };
 
+// The same entry as JSON gives it: the names are plain text until they are read back as their types.
+type RawCached = {
+	principal: { userId: string; username: string; role: Role };
+	expiresAt: string;
+};
+
 // The failure of an entry that is not a login the cache wrote.
 const UNREADABLE_ENTRY = "unreadable_entry";
 
 const isText = (value: unknown): value is string => typeof value === "string";
 
 // Whether a parsed value is a principal: an id, a name and a role the rules know.
-function isPrincipal(value: unknown): value is Principal {
+function isPrincipal(value: unknown): value is RawCached["principal"] {
 	if (typeof value !== "object" || value === null) return false;
 	return (
 		"userId" in value &&
@@ -36,7 +43,7 @@ function isPrincipal(value: unknown): value is Principal {
 }
 
 // Whether a parsed value is a login the cache wrote. Anything else is a broken entry, and a login is read from Postgres.
-function isCached(value: unknown): value is Cached {
+function isCached(value: unknown): value is RawCached {
 	if (typeof value !== "object" || value === null) return false;
 	return (
 		"principal" in value &&
@@ -53,9 +60,17 @@ function readCached(text: string): Result<Cached, typeof UNREADABLE_ENTRY> {
 		return value;
 	}, SyntaxError);
 	if (parsed.isErr()) return new Err(UNREADABLE_ENTRY);
-	return isCached(parsed.value)
-		? new Ok(parsed.value)
-		: new Err(UNREADABLE_ENTRY);
+	if (!isCached(parsed.value)) return new Err(UNREADABLE_ENTRY);
+	// The names were written from a principal, so they are read back as the types the rules keep.
+	const { principal, expiresAt } = parsed.value;
+	return new Ok({
+		principal: {
+			userId: userIdOf(principal.userId),
+			username: storedUsername(principal.username),
+			role: principal.role,
+		},
+		expiresAt,
+	});
 }
 
 // Remembers who an access token belongs to, so a request does not read Postgres to be recognised. Postgres is the truth:

@@ -25,7 +25,7 @@ const ALLOWED: Array<[method: string, path: RegExp]> = [
 	["GET", /^\/sales\/(?<saleId>[^/]+)\/purchases\/me$/],
 ];
 
-// A copy of the sale id rule of flash-be (`isSaleId`); `same_as_be_tests.ts` checks it.
+// A copy of the sale id rule of flash-be (`isUuid`); `same_as_be_tests.ts` checks it.
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Headers that carry something the API needs, or something the browser needs back. The API limits by address, so it
 // needs the browser's address (`x-forwarded-for`) and not this server's.

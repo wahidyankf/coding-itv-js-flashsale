@@ -11,10 +11,9 @@ import {
 	type Principal,
 	REFRESH_TTL_SECONDS,
 	type Role,
-	usablePassword,
 } from "../domain/auth.js";
 import { isLive } from "../domain/time.js";
-import { normalizeUser, type UserId } from "../domain/user.js";
+import type { UserId, Username } from "../domain/user.js";
 import type { AccountStore } from "./ports/account-store.js";
 import type { Clock } from "./ports/clock.js";
 import type { PasswordHasher } from "./ports/password-hasher.js";
@@ -30,23 +29,21 @@ export type Login = {
 	refreshExpiresAt: Date;
 };
 
-// Why an account cannot be made: the name is not usable, the password is not, or the name is taken.
-export type RegisterError =
-	| "invalid_user"
-	| "invalid_password"
-	| "username_taken";
+// Why an account cannot be made: the name is taken. The name and the password are checked at the HTTP edge (and by the
+// command line) before the service sees them, so they arrive typed.
+export type RegisterError = "username_taken";
 
 export type AuthService = {
 	// Makes a shopper account and logs it in.
 	register: (
-		username: unknown,
-		password: unknown,
+		username: Username,
+		password: string,
 		client?: ClientInfo,
 	) => Promise<Result<Login, RegisterError>>;
 	// One error for an unknown name and a wrong password, so a reply never says which names exist.
 	login: (
-		username: unknown,
-		password: unknown,
+		username: Username,
+		password: string,
 		client?: ClientInfo,
 	) => Promise<Result<Login, "invalid_credentials">>;
 	// Trades the refresh token for a new pair. The old refresh token stops working.
@@ -68,8 +65,8 @@ export type AuthService = {
 	) => Promise<Result<Principal, "not_authenticated" | "forbidden">>;
 	// Makes an operator account, for the command that makes the first one. `createdBy` is the system user.
 	createOperator: (
-		username: unknown,
-		password: unknown,
+		username: Username,
+		password: string,
 		createdBy: UserId,
 	) => Promise<Result<Principal, RegisterError>>;
 };
@@ -113,18 +110,14 @@ async function openLogin(
 	return { principal, ...issued };
 }
 
-// A new account with a role, after the name and the password have passed the rules.
+// A new account with a role. The name and the password have passed the rules at the edge.
 async function makeAccount(
 	ports: AuthPorts,
-	rawUsername: unknown,
-	rawPassword: unknown,
+	username: Username,
+	password: string,
 	role: Role,
 	createdBy?: UserId,
 ): Promise<Result<Principal, RegisterError>> {
-	const username = normalizeUser(rawUsername);
-	if (username === undefined) return new Err("invalid_user");
-	const password = usablePassword(rawPassword);
-	if (password === undefined) return new Err("invalid_password");
 	const created = await ports.accounts.register({
 		username,
 		passwordHash: await ports.hasher.hash(password),
@@ -171,13 +164,8 @@ export function createAuthService(
 		createOperator: (username, password, createdBy) =>
 			makeAccount(ports, username, password, "operator", createdBy),
 
-		login: async (rawUsername, rawPassword, client) => {
-			const username = normalizeUser(rawUsername);
-			const found =
-				username === undefined
-					? undefined
-					: await accounts.findCredentials(username);
-			const password = typeof rawPassword === "string" ? rawPassword : "";
+		login: async (username, password, client) => {
+			const found = await accounts.findCredentials(username);
 			const matches = await hasher.verify(
 				password,
 				found?.passwordHash ?? (await decoy),

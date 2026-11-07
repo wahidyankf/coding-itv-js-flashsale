@@ -1,6 +1,8 @@
 // The seed use case with a fake store: it passes on what it is given, and returns the sale as the domain builds it, with
 // nothing sold yet.
+
 import { expect, it } from "vitest";
+import { userIdOf } from "../domain/user.js";
 import { createSaleSeedService } from "./sale-seed-service.js";
 
 it("returns the stored sale with its id and product, and nothing sold", async () => {
@@ -20,7 +22,7 @@ it("returns the stored sale with its id and product, and nothing sold", async ()
 		admitPerSecond: 50,
 	};
 
-	const sale = await service.seed(input, "actor-1");
+	const sale = await service.seed(input, userIdOf("actor-1"));
 
 	expect(sale).toMatchObject({
 		id: "sale-1",

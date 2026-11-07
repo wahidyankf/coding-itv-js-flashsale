@@ -1,7 +1,9 @@
 // The purchase use case, against fake stores: what a confirm and an outcome answer, in the order the checks run.
+
 import { describe, expect, it } from "vitest";
 import { queueWorld } from "../bdd/support/queue-world.js";
 import { relativeTime } from "../bdd/support/time.js";
+import { usernameOf } from "../bdd/support/users.js";
 
 // Answers that no scenario reaches by itself: odd requests, and a purchase row that Postgres would refuse.
 const NOW = new Date("2026-06-01T12:00:00Z");
@@ -41,7 +43,7 @@ describe("confirming a purchase", () => {
 		const reservationId = crypto.randomUUID();
 		world.repository.rows.set(`${world.saleId}:ana`, {
 			saleId: world.saleId,
-			user: "ana",
+			user: usernameOf("ana"),
 			reservationId,
 			expiresAt: new Date(NOW.getTime() + 60_000),
 		});
@@ -59,7 +61,7 @@ describe("confirming a purchase", () => {
 		const reservationId = crypto.randomUUID();
 		world.repository.rows.set(`${world.saleId}:ana`, {
 			saleId: world.saleId,
-			user: "ana",
+			user: usernameOf("ana"),
 			reservationId,
 			expiresAt: new Date(NOW.getTime() + 60_000),
 		});
@@ -97,6 +99,94 @@ describe("a commit that fails after the charge", () => {
 		const reservationId = world.holds.get("ana")?.reservationId;
 		world.purchaseRepository.commit = async () => {
 			throw new Error("postgres is unreachable");
+		};
+
+		const reply = await world.confirm("ana");
+		expect(reply.statusCode).toBe(500);
+		expect(reply.json().errorCode).toBe("internal");
+		expect(world.payment.refunded).toEqual([`mock-${reservationId}`]);
+	});
+
+	// A commit that threw may still have written the purchase: the reply was lost, not the write. The purchase is then
+	// the answer, and the charge is kept, because the shopper did get the item.
+	it("answers the purchase that was written when the reply of the commit was lost, and refunds nothing", async () => {
+		const world = queueWorld(NOW);
+		await world.addSale({
+			stock: 5,
+			startsAt: relativeTime("1 hour ago", NOW),
+			endsAt: relativeTime("in 1 hour", NOW),
+		});
+		await world.admitted("ana");
+		await world.reserve("ana");
+		const reservationId = world.holds.get("ana")?.reservationId;
+		const written = world.purchaseRepository.commit;
+		world.purchaseRepository.commit = async (input) => {
+			await written(input);
+			throw new Error("the reply was lost");
+		};
+
+		const reply = await world.confirm("ana");
+		expect(reply.statusCode).toBe(201);
+		expect(reply.json().reservationId).toBe(reservationId);
+		expect(world.payment.refunded).toEqual([]);
+	});
+
+	// A purchase found under the reservation that is not this shopper's, or not this sale's, is not the answer: the
+	// charge is refunded and the failure goes on as before.
+	it("refunds the charge when the purchase found after a lost commit belongs to someone else", async () => {
+		const world = queueWorld(NOW);
+		await world.addSale({
+			stock: 5,
+			startsAt: relativeTime("1 hour ago", NOW),
+			endsAt: relativeTime("in 1 hour", NOW),
+		});
+		await world.admitted("ana");
+		await world.reserve("ana");
+		const reservationId = world.holds.get("ana")?.reservationId;
+		let commitFailed = false;
+		world.purchaseRepository.commit = async () => {
+			commitFailed = true;
+			throw new Error("the reply was lost");
+		};
+		world.purchaseRepository.findByReservation = async () =>
+			commitFailed
+				? {
+						id: crypto.randomUUID(),
+						saleId: world.saleId,
+						user: usernameOf("ben"),
+						reservationId: reservationId ?? "",
+						paymentRef: "mock-other",
+						purchasedAt: NOW,
+					}
+				: undefined;
+
+		const reply = await world.confirm("ana");
+		expect(reply.statusCode).toBe(500);
+		expect(reply.json().errorCode).toBe("internal");
+		expect(world.payment.refunded).toEqual([`mock-${reservationId}`]);
+	});
+
+	// The lookup of the purchase fails too, most likely because Postgres is down, so the commit most likely never landed:
+	// the charge is refunded and the failure goes on as before.
+	it("refunds the charge when the commit fails and the lookup after it fails too", async () => {
+		const world = queueWorld(NOW);
+		await world.addSale({
+			stock: 5,
+			startsAt: relativeTime("1 hour ago", NOW),
+			endsAt: relativeTime("in 1 hour", NOW),
+		});
+		await world.admitted("ana");
+		await world.reserve("ana");
+		const reservationId = world.holds.get("ana")?.reservationId;
+		const found = world.purchaseRepository.findByReservation;
+		let commitFailed = false;
+		world.purchaseRepository.commit = async () => {
+			commitFailed = true;
+			throw new Error("postgres is unreachable");
+		};
+		world.purchaseRepository.findByReservation = async (id) => {
+			if (commitFailed) throw new Error("postgres is unreachable");
+			return found(id);
 		};
 
 		const reply = await world.confirm("ana");

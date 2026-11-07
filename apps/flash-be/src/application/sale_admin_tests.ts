@@ -1,9 +1,11 @@
 // The operator's sale use case: creating, changing, removing and listing sales, with the checks on each step.
+
 import { Err, Ok } from "@flash/typekit";
 import { describe, expect, it } from "vitest";
 import { fakeSale } from "../bdd/support/fake-sales.js";
 import { memorySaleAdmin } from "../bdd/support/memory-sale-admin.js";
 import type { Sale } from "../domain/sale.js";
+import { userIdOf } from "../domain/user.js";
 import type { SaleAdmin } from "./ports/sale-admin.js";
 import { createSaleAdminService } from "./sale-admin-service.js";
 
@@ -40,7 +42,7 @@ describe("create", () => {
 				stored.push(sale);
 				return new Ok({ id: "sale-9", productId: PRODUCT_ID });
 			}),
-		).create(draft, ACTOR);
+		).create(draft, userIdOf(ACTOR));
 		expect(created.isOk() && created.value).toEqual({
 			id: "sale-9",
 			productId: PRODUCT_ID,
@@ -61,7 +63,7 @@ describe("create", () => {
 				asked += 1;
 				return new Ok({ id: "sale-1", productId: PRODUCT_ID });
 			}),
-		).create({ ...draft, stock: 0 }, ACTOR);
+		).create({ ...draft, stock: 0 }, userIdOf(ACTOR));
 		expect(created.isErr() && created.error).toBe("invalid_sale");
 		expect(asked).toBe(0);
 	});
@@ -69,7 +71,7 @@ describe("create", () => {
 	it("passes on the refusal of the store", async () => {
 		const created = await serviceWith(
 			creating(async () => new Err("sale_overlaps")),
-		).create(draft, ACTOR);
+		).create(draft, userIdOf(ACTOR));
 		expect(created.isErr() && created.error).toBe("sale_overlaps");
 	});
 });
@@ -95,7 +97,7 @@ describe("changing, removing and listing", () => {
 		const changed = await serviceOver([{ ...upcoming }]).update(
 			upcoming.id,
 			{ stock: 9 },
-			ACTOR,
+			userIdOf(ACTOR),
 		);
 		expect(changed.isOk() && changed.value).toMatchObject({
 			id: upcoming.id,
@@ -107,8 +109,12 @@ describe("changing, removing and listing", () => {
 
 	it("never asks the store about an id that cannot exist", async () => {
 		const service = serviceOver([]);
-		const changed = await service.update("not-a-uuid", { stock: 9 }, ACTOR);
-		const removed = await service.remove("not-a-uuid", ACTOR);
+		const changed = await service.update(
+			"not-a-uuid",
+			{ stock: 9 },
+			userIdOf(ACTOR),
+		);
+		const removed = await service.remove("not-a-uuid", userIdOf(ACTOR));
 		expect(changed.isErr() && changed.error).toBe("sale_not_found");
 		expect(removed.isErr() && removed.error).toBe("sale_not_found");
 	});
@@ -119,19 +125,19 @@ describe("changing, removing and listing", () => {
 		const locked = await service.update(
 			running.id,
 			{ startsAt: "2026-06-01T11:30:00.000Z" },
-			ACTOR,
+			userIdOf(ACTOR),
 		);
 		expect(locked.isErr() && locked.error).toBe("sale_locked");
 		const overlapping = await service.update(
 			upcoming.id,
 			{ startsAt: "2026-06-01T12:00:00.000Z" },
-			ACTOR,
+			userIdOf(ACTOR),
 		);
 		expect(overlapping.isErr() && overlapping.error).toBe("sale_overlaps");
 		const unknown = await service.update(
 			"00000000-0000-4000-8000-000000000003",
 			{ stock: 9 },
-			ACTOR,
+			userIdOf(ACTOR),
 		);
 		expect(unknown.isErr() && unknown.error).toBe("sale_not_found");
 	});
@@ -139,9 +145,9 @@ describe("changing, removing and listing", () => {
 	it("removes a sale nobody bought from and refuses one that was", async () => {
 		const sales = [{ ...upcoming }, { ...running }];
 		const service = serviceOver(sales);
-		const refused = await service.remove(running.id, ACTOR);
+		const refused = await service.remove(running.id, userIdOf(ACTOR));
 		expect(refused.isErr() && refused.error).toBe("sale_has_purchases");
-		const removed = await service.remove(upcoming.id, ACTOR);
+		const removed = await service.remove(upcoming.id, userIdOf(ACTOR));
 		expect(removed.isOk()).toBe(true);
 		expect(sales.map((sale) => sale.id)).toEqual([running.id]);
 	});

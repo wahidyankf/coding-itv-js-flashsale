@@ -5,7 +5,7 @@
 import { attemptAsync } from "@flash/typekit";
 import { failureMessage } from "./adapters/inbound/cli/failure-message.js";
 import {
-	operatorArgsRefusal,
+	operatorInputOf,
 	parseOperatorArgs,
 	refusalMessage,
 } from "./adapters/inbound/cli/operator-args.js";
@@ -18,19 +18,19 @@ import { SYSTEM_USERNAME } from "./domain/actors.js";
 // Usage: node dist/create-operator.js --username ana --password "a long phrase" (or --username=ana --password=...)
 const created = await attemptAsync(async () => {
 	const args = parseOperatorArgs(process.argv.slice(2));
-	const refused = operatorArgsRefusal(args);
-	if (refused !== undefined) {
-		throw new Error(refusalMessage(refused, args.username));
+	const input = operatorInputOf(args);
+	if (input.isErr()) {
+		throw new Error(refusalMessage(input.error, undefined));
 	}
 	const db = createDb(config.databaseUrl);
 	try {
 		const made = await postgresAuth(db).createOperator(
-			args.username,
-			args.password,
+			input.value.username,
+			input.value.password,
 			await actorId(db, SYSTEM_USERNAME),
 		);
 		if (made.isErr()) {
-			throw new Error(refusalMessage(made.error, args.username));
+			throw new Error(refusalMessage(made.error, input.value.username));
 		}
 		console.log(`created operator ${made.value.username}`);
 	} finally {

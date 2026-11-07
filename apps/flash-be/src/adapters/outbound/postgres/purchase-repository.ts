@@ -9,6 +9,7 @@ import type {
 } from "../../../application/ports/purchase-repository.js";
 import type { Purchase } from "../../../domain/purchase.js";
 import type { Reservation } from "../../../domain/reservation.js";
+import { storedUsername } from "../../../domain/user.js";
 import type { Database } from "./database.js";
 import {
 	livePurchaseOf,
@@ -26,7 +27,7 @@ function toPurchase(row: Named<Database["purchases"]>): Purchase {
 	return {
 		id: row.id,
 		saleId: row.sale_id,
-		user: row.username,
+		user: storedUsername(row.username),
 		reservationId: row.reservation_id,
 		paymentRef: row.payment_ref,
 		purchasedAt: row.created_at,
@@ -37,7 +38,7 @@ function toPurchase(row: Named<Database["purchases"]>): Purchase {
 function toReservation(row: Named<Database["reservations"]>): Reservation {
 	return {
 		saleId: row.sale_id,
-		user: row.username,
+		user: storedUsername(row.username),
 		reservationId: row.id,
 		expiresAt: row.expires_at,
 	};

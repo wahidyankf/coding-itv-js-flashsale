@@ -9,7 +9,7 @@ import {
 	outcomeOf,
 	type Purchase,
 } from "../domain/purchase.js";
-import { confirmBlock, isSaleId, type Sale } from "../domain/sale.js";
+import { confirmBlock, isUuid, type Sale } from "../domain/sale.js";
 import type { Username } from "../domain/user.js";
 import type { Clock } from "./ports/clock.js";
 import type { HoldGate } from "./ports/hold-gate.js";
@@ -52,22 +52,20 @@ export type PurchaseService = {
 	confirm: (
 		saleId: string,
 		user: Username,
-		reservationId: unknown,
+		reservationId: string,
 	) => Promise<ConfirmResult>;
 	// "Did I get it?": a purchase, a live hold, or nothing.
 	outcome: (saleId: string, user: Username) => Promise<OutcomeResult>;
 };
 
 // The first check of a confirmation: the sale exists and the reservation id is well formed. The text is checked as an
-// id, because it arrives from a client and is only ever looked up.
+// id, because it arrives from a client and is only ever looked up. The edge has checked that it is text.
 function wellFormed(
 	found: Sale | undefined,
-	reservationId: unknown,
+	reservationId: string,
 ): Result<{ sale: Sale; reservationId: string }, ConfirmError> {
 	if (found === undefined) return new Err("sale_not_found");
-	if (typeof reservationId !== "string" || !isSaleId(reservationId)) {
-		return new Err("invalid_reservation");
-	}
+	if (!isUuid(reservationId)) return new Err("invalid_reservation");
 	return new Ok({ sale: found, reservationId });
 }
 
@@ -93,9 +91,25 @@ export function createPurchaseService(
 			: new Err("reservation_not_found");
 	}
 
+	// The purchase that a commit which threw may still have written, when its reply was lost. It is looked up by the
+	// reservation; undefined when none is found, when the purchase is someone else's, or when the lookup fails too.
+	async function writtenDespite(
+		saleId: string,
+		user: Username,
+		reservationId: string,
+	): Promise<Purchase | undefined> {
+		const found = await attemptAsync(
+			() => repository.findByReservation(reservationId),
+			Error,
+		);
+		if (found.isErr() || found.value === undefined) return undefined;
+		return isPurchaseOf(found.value, saleId, user) ? found.value : undefined;
+	}
+
 	// Charges the hold, then writes the purchase in the database. A declined charge ends here. A commit that finds the sale
-	// sold out, or the shopper already bought, refunds the charge. A commit that fails after the charge refunds it too, and
-	// the failure goes on to the caller as before.
+	// sold out, or the shopper already bought, refunds the charge. A commit that throws is looked up: a purchase found for
+	// the reservation is the answer, and the charge is kept, because the write landed. When no purchase is found, the charge
+	// is refunded and the failure goes on to the caller as before.
 	async function chargeAndCommit(
 		saleId: string,
 		user: Username,
@@ -118,11 +132,18 @@ export function createPurchaseService(
 				}),
 			Error,
 		);
-		if (committed.isErr()) {
-			await payment.refund(ref);
-			throw committed.error;
+		let result: CommitResult;
+		if (committed.isOk()) {
+			result = committed.value;
+		} else {
+			const written = await writtenDespite(saleId, user, reservationId);
+			if (written === undefined) {
+				await payment.refund(ref);
+				throw committed.error;
+			}
+			// This call is the one that wrote it, as far as this call can tell, so it is reported as created.
+			result = { kind: "purchased", purchase: written, created: true };
 		}
-		const result: CommitResult = committed.value;
 		if (result.kind !== "purchased") {
 			await payment.refund(ref);
 			return new Err(result.kind);

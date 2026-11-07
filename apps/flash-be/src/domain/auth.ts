@@ -27,11 +27,10 @@ export const REFRESH_TTL_SECONDS = REFRESH_TTL_DAYS * SECONDS_PER_DAY;
 export const PASSWORD_MIN_LENGTH = 8;
 export const PASSWORD_MAX_LENGTH = 128;
 
-// A password is any text of a usable length. The rules stay short on purpose; a long phrase beats a pattern.
-export function usablePassword(raw: unknown): string | undefined {
-	return typeof raw === "string" &&
-		raw.length >= PASSWORD_MIN_LENGTH &&
-		raw.length <= PASSWORD_MAX_LENGTH
+// A password is any text of a usable length. The rules stay short on purpose; a long phrase beats a pattern. The edge
+// checks that the body holds text first, so this rule only reads the length.
+export function usablePassword(raw: string): string | undefined {
+	return raw.length >= PASSWORD_MIN_LENGTH && raw.length <= PASSWORD_MAX_LENGTH
 		? raw
 		: undefined;
 }

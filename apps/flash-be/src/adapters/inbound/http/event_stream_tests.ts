@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { Dependencies } from "../../../application/dependencies.js";
 import { healthyDeps } from "../../../bdd/support/deps.js";
 import { fakeSale } from "../../../bdd/support/fake-sales.js";
+import { usernameOf } from "../../../bdd/support/users.js";
+import { userIdOf } from "../../../domain/user.js";
 import { buildApp } from "./app.js";
 import { formatEvent, serveEvents } from "./event-stream.js";
 
@@ -17,7 +19,11 @@ const auth: Dependencies["auth"] = {
 	...healthyDeps.auth,
 	authenticate: async (token) =>
 		token === "shopper-token"
-			? new Ok({ userId: "user-1", username: "ana", role: "shopper" as const })
+			? new Ok({
+					userId: userIdOf("user-1"),
+					username: usernameOf("ana"),
+					role: "shopper" as const,
+				})
 			: new Err("not_authenticated" as const),
 };
 
@@ -187,7 +193,7 @@ describe("the event stream", () => {
 						calls++;
 						return calls <= 2
 							? new Ok({
-									user: "ana",
+									user: usernameOf("ana"),
 									place: { state: "waiting" as const, place: 1 },
 								})
 							: new Err("not_in_queue");
@@ -239,7 +245,7 @@ describe("the event stream", () => {
 						calls++;
 						if (calls === 2) throw new Error("redis is down");
 						return new Ok({
-							user: "ana",
+							user: usernameOf("ana"),
 							place: { state: "admitted" as const },
 						});
 					},

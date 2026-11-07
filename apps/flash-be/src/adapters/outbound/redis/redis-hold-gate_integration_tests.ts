@@ -1,7 +1,9 @@
 // The Redis hold gate against a real Redis: the rebuild writes the keys the reserve script reads, and only the owner of the
 // rebuild lock can release it. Adapter layer (integration test: it needs the dev compose stack).
+
 import { randomUUID } from "node:crypto";
 import { afterAll, describe, expect, it } from "vitest";
+import { usernameOf } from "../../../bdd/support/users.js";
 import { config } from "../../../config.js";
 import { createRedis } from "./redis-client.js";
 import { createRedisHoldGate } from "./redis-hold-gate.js";
@@ -20,10 +22,10 @@ describe("the rebuild of the Redis gate", () => {
 		const saleId = randomUUID();
 		const now = Date.now();
 		await gate.restore(saleId, {
-			buyers: ["ana"],
+			buyers: [usernameOf("ana")],
 			holds: [
 				{
-					user: "ben",
+					user: usernameOf("ben"),
 					reservationId: "r-ben",
 					expiresAt: new Date(now + ONE_MINUTE_MS),
 				},

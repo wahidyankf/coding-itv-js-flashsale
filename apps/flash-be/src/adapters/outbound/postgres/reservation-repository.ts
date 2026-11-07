@@ -5,12 +5,15 @@ import { attemptAsync } from "@flash/typekit";
 import { type Kysely, sql } from "kysely";
 import type { ReservationRepository } from "../../../application/ports/reservation-repository.js";
 import {
-	decideReservation,
+	earlyReservationAnswer,
 	type FallbackAnswer,
 	type HoldSnapshot,
 	type Reservation,
 	type ReserveRequest,
+	roomReservationAnswer,
+	type ShopperState,
 } from "../../../domain/reservation.js";
+import { storedUsername } from "../../../domain/user.js";
 import type { Database } from "./database.js";
 import {
 	livePurchaseOf,
@@ -103,9 +106,29 @@ async function countHoldsOfOthers(
 	return Number(live.count);
 }
 
+// What the early answers need about the shopper, read in their order: the purchase first, then the own hold. A buyer's own
+// hold is not read, because the purchase answers before it does.
+async function shopperStateOf(
+	trx: Kysely<Database>,
+	request: ReserveRequest,
+	userId: string,
+): Promise<ShopperState> {
+	const purchased =
+		(await livePurchaseOf(trx, request.saleId, request.user)) !== undefined;
+	if (purchased) return { purchased, ownHold: undefined };
+	const own = await ownHoldOf(trx, request.saleId, userId);
+	return {
+		purchased,
+		ownHold: own
+			? { reservationId: own.id, expiresAt: own.expires_at }
+			: undefined,
+	};
+}
+
 // The Postgres fallback, under the sale's row lock. The steps run in this order, and the order is the rule: the lock
-// first, then the rebuild check, then the state the decision needs, then the decision, and only then the write. A sale
-// that is gone answers `sale_not_found`, so a removal during a request is a value, not a failure.
+// first, then the rebuild check, then the purchase and the own hold, then the count of the others only when those give
+// no answer, and only then the write. A sale that is gone answers `sale_not_found`, so a removal during a request is a
+// value, not a failure.
 async function reserveUnderLock(
 	trx: Kysely<Database>,
 	request: ReserveRequest,
@@ -124,15 +147,16 @@ async function reserveUnderLock(
 	if (ready.isOk() && ready.value) return { kind: "gate_ready" };
 
 	const userId = await ensureUser(trx, request.user);
-	const own = await ownHoldOf(trx, request.saleId, userId);
-	const decision = decideReservation(
+	// The purchase and the own hold answer most repeats without a count of the other holds.
+	const early = earlyReservationAnswer(
+		await shopperStateOf(trx, request, userId),
+		request,
+	);
+	if (early !== undefined) return early;
+
+	const decision = roomReservationAnswer(
 		{
 			sold: sale.sold,
-			purchased:
-				(await livePurchaseOf(trx, request.saleId, request.user)) !== undefined,
-			ownHold: own
-				? { reservationId: own.id, expiresAt: own.expires_at }
-				: undefined,
 			othersHolding: await countHoldsOfOthers(
 				trx,
 				request.saleId,
@@ -167,9 +191,9 @@ async function snapshotOf(
 		.where("reservations.expires_at", ">", now)
 		.execute();
 	return {
-		buyers: purchases.map((row) => row.username),
+		buyers: purchases.map((row) => storedUsername(row.username)),
 		holds: holds.map((row) => ({
-			user: row.username,
+			user: storedUsername(row.username),
 			reservationId: row.id,
 			expiresAt: row.expires_at,
 		})),

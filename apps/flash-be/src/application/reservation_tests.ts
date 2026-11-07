@@ -1,9 +1,11 @@
 // The reservation use case, against fake stores: the answers of the gate, the rebuild from Postgres, and the replies.
+
 import { randomUUID } from "node:crypto";
 import { Err, Ok, type Result } from "@flash/typekit";
 import { describe, expect, it } from "vitest";
 import { queueWorld } from "../bdd/support/queue-world.js";
 import { relativeTime } from "../bdd/support/time.js";
+import { usernameOf } from "../bdd/support/users.js";
 import type { GateAnswer } from "../domain/reservation.js";
 import { createGuardedGate } from "./guarded-gate.js";
 import type { HoldGate } from "./ports/hold-gate.js";
@@ -79,7 +81,7 @@ async function reserveWith(
 			...options,
 		},
 	});
-	return service.reserve(saleId, "ana", ticket);
+	return service.reserve(saleId, usernameOf("ana"), ticket);
 }
 
 describe("the reservation service", () => {
@@ -232,9 +234,9 @@ describe("the reservation service", () => {
 			newId: randomUUID,
 			options: { rebuildWaitMs: 100, wait: async () => {}, random: () => 0.5 },
 		});
-		await expect(service.reserve(saleId, "ana", ticket)).rejects.toThrow(
-			"postgres is unreachable",
-		);
+		await expect(
+			service.reserve(saleId, usernameOf("ana"), ticket),
+		).rejects.toThrow("postgres is unreachable");
 	});
 
 	it("answers sale_not_found when the sale was removed while the request ran", async () => {
@@ -256,7 +258,7 @@ describe("the reservation service", () => {
 			newId: randomUUID,
 			options: { rebuildWaitMs: 100, wait: async () => {}, random: () => 0.5 },
 		});
-		expect(await service.reserve(saleId, "ana", ticket)).toEqual(
+		expect(await service.reserve(saleId, usernameOf("ana"), ticket)).toEqual(
 			new Err("sale_not_found"),
 		);
 	});
@@ -270,8 +272,8 @@ describe("the reservation service", () => {
 	it("tells a shopper whose queue place was lost that they are not admitted", async () => {
 		const { world, saleId, ticket } = await admittedAna();
 		world.store.clear();
-		expect(await world.reservations.reserve(saleId, "ana", ticket)).toEqual(
-			new Err("not_admitted"),
-		);
+		expect(
+			await world.reservations.reserve(saleId, usernameOf("ana"), ticket),
+		).toEqual(new Err("not_admitted"));
 	});
 });

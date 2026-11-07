@@ -5,7 +5,7 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import type { Dependencies } from "../../../../application/dependencies.js";
 import type { Outcome, Purchase } from "../../../../domain/purchase.js";
 import type { Username } from "../../../../domain/user.js";
-import { fieldOf, missingFieldError } from "./bodies.js";
+import { reservationBody } from "./bodies.js";
 import { createGuards, type SaleParams, shopperOf } from "./guards.js";
 import { createdOrOk, sendError, sendResult } from "./reply.js";
 
@@ -56,14 +56,14 @@ export function registerPurchaseRoutes(
 		url: "/sales/:saleId/purchases",
 		preValidation: limit,
 		handler: async (request, reply) => {
-			const bad = missingFieldError(request.body, ["reservationId"]);
-			if (bad !== undefined) return sendError(reply, bad);
+			const body = reservationBody(request.body);
+			if (body.isErr()) return sendError(reply, "invalid_reservation");
 			return sendResult(
 				reply,
 				await deps.purchases.confirm(
 					request.params.saleId,
 					shopperOf(request),
-					fieldOf(request.body, "reservationId"),
+					body.value.reservationId,
 				),
 				({ created, purchase }) =>
 					createdOrOk(reply, created).send(purchaseView(purchase)),

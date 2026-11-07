@@ -94,6 +94,22 @@ export const uuid: Decoder<string> = (value) =>
 		? new Ok(value)
 		: fail("a UUID");
 
+// A value that a decoder reads, then a rule of the app makes into the typed value. The rule returns `undefined` to refuse
+// the value, and `expected` names what it wanted. The rule belongs to the app; the kit only runs it after the decoder, so
+// a rule is never run on a value of the wrong shape.
+export function refine<T, U>(
+	decode: Decoder<T>,
+	rule: (value: T) => U | undefined,
+	expected: string,
+): Decoder<U> {
+	return (value) => {
+		const decoded = decode(value);
+		if (decoded.isErr()) return new Err(decoded.error);
+		const made = rule(decoded.value);
+		return made === undefined ? fail(expected) : new Ok(made);
+	};
+}
+
 // Exactly the text it names. Used for the tag of a branch, or a fixed word such as "ok".
 export function literal<const V extends string>(wanted: V): Decoder<V> {
 	const phrase = `the text ${quote(wanted)}`;

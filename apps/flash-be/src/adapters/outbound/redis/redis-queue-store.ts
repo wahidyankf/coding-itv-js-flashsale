@@ -6,7 +6,7 @@ import { Err, Ok, type Result } from "@flash/typekit";
 import type { QueueStore } from "../../../application/ports/queue-store.js";
 import type { UnreadableReply } from "../../../application/ports/reply.js";
 import type { QueuePlace } from "../../../domain/queue.js";
-import type { Username } from "../../../domain/user.js";
+import { storedUsername, type Username } from "../../../domain/user.js";
 import type { RedisClient } from "./redis-client.js";
 import { saleKey } from "./redis-keys.js";
 
@@ -97,13 +97,15 @@ export function joinReplyOf(
 	return new Err(UNREADABLE);
 }
 
-const isName = (value: unknown): value is Username => typeof value === "string";
+const isName = (value: unknown): value is string => typeof value === "string";
 
 // The names the admit script returns: a list of text, one name per admitted shopper.
 export function usersOf(reply: unknown): Result<Username[], UnreadableReply> {
 	if (!Array.isArray(reply)) return new Err(UNREADABLE);
 	const names: unknown[] = reply;
-	return names.every(isName) ? new Ok(names) : new Err(UNREADABLE);
+	return names.every(isName)
+		? new Ok(names.map(storedUsername))
+		: new Err(UNREADABLE);
 }
 
 // The queue over Redis. Each method is one script or one plain command, and each returns what the domain needs, or a

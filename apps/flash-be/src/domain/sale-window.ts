@@ -1,7 +1,7 @@
 // Making and changing a sale: the rules an operator's input must meet, and the rules for a sale that already exists.
 // The window is absolute here; the seed command turns minutes into one.
 import { Err, Ok, type Result } from "@flash/typekit";
-import { isSaleId, type Sale } from "./sale.js";
+import { isUuid, type Sale } from "./sale.js";
 
 // A sale ready to store. Its window is absolute, and the stock, hold and rate are whole and positive.
 export type NewSale = {
@@ -46,7 +46,7 @@ export function newSaleFrom(draft: SaleDraft): Result<NewSale, "invalid_sale"> {
 	const admitPerSecond = draft.admitPerSecond ?? DEFAULT_ADMIT_PER_SECOND;
 
 	const usable =
-		(draft.productId === undefined || isSaleId(draft.productId)) &&
+		(draft.productId === undefined || isUuid(draft.productId)) &&
 		name.length >= 1 &&
 		name.length <= NAME_MAX_LENGTH &&
 		positiveInteger(draft.stock) &&

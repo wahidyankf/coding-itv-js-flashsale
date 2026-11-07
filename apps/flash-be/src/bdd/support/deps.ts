@@ -11,13 +11,13 @@ export const healthyDeps: Dependencies = {
 	checkGate: async () => {},
 	sales: { cacheMs: () => 0, current: noSale, byId: noSale, details: noSale },
 	auth: {
-		register: async () => new Err("invalid_user"),
+		register: async () => new Err("username_taken"),
 		login: async () => new Err("invalid_credentials"),
 		refresh: async () => new Err("invalid_refresh_token"),
 		logout: async () => {},
 		authenticate: async () => new Err("not_authenticated"),
 		authorizeOperator: async () => new Err("not_authenticated"),
-		createOperator: async () => new Err("invalid_user"),
+		createOperator: async () => new Err("username_taken"),
 	},
 	admin: {
 		create: async () => new Err("sale_overlaps"),

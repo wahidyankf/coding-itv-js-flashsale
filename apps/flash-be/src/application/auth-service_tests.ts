@@ -3,14 +3,16 @@ import { Err, Ok } from "@flash/typekit";
 import { describe, expect, it } from "vitest";
 import { randomTokenSource } from "../adapters/outbound/crypto/token-source.js";
 import { memoryAuth, plainHasher } from "../bdd/support/memory-auth.js";
+import { usernameOf } from "../bdd/support/users.js";
 import { ACCESS_TTL_SECONDS, REFRESH_TTL_SECONDS } from "../domain/auth.js";
+import { userIdOf } from "../domain/user.js";
 import { createAuthService } from "./auth-service.js";
 
 // The branches of the auth service that no scenario of a shopper reaches by itself.
 const START = new Date("2026-06-01T12:00:00Z");
 const PASSWORD = "a long password";
 // The system user that makes the first operator. Only the id matters here, so any id will do.
-const SYSTEM_ID = "system-user-id";
+const SYSTEM_ID = userIdOf("system-user-id");
 
 function world() {
 	let now = START;
@@ -27,7 +29,7 @@ function world() {
 describe("registering and logging in", () => {
 	it("gives a login the two tokens and when each one ends", async () => {
 		const { service } = world();
-		const registered = await service.register("ana", PASSWORD);
+		const registered = await service.register(usernameOf("ana"), PASSWORD);
 		expect(registered.isOk()).toBe(true);
 		if (registered.isErr()) return;
 		expect(registered.value.principal.role).toBe("shopper");
@@ -42,39 +44,19 @@ describe("registering and logging in", () => {
 		);
 	});
 
-	it("takes a name that is not text as an unusable name, and a password that is not text as unusable", async () => {
-		const { service } = world();
-		const noName = await service.register(undefined, PASSWORD);
-		expect(noName.isErr() && noName.error).toBe("invalid_user");
-		const noPassword = await service.register("ana", undefined);
-		expect(noPassword.isErr() && noPassword.error).toBe("invalid_password");
-	});
-
-	it("refuses a name or a password that is not text with the one error of a wrong login", async () => {
-		const { service } = world();
-		await service.register("ana", PASSWORD);
-		for (const [name, password] of [
-			[undefined, PASSWORD],
-			["ana", undefined],
-			["ana", 12345678],
-			["has space", PASSWORD],
-		]) {
-			const login = await service.login(name, password);
-			expect(login.isErr() && login.error).toBe("invalid_credentials");
-		}
-	});
-
 	it("logs in with the name in any case", async () => {
 		const { service } = world();
-		await service.register("ana", PASSWORD);
-		expect((await service.login(" ANA ", PASSWORD)).isOk()).toBe(true);
+		await service.register(usernameOf("ana"), PASSWORD);
+		expect((await service.login(usernameOf(" ANA "), PASSWORD)).isOk()).toBe(
+			true,
+		);
 	});
 
 	it("gives every login its own tokens", async () => {
 		const { service } = world();
-		await service.register("ana", PASSWORD);
-		const first = await service.login("ana", PASSWORD);
-		const second = await service.login("ana", PASSWORD);
+		await service.register(usernameOf("ana"), PASSWORD);
+		const first = await service.login(usernameOf("ana"), PASSWORD);
+		const second = await service.login(usernameOf("ana"), PASSWORD);
 		expect(first.isOk() && second.isOk()).toBe(true);
 		if (first.isErr() || second.isErr()) return;
 		expect(first.value.accessToken).not.toBe(second.value.accessToken);
@@ -92,7 +74,7 @@ describe("recognising a login", () => {
 
 	it("refuses an access token once its 15 minutes have passed", async () => {
 		const { service, advance } = world();
-		const registered = await service.register("ana", PASSWORD);
+		const registered = await service.register(usernameOf("ana"), PASSWORD);
 		if (registered.isErr()) throw new Error("no login");
 		advance(ACCESS_TTL_SECONDS - 1);
 		expect(
@@ -113,7 +95,11 @@ describe("recognising a login", () => {
 			{
 				create: async () => {},
 				findByAccess: async () => ({
-					principal: { userId: "u", username: "ana", role: "shopper" },
+					principal: {
+						userId: userIdOf("u"),
+						username: usernameOf("ana"),
+						role: "shopper",
+					},
 					expiresAt: new Date(START.getTime() - 1),
 				}),
 				rotate: async () => ({ principal: undefined, ended: [] }),
@@ -137,7 +123,7 @@ describe("refreshing", () => {
 
 	it("refuses a refresh token after its 7 days", async () => {
 		const { service, advance } = world();
-		const registered = await service.register("ana", PASSWORD);
+		const registered = await service.register(usernameOf("ana"), PASSWORD);
 		if (registered.isErr()) throw new Error("no login");
 		advance(REFRESH_TTL_SECONDS);
 		const refreshed = await service.refresh(registered.value.refreshToken);
@@ -146,7 +132,7 @@ describe("refreshing", () => {
 
 	it("gives a new pair that works, and a new week", async () => {
 		const { service, advance } = world();
-		const registered = await service.register("ana", PASSWORD);
+		const registered = await service.register(usernameOf("ana"), PASSWORD);
 		if (registered.isErr()) throw new Error("no login");
 		advance(ACCESS_TTL_SECONDS + 1);
 		const refreshed = await service.refresh(registered.value.refreshToken);
@@ -163,8 +149,8 @@ describe("refreshing", () => {
 describe("logging out", () => {
 	it("ends the login by whichever token the client still has", async () => {
 		const { service } = world();
-		const one = await service.register("ana", PASSWORD);
-		const two = await service.login("ana", PASSWORD);
+		const one = await service.register(usernameOf("ana"), PASSWORD);
+		const two = await service.login(usernameOf("ana"), PASSWORD);
 		if (one.isErr() || two.isErr()) throw new Error("no login");
 		await service.logout({ accessToken: one.value.accessToken });
 		await service.logout({ refreshToken: two.value.refreshToken });
@@ -214,7 +200,7 @@ describe("refreshing", () => {
 describe("who may manage sales", () => {
 	it("refuses no login as not_authenticated, and a shopper as forbidden", async () => {
 		const { service } = world();
-		const shopper = await service.register("ana", PASSWORD);
+		const shopper = await service.register(usernameOf("ana"), PASSWORD);
 		if (shopper.isErr()) throw new Error("no login");
 		const none = await service.authorizeOperator(undefined);
 		expect(none.isErr() && none.error).toBe("not_authenticated");
@@ -224,9 +210,13 @@ describe("who may manage sales", () => {
 
 	it("lets through the operator that createOperator made", async () => {
 		const { service } = world();
-		const made = await service.createOperator("boss", PASSWORD, SYSTEM_ID);
+		const made = await service.createOperator(
+			usernameOf("boss"),
+			PASSWORD,
+			SYSTEM_ID,
+		);
 		expect(made.isOk() && made.value.role).toBe("operator");
-		const login = await service.login("boss", PASSWORD);
+		const login = await service.login(usernameOf("boss"), PASSWORD);
 		if (login.isErr()) throw new Error("no login");
 		const who = await service.authorizeOperator(login.value.accessToken);
 		expect(who.isOk() && who.value.username).toBe("boss");
@@ -239,7 +229,7 @@ describe("who may manage sales", () => {
 				register: async (account) => {
 					recorded = account;
 					return new Ok({
-						userId: "u",
+						userId: userIdOf("u"),
 						username: account.username,
 						role: account.role,
 					});
@@ -256,7 +246,7 @@ describe("who may manage sales", () => {
 			() => START,
 			randomTokenSource,
 		);
-		await service.createOperator("boss", PASSWORD, SYSTEM_ID);
+		await service.createOperator(usernameOf("boss"), PASSWORD, SYSTEM_ID);
 		expect(recorded).toMatchObject({
 			username: "boss",
 			role: "operator",
@@ -264,14 +254,14 @@ describe("who may manage sales", () => {
 		});
 	});
 
-	it("refuses a name that is not usable, a short password, and a name that is taken", async () => {
+	it("refuses a name that is taken", async () => {
 		const { service } = world();
-		const noName = await service.createOperator(undefined, PASSWORD, SYSTEM_ID);
-		expect(noName.isErr() && noName.error).toBe("invalid_user");
-		const short = await service.createOperator("boss", "short", SYSTEM_ID);
-		expect(short.isErr() && short.error).toBe("invalid_password");
-		await service.createOperator("boss", PASSWORD, SYSTEM_ID);
-		const taken = await service.createOperator("boss", PASSWORD, SYSTEM_ID);
+		await service.createOperator(usernameOf("boss"), PASSWORD, SYSTEM_ID);
+		const taken = await service.createOperator(
+			usernameOf("boss"),
+			PASSWORD,
+			SYSTEM_ID,
+		);
 		expect(taken.isErr() && taken.error).toBe("username_taken");
 	});
 });

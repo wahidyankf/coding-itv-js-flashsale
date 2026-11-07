@@ -2,7 +2,9 @@ import { Err, Ok } from "@flash/typekit";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Dependencies } from "../../../application/dependencies.js";
 import { healthyDeps } from "../../../bdd/support/deps.js";
+import { usernameOf } from "../../../bdd/support/users.js";
 import { isOperator, type Principal } from "../../../domain/auth.js";
+import { userIdOf } from "../../../domain/user.js";
 import { buildApp } from "./app.js";
 import { errorPayload } from "./errors.js";
 
@@ -28,8 +30,16 @@ const PURCHASES = "/sales/00000000-0000-4000-8000-000000000000/purchases";
 const SHOPPER_COOKIE = "access_token=shopper-token";
 const OPERATOR_COOKIE = "access_token=operator-token";
 const principals: Record<string, Principal> = {
-	"shopper-token": { userId: "user-1", username: "ana", role: "shopper" },
-	"operator-token": { userId: "user-2", username: "boss", role: "operator" },
+	"shopper-token": {
+		userId: userIdOf("user-1"),
+		username: usernameOf("ana"),
+		role: "shopper",
+	},
+	"operator-token": {
+		userId: userIdOf("user-2"),
+		username: usernameOf("boss"),
+		role: "operator",
+	},
 };
 const auth: Dependencies["auth"] = {
 	...healthyDeps.auth,
@@ -306,6 +316,38 @@ describe("the cookies of a login", () => {
 		for (const cookie of [reply.headers["set-cookie"]].flat().map(String)) {
 			expect(cookie).toContain("Secure");
 		}
+	});
+});
+
+describe("the login body at the edge", () => {
+	// A name the rule refuses, or a body with no password, is a wrong login: the same reply, and the service is not asked.
+	it("answers a body the rule refuses as a wrong login, without asking the service", async () => {
+		let asked = 0;
+		const app = appWith({
+			...healthyDeps,
+			auth: {
+				...healthyDeps.auth,
+				login: async () => {
+					asked++;
+					return new Err("invalid_credentials" as const);
+				},
+			},
+		});
+		for (const payload of [
+			{ username: "has space", password: "a long password" },
+			{ username: "ana" },
+			{ password: "a long password" },
+		]) {
+			const reply = await app.inject({
+				method: "POST",
+				url: "/auth/login",
+				headers: json,
+				payload: JSON.stringify(payload),
+			});
+			expect(reply.statusCode).toBe(401);
+			expect(reply.json()).toEqual(errorPayload("invalid_credentials"));
+		}
+		expect(asked).toBe(0);
 	});
 });
 

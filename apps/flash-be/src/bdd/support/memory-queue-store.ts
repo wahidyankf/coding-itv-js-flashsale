@@ -5,16 +5,17 @@ import { Ok } from "@flash/typekit";
 import type { Clock } from "../../application/ports/clock.js";
 import type { QueueStore } from "../../application/ports/queue-store.js";
 import type { QueuePlace } from "../../domain/queue.js";
+import type { Username } from "../../domain/user.js";
 
 // The queue state in memory, for unit tests. It follows the same rules as the Redis store.
 export type MemoryQueueStore = QueueStore & { clear: () => void };
 
 export function memoryQueueStore(clock: Clock): MemoryQueueStore {
-	const waiting = new Map<string, string[]>();
+	const waiting = new Map<string, Username[]>();
 	const admitted = new Map<string, Map<string, number>>();
 	const leaseUntil = new Map<string, number>();
 
-	const line = (saleId: string): string[] => {
+	const line = (saleId: string): Username[] => {
 		let users = waiting.get(saleId);
 		if (!users) {
 			users = [];
@@ -30,7 +31,7 @@ export function memoryQueueStore(clock: Clock): MemoryQueueStore {
 		}
 		return users;
 	};
-	const placeOf = (saleId: string, user: string, now: Date): QueuePlace => {
+	const placeOf = (saleId: string, user: Username, now: Date): QueuePlace => {
 		const until = admissions(saleId).get(user);
 		if (until !== undefined && until > now.getTime()) {
 			return { state: "admitted" };

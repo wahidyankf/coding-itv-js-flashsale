@@ -4,6 +4,7 @@ import { afterAll, beforeEach, expect, it } from "vitest";
 import { resetSales } from "../../../bdd/support/seed.js";
 import { config } from "../../../config.js";
 import { hashToken } from "../../../domain/auth.js";
+import { userIdOf } from "../../../domain/user.js";
 import { randomTokenSource } from "../crypto/token-source.js";
 import { createDb } from "./database.js";
 import { createSessionStore } from "./session-store.js";
@@ -21,7 +22,7 @@ async function openLogin(userId: string, now: Date) {
 	const access = hashToken(randomTokenSource());
 	const refresh = randomTokenSource();
 	await sessions.create({
-		userId,
+		userId: userIdOf(userId),
 		accessHash: access,
 		accessExpiresAt: anHourFrom(now),
 		refreshHash: hashToken(refresh),
@@ -43,7 +44,7 @@ it("does not rotate a refresh token that has ended, and ends nothing", async () 
 	const refresh = randomTokenSource();
 	const now = new Date();
 	await sessions.create({
-		userId,
+		userId: userIdOf(userId),
 		accessHash: hashToken(randomTokenSource()),
 		accessExpiresAt: new Date(now.getTime() + MS_PER_HOUR),
 		refreshHash: hashToken(refresh),

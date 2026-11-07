@@ -13,6 +13,7 @@ import {
 	object,
 	oneOf,
 	optional,
+	refine,
 	tagged,
 	text,
 	uuid,
@@ -275,6 +276,34 @@ describe("both", () => {
 		);
 		expect(joined({ ticket: "t" })).toEqual(
 			new Err({ path: "place", expected: "an integer" }),
+		);
+	});
+});
+
+describe("refine", () => {
+	// A rule of the app: a short text, made upper case. A longer text is not made, so the rule refuses it.
+	const shortCode = refine(
+		text,
+		(value) => (value.length <= 3 ? value.toUpperCase() : undefined),
+		"a short code",
+	);
+
+	it("gives the value the rule makes", () => {
+		expect(shortCode("ab")).toEqual(new Ok("AB"));
+	});
+
+	it("refuses a value the rule does not make, with the phrase the decoder names", () => {
+		expect(shortCode("abcd")).toEqual(new Err(wrong("a short code")));
+	});
+
+	it("refuses a value the decoder refuses, with the decoder's own error", () => {
+		expect(shortCode(5)).toEqual(new Err(wrong("text")));
+	});
+
+	it("names the field in an object, as any refusal does", () => {
+		const coded = object({ code: shortCode });
+		expect(coded({ code: "abcd" })).toEqual(
+			new Err({ path: "code", expected: "a short code" }),
 		);
 	});
 });

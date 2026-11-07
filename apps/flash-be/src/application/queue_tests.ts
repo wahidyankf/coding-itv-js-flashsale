@@ -1,8 +1,10 @@
 // The queue use case: the rules for a user name, the tickets, and joining, checking and admitting shoppers.
+
 import { Err } from "@flash/typekit";
 import { describe, expect, it } from "vitest";
 import { queueWorld } from "../bdd/support/queue-world.js";
 import { relativeTime } from "../bdd/support/time.js";
+import { usernameOf } from "../bdd/support/users.js";
 import { issueTicket, ticketMatches } from "../domain/ticket.js";
 import { normalizeUser } from "../domain/user.js";
 
@@ -19,11 +21,6 @@ async function openWorld() {
 }
 
 describe("normalizeUser", () => {
-	it("refuses a value that is not text", () => {
-		expect(normalizeUser(42)).toBeUndefined();
-		expect(normalizeUser(undefined)).toBeUndefined();
-	});
-
 	it("accepts letters, digits and . _ @ + -", () => {
 		expect(normalizeUser("  Ana.B_1@x+y-z ")).toEqual("ana.b_1@x+y-z");
 	});
@@ -31,23 +28,29 @@ describe("normalizeUser", () => {
 
 describe("tickets", () => {
 	it("match only the sale and user they were issued for", () => {
-		const ticket = issueTicket("s", "sale-1", "ana");
-		expect(ticketMatches("s", "sale-1", "ana", ticket)).toBe(true);
-		expect(ticketMatches("s", "sale-2", "ana", ticket)).toBe(false);
-		expect(ticketMatches("s", "sale-1", "ben", ticket)).toBe(false);
-		expect(ticketMatches("other", "sale-1", "ana", ticket)).toBe(false);
+		const ticket = issueTicket("s", "sale-1", usernameOf("ana"));
+		expect(ticketMatches("s", "sale-1", usernameOf("ana"), ticket)).toBe(true);
+		expect(ticketMatches("s", "sale-2", usernameOf("ana"), ticket)).toBe(false);
+		expect(ticketMatches("s", "sale-1", usernameOf("ben"), ticket)).toBe(false);
+		expect(ticketMatches("other", "sale-1", usernameOf("ana"), ticket)).toBe(
+			false,
+		);
 	});
 
 	it("never match a missing ticket or one of the wrong length", () => {
-		expect(ticketMatches("s", "sale-1", "ana", undefined)).toBe(false);
-		expect(ticketMatches("s", "sale-1", "ana", "short")).toBe(false);
+		expect(ticketMatches("s", "sale-1", usernameOf("ana"), undefined)).toBe(
+			false,
+		);
+		expect(ticketMatches("s", "sale-1", usernameOf("ana"), "short")).toBe(
+			false,
+		);
 	});
 });
 
 describe("the queue service", () => {
 	it("refuses a check for an unknown sale", async () => {
 		const world = await openWorld();
-		expect(await world.queue.check("nope", "ana", "t")).toEqual(
+		expect(await world.queue.check("nope", usernameOf("ana"), "t")).toEqual(
 			new Err("sale_not_found"),
 		);
 	});

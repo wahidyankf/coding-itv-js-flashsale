@@ -1,5 +1,7 @@
 // The purchase rules: which purchase belongs to a sale and a shopper, and what a shopper sees (purchased, held, or nothing).
+
 import { describe, expect, it } from "vitest";
+import { usernameOf } from "../bdd/support/users.js";
 import {
 	holdRefusalOf,
 	isPurchaseOf,
@@ -10,7 +12,7 @@ import {
 const purchase: Purchase = {
 	id: "p-1",
 	saleId: "s-1",
-	user: "ana",
+	user: usernameOf("ana"),
 	reservationId: "r-1",
 	paymentRef: "pay-1",
 	purchasedAt: new Date("2026-01-01T10:00:00Z"),
@@ -19,16 +21,16 @@ const purchase: Purchase = {
 const NOW = new Date("2026-01-01T10:00:00Z");
 const hold = {
 	saleId: "s-1",
-	user: "ana",
+	user: usernameOf("ana"),
 	reservationId: "r-2",
 	expiresAt: new Date("2026-01-01T10:02:00Z"),
 };
 
 describe("purchase rules", () => {
 	it("belongs to the shopper and the sale it was made for", () => {
-		expect(isPurchaseOf(purchase, "s-1", "ana")).toBe(true);
-		expect(isPurchaseOf(purchase, "s-1", "bo")).toBe(false);
-		expect(isPurchaseOf(purchase, "s-2", "ana")).toBe(false);
+		expect(isPurchaseOf(purchase, "s-1", usernameOf("ana"))).toBe(true);
+		expect(isPurchaseOf(purchase, "s-1", usernameOf("bo"))).toBe(false);
+		expect(isPurchaseOf(purchase, "s-2", usernameOf("ana"))).toBe(false);
 	});
 
 	it("says a purchase first, then a live hold, then nothing", () => {

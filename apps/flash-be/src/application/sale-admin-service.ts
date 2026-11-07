@@ -1,7 +1,7 @@
 // The operator's writes to sales: create, change, remove and list. The rules that decide a write are in the domain
 // (sale-window); this service asks the store, and shapes the reply. Seeding is a different use case (sale-seed-service).
 import { Err, Ok, type Result } from "@flash/typekit";
-import { isSaleId } from "../domain/sale.js";
+import { isUuid } from "../domain/sale.js";
 import {
 	changeSaleFrom,
 	newSale,
@@ -64,7 +64,7 @@ export function createSaleAdminService(
 		},
 		update: async (id, patch, actor) => {
 			// A malformed id can never match a row, so the store is not asked.
-			if (!isSaleId(id)) return new Err("sale_not_found");
+			if (!isUuid(id)) return new Err("sale_not_found");
 			const updated = await store.update(
 				id,
 				(current) => changeSaleFrom(current, patch, clock()),
@@ -74,7 +74,7 @@ export function createSaleAdminService(
 			return new Ok(describeSale(updated.value, clock()));
 		},
 		remove: async (id, actor) => {
-			if (!isSaleId(id)) return new Err("sale_not_found");
+			if (!isUuid(id)) return new Err("sale_not_found");
 			return store.remove(id, actor);
 		},
 		list: async () => {

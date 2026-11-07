@@ -1,8 +1,10 @@
 // The rate limits: the in-process store, and the limiter that checks each user and each address.
+
 import { Ok } from "@flash/typekit";
 import { describe, expect, it } from "vitest";
 import { createMemoryRateLimitStore } from "../adapters/outbound/memory/memory-rate-limit-store.js";
 import { sharedCounter } from "../bdd/support/shared-counter.js";
+import { usernameOf } from "../bdd/support/users.js";
 import type { RateLimitStore } from "./ports/rate-limit-store.js";
 import { createRateLimiter } from "./rate-limiter.js";
 
@@ -47,13 +49,13 @@ describe("the rate limiter", () => {
 			{ windowSeconds: 10, perUser: 2, perIp: 100, authPerIp: 100 },
 		);
 		const ask = () =>
-			limiter.check({ saleId: "s", user: "ana", ip: "1.1.1.1" });
+			limiter.check({ saleId: "s", user: usernameOf("ana"), ip: "1.1.1.1" });
 		expect(await ask()).toEqual({ limited: false });
 		expect(await ask()).toEqual({ limited: false });
 		expect(await ask()).toEqual({ limited: true, retryAfterSeconds: 10 });
 	});
 
-	it("counts a request with no usable user id against its address only", async () => {
+	it("counts a request with no login against its address only", async () => {
 		const limiter = createRateLimiter(
 			sharedCounter(createMemoryRateLimitStore()),
 			createMemoryRateLimitStore(),
@@ -61,7 +63,11 @@ describe("the rate limiter", () => {
 			{ windowSeconds: 10, perUser: 1, perIp: 2, authPerIp: 100 },
 		);
 		const ask = () =>
-			limiter.check({ saleId: "s", user: "has space", ip: "1.1.1.1" });
+			limiter.check({
+				saleId: "s",
+				user: undefined,
+				ip: "1.1.1.1",
+			});
 		expect(await ask()).toEqual({ limited: false });
 		expect(await ask()).toEqual({ limited: false });
 		expect(await ask()).toMatchObject({ limited: true });
@@ -81,7 +87,11 @@ describe("the rate limiter", () => {
 			},
 		);
 		expect(
-			await limiter.check({ saleId: "s", user: "ana", ip: "1.1.1.1" }),
+			await limiter.check({
+				saleId: "s",
+				user: usernameOf("ana"),
+				ip: "1.1.1.1",
+			}),
 		).toEqual({ limited: true, retryAfterSeconds: 1 });
 	});
 
@@ -101,7 +111,11 @@ describe("the rate limiter", () => {
 		});
 		// A sale has its own count.
 		expect(
-			await limiter.check({ saleId: "s", user: "ana", ip: "1.1.1.1" }),
+			await limiter.check({
+				saleId: "s",
+				user: usernameOf("ana"),
+				ip: "1.1.1.1",
+			}),
 		).toEqual({ limited: false });
 	});
 });

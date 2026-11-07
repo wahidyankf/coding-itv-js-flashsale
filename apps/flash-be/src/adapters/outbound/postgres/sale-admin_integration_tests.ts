@@ -1,6 +1,7 @@
 import { Ok } from "@flash/typekit";
 import { afterAll, describe, expect, it } from "vitest";
 import { config } from "../../../config.js";
+import { userIdOf } from "../../../domain/user.js";
 import { createDb } from "./database.js";
 import { createPostgresSaleAdmin } from "./sale-admin.js";
 
@@ -24,14 +25,14 @@ describe("changing and removing a sale that is not there", () => {
 				asked = true;
 				return new Ok(current);
 			},
-			ACTOR,
+			userIdOf(ACTOR),
 		);
 		expect(changed.isErr() && changed.error).toBe("sale_not_found");
 		expect(asked).toBe(false);
 	});
 
 	it("refuses a removal with `sale_not_found`", async () => {
-		const removed = await admin.remove(MISSING, ACTOR);
+		const removed = await admin.remove(MISSING, userIdOf(ACTOR));
 		expect(removed.isErr() && removed.error).toBe("sale_not_found");
 	});
 });

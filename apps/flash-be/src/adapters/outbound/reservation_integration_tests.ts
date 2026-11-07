@@ -1,10 +1,12 @@
 // Integration tests for the Postgres reservation repository (adapter layer, outbound), over the dev database. Each decision
 // runs under the sale row lock, so these check the order the lock gives.
+
 import type { Result } from "@flash/typekit";
 import { sql } from "kysely";
 import { afterAll, describe, expect, it } from "vitest";
 import type { UnreadableReply } from "../../application/ports/reply.js";
 import { insertPurchase, insertSale } from "../../bdd/support/seed.js";
+import { usernameOf } from "../../bdd/support/users.js";
 import { config } from "../../config.js";
 import type { GateAnswer, HoldSnapshot } from "../../domain/reservation.js";
 import { createDb } from "./postgres/database.js";
@@ -40,7 +42,7 @@ describe("the rebuild from Postgres", () => {
 			startsAt: new Date(now.getTime() - 3_600_000),
 			endsAt: new Date(now.getTime() + 3_600_000),
 		});
-		await insertPurchase(db, { saleId, user: "ana" });
+		await insertPurchase(db, { saleId, user: usernameOf("ana") });
 
 		const gate = createRedisHoldGate(redis);
 		const repository = createReservationRepository(db);
@@ -55,18 +57,23 @@ describe("the rebuild from Postgres", () => {
 			expiresAt: new Date(now.getTime() + 60_000),
 			stock: 3,
 		};
-		expect(await answered(gate.reserve({ ...request, user: "ana" }))).toEqual({
+		expect(
+			await answered(gate.reserve({ ...request, user: usernameOf("ana") })),
+		).toEqual({
 			kind: "purchased",
 		});
 		// The buyer takes one of the three items, so two holds fit and the third does not.
 		expect(
-			(await answered(gate.reserve({ ...request, user: "ben" }))).kind,
+			(await answered(gate.reserve({ ...request, user: usernameOf("ben") })))
+				.kind,
 		).toBe("reserved");
 		expect(
-			(await answered(gate.reserve({ ...request, user: "cai" }))).kind,
+			(await answered(gate.reserve({ ...request, user: usernameOf("cai") })))
+				.kind,
 		).toBe("reserved");
 		expect(
-			(await answered(gate.reserve({ ...request, user: "dan" }))).kind,
+			(await answered(gate.reserve({ ...request, user: usernameOf("dan") })))
+				.kind,
 		).toBe("sold_out");
 	});
 });
@@ -89,7 +96,7 @@ describe("the reservation without Redis", () => {
 		const now = new Date();
 		return {
 			saleId,
-			user,
+			user: usernameOf(user),
 			reservationId: crypto.randomUUID(),
 			now,
 			expiresAt: new Date(now.getTime() + 60_000),
@@ -124,7 +131,7 @@ describe("the reservation without Redis", () => {
 
 	it("tells a buyer they bought", async () => {
 		const saleId = await openSale(3, 1);
-		await insertPurchase(db, { saleId, user: "ana" });
+		await insertPurchase(db, { saleId, user: usernameOf("ana") });
 		expect(
 			await repository.reserveWithoutGate(requestFor(saleId, "ana", 3), down),
 		).toEqual({ kind: "purchased" });
@@ -179,7 +186,7 @@ describe("a sale removed while a request runs", () => {
 			const answer = await createReservationRepository(db2).reserveWithoutGate(
 				{
 					saleId,
-					user: "ana",
+					user: usernameOf("ana"),
 					reservationId: crypto.randomUUID(),
 					now,
 					expiresAt: new Date(now.getTime() + 60_000),
@@ -207,7 +214,7 @@ describe("the rebuild leaves out removed users, as the live checks do", () => {
 		await insertPurchase(db, { saleId, user: buyer });
 		await createReservationRepository(db).save({
 			saleId,
-			user: holder,
+			user: usernameOf(holder),
 			reservationId: crypto.randomUUID(),
 			expiresAt: new Date(now.getTime() + 60_000),
 		});
