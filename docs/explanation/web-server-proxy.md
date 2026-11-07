@@ -47,7 +47,7 @@ is stateless, so more copies can run behind a load balancer.
 ## What the page does
 
 The page renders on the server from the current sale, so the first paint already shows the status and the items left.
-After that it follows the sale stream and updates by itself. A shopper types a name and presses **Buy Now**:
+After that it follows the sale stream and updates by itself. A shopper logs in (or signs up) and presses **Buy Now**:
 
 1. The page joins the queue. If the line is moving, it shows the place and follows the place stream.
 2. When the queue admits the shopper, the page reserves an item and shows a countdown for the hold.

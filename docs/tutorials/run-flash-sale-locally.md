@@ -95,8 +95,8 @@ Open <http://localhost:3000>. The page shows **Flash Sale**, the status **On sal
    Confirm within 60 seconds.** (the hold time you seeded) and the seconds count down.
 3. Press **Confirm purchase**. The page says **You got it! Your purchase is confirmed.** and **Items left** drops to 2.
 4. Press **Buy Now** again. The page says **You already bought an item.** One shopper can buy one item.
-5. Press **Log out**, choose **I have an account** and log in as `ben` with another password to see a shopper who has
-   nothing: the page says **You have no purchase and no hold.** after **Check my status**.
+5. Press **Log out**, choose **I am new** and sign up as `ben` to see a shopper who has nothing: the page says **You
+   have no purchase and no hold.** after **Check my status**.
 
 A wrong password says **Wrong name or password.**, and a name that is taken says **That name is taken. Choose another
 one.** If your login ends while the page is open (the access cookie lasts 15 minutes and the page renews it by itself),
