@@ -25,6 +25,7 @@ const PURCHASE = {
 };
 const SALE_VIEW = {
 	id: SALE,
+	productId: "22222222-2222-4222-8222-222222222222",
 	name: "Drop",
 	status: "active",
 	startsAt: WHEN,
@@ -44,22 +45,22 @@ function client(reply: () => Response | Promise<Response>) {
 }
 
 describe("createSaleClient", () => {
-	it("sends the user and gets the ticket", async () => {
+	it("gets the ticket, and names nobody: the cookie does", async () => {
 		const { api, fetcher } = client(() =>
 			Response.json(JOINED, { status: 201 }),
 		);
-		const result = await api.join(SALE, "ana");
+		const result = await api.join(SALE);
 		expect(result).toEqual(new Ok(JOINED));
 		const [url, init] = fetcher.mock.calls[0] ?? [];
 		expect(url).toBe(`http://web.test/api/sales/${SALE}/queue`);
-		expect(init?.body).toBe('{"userId":"ana"}');
+		expect(init?.body).toBe("{}");
 	});
 
 	it("sends the ticket as a header when it reserves", async () => {
 		const { api, fetcher } = client(() =>
 			Response.json(RESERVED, { status: 201 }),
 		);
-		expect(await api.reserve(SALE, "ana", "t1")).toEqual(new Ok(RESERVED));
+		expect(await api.reserve(SALE, "t1")).toEqual(new Ok(RESERVED));
 		const [, init] = fetcher.mock.calls[0] ?? [];
 		expect(init?.headers).toMatchObject({ "x-queue-ticket": "t1" });
 	});
@@ -68,18 +69,18 @@ describe("createSaleClient", () => {
 		const { api, fetcher } = client(() =>
 			Response.json(PURCHASE, { status: 201 }),
 		);
-		expect(await api.confirm(SALE, "ana", "r1")).toEqual(new Ok(PURCHASE));
+		expect(await api.confirm(SALE, "r1")).toEqual(new Ok(PURCHASE));
 		const [, init] = fetcher.mock.calls[0] ?? [];
-		expect(init?.body).toBe('{"userId":"ana","reservationId":"r1"}');
+		expect(init?.body).toBe('{"reservationId":"r1"}');
 	});
 
-	it("encodes the user when it asks for the outcome", async () => {
+	it("asks for the outcome of the shopper who is logged in", async () => {
 		const { api, fetcher } = client(() =>
-			Response.json({ userId: "a+b@c", state: "none" }),
+			Response.json({ userId: "ana", state: "none" }),
 		);
-		await api.outcome(SALE, "a+b@c");
+		await api.outcome(SALE);
 		const [url, init] = fetcher.mock.calls[0] ?? [];
-		expect(url).toBe(`http://web.test/api/sales/${SALE}/purchases/a%2Bb%40c`);
+		expect(url).toBe(`http://web.test/api/sales/${SALE}/purchases/me`);
 		expect(init?.body).toBeUndefined();
 	});
 
@@ -90,7 +91,7 @@ describe("createSaleClient", () => {
 				{ status: 429, headers: { "retry-after": "7" } },
 			),
 		);
-		expect(await api.join(SALE, "ana")).toEqual(
+		expect(await api.join(SALE)).toEqual(
 			new Err({ ...rateLimited, retryAfterSeconds: 7 }),
 		);
 	});
@@ -99,28 +100,28 @@ describe("createSaleClient", () => {
 		const { api } = client(() =>
 			Response.json({ ...rateLimited, retryAfterSeconds: 3 }, { status: 429 }),
 		);
-		expect(await api.join(SALE, "ana")).toEqual(
+		expect(await api.join(SALE)).toEqual(
 			new Err({ ...rateLimited, retryAfterSeconds: 3 }),
 		);
 	});
 
 	it("calls an answer it cannot read unexpected", async () => {
 		const { api } = client(() => new Response("<html>", { status: 500 }));
-		expect(await api.join(SALE, "ana")).toEqual(unexpected);
+		expect(await api.join(SALE)).toEqual(unexpected);
 	});
 
 	it("calls an error without a code unexpected", async () => {
 		const { api } = client(() =>
 			Response.json({ errorCode: 5 }, { status: 400 }),
 		);
-		expect(await api.join(SALE, "ana")).toEqual(unexpected);
+		expect(await api.join(SALE)).toEqual(unexpected);
 	});
 
 	it("reports the network when nothing answers", async () => {
 		const { api } = client(() => {
 			throw new TypeError("fetch failed");
 		});
-		expect(await api.join(SALE, "ana")).toEqual(
+		expect(await api.join(SALE)).toEqual(
 			new Err({
 				errorCode: "network",
 				errorMessage: "The server could not be reached.",
@@ -130,7 +131,7 @@ describe("createSaleClient", () => {
 
 	it("calls a good answer that has no body unexpected", async () => {
 		const { api } = client(() => new Response(null, { status: 200 }));
-		expect(await api.outcome(SALE, "ana")).toEqual(unexpected);
+		expect(await api.outcome(SALE)).toEqual(unexpected);
 	});
 
 	it("hands only sale events to the sale callback", () => {
@@ -149,13 +150,13 @@ describe("createSaleClient", () => {
 	it("hands only place events to the place callback, with the ticket", () => {
 		const { api, watch } = client(() => Response.json({}));
 		const seen: unknown[] = [];
-		api.watchPlace(SALE, "a b", "t1", (place) => seen.push(place));
+		api.watchPlace(SALE, "t1", (place) => seen.push(place));
 		const [url, onEvent, headers] = watch.mock.calls[0] ?? [];
-		expect(url).toBe(`http://web.test/api/sales/${SALE}/queue/a%20b/events`);
+		expect(url).toBe(`http://web.test/api/sales/${SALE}/queue/me/events`);
 		expect(headers).toEqual({ "x-queue-ticket": "t1" });
 		onEvent?.("sale", SALE_VIEW);
-		onEvent?.("place", { userId: "a b", state: "admitted" });
-		expect(seen).toEqual([{ userId: "a b", state: "admitted" }]);
+		onEvent?.("place", { userId: "ana", state: "admitted" });
+		expect(seen).toEqual([{ userId: "ana", state: "admitted" }]);
 	});
 
 	it("works with the defaults", () => {

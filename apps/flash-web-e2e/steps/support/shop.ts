@@ -1,5 +1,8 @@
 import {
 	cleanup as cleanupBackend,
+	createOperator,
+	E2E_OPERATOR,
+	E2E_PASSWORD,
 	migratedDatabase,
 	query,
 	startApi,
@@ -8,7 +11,7 @@ import {
 import { salePath, TICKET_HEADER } from "./api.js";
 import { forwarder } from "./forwarder.js";
 
-export { query, world };
+export { E2E_PASSWORD, query, world };
 
 // True when a step has already chosen where the web server's API address leads.
 const shop: { chosen: boolean } = { chosen: false };
@@ -40,9 +43,91 @@ type SalePlan = {
 };
 let planned: SalePlan | undefined;
 
-// The operator's token for the scenario's own flash-be. Only this file and the API it starts know it; the web server
-// never gets it, so the sale is made on flash-be directly and not through the browser's proxy.
-const ADMIN_TOKEN = "web-e2e-admin-token-0001";
+// The `cookie` header for what a reply set: the cookies that were given a value, not the ones that were cleared.
+function cookieHeaderOf(reply: Response): string {
+	return reply.headers
+		.getSetCookie()
+		.filter((cookie) => !cookie.includes("Max-Age=0"))
+		.map((cookie) => cookie.split(";")[0])
+		.join("; ");
+}
+
+async function postAuth(
+	api: string,
+	path: string,
+	body: object,
+): Promise<Response> {
+	return fetch(`${api}${path}`, {
+		method: "POST",
+		headers: { "content-type": "application/json" },
+		body: JSON.stringify(body),
+	});
+}
+
+function logins(): Map<string, string> {
+	world.logins ??= new Map();
+	return world.logins;
+}
+
+// The cookie header of a user of the scenario's own flash-be, as a client other than the page would hold it. The account
+// is made the first time (a sign up logs in); when the page or an earlier step made it, it is logged in to.
+export async function cookieFor(
+	username: string,
+	password = E2E_PASSWORD,
+	apiUrl?: string,
+): Promise<string> {
+	const key = username.trim().toLowerCase();
+	const known = logins().get(key);
+	if (known !== undefined) return known;
+	const api = apiUrl ?? (await privateApi());
+	const body = { username: key, password };
+	let reply = await postAuth(api, "/auth/login", body);
+	if (reply.status === UNAUTHORIZED) {
+		reply = await postAuth(api, "/auth/register", body);
+	}
+	if (!reply.ok) {
+		throw new Error(
+			`${key} got no login: ${reply.status} ${await reply.text()}`,
+		);
+	}
+	const cookie = cookieHeaderOf(reply);
+	logins().set(key, cookie);
+	return cookie;
+}
+
+// An account that exists but is not logged in anywhere, made as a deployment's sign up would.
+export async function createAccount(
+	username: string,
+	password: string,
+): Promise<void> {
+	const api = await privateApi();
+	const reply = await postAuth(api, "/auth/register", {
+		username: username.trim().toLowerCase(),
+		password,
+	});
+	if (reply.status !== CREATED) {
+		throw new Error(`${username} was not made: ${reply.status}`);
+	}
+}
+
+const UNAUTHORIZED = 401;
+const CREATED = 201;
+
+// The operator is made with the command, as in a deployment, and logs in through the API. The web server never gets the
+// cookie: the sale is made on flash-be directly and not through the browser's proxy.
+async function operatorCookie(api: string): Promise<string> {
+	const known = logins().get(E2E_OPERATOR);
+	if (known !== undefined) return known;
+	createOperator(E2E_OPERATOR, E2E_PASSWORD);
+	const reply = await postAuth(api, "/auth/login", {
+		username: E2E_OPERATOR,
+		password: E2E_PASSWORD,
+	});
+	if (!reply.ok) throw new Error(`the operator got no login: ${reply.status}`);
+	const cookie = cookieHeaderOf(reply);
+	logins().set(E2E_OPERATOR, cookie);
+	return cookie;
+}
 
 export function planSale(
 	stock: number,
@@ -102,7 +187,7 @@ async function operator(
 	const reply = await fetch(`${api}${path}`, {
 		method,
 		headers: {
-			authorization: `Bearer ${ADMIN_TOKEN}`,
+			cookie: await operatorCookie(api),
 			"content-type": "application/json",
 		},
 		body: JSON.stringify(body),
@@ -113,51 +198,47 @@ async function operator(
 	return JSON.parse(text) as { id: string };
 }
 
-// Shoppers u1..uN each buy one item through the real routes: queue, hold, purchase.
+// Shoppers u1..uN each buy one item through the real routes: sign up, queue, hold, purchase.
 async function buyItems(
 	api: string,
 	saleId: string,
 	count: number,
 ): Promise<void> {
 	const sale = `${api}${salePath(saleId)}`;
-	const post = (
-		url: string,
-		body: object,
-		headers: Record<string, string> = {},
-	) =>
-		fetch(url, {
-			method: "POST",
-			headers: { "content-type": "application/json", ...headers },
-			body: JSON.stringify(body),
-		});
 	await Promise.all(
 		Array.from({ length: count }, async (_, index) => {
 			const user = `u${index + 1}`;
-			const joined = await post(`${sale}/queue`, { userId: user });
+			const cookie = await cookieFor(user, E2E_PASSWORD, api);
+			const post = (
+				url: string,
+				body: object,
+				headers: Record<string, string> = {},
+			) =>
+				fetch(url, {
+					method: "POST",
+					headers: { "content-type": "application/json", cookie, ...headers },
+					body: JSON.stringify(body),
+				});
+			const joined = await post(`${sale}/queue`, {});
 			const { ticket } = (await joined.json()) as { ticket: string };
 			const headers = { [TICKET_HEADER]: ticket };
 			const deadline = Date.now() + ADMISSION_WAIT_MS;
 			for (;;) {
-				const place = await fetch(`${sale}/queue/${user}`, { headers });
+				const place = await fetch(`${sale}/queue/me`, {
+					headers: { cookie, ...headers },
+				});
 				if (((await place.json()) as { state: string }).state === "admitted")
 					break;
 				if (Date.now() > deadline) throw new Error(`${user} was not admitted`);
 				await new Promise((resolve) => setTimeout(resolve, POLL_MS));
 			}
-			const held = await post(
-				`${sale}/reservations`,
-				{ userId: user },
-				headers,
-			);
+			const held = await post(`${sale}/reservations`, {}, headers);
 			if (held.status !== 201)
 				throw new Error(`${user} got no hold: ${held.status}`);
 			const { reservationId } = (await held.json()) as {
 				reservationId: string;
 			};
-			const bought = await post(`${sale}/purchases`, {
-				userId: user,
-				reservationId,
-			});
+			const bought = await post(`${sale}/purchases`, { reservationId });
 			if (bought.status !== 201)
 				throw new Error(`${user} bought nothing: ${bought.status}`);
 		}),
@@ -212,7 +293,6 @@ async function makePlannedSale(api: string): Promise<void> {
 // The scenario's own flash-be, started on first use, with the sale the scenario planned.
 export async function privateApi(): Promise<string> {
 	await ensureDatabase();
-	setApiEnv({ ADMIN_TOKEN });
 	const api = await startApi();
 	await makePlannedSale(api);
 	return api;

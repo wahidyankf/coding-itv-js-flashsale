@@ -1,14 +1,15 @@
 Feature: Checking my status
 
   As a shopper
-  I want to ask whether I got the item
+  I want to ask, once I am logged in, whether I got the item
   So that I can find out after I closed the page
 
   Scenario Outline: A shopper checks the outcome
     Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
     And "ana" <history>
+    And "ana" is logged in
     And a visitor has the page open
-    When "ana" presses Check my status
+    When she presses Check my status
     Then the page says "<message>"
 
     Examples:
@@ -20,7 +21,8 @@ Feature: Checking my status
   Scenario: A shopper who holds an item can confirm after checking
     Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
     And "ana" holds an item
+    And "ana" is logged in
     And a visitor has the page open
-    And "ana" presses Check my status
+    And she presses Check my status
     When she confirms the purchase
     Then the page says "You got it! Your purchase is confirmed."

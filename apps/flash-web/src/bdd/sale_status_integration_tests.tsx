@@ -33,6 +33,10 @@ describeFeature(
 					},
 				);
 
+				And("{string} is logged in", async (_ctx, name: string) =>
+					world.loggedIn(name),
+				);
+
 				When("a visitor opens the page", async () => world.openPage());
 
 				Then('the page shows the status "<label>"', async () => {
@@ -70,6 +74,10 @@ describeFeature(
 			({ Given, And, When, Then }) => {
 				Given(SALE_WITH_3, async () =>
 					openSale(world, 10, 3, "1 hour ago", "in 1 hour"),
+				);
+
+				And("{string} is logged in", async (_ctx, name: string) =>
+					world.loggedIn(name),
 				);
 
 				And("a visitor has the page open", async () => world.openPage());

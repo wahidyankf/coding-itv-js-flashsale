@@ -1,7 +1,12 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { AuthCard } from "../auth/auth-form";
+import { AUTH_TEXT } from "../auth/messages";
+import { useAccount } from "../auth/use-account";
+import { createWebApi, type WebApi } from "../auth/web-api";
 import { SaleTime } from "../components/sale-time";
 import { Spinner } from "../components/spinner";
-import { createSaleClient, type SaleClient } from "./client";
+import { BUTTON, CARD, OUTLINE, PRIMARY } from "../components/ui";
+import type { SaleClient } from "./client";
 import { STATUS_LABEL, STATUS_NOTE, TEXT } from "./messages";
 import type { SaleLoad, SaleStatus, SaleView } from "./types";
 import { type Phase, useShopper } from "./use-shopper";
@@ -17,17 +22,11 @@ function useLiveSale(initial: SaleView | undefined, client: SaleClient) {
 	return sale;
 }
 
-export function SalePage({
-	load,
-	client,
-}: {
-	load: SaleLoad;
-	client?: SaleClient;
-}) {
-	const saleClient = useMemo(() => client ?? createSaleClient(), [client]);
+export function SalePage({ load, api }: { load: SaleLoad; api?: WebApi }) {
+	const web = useMemo(() => api ?? createWebApi(), [api]);
 	const sale = useLiveSale(
 		load.state === "ok" ? load.sale : undefined,
-		saleClient,
+		web.sale,
 	);
 
 	if (!sale) {
@@ -51,7 +50,7 @@ export function SalePage({
 			</div>
 		);
 	}
-	return <SaleShop sale={sale} client={saleClient} />;
+	return <SaleShop sale={sale} web={web} />;
 }
 
 // How each sale status looks. The text always says it too, so colour is never the only signal.
@@ -74,18 +73,42 @@ const NOTE_TONE: Partial<Record<Phase["kind"], string>> = {
 const NOTE_BASE =
 	"bg-slate-100 text-slate-700 dark:bg-slate-800/70 dark:text-slate-300";
 
-const CARD =
-	"rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-slate-800 dark:bg-slate-900";
-const FOCUS =
-	"focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 dark:focus-visible:outline-sky-400";
-const BUTTON = `inline-flex h-11 items-center justify-center gap-2 rounded-lg px-4 text-base font-medium motion-safe:transition-colors disabled:cursor-not-allowed ${FOCUS}`;
-const OUTLINE =
-	"border border-slate-300 text-slate-800 hover:bg-slate-100 disabled:text-slate-500 disabled:hover:bg-transparent dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800 dark:disabled:text-slate-500 dark:disabled:hover:bg-transparent";
+// Who is logged in, and the way out.
+function AccountBar({
+	username,
+	onLogOut,
+}: {
+	username: string;
+	onLogOut: () => void;
+}) {
+	return (
+		<div className="flex flex-wrap items-center justify-between gap-3 md:col-span-2">
+			<p className="text-sm text-slate-600 dark:text-slate-400">
+				{AUTH_TEXT.signedInAs}{" "}
+				<strong className="text-slate-900 dark:text-slate-100">
+					{username}
+				</strong>
+			</p>
+			<button
+				type="button"
+				onClick={onLogOut}
+				className={`${BUTTON} ${OUTLINE} h-10 text-sm`}
+			>
+				{AUTH_TEXT.logOut}
+			</button>
+		</div>
+	);
+}
 
 // The part of the page that exists only when there is a sale to buy from.
-function SaleShop({ sale, client }: { sale: SaleView; client: SaleClient }) {
-	const shopper = useShopper(sale.id, sale.status, client);
-	const [name, setName] = useState("");
+function SaleShop({ sale, web }: { sale: SaleView; web: WebApi }) {
+	const account = useAccount(web.auth, web.onExpired);
+	const shopper = useShopper(
+		sale.id,
+		sale.status,
+		web.sale,
+		account.state.kind === "in",
+	);
 
 	const phase = shopper.phase.kind;
 	const busy = phase === "busy" || phase === "waiting";
@@ -95,7 +118,7 @@ function SaleShop({ sale, client }: { sale: SaleView; client: SaleClient }) {
 	const canBuy = sale.status === "active" && !busy && phase !== "holding";
 	const submit = (event: FormEvent) => {
 		event.preventDefault();
-		if (canBuy) void shopper.buy(name);
+		if (canBuy) void shopper.buy();
 	};
 	// What is left of the stock, from 0 to 1, for the bar.
 	const left = sale.stock > 0 ? Math.min(1, sale.remaining / sale.stock) : 0;
@@ -105,6 +128,12 @@ function SaleShop({ sale, client }: { sale: SaleView; client: SaleClient }) {
 			aria-labelledby="sale-name"
 			className="grid gap-5 md:grid-cols-2 md:items-start md:gap-6"
 		>
+			{account.state.kind === "in" && (
+				<AccountBar
+					username={account.state.account.username}
+					onLogOut={() => void account.leave()}
+				/>
+			)}
 			<div className={CARD}>
 				<h2 id="sale-name" className="text-xl font-semibold">
 					{sale.name}
@@ -148,70 +177,71 @@ function SaleShop({ sale, client }: { sale: SaleView; client: SaleClient }) {
 			</div>
 
 			<div className={`${CARD} flex flex-col gap-4`}>
-				<form
-					onSubmit={submit}
-					aria-busy={busy}
-					className="flex flex-col gap-4"
-				>
-					<label className="flex flex-col gap-1.5 text-sm font-medium">
-						Your name{" "}
-						<input
-							name="name"
-							autoComplete="off"
-							value={name}
-							onChange={(event) => setName(event.target.value)}
-							className={`h-11 rounded-lg border border-slate-300 bg-white px-3 text-base font-normal text-slate-900 placeholder:text-slate-400 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 ${FOCUS}`}
-						/>
-					</label>
-					<div className="grid gap-3 sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2">
-						<button
-							type="submit"
-							disabled={!canBuy}
-							className={`${BUTTON} bg-sky-700 text-white hover:bg-sky-800 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:bg-slate-200 dark:bg-sky-500 dark:text-slate-950 dark:hover:bg-sky-400 dark:disabled:bg-slate-800 dark:disabled:text-slate-500 dark:disabled:hover:bg-slate-800`}
+				{account.state.kind === "checking" && (
+					<p
+						role="status"
+						aria-busy="true"
+						className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400"
+					>
+						<Spinner />
+						{AUTH_TEXT.checking}
+					</p>
+				)}
+				{account.state.kind === "anonymous" && (
+					<AuthCard notice={account.state.notice} enter={account.enter} />
+				)}
+				{account.state.kind === "in" && (
+					<>
+						<form
+							onSubmit={submit}
+							aria-busy={busy}
+							className="grid gap-3 sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2"
 						>
-							{buying && <Spinner />}
-							Buy Now
-						</button>
+							<button type="submit" disabled={!canBuy} className={PRIMARY}>
+								{buying && <Spinner />}
+								Buy Now
+							</button>
+							<button
+								type="button"
+								disabled={phase === "busy"}
+								onClick={() => void shopper.check()}
+								className={`${BUTTON} ${OUTLINE}`}
+							>
+								{action === "check" && <Spinner />}
+								Check my status
+							</button>
+						</form>
 						<button
 							type="button"
-							disabled={phase === "busy"}
-							onClick={() => void shopper.check(name)}
-							className={`${BUTTON} ${OUTLINE}`}
+							disabled={phase !== "holding"}
+							onClick={() => void shopper.confirm()}
+							className={`${BUTTON} ${OUTLINE} enabled:border-transparent enabled:bg-emerald-700 enabled:text-white enabled:hover:bg-emerald-800 dark:enabled:bg-emerald-500 dark:enabled:text-slate-950 dark:enabled:hover:bg-emerald-400`}
 						>
-							{action === "check" && <Spinner />}
-							Check my status
+							{action === "confirm" && <Spinner />}
+							Confirm purchase
 						</button>
-					</div>
-				</form>
-				<button
-					type="button"
-					disabled={phase !== "holding"}
-					onClick={() => void shopper.confirm()}
-					className={`${BUTTON} ${OUTLINE} enabled:border-transparent enabled:bg-emerald-700 enabled:text-white enabled:hover:bg-emerald-800 dark:enabled:bg-emerald-500 dark:enabled:text-slate-950 dark:enabled:hover:bg-emerald-400`}
-				>
-					{action === "confirm" && <Spinner />}
-					Confirm purchase
-				</button>
-				<p
-					role="status"
-					aria-live="polite"
-					aria-busy={busy}
-					className={`min-h-12 rounded-lg px-3 py-2.5 text-sm leading-6 ${shopper.text ? (NOTE_TONE[phase] ?? NOTE_BASE) : ""}`}
-				>
-					<span className="flex items-start gap-2">
-						{busy && (
-							<span className="mt-1">
-								<Spinner />
+						<p
+							role="status"
+							aria-live="polite"
+							aria-busy={busy}
+							className={`min-h-12 rounded-lg px-3 py-2.5 text-sm leading-6 ${shopper.text ? (NOTE_TONE[phase] ?? NOTE_BASE) : ""}`}
+						>
+							<span className="flex items-start gap-2">
+								{busy && (
+									<span className="mt-1">
+										<Spinner />
+									</span>
+								)}
+								<span>{shopper.text}</span>
 							</span>
-						)}
-						<span>{shopper.text}</span>
-					</span>
-					{phase === "waiting" && (
-						<span className="mt-1 block text-xs opacity-80">
-							{TEXT.waitingHint}
-						</span>
-					)}
-				</p>
+							{phase === "waiting" && (
+								<span className="mt-1 block text-xs opacity-80">
+									{TEXT.waitingHint}
+								</span>
+							)}
+						</p>
+					</>
+				)}
 			</div>
 		</section>
 	);

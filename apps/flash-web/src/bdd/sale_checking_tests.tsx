@@ -26,11 +26,13 @@ describeFeature(
 					if (examples.history === "holds an item") world.holds("ana");
 				});
 
+				And("{string} is logged in", async (_ctx, name: string) =>
+					world.loggedIn(name),
+				);
+
 				And("a visitor has the page open", async () => world.openPage());
 
-				When('"ana" presses Check my status', async () =>
-					world.pressCheck("ana"),
-				);
+				When("she presses Check my status", async () => world.pressCheck());
 
 				Then('the page says "<message>"', async () =>
 					world.expectPageSays(String(examples.message)),
@@ -47,11 +49,13 @@ describeFeature(
 
 				And('"ana" holds an item', () => world.holds("ana"));
 
+				And("{string} is logged in", async (_ctx, name: string) =>
+					world.loggedIn(name),
+				);
+
 				And("a visitor has the page open", async () => world.openPage());
 
-				And('"ana" presses Check my status', async () =>
-					world.pressCheck("ana"),
-				);
+				And("she presses Check my status", async () => world.pressCheck());
 
 				When("she confirms the purchase", async () => world.pressConfirm());
 

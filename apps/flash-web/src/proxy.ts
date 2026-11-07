@@ -4,26 +4,26 @@ import { buildConfig } from "./config";
 
 // The routes the browser may reach, each with its one method. Anything else is not the browser's. In particular the
 // operator routes (`GET /admin/sales`, `POST /admin/sales`, `PATCH` and `DELETE /admin/sales/:saleId`) are not here, and
-// `/sales/current` comes first so it is not taken for a sale.
+// `/sales/current` comes first so it is not taken for a sale. A shopper's own routes end in `/me`: who they are comes from
+// the login cookie, never from the address.
 const ALLOWED: Array<[method: string, path: RegExp]> = [
+	["POST", /^\/auth\/(?:register|login|refresh|logout)$/],
+	["GET", /^\/auth\/me$/],
 	["GET", /^\/sales\/current$/],
 	["GET", /^\/sales\/(?<saleId>[^/]+)$/],
 	["GET", /^\/sales\/(?<saleId>[^/]+)\/events$/],
 	["POST", /^\/sales\/(?<saleId>[^/]+)\/queue$/],
-	["GET", /^\/sales\/(?<saleId>[^/]+)\/queue\/(?<userId>[^/]+)$/],
-	["GET", /^\/sales\/(?<saleId>[^/]+)\/queue\/(?<userId>[^/]+)\/events$/],
+	["GET", /^\/sales\/(?<saleId>[^/]+)\/queue\/me$/],
+	["GET", /^\/sales\/(?<saleId>[^/]+)\/queue\/me\/events$/],
 	["POST", /^\/sales\/(?<saleId>[^/]+)\/reservations$/],
 	["POST", /^\/sales\/(?<saleId>[^/]+)\/purchases$/],
-	["GET", /^\/sales\/(?<saleId>[^/]+)\/purchases\/(?<userId>[^/]+)$/],
+	["GET", /^\/sales\/(?<saleId>[^/]+)\/purchases\/me$/],
 ];
 
 // A copy of the sale id rule of flash-be (`isSaleId`); `same_as_be_tests.ts` checks it.
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-// A name in a path may still be percent-encoded and in any case; the API normalises it.
-const USER_IN_PATH = /^[A-Za-z0-9._@+-]{1,200}$/;
-
 // Headers that carry something the API needs, or something the browser needs back.
-const SENT = ["content-type", TICKET_HEADER, "accept"];
+const SENT = ["content-type", TICKET_HEADER, "accept", "cookie"];
 const RETURNED = ["content-type", "cache-control", RETRY_AFTER_HEADER];
 
 // The answers this server gives on its own, in the shape of the API's errors. `not_found` is a copy of flash-be's code,
@@ -32,6 +32,10 @@ const REFUSALS = {
 	not_found: {
 		status: STATUS.notFound,
 		message: "Nothing was found at this address.",
+	},
+	cross_site: {
+		status: STATUS.forbidden,
+		message: "This request came from another site.",
 	},
 	backend_unavailable: {
 		status: STATUS.badGateway,
@@ -55,13 +59,35 @@ export function isAllowed(method: string, path: string): boolean {
 		const found = pattern.exec(path);
 		if (!found) continue;
 		const saleId = decode(found.groups?.saleId);
-		const userId = decode(found.groups?.userId);
-		return (
-			(saleId === undefined || UUID.test(saleId)) &&
-			(userId === undefined || USER_IN_PATH.test(userId))
-		);
+		return saleId === undefined || UUID.test(saleId);
 	}
 	return false;
+}
+
+// The refresh cookie is set for `/auth` by flash-be, but the browser reaches that route as `/api/auth`, and would never
+// send a cookie of another path. So the path moves under `/api`.
+const BACKEND_AUTH_PATH = /;\s*Path=\/auth(?=;|$)/i;
+const rewritePath = (cookie: string) =>
+	cookie.replace(BACKEND_AUTH_PATH, "; Path=/api/auth");
+
+// A cookie only helps an attacker's page when the browser sends it from another site. `SameSite=Lax` already stops that
+// for a POST, and this is the second lock: the page that sends a POST must come from this very host. A browser sends
+// `Origin` on every POST, or else `Sec-Fetch-Site`. A caller that sends neither is not a browser, and has no cookie of the
+// shopper to misuse.
+export function isCrossSite(request: Request): boolean {
+	const origin = request.headers.get("origin");
+	if (origin !== null) {
+		const here =
+			request.headers.get("x-forwarded-host") ??
+			request.headers.get("host") ??
+			new URL(request.url).host;
+		return attempt(() => new URL(origin).host, TypeError).match({
+			ok: (host) => host !== here,
+			err: () => true,
+		});
+	}
+	const site = request.headers.get("sec-fetch-site");
+	return site !== null && site !== "same-origin" && site !== "none";
 }
 
 function refuse(code: keyof typeof REFUSALS): Response {
@@ -69,7 +95,7 @@ function refuse(code: keyof typeof REFUSALS): Response {
 	return Response.json({ errorCode: code, errorMessage: message }, { status });
 }
 
-// Passes a browser request under /api/sales on to flash-be and streams the answer back. The address of flash-be is read
+// Passes a browser request under /api on to flash-be and streams the answer back. The address of flash-be is read
 // here, on the server, and never reaches the page.
 export async function proxyToBackend(
 	request: Request,
@@ -79,6 +105,9 @@ export async function proxyToBackend(
 	const url = new URL(request.url);
 	const path = url.pathname.replace(/^\/api/, "");
 	if (!isAllowed(request.method, path)) return refuse("not_found");
+	if (request.method === "POST" && isCrossSite(request)) {
+		return refuse("cross_site");
+	}
 
 	const headers = new Headers();
 	for (const name of SENT) {
@@ -100,6 +129,10 @@ export async function proxyToBackend(
 		for (const name of RETURNED) {
 			const value = upstream.headers.get(name);
 			if (value !== null) returned.set(name, value);
+		}
+		// Every cookie, one header each: they cannot be joined into one value.
+		for (const cookie of upstream.headers.getSetCookie()) {
+			returned.append("set-cookie", rewritePath(cookie));
 		}
 		return new Response(upstream.body, {
 			status: upstream.status,

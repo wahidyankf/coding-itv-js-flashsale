@@ -13,6 +13,13 @@ function reply(): ApiAnswer {
 	return answer;
 }
 
+// The attributes (`HttpOnly`, `Path=/`, ...) of the cookie of that name in the last reply.
+function attributesOf(name: string): string[] {
+	const cookie = reply().cookies.find((value) => value.startsWith(`${name}=`));
+	expect(cookie, `a cookie named ${name}`).toBeDefined();
+	return (cookie ?? "").split(";").map((part) => part.trim());
+}
+
 const SALE_3 =
 	"a sale with stock 10 and 3 sold that opens 1 hour ago and closes in 1 hour";
 const SALE_0 =
@@ -81,19 +88,34 @@ describeFeature(
 		);
 
 		Scenario(
-			"A write request is passed on with the ticket",
-			({ Given, When, Then, And }) => {
+			"The operator routes are not reachable through the web server",
+			({ When, Then }) => {
+				When("a client sends GET /api/admin/sales", async () => {
+					answer = await world.send("GET", "/api/admin/sales");
+				});
+
+				Then("the response status is {int}", (_ctx, status: number) => {
+					expect(reply().status).toBe(status);
+				});
+			},
+		);
+
+		Scenario(
+			"A write request is passed on with the cookie of the shopper",
+			({ Given, And, When, Then }) => {
 				Given(SALE_0, async () =>
 					openSale(world, 10, 0, "1 hour ago", "in 1 hour"),
+				);
+
+				And("{string} is logged in", async (_ctx, name: string) =>
+					world.loggedIn(name),
 				);
 
 				When("a client joins the queue through the web server", async () => {
 					answer = await world.send(
 						"POST",
 						`/api/sales/${world.saleId}/queue`,
-						{
-							userId: "ana",
-						},
+						{},
 					);
 				});
 
@@ -103,6 +125,123 @@ describeFeature(
 
 				And("the body has a ticket", () => {
 					expect(typeof reply().json.ticket).toBe("string");
+				});
+
+				And("the body names {string}", (_ctx, name: string) => {
+					expect(reply().json.userId).toBe(name);
+				});
+			},
+		);
+
+		Scenario(
+			"A shopper who is not logged in is refused by the API",
+			({ Given, When, Then, And }) => {
+				Given(SALE_0, async () =>
+					openSale(world, 10, 0, "1 hour ago", "in 1 hour"),
+				);
+
+				When("a client joins the queue through the web server", async () => {
+					answer = await world.send(
+						"POST",
+						`/api/sales/${world.saleId}/queue`,
+						{},
+					);
+				});
+
+				Then("the response status is {int}", (_ctx, status: number) => {
+					expect(reply().status).toBe(status);
+				});
+
+				And("the body has error {string}", (_ctx, error: string) => {
+					expect(reply().json.errorCode).toBe(error);
+				});
+			},
+		);
+
+		Scenario(
+			"Signing up sets both cookies, and the refresh cookie is moved under /api/auth",
+			({ When, Then, And }) => {
+				When(
+					"a client signs up through the web server as {string}",
+					async (_ctx, name: string) => {
+						answer = await world.send("POST", "/api/auth/register", {
+							username: name,
+							password: "a long password",
+						});
+					},
+				);
+
+				Then("the response status is {int}", (_ctx, status: number) => {
+					expect(reply().status).toBe(status);
+				});
+
+				And(
+					"the response sets the cookie {string} for the path {string}",
+					(_ctx, name: string, path: string) => {
+						expect(attributesOf(name)).toContain(`Path=${path}`);
+					},
+				);
+
+				And(
+					'the response sets the cookie "refresh_token" for the path "/api/auth"',
+					() => {
+						expect(attributesOf("refresh_token")).toContain("Path=/api/auth");
+					},
+				);
+
+				And("both cookies are HttpOnly", () => {
+					expect(reply().cookies).toHaveLength(2);
+					for (const cookie of reply().cookies) {
+						expect(cookie.split(";").map((part) => part.trim())).toContain(
+							"HttpOnly",
+						);
+					}
+				});
+
+				And("the body holds neither token", () => {
+					const body = JSON.stringify(reply().json);
+					for (const cookie of reply().cookies) {
+						const token = cookie.split(";")[0]?.split("=")[1] ?? "";
+						expect(token).not.toBe("");
+						expect(body).not.toContain(token);
+					}
+				});
+			},
+		);
+
+		Scenario(
+			"A request from another site is refused before it reaches the API",
+			({ Given, And, When, Then }) => {
+				Given(SALE_0, async () =>
+					openSale(world, 10, 0, "1 hour ago", "in 1 hour"),
+				);
+
+				And("{string} is logged in", async (_ctx, name: string) =>
+					world.loggedIn(name),
+				);
+
+				When(
+					"a client on another site sends POST /api/auth/logout",
+					async () => {
+						answer = await world.send(
+							"POST",
+							"/api/auth/logout",
+							{},
+							"http://evil.test",
+						);
+					},
+				);
+
+				Then("the response status is {int}", (_ctx, status: number) => {
+					expect(reply().status).toBe(status);
+				});
+
+				And("the body has error {string}", (_ctx, error: string) => {
+					expect(reply().json.errorCode).toBe(error);
+				});
+
+				And("the API was not asked", () => {
+					expect(reply().reachedApi).toBe(false);
 				});
 			},
 		);

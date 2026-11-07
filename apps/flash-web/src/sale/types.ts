@@ -8,6 +8,7 @@ export type SaleStatus = "upcoming" | "active" | "sold_out" | "ended";
 
 export type SaleView = {
 	id: string;
+	productId: string;
 	name: string;
 	status: SaleStatus;
 	startsAt: string;

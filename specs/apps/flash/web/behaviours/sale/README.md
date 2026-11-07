@@ -1,6 +1,6 @@
 # Sale
 
-Scenarios for the sale page: what it shows, how a shopper buys, and how a shopper checks the outcome.
+Scenarios for the sale page: what it shows, how a logged-in shopper buys, and how a shopper checks the outcome. The login itself is in [account/](../account/README.md).
 
 ## Directory Map
 

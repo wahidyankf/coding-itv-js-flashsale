@@ -21,11 +21,13 @@ describeFeature(
 				openSale(world, 10, 0, "1 hour ago", "in 1 hour"),
 			);
 
+			And("{string} is logged in", async (_ctx, name: string) =>
+				world.loggedIn(name),
+			);
+
 			And("a visitor has the page open", async () => world.openPage());
 
-			When("{string} presses Buy Now", async (_ctx, name: string) =>
-				world.pressBuyNow(name),
-			);
+			When("she presses Buy Now", async () => world.pressBuyNow());
 
 			Then("the page says {string}", async (_ctx, text: string) =>
 				world.expectPageSays(text),
@@ -61,11 +63,13 @@ describeFeature(
 					world.queueAhead(count),
 				);
 
+				And("{string} is logged in", async (_ctx, name: string) =>
+					world.loggedIn(name),
+				);
+
 				And("a visitor has the page open", async () => world.openPage());
 
-				When("{string} presses Buy Now", async (_ctx, name: string) =>
-					world.pressBuyNow(name),
-				);
+				When("she presses Buy Now", async () => world.pressBuyNow());
 
 				Then("the page says {string}", async (_ctx, text: string) =>
 					world.expectPageSays(text),
@@ -82,11 +86,13 @@ describeFeature(
 
 				And('"ben" holds the last item', () => world.holdsLastItem("ben"));
 
+				And("{string} is logged in", async (_ctx, name: string) =>
+					world.loggedIn(name),
+				);
+
 				And("a visitor has the page open", async () => world.openPage());
 
-				When("{string} presses Buy Now", async (_ctx, name: string) =>
-					world.pressBuyNow(name),
-				);
+				When("she presses Buy Now", async () => world.pressBuyNow());
 
 				Then("the page says {string}", async (_ctx, text: string) =>
 					world.expectPageSays(text),
@@ -103,11 +109,13 @@ describeFeature(
 
 				And('"ana" has bought an item', () => world.hasBought("ana"));
 
+				And("{string} is logged in", async (_ctx, name: string) =>
+					world.loggedIn(name),
+				);
+
 				And("a visitor has the page open", async () => world.openPage());
 
-				When("{string} presses Buy Now", async (_ctx, name: string) =>
-					world.pressBuyNow(name),
-				);
+				When("she presses Buy Now", async () => world.pressBuyNow());
 
 				Then("the page says {string}", async (_ctx, text: string) =>
 					world.expectPageSays(text),
@@ -128,9 +136,13 @@ describeFeature(
 					world.queueAhead(count),
 				);
 
+				And("{string} is logged in", async (_ctx, name: string) =>
+					world.loggedIn(name),
+				);
+
 				And("a visitor has the page open", async () => world.openPage());
 
-				And('"ana" presses Buy Now', async () => world.pressBuyNow("ana"));
+				And("she presses Buy Now", async () => world.pressBuyNow());
 
 				When("the sale ends", async () => world.endSale());
 
@@ -153,31 +165,16 @@ describeFeature(
 					world.queueAhead(count),
 				);
 
+				And("{string} is logged in", async (_ctx, name: string) =>
+					world.loggedIn(name),
+				);
+
 				And("a visitor has the page open", async () => world.openPage());
 
-				And('"ana" presses Buy Now', async () => world.pressBuyNow("ana"));
+				And("she presses Buy Now", async () => world.pressBuyNow());
 
 				When("the sold count changes to {int}", async (_ctx, sold: number) =>
 					world.setSold(sold),
-				);
-
-				Then("the page says {string}", async (_ctx, text: string) =>
-					world.expectPageSays(text),
-				);
-			},
-		);
-
-		Scenario(
-			"A name that cannot be used is refused before anything is sent",
-			({ Given, And, When, Then }) => {
-				Given(SALE_10, async () =>
-					openSale(world, 10, 0, "1 hour ago", "in 1 hour"),
-				);
-
-				And("a visitor has the page open", async () => world.openPage());
-
-				When("{string} presses Buy Now", async (_ctx, name: string) =>
-					world.pressBuyNow(name),
 				);
 
 				Then("the page says {string}", async (_ctx, text: string) =>
@@ -198,11 +195,13 @@ describeFeature(
 					(_ctx, count: number) => world.writeLimit(count),
 				);
 
+				And("{string} is logged in", async (_ctx, name: string) =>
+					world.loggedIn(name),
+				);
+
 				And("a visitor has the page open", async () => world.openPage());
 
-				When("{string} presses Buy Now", async (_ctx, name: string) =>
-					world.pressBuyNow(name),
-				);
+				When("she presses Buy Now", async () => world.pressBuyNow());
 
 				Then("the page says {string}", async (_ctx, text: string) =>
 					world.expectPageSays(text),
@@ -221,9 +220,13 @@ describeFeature(
 					world.paymentDeclines(),
 				);
 
+				And("{string} is logged in", async (_ctx, name: string) =>
+					world.loggedIn(name),
+				);
+
 				And("a visitor has the page open", async () => world.openPage());
 
-				And('"ana" presses Buy Now', async () => world.pressBuyNow("ana"));
+				And("she presses Buy Now", async () => world.pressBuyNow());
 
 				When("she confirms the purchase", async () => world.pressConfirm());
 
@@ -248,11 +251,13 @@ describeFeature(
 					world.holdSeconds(seconds),
 				);
 
+				And("{string} is logged in", async (_ctx, name: string) =>
+					world.loggedIn(name),
+				);
+
 				And("a visitor has the page open", async () => world.openPage());
 
-				When("{string} presses Buy Now", async (_ctx, name: string) =>
-					world.pressBuyNow(name),
-				);
+				When("she presses Buy Now", async () => world.pressBuyNow());
 
 				And("{int} seconds pass", async (_ctx, seconds: number) =>
 					world.advance(seconds),

@@ -1,8 +1,10 @@
 import { TICKET_HEADER } from "../../api";
+import { cleanPassword } from "../../auth/messages";
 import { cleanUser } from "../../sale/messages";
 import type { Place, SaleStatus, SaleView } from "../../sale/types";
 
 export const SALE_ID = "11111111-1111-4111-8111-111111111111";
+const PRODUCT_ID = "22222222-2222-4222-8222-222222222222";
 
 export type SaleSpec = {
 	name?: string;
@@ -15,12 +17,25 @@ export type SaleSpec = {
 export type Reply = {
 	status: number;
 	headers: Record<string, string>;
+	// One `Set-Cookie` header each; they cannot be joined into one value.
+	cookies?: string[];
 	body: unknown;
 };
+
+// The names and the lives of the two cookies, as flash-be sets them.
+export const ACCESS_COOKIE = "access_token";
+export const REFRESH_COOKIE = "refresh_token";
+const ACCESS_TTL_MS = 15 * 60 * 1000;
+const REFRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 // The error codes the fake answers with, and the one status of each, as flash-be does.
 const ERROR_STATUS = {
 	invalid_user: 400,
+	invalid_password: 400,
+	invalid_credentials: 401,
+	not_authenticated: 401,
+	invalid_refresh_token: 401,
+	username_taken: 409,
 	invalid_ticket: 401,
 	payment_failed: 402,
 	not_admitted: 403,
@@ -45,12 +60,18 @@ const reply = (
 	status: number,
 	body: unknown,
 	headers: Record<string, string> = {},
-): Reply => ({ status, headers, body });
+	cookies: string[] = [],
+): Reply => ({ status, headers, body, cookies });
 const refuse = (error: ErrorCode) =>
 	reply(ERROR_STATUS[error], errorPayload(error));
 
 // The routes of flash-be that the page can reach, each with its method and path.
 export type RouteName =
+	| "register"
+	| "login"
+	| "refresh"
+	| "logout"
+	| "account"
 	| "currentSale"
 	| "sale"
 	| "saleEvents"
@@ -61,23 +82,20 @@ export type RouteName =
 	| "confirm"
 	| "outcome";
 const ROUTES: Array<[RouteName, string, RegExp]> = [
+	["register", "POST", /^\/auth\/register$/],
+	["login", "POST", /^\/auth\/login$/],
+	["refresh", "POST", /^\/auth\/refresh$/],
+	["logout", "POST", /^\/auth\/logout$/],
+	["account", "GET", /^\/auth\/me$/],
 	["currentSale", "GET", /^\/sales\/current$/],
 	["sale", "GET", /^\/sales\/(?<saleId>[^/]+)$/],
 	["saleEvents", "GET", /^\/sales\/(?<saleId>[^/]+)\/events$/],
 	["joinQueue", "POST", /^\/sales\/(?<saleId>[^/]+)\/queue$/],
-	["checkPlace", "GET", /^\/sales\/(?<saleId>[^/]+)\/queue\/(?<userId>[^/]+)$/],
-	[
-		"placeEvents",
-		"GET",
-		/^\/sales\/(?<saleId>[^/]+)\/queue\/(?<userId>[^/]+)\/events$/,
-	],
+	["checkPlace", "GET", /^\/sales\/(?<saleId>[^/]+)\/queue\/me$/],
+	["placeEvents", "GET", /^\/sales\/(?<saleId>[^/]+)\/queue\/me\/events$/],
 	["reserve", "POST", /^\/sales\/(?<saleId>[^/]+)\/reservations$/],
 	["confirm", "POST", /^\/sales\/(?<saleId>[^/]+)\/purchases$/],
-	[
-		"outcome",
-		"GET",
-		/^\/sales\/(?<saleId>[^/]+)\/purchases\/(?<userId>[^/]+)$/,
-	],
+	["outcome", "GET", /^\/sales\/(?<saleId>[^/]+)\/purchases\/me$/],
 ];
 
 export type Match = { name: RouteName; params: Record<string, string> };
@@ -117,6 +135,18 @@ export function createFakeBackend(now: () => number) {
 		// Zero means no limit.
 		writesPerUser: 0,
 	};
+	// Accounts by name, and one session for each login. The name is the user in everything else.
+	const accounts = new Map<string, { password: string; role: "shopper" }>();
+	type Session = {
+		user: string;
+		access: string;
+		accessEndsAt: number;
+		refresh: string;
+		refreshEndsAt: number;
+		previous: string | undefined;
+	};
+	const sessions: Session[] = [];
+	let requests = 0;
 	const listeners = new Set<() => void>();
 	const changed = () => {
 		for (const listener of [...listeners]) listener();
@@ -134,6 +164,7 @@ export function createFakeBackend(now: () => number) {
 		if (!sale) throw new Error("no sale");
 		return {
 			id: SALE_ID,
+			productId: PRODUCT_ID,
 			name: sale.name ?? "Flash sale",
 			status: status(),
 			startsAt: sale.startsAt.toISOString(),
@@ -281,6 +312,104 @@ export function createFakeBackend(now: () => number) {
 		return reply(200, { userId: user, state: "none" });
 	}
 
+	const cookie = (
+		name: string,
+		value: string,
+		path: string,
+		maxAgeMs: number,
+	) =>
+		`${name}=${value}; Path=${path}; Max-Age=${Math.floor(maxAgeMs / 1000)}; HttpOnly; SameSite=Lax`;
+	const cookiesOf = (session: Session) => [
+		cookie(ACCESS_COOKIE, session.access, "/", ACCESS_TTL_MS),
+		cookie(REFRESH_COOKIE, session.refresh, "/auth", REFRESH_TTL_MS),
+	];
+	const clearedCookies = () => [
+		cookie(ACCESS_COOKIE, "", "/", 0),
+		cookie(REFRESH_COOKIE, "", "/auth", 0),
+	];
+	const cookieValue = (header: string | undefined, name: string) =>
+		(header ?? "")
+			.split(";")
+			.map((part) => part.trim().split("="))
+			.find(([key]) => key === name)?.[1];
+
+	function startSession(user: string): Session {
+		const session = {
+			user,
+			access: crypto.randomUUID(),
+			accessEndsAt: now() + ACCESS_TTL_MS,
+			refresh: crypto.randomUUID(),
+			refreshEndsAt: now() + REFRESH_TTL_MS,
+			previous: undefined,
+		};
+		sessions.push(session);
+		return session;
+	}
+
+	// The name of the shopper whose access cookie is in the header, if it still works.
+	function userOf(cookies: string | undefined): string | undefined {
+		const token = cookieValue(cookies, ACCESS_COOKIE);
+		return sessions.find(
+			(session) => session.access === token && session.accessEndsAt > now(),
+		)?.user;
+	}
+
+	const account = (user: string) => ({ username: user, role: "shopper" });
+
+	function register(body: Record<string, unknown>): Reply {
+		const user = cleanUser(String(body.username ?? ""));
+		if (user === undefined) return refuse("invalid_user");
+		const password = cleanPassword(String(body.password ?? ""));
+		if (password === undefined) return refuse("invalid_password");
+		if (accounts.has(user)) return refuse("username_taken");
+		accounts.set(user, { password, role: "shopper" });
+		return reply(201, account(user), {}, cookiesOf(startSession(user)));
+	}
+
+	function login(body: Record<string, unknown>): Reply {
+		const user = cleanUser(String(body.username ?? ""));
+		const known = user === undefined ? undefined : accounts.get(user);
+		if (user === undefined || known?.password !== body.password) {
+			return refuse("invalid_credentials");
+		}
+		return reply(200, account(user), {}, cookiesOf(startSession(user)));
+	}
+
+	// Trades the refresh token for a new pair. The old one works no more; showing it again ends the login, as flash-be does.
+	function refresh(cookies: string | undefined): Reply {
+		const token = cookieValue(cookies, REFRESH_COOKIE);
+		const session = sessions.find(
+			(candidate) => token !== undefined && candidate.refresh === token,
+		);
+		const replayed = sessions.find(
+			(candidate) => token !== undefined && candidate.previous === token,
+		);
+		if (replayed) sessions.splice(sessions.indexOf(replayed), 1);
+		if (!session || session.refreshEndsAt <= now()) {
+			return {
+				...refuse("invalid_refresh_token"),
+				cookies: clearedCookies(),
+			};
+		}
+		session.previous = session.refresh;
+		session.refresh = crypto.randomUUID();
+		session.access = crypto.randomUUID();
+		session.accessEndsAt = now() + ACCESS_TTL_MS;
+		session.refreshEndsAt = now() + REFRESH_TTL_MS;
+		return reply(200, account(session.user), {}, cookiesOf(session));
+	}
+
+	function logout(cookies: string | undefined): Reply {
+		const access = cookieValue(cookies, ACCESS_COOKIE);
+		const token = cookieValue(cookies, REFRESH_COOKIE);
+		for (const session of sessions.filter(
+			(candidate) => candidate.access === access || candidate.refresh === token,
+		)) {
+			sessions.splice(sessions.indexOf(session), 1);
+		}
+		return reply(200, {}, {}, clearedCookies());
+	}
+
 	return {
 		settings,
 		onChange(listener: () => void): () => void {
@@ -328,6 +457,23 @@ export function createFakeBackend(now: () => number) {
 			if (sale) sale.sold += 1;
 			changed();
 		},
+		// An account that already exists, made without the page.
+		addAccount(user: string, password: string) {
+			accounts.set(user, { password, role: "shopper" });
+		},
+		// The login of every shopper ends, as the passing of 7 days does.
+		endLogins() {
+			for (const session of sessions) {
+				session.accessEndsAt = now() - 1;
+				session.refreshEndsAt = now() - 1;
+			}
+		},
+		// Only the short token ends, as the passing of 15 minutes does. The refresh token still works.
+		endAccessTokens() {
+			for (const session of sessions) session.accessEndsAt = now() - 1;
+		},
+		userOf,
+		requestCount: () => requests,
 		view,
 		placeOf,
 		hasSale: () => sale !== undefined,
@@ -338,31 +484,48 @@ export function createFakeBackend(now: () => number) {
 			headers: Record<string, string | undefined>,
 			body: Record<string, unknown>,
 		): Reply {
+			requests += 1;
 			if (unreachable) throw new TypeError("fetch failed");
 			const match = matchRoute(method, path);
 			if (!match) return refuse("not_found");
 			const { name: route, params } = match;
-			if (route === "currentSale") {
-				// Like the real API: a sale that is over is no longer the current sale.
-				return sale && view().status !== "ended"
-					? reply(200, view())
-					: refuse("sale_not_found");
+			const cookies = headers.cookie;
+			switch (route) {
+				case "register":
+					return register(body);
+				case "login":
+					return login(body);
+				case "refresh":
+					return refresh(cookies);
+				case "logout":
+					return logout(cookies);
+				case "currentSale":
+					// Like the real API: a sale that is over is no longer the current sale.
+					return sale && view().status !== "ended"
+						? reply(200, view())
+						: refuse("sale_not_found");
+				default:
+			}
+			if (route === "account") {
+				const user = userOf(cookies);
+				return user === undefined
+					? refuse("not_authenticated")
+					: reply(200, account(user));
 			}
 			if (params.saleId !== SALE_ID || !sale) return refuse("sale_not_found");
-			const name = String(body.userId ?? params.userId ?? "")
-				.trim()
-				.toLowerCase();
+			if (route === "sale") return reply(200, view());
+			// Everything below is a shopper's own, and the cookie says who the shopper is.
+			const user = userOf(cookies);
+			if (user === undefined) return refuse("not_authenticated");
 			switch (route) {
-				case "sale":
-					return reply(200, view());
 				case "joinQueue":
-					return join(name);
+					return join(user);
 				case "reserve":
-					return reserve(name, headers[TICKET_HEADER]);
+					return reserve(user, headers[TICKET_HEADER]);
 				case "confirm":
-					return confirm(name, String(body.reservationId ?? ""));
+					return confirm(user, String(body.reservationId ?? ""));
 				case "outcome":
-					return outcome(name);
+					return outcome(user);
 				default:
 					return refuse("not_found");
 			}

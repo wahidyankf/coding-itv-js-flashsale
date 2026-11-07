@@ -6,6 +6,7 @@ Feature: Sale status on the page
 
   Scenario Outline: The page shows the sale and its status
     Given a sale with stock 10 and <sold> sold that opens <opens> and closes <closes>
+    And "ana" is logged in
     When a visitor opens the page
     Then the page shows the status "<label>"
     And the page shows <left> items left
@@ -24,6 +25,7 @@ Feature: Sale status on the page
 
   Scenario: The page follows the sale to its end
     Given a sale with stock 10 and 3 sold that opens 1 hour ago and closes in 1 hour
+    And "ana" is logged in
     And a visitor has the page open
     When the sale ends
     Then the page shows the status "Ended"

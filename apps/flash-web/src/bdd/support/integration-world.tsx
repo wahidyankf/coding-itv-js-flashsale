@@ -14,13 +14,13 @@ import {
 } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { TICKET_HEADER } from "../../api";
+import { createWebApi } from "../../auth/web-api";
 import { proxyToBackend } from "../../proxy";
 import { HomePage } from "../../routes/index";
-import { createSaleClient } from "../../sale/client";
 import { loadSale } from "../../sale/load";
 import { SalePage } from "../../sale/sale-page";
-import { createWatcher } from "../../sale/sse";
 import type { SaleLoad } from "../../sale/types";
+import { createCookieJar } from "./cookie-jar";
 import {
 	createFakeBackend,
 	type FakeBackend,
@@ -31,6 +31,8 @@ import {
 import type { WebWorld } from "./web-world";
 
 const WAIT = { timeout: 8000, interval: 50 };
+// The password of a shopper that a scenario logs in without naming one.
+const PASSWORD = "a long password";
 
 function listen(server: Server): Promise<string> {
 	return new Promise((resolve) =>
@@ -68,12 +70,13 @@ function backendServer(current: () => FakeBackend): Server {
 			const reply = backend.handle(
 				request.method ?? "GET",
 				path,
-				{ [TICKET_HEADER]: ticket },
+				{ [TICKET_HEADER]: ticket, cookie: request.headers.cookie },
 				text ? JSON.parse(text) : {},
 			);
 			response.writeHead(reply.status, {
 				"content-type": "application/json",
 				...reply.headers,
+				...(reply.cookies?.length ? { "set-cookie": reply.cookies } : {}),
 			});
 			response.end(JSON.stringify(reply.body));
 		} catch {
@@ -90,10 +93,11 @@ function stream(
 	request: IncomingMessage,
 	response: ServerResponse,
 ): void {
-	const user = match.params.userId ?? "";
 	const isPlace = match.name === "placeEvents";
+	// The place stream is a shopper's own: the cookie says who, and the ticket proves the place.
+	const user = backend.userOf(request.headers.cookie) ?? "";
 	if (backend.isCutOff()) throw new Error("unreachable");
-	if (isPlace && ticket !== `ticket-${user}`) {
+	if (isPlace && (user === "" || ticket !== `ticket-${user}`)) {
 		response.writeHead(401).end();
 		return;
 	}
@@ -133,7 +137,11 @@ function webServer(backendUrl: () => string): Server {
 			}),
 			{ FLASH_BE_URL: backendUrl() },
 		);
-		response.writeHead(reply.status, Object.fromEntries(reply.headers));
+		response.writeHead(reply.status, {
+			...Object.fromEntries(reply.headers),
+			// Several cookies are several headers, which a plain object cannot hold.
+			"set-cookie": reply.headers.getSetCookie(),
+		});
 		try {
 			if (reply.body) {
 				for await (const chunk of reply.body) response.write(chunk);
@@ -162,10 +170,39 @@ export async function integrationWorld(): Promise<
 		globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
 	).IS_REACT_ACT_ENVIRONMENT = false;
 
-	const type = (name: string) =>
-		fireEvent.change(screen.getByLabelText(/Your name/), {
-			target: { value: name },
-		});
+	// What the browser keeps between requests, and the way it sends them: cookies that match the path, and the site a
+	// POST comes from.
+	const jar = createCookieJar();
+	const browserFetch: typeof fetch = async (input, init) => {
+		const url = new URL(String(input));
+		const headers = new Headers(init?.headers);
+		const cookie = jar.header(url.pathname);
+		if (cookie !== undefined) headers.set("cookie", cookie);
+		if (init?.method === "POST" && !headers.has("origin")) {
+			headers.set("origin", webUrl);
+		}
+		const reply = await fetch(url, { ...init, headers });
+		jar.store(reply.headers.getSetCookie());
+		return reply;
+	};
+
+	const fill = (label: RegExp, value: string) =>
+		fireEvent.change(screen.getByLabelText(label), { target: { value } });
+	// The page answers "who am I" after it is shown, so a button may need a moment to appear.
+	const click = async (name: string): Promise<void> => {
+		fireEvent.click(await screen.findByRole("button", { name }, WAIT));
+	};
+	const enter = async (
+		mode: "I have an account" | "I am new",
+		user: string,
+		password: string,
+		submit: string,
+	) => {
+		await click(mode);
+		fill(/Username/, user);
+		fill(/Password/, password);
+		await click(submit);
+	};
 
 	return {
 		saleId: SALE_ID,
@@ -173,6 +210,7 @@ export async function integrationWorld(): Promise<
 		reset() {
 			backend = createFakeBackend(() => Date.now());
 			load = { state: "none" };
+			jar.clear();
 		},
 		clear: () => cleanup(),
 		async close() {
@@ -187,6 +225,18 @@ export async function integrationWorld(): Promise<
 			backend.settings.slowAdmission = true;
 		},
 		queueAhead: (count) => backend.queueAhead(count),
+		async hasAccount(user, password) {
+			backend.addAccount(user, password);
+		},
+		async loggedIn(user) {
+			await browserFetch(`${webUrl}/api/auth/register`, {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ username: user, password: PASSWORD }),
+			});
+		},
+		loginEnds: () => backend.endLogins(),
+		accessTokenEnds: () => backend.endAccessTokens(),
 		holdsLastItem: (user) => backend.giveHold(user),
 		hasBought: (user) => backend.giveItem(user),
 		holds: (user) => backend.giveHold(user),
@@ -204,22 +254,24 @@ export async function integrationWorld(): Promise<
 			render(
 				<SalePage
 					load={load}
-					client={createSaleClient(
-						webUrl,
-						fetch,
-						createWatcher({ retryMs: 200 }),
-					)}
+					api={createWebApi(webUrl, browserFetch, { retryMs: 200 })}
 				/>,
 			);
+			// A sale page asks who is logged in first; the scenario goes on once it knows.
+			if (load.state === "ok") {
+				await waitFor(() => {
+					if (screen.queryByText("Checking your login…")) {
+						throw new Error("the page is still checking the login");
+					}
+				}, WAIT);
+			}
 		},
-		async pressBuyNow(name) {
-			type(name);
-			fireEvent.click(screen.getByRole("button", { name: "Buy Now" }));
-		},
-		async pressCheck(name) {
-			type(name);
-			fireEvent.click(screen.getByRole("button", { name: "Check my status" }));
-		},
+		signUp: (user, password) => enter("I am new", user, password, "Sign up"),
+		logIn: (user, password) =>
+			enter("I have an account", user, password, "Log in"),
+		logOut: () => click("Log out"),
+		pressBuyNow: () => click("Buy Now"),
+		pressCheck: () => click("Check my status"),
 		async pressConfirm() {
 			// The button is enabled once the hold is shown, which can take a moment after the click before it.
 			await waitFor(() => {
@@ -255,20 +307,39 @@ export async function integrationWorld(): Promise<
 				}
 			}, WAIT);
 		},
+		async expectNoButton(name) {
+			await waitFor(() => {
+				if (screen.queryByRole("button", { name })) {
+					throw new Error(`the page still has a "${name}" button`);
+				}
+			}, WAIT);
+		},
+		async expectNoLogin() {
+			await waitFor(() => {
+				if (jar.has("access_token") || jar.has("refresh_token")) {
+					throw new Error("the browser still holds a login");
+				}
+			}, WAIT);
+		},
 		renderedPage: () =>
 			renderToStaticMarkup(<HomePage status="ok" sale={load} />) +
 			document.body.innerHTML,
 		apiAddress: () => backendUrl,
-		async send(method, path, body) {
-			const reply = await fetch(`${webUrl}${path}`, {
+		async send(method, path, body, origin) {
+			const before = backend.requestCount();
+			const reply = await browserFetch(`${webUrl}${path}`, {
 				method,
-				headers:
-					body === undefined ? {} : { "content-type": "application/json" },
+				headers: {
+					...(body === undefined ? {} : { "content-type": "application/json" }),
+					...(origin === undefined ? {} : { origin }),
+				},
 				body: body === undefined ? null : JSON.stringify(body),
 			});
 			return {
 				status: reply.status,
 				json: (await reply.json()) as Record<string, unknown>,
+				cookies: reply.headers.getSetCookie(),
+				reachedApi: backend.requestCount() > before,
 			};
 		},
 	};

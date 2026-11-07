@@ -21,15 +21,45 @@ Feature: The web server in front of the API
     And the body has error "not_found"
 
     Examples:
-      | path                       |
-      | /api/sales/..%2Fready      |
-      | /api/sales/not-a-sale-id   |
+      | path                                                      |
+      | /api/sales/..%2Fready                                     |
+      | /api/sales/not-a-sale-id                                  |
+      | /api/auth/other                                           |
+      | /api/sales/11111111-1111-4111-8111-111111111111/queue/ana |
 
-  Scenario: A write request is passed on with the ticket
+  Scenario: The operator routes are not reachable through the web server
+    When a client sends GET /api/admin/sales
+    Then the response status is 404
+
+  Scenario: A write request is passed on with the cookie of the shopper
     Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
+    And "ana" is logged in
     When a client joins the queue through the web server
     Then the response status is 201
     And the body has a ticket
+    And the body names "ana"
+
+  Scenario: A shopper who is not logged in is refused by the API
+    Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
+    When a client joins the queue through the web server
+    Then the response status is 401
+    And the body has error "not_authenticated"
+
+  Scenario: Signing up sets both cookies, and the refresh cookie is moved under /api/auth
+    When a client signs up through the web server as "ana"
+    Then the response status is 201
+    And the response sets the cookie "access_token" for the path "/"
+    And the response sets the cookie "refresh_token" for the path "/api/auth"
+    And both cookies are HttpOnly
+    And the body holds neither token
+
+  Scenario: A request from another site is refused before it reaches the API
+    Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
+    And "ana" is logged in
+    When a client on another site sends POST /api/auth/logout
+    Then the response status is 403
+    And the body has error "cross_site"
+    And the API was not asked
 
   Scenario: An API that cannot be reached gives a gateway error
     Given the sale cannot be reached

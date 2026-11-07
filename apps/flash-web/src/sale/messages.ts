@@ -1,3 +1,4 @@
+import { AUTH_TEXT } from "../auth/messages";
 import type { ApiFailure, SaleStatus } from "./types";
 
 export const STATUS_LABEL: Record<SaleStatus, string> = {
@@ -10,12 +11,12 @@ export const STATUS_LABEL: Record<SaleStatus, string> = {
 // One plain sentence under the status: what the shopper can do now. The times of the window are shown next to it.
 export const STATUS_NOTE: Record<SaleStatus, string> = {
 	upcoming: "Buying opens when the sale starts.",
-	active: "The sale is open. Enter your name and press Buy Now.",
+	active: "The sale is open. Log in, then press Buy Now.",
 	sold_out: "All items have been bought.",
 	ended: "This sale is over.",
 };
 
-// The same rule the API uses for a user id (trimmed, lowercased), so a bad name is refused before anything is sent.
+// The same rule the API uses for a user name (trimmed, lowercased), so a bad name is refused before anything is sent.
 // A copy of `normalizeUser` in flash-be; `same_as_be_tests.ts` fails when the two differ.
 const USER_ID = /^[a-z0-9][a-z0-9._@+-]{0,63}$/;
 
@@ -66,6 +67,15 @@ export function errorText(
 			return "You already bought an item.";
 		case "invalid_user":
 			return TEXT.invalidUser;
+		case "invalid_password":
+			return AUTH_TEXT.passwordLength;
+		case "invalid_credentials":
+			return AUTH_TEXT.badCredentials;
+		case "username_taken":
+			return AUTH_TEXT.nameTaken;
+		case "not_authenticated":
+		case "invalid_refresh_token":
+			return AUTH_TEXT.loginEnded;
 		case "rate_limited":
 			return `Too many requests. Try again in ${retryAfterSeconds ?? 1} seconds.`;
 		case "hold_expired":

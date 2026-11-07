@@ -7,6 +7,9 @@ import {
 	screen,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { AuthClient } from "../auth/client";
+import type { Account } from "../auth/types";
+import type { WebApi } from "../auth/web-api";
 import type { SaleClient } from "./client";
 import { SalePage } from "./sale-page";
 import type {
@@ -20,6 +23,7 @@ import type {
 
 const SALE: SaleView = {
 	id: "11111111-1111-4111-8111-111111111111",
+	productId: "22222222-2222-4222-8222-222222222222",
 	name: "Flash sale",
 	status: "active",
 	startsAt: "2026-06-01T11:00:00Z",
@@ -66,7 +70,7 @@ function stubClient(overrides: Partial<SaleClient> = {}) {
 			async () => new Ok({ userId: "ana", state: "none" as const }),
 		),
 		watchSale: () => () => {},
-		watchPlace: (_id, _user, _ticket, onPlace) => {
+		watchPlace: (_id, _ticket, onPlace) => {
 			push = onPlace;
 			return () => {};
 		},
@@ -75,24 +79,60 @@ function stubClient(overrides: Partial<SaleClient> = {}) {
 	return { client, push: (place: Place) => push(place) };
 }
 
+const ANA: Account = { username: "ana", role: "shopper" };
+
+// The pieces of the web API. The shopper is logged in unless a test says otherwise.
+function stubApi(
+	sale: SaleClient,
+	auth: Partial<AuthClient> = {},
+): WebApi & { expire: () => void } {
+	const listeners = new Set<() => void>();
+	return {
+		sale,
+		auth: {
+			me: vi.fn(async () => new Ok(ANA)),
+			register: vi.fn(async () => new Ok(ANA)),
+			login: vi.fn(async () => new Ok(ANA)),
+			logout: vi.fn(async () => new Ok({})),
+			...auth,
+		},
+		onExpired: (listener) => {
+			listeners.add(listener);
+			return () => listeners.delete(listener);
+		},
+		expire: () => {
+			for (const listener of listeners) listener();
+		},
+	};
+}
+
+// Renders the page and waits for the answer to "who am I", which comes after the first paint.
+async function show(
+	load: Parameters<typeof SalePage>[0]["load"],
+	api: WebApi,
+): Promise<void> {
+	await act(async () => {
+		render(<SalePage load={load} api={api} />);
+	});
+}
+
+const OPEN = { state: "ok", sale: SALE } as const;
+
 async function press(name: string): Promise<void> {
 	await act(async () => {
 		fireEvent.click(screen.getByRole("button", { name }));
 	});
 }
 
-async function buyAs(name: string): Promise<void> {
-	fireEvent.change(screen.getByLabelText(/Your name/), {
-		target: { value: name },
-	});
+async function buy(): Promise<void> {
 	await press("Buy Now");
 }
 
 describe("SalePage", () => {
 	it("tells a waiting shopper when the place is lost", async () => {
 		const { client, push } = stubClient();
-		render(<SalePage load={{ state: "ok", sale: SALE }} client={client} />);
-		await buyAs("ana");
+		await show(OPEN, stubApi(client));
+		await buy();
 		expect(screen.getByRole("status").textContent).toContain("Your place: 2");
 		await act(async () => push({ state: "absent" }));
 		expect(screen.getByRole("status").textContent).toContain(
@@ -102,12 +142,12 @@ describe("SalePage", () => {
 
 	it("moves a waiting shopper on when the place changes and then admits them", async () => {
 		const { client, push } = stubClient();
-		render(<SalePage load={{ state: "ok", sale: SALE }} client={client} />);
-		await buyAs("ana");
+		await show(OPEN, stubApi(client));
+		await buy();
 		await act(async () => push({ state: "waiting", place: 1 }));
 		expect(screen.getByRole("status").textContent).toContain("Your place: 1");
 		await act(async () => push({ state: "admitted" }));
-		expect(client.reserve).toHaveBeenCalledWith(SALE.id, "ana", "t");
+		expect(client.reserve).toHaveBeenCalledWith(SALE.id, "t");
 		expect(screen.getByRole("status").textContent).toContain("An item is held");
 	});
 
@@ -119,8 +159,8 @@ describe("SalePage", () => {
 			),
 			confirm: vi.fn(async () => new Err(failure("hold_expired"))),
 		});
-		render(<SalePage load={{ state: "ok", sale: SALE }} client={client} />);
-		await buyAs("ana");
+		await show(OPEN, stubApi(client));
+		await buy();
 		await press("Confirm purchase");
 		expect(screen.getByRole("status").textContent).toContain(
 			"Your hold has ended",
@@ -131,45 +171,26 @@ describe("SalePage", () => {
 		const { client } = stubClient({
 			outcome: vi.fn(async () => new Err(failure("network"))),
 		});
-		render(<SalePage load={{ state: "ok", sale: SALE }} client={client} />);
-		fireEvent.change(screen.getByLabelText(/Your name/), {
-			target: { value: "ana" },
-		});
+		await show(OPEN, stubApi(client));
 		await press("Check my status");
 		expect(screen.getByRole("status").textContent).toContain(
 			"could not be reached",
 		);
 	});
 
-	it("refuses a bad name when checking, without asking", async () => {
-		const { client } = stubClient();
-		render(<SalePage load={{ state: "ok", sale: SALE }} client={client} />);
-		fireEvent.change(screen.getByLabelText(/Your name/), {
-			target: { value: "no good" },
-		});
-		await press("Check my status");
-		expect(client.outcome).not.toHaveBeenCalled();
-		expect(screen.getByRole("status").textContent).toContain("Use 1 to 64");
-	});
-
 	it("does not send a form that cannot be bought from", async () => {
 		const { client } = stubClient();
-		render(
-			<SalePage
-				load={{ state: "ok", sale: { ...SALE, status: "sold_out" } }}
-				client={client}
-			/>,
+		await show(
+			{ state: "ok", sale: { ...SALE, status: "sold_out" } },
+			stubApi(client),
 		);
-		fireEvent.change(screen.getByLabelText(/Your name/), {
-			target: { value: "ana" },
-		});
 		await act(async () => {
 			fireEvent.submit(screen.getByRole("button", { name: "Buy Now" }));
 		});
 		expect(client.join).not.toHaveBeenCalled();
 	});
 
-	it("builds its own client when none is given", () => {
+	it("builds its own API when none is given", () => {
 		render(<SalePage load={{ state: "none" }} />);
 		expect(screen.getByText("No sale is open right now.")).toBeTruthy();
 	});
@@ -185,13 +206,12 @@ describe("SalePage", () => {
 		expect(alert.textContent).toContain("Reload the page to try again.");
 	});
 
-	it("shows the window of the sale and a plain line for its status", () => {
-		const { container } = render(
-			<SalePage
-				load={{ state: "ok", sale: { ...SALE, status: "upcoming" } }}
-				client={stubClient().client}
-			/>,
+	it("shows the window of the sale and a plain line for its status", async () => {
+		await show(
+			{ state: "ok", sale: { ...SALE, status: "upcoming" } },
+			stubApi(stubClient().client),
 		);
+		const container = document.body;
 		expect(screen.getByText("Buying opens when the sale starts.")).toBeTruthy();
 		const times = [...container.querySelectorAll("time")].map((time) =>
 			time.getAttribute("datetime"),
@@ -219,11 +239,8 @@ describe("loading indicators", () => {
 		const { client } = stubClient({
 			join: vi.fn(() => request.promise),
 		});
-		render(<SalePage load={{ state: "ok", sale: SALE }} client={client} />);
+		await show(OPEN, stubApi(client));
 		expect(spinners()).toHaveLength(0);
-		fireEvent.change(screen.getByLabelText(/Your name/), {
-			target: { value: "ana" },
-		});
 		await press("Buy Now");
 		const buy = screen.getByRole("button", { name: "Buy Now" });
 		expect(spinners(buy)).toHaveLength(1);
@@ -245,8 +262,8 @@ describe("loading indicators", () => {
 
 	it("keeps a spinner and says the page updates by itself while the shopper waits in the queue", async () => {
 		const { client } = stubClient();
-		render(<SalePage load={{ state: "ok", sale: SALE }} client={client} />);
-		await buyAs("ana");
+		await show(OPEN, stubApi(client));
+		await buy();
 		expect(
 			spinners(screen.getByRole("button", { name: "Buy Now" })),
 		).toHaveLength(1);
@@ -261,10 +278,7 @@ describe("loading indicators", () => {
 		const { client } = stubClient({
 			outcome: vi.fn(() => request.promise),
 		});
-		render(<SalePage load={{ state: "ok", sale: SALE }} client={client} />);
-		fireEvent.change(screen.getByLabelText(/Your name/), {
-			target: { value: "ana" },
-		});
+		await show(OPEN, stubApi(client));
 		await press("Check my status");
 		expect(
 			spinners(screen.getByRole("button", { name: "Check my status" })),
@@ -287,8 +301,8 @@ describe("loading indicators", () => {
 			),
 			confirm: vi.fn(() => request.promise),
 		});
-		render(<SalePage load={{ state: "ok", sale: SALE }} client={client} />);
-		await buyAs("ana");
+		await show(OPEN, stubApi(client));
+		await buy();
 		expect(spinners()).toHaveLength(0);
 		await press("Confirm purchase");
 		expect(
@@ -306,5 +320,201 @@ describe("loading indicators", () => {
 			),
 		);
 		expect(spinners()).toHaveLength(0);
+	});
+});
+
+const field = (label: RegExp) => screen.getByLabelText(label);
+const typeInto = (label: RegExp, value: string) =>
+	fireEvent.change(field(label), { target: { value } });
+
+describe("the account", () => {
+	it("waits for the answer before it shows a form or the buttons", () => {
+		const never = new Promise<ApiResult<Account>>(() => {});
+		render(
+			<SalePage
+				load={OPEN}
+				api={stubApi(stubClient().client, { me: () => never })}
+			/>,
+		);
+		expect(screen.getByRole("status").textContent).toContain(
+			"Checking your login",
+		);
+		expect(screen.queryByRole("button", { name: "Buy Now" })).toBeNull();
+		expect(screen.queryByLabelText(/Username/)).toBeNull();
+	});
+
+	it("shows who is logged in, and the way out", async () => {
+		await show(OPEN, stubApi(stubClient().client));
+		expect(screen.getByText("Signed in as").textContent).toContain("ana");
+		expect(screen.getByRole("button", { name: "Log out" })).toBeTruthy();
+		expect(screen.queryByLabelText(/Username/)).toBeNull();
+	});
+
+	it("shows the form, and no buying buttons, to a visitor who is not logged in", async () => {
+		const api = stubApi(stubClient().client, {
+			me: async () => new Err(failure("not_authenticated")),
+		});
+		await show(OPEN, api);
+		expect(screen.getByRole("button", { name: "Log in" })).toBeTruthy();
+		expect(screen.queryByRole("button", { name: "Buy Now" })).toBeNull();
+		expect(screen.queryByRole("button", { name: "Log out" })).toBeNull();
+		// Not being logged in is the normal start, so nothing is flagged as an error.
+		expect(screen.queryByRole("alert")).toBeNull();
+	});
+
+	it("logs in, then shows the buying buttons for the account", async () => {
+		const login = vi.fn(async () => new Ok(ANA));
+		const api = stubApi(stubClient().client, {
+			me: async () => new Err(failure("not_authenticated")),
+			login,
+		});
+		await show(OPEN, api);
+		typeInto(/Username/, "  Ana ");
+		typeInto(/Password/, "a long password");
+		await press("Log in");
+		expect(login).toHaveBeenCalledWith("ana", "a long password");
+		expect(screen.getByRole("button", { name: "Buy Now" })).toBeTruthy();
+		expect(screen.getByText("Signed in as").textContent).toContain("ana");
+	});
+
+	it("signs up with the form for a new shopper", async () => {
+		const register = vi.fn(async () => new Ok(ANA));
+		const api = stubApi(stubClient().client, {
+			me: async () => new Err(failure("not_authenticated")),
+			register,
+		});
+		await show(OPEN, api);
+		await press("I am new");
+		expect(screen.getByText("At least 8 characters.")).toBeTruthy();
+		typeInto(/Username/, "ana");
+		typeInto(/Password/, "a long password");
+		await press("Sign up");
+		expect(register).toHaveBeenCalledWith("ana", "a long password");
+		expect(screen.getByRole("button", { name: "Buy Now" })).toBeTruthy();
+	});
+
+	it.each([
+		["login", "invalid_credentials", "Wrong name or password."],
+		["signup", "username_taken", "That name is taken. Choose another one."],
+	] as const)(
+		"tells in words when the %s is refused (%s)",
+		async (mode, code, text) => {
+			const refuse = vi.fn(async () => new Err(failure(code)));
+			const api = stubApi(stubClient().client, {
+				me: async () => new Err(failure("not_authenticated")),
+				login: refuse,
+				register: refuse,
+			});
+			await show(OPEN, api);
+			if (mode === "signup") await press("I am new");
+			typeInto(/Username/, "ana");
+			typeInto(/Password/, "a long password");
+			await press(mode === "login" ? "Log in" : "Sign up");
+			expect(screen.getByRole("alert").textContent).toBe(text);
+			// The shopper can try again.
+			expect(
+				(
+					screen.getByRole("button", {
+						name: mode === "login" ? "Log in" : "Sign up",
+					}) as HTMLButtonElement
+				).disabled,
+			).toBe(false);
+			expect(screen.queryByRole("button", { name: "Buy Now" })).toBeNull();
+		},
+	);
+
+	it("refuses a bad name or a short password in words, without asking", async () => {
+		const api = stubApi(stubClient().client, {
+			me: async () => new Err(failure("not_authenticated")),
+		});
+		await show(OPEN, api);
+		typeInto(/Username/, "no good");
+		typeInto(/Password/, "a long password");
+		await press("Log in");
+		expect(screen.getByRole("alert").textContent).toContain("Use 1 to 64");
+		typeInto(/Username/, "ana");
+		await press("I am new");
+		typeInto(/Password/, "short");
+		await press("Sign up");
+		expect(screen.getByRole("alert").textContent).toBe(
+			"Use 8 to 128 characters for the password.",
+		);
+		expect(api.auth.login).not.toHaveBeenCalled();
+		expect(api.auth.register).not.toHaveBeenCalled();
+	});
+
+	it("sends an old password to the server on login, which alone knows the rule it was made under", async () => {
+		const login = vi.fn(async () => new Ok(ANA));
+		const api = stubApi(stubClient().client, {
+			me: async () => new Err(failure("not_authenticated")),
+			login,
+		});
+		await show(OPEN, api);
+		typeInto(/Username/, "ana");
+		typeInto(/Password/, "short");
+		await press("Log in");
+		expect(login).toHaveBeenCalledWith("ana", "short");
+	});
+
+	it("does not send a login with no password", async () => {
+		const api = stubApi(stubClient().client, {
+			me: async () => new Err(failure("not_authenticated")),
+		});
+		await show(OPEN, api);
+		typeInto(/Username/, "ana");
+		await press("Log in");
+		expect(api.auth.login).not.toHaveBeenCalled();
+		expect(screen.getByRole("alert")).toBeTruthy();
+	});
+
+	it("clears the problem when the shopper switches between the two forms", async () => {
+		const api = stubApi(stubClient().client, {
+			me: async () => new Err(failure("not_authenticated")),
+		});
+		await show(OPEN, api);
+		await press("Log in");
+		expect(screen.getByRole("alert")).toBeTruthy();
+		await press("I am new");
+		expect(screen.queryByRole("alert")).toBeNull();
+	});
+
+	it("logs out, leaving the form", async () => {
+		const api = stubApi(stubClient().client);
+		await show(OPEN, api);
+		await press("Log out");
+		expect(api.auth.logout).toHaveBeenCalledOnce();
+		expect(screen.getByRole("button", { name: "Log in" })).toBeTruthy();
+		expect(screen.queryByRole("button", { name: "Buy Now" })).toBeNull();
+	});
+
+	it("stops a shopper in the queue when they log out", async () => {
+		const { client } = stubClient();
+		const api = stubApi(client);
+		await show(OPEN, api);
+		await buy();
+		expect(screen.getByRole("status").textContent).toContain("Your place: 2");
+		await press("Log out");
+		await press("Log in");
+		expect(screen.queryByText(/Your place/)).toBeNull();
+	});
+
+	it("sends the shopper back to the form, and says why, when the login ended", async () => {
+		const api = stubApi(stubClient().client);
+		await show(OPEN, api);
+		await act(async () => api.expire());
+		expect(
+			screen.getByText("Your login has ended. Please log in again."),
+		).toBeTruthy();
+		expect(screen.getByRole("button", { name: "Log in" })).toBeTruthy();
+		expect(screen.queryByRole("button", { name: "Buy Now" })).toBeNull();
+	});
+
+	it('ignores the answer to "who am I" when the page is gone', async () => {
+		const answer = deferred<ApiResult<Account>>();
+		const api = stubApi(stubClient().client, { me: () => answer.promise });
+		const { unmount } = render(<SalePage load={OPEN} api={api} />);
+		unmount();
+		await act(async () => answer.answer(new Ok(ANA)));
+		expect(screen.queryByRole("button", { name: "Log out" })).toBeNull();
 	});
 });

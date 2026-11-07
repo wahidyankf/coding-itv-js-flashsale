@@ -2,23 +2,33 @@ import type { APIRequestContext } from "@playwright/test";
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { getJson, postJson, salePath, TICKET_HEADER } from "./support/api.js";
-import { privateApi, world } from "./support/shop.js";
+import {
+	connectWebServer,
+	cookieFor,
+	createAccount,
+	E2E_PASSWORD,
+	privateApi,
+	world,
+} from "./support/shop.js";
 
 const { Given, When, Then } = createBdd();
 
-// Shoppers that the scenario set up before the page opened talk to flash-be directly, as other clients would.
+// Shoppers that the scenario set up before the page opened talk to flash-be directly, as other clients would. Each
+// holds the cookie of their own login.
 async function joinAndWait(
 	request: APIRequestContext,
 	user: string,
-): Promise<{ api: string; ticket: string }> {
+): Promise<{ api: string; ticket: string; cookie: string }> {
 	const api = await privateApi();
+	const cookie = await cookieFor(user);
 	const sale = `${api}${salePath(world.saleId)}`;
-	const joined = await postJson(request, `${sale}/queue`, { userId: user });
+	const joined = await postJson(request, `${sale}/queue`, {}, { cookie });
 	const ticket: string = (await joined.json()).ticket ?? "";
 	await expect
 		.poll(
 			async () => {
-				const place = await getJson(request, `${sale}/queue/${user}`, {
+				const place = await getJson(request, `${sale}/queue/me`, {
+					cookie,
 					[TICKET_HEADER]: ticket,
 				});
 				return (await place.json()).state;
@@ -26,22 +36,26 @@ async function joinAndWait(
 			{ timeout: 20_000 },
 		)
 		.toBe("admitted");
-	return { api, ticket };
+	return { api, ticket, cookie };
 }
 
 async function hold(
 	request: APIRequestContext,
 	user: string,
-): Promise<{ api: string; reservationId: string }> {
-	const { api, ticket } = await joinAndWait(request, user);
+): Promise<{ api: string; reservationId: string; cookie: string }> {
+	const { api, ticket, cookie } = await joinAndWait(request, user);
 	const reserved = await postJson(
 		request,
 		`${api}${salePath(world.saleId)}/reservations`,
-		{ userId: user },
-		{ [TICKET_HEADER]: ticket },
+		{},
+		{ cookie, [TICKET_HEADER]: ticket },
 	);
 	expect(reserved.status()).toBe(201);
-	return { api, reservationId: (await reserved.json()).reservationId ?? "" };
+	return {
+		api,
+		cookie,
+		reservationId: (await reserved.json()).reservationId ?? "",
+	};
 }
 
 Given(/^"([^"]+)" holds the last item$/, async ({ request }, user: string) => {
@@ -53,11 +67,12 @@ Given(/^"([^"]+)" holds an item$/, async ({ request }, user: string) => {
 });
 
 Given(/^"([^"]+)" has bought an item$/, async ({ request }, user: string) => {
-	const { api, reservationId } = await hold(request, user);
+	const { api, reservationId, cookie } = await hold(request, user);
 	const bought = await postJson(
 		request,
 		`${api}${salePath(world.saleId)}/purchases`,
-		{ userId: user, reservationId },
+		{ reservationId },
+		{ cookie },
 	);
 	expect(bought.status()).toBe(201);
 });
@@ -76,20 +91,37 @@ Given(
 			const joined = await postJson(
 				request,
 				`${api}${salePath(world.saleId)}/queue`,
-				{ userId: `shopper${index}` },
+				{},
+				{ cookie: await cookieFor(`shopper${index}`) },
 			);
 			expect(joined.status()).toBe(201);
 		}
 	},
 );
 
-When(/^"([^"]*)" presses Buy Now$/, async ({ page }, name: string) => {
-	await page.getByLabel("Your name").fill(name);
+// The pages of a shopper who is logged in are reached through the web server, so the cookies are the browser's own.
+Given(/^"([^"]+)" is logged in$/, async ({ page }, user: string) => {
+	await cookieFor(user);
+	await connectWebServer();
+	const reply = await page.request.post("/api/auth/login", {
+		data: { username: user, password: E2E_PASSWORD },
+	});
+	expect(reply.status(), await reply.text()).toBe(200);
+});
+
+Given(
+	/^"([^"]+)" has an account with the password "([^"]*)"$/,
+	// biome-ignore lint/correctness/noEmptyPattern: playwright-bdd needs an object pattern as the first argument
+	async ({}, user: string, password: string) => {
+		await createAccount(user, password);
+	},
+);
+
+When("she presses Buy Now", async ({ page }) => {
 	await page.getByRole("button", { name: "Buy Now" }).click();
 });
 
-When(/^"([^"]*)" presses Check my status$/, async ({ page }, name: string) => {
-	await page.getByLabel("Your name").fill(name);
+When("she presses Check my status", async ({ page }) => {
 	await page.getByRole("button", { name: "Check my status" }).click();
 });
 

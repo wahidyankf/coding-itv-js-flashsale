@@ -1,13 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MS_PER_SECOND } from "../api";
 import type { SaleClient } from "./client";
-import {
-	cleanUser,
-	errorText,
-	holdingText,
-	TEXT,
-	waitingText,
-} from "./messages";
+import { errorText, holdingText, TEXT, waitingText } from "./messages";
 import type { ApiFailure, Place, SaleStatus } from "./types";
 
 // What the shopper asked for, so the page can show the spinner on the button that was pressed.
@@ -33,11 +27,12 @@ export function useShopper(
 	saleId: string,
 	saleStatus: SaleStatus,
 	client: SaleClient,
+	// Only a shopper who is logged in can buy. When the login goes, whatever the shopper was doing stops.
+	loggedIn: boolean,
 	now: () => number = Date.now,
 ) {
 	const [phase, setPhase] = useState<Phase>({ kind: "idle" });
 	const [clock, setClock] = useState(now());
-	const user = useRef("");
 	const stopWatching = useRef<() => void>(() => {});
 
 	const stop = useCallback(() => {
@@ -45,6 +40,11 @@ export function useShopper(
 		stopWatching.current = () => {};
 	}, []);
 	useEffect(() => stop, [stop]);
+	useEffect(() => {
+		if (loggedIn) return;
+		stop();
+		setPhase({ kind: "idle" });
+	}, [loggedIn, stop]);
 
 	// The countdown ticks only while an item is held.
 	const holding = phase.kind === "holding";
@@ -83,9 +83,9 @@ export function useShopper(
 			text: errorText(errorCode, retryAfterSeconds),
 		});
 
-	const reserve = async (id: string, name: string, ticket: string) => {
+	const reserve = async (id: string, ticket: string) => {
 		setPhase({ kind: "busy", action: "buy", text: TEXT.reserving });
-		const reserved = await client.reserve(id, name, ticket);
+		const reserved = await client.reserve(id, ticket);
 		if (reserved.isErr()) return fail(reserved.error);
 		const expiresAt = Date.parse(reserved.value.expiresAt);
 		setClock(now());
@@ -96,43 +96,35 @@ export function useShopper(
 		});
 	};
 
-	const buy = async (raw: string) => {
-		const name = cleanUser(raw);
-		if (name === undefined)
-			return setPhase({ kind: "message", text: TEXT.invalidUser });
+	const buy = async () => {
 		stop();
-		user.current = name;
 		setPhase({ kind: "busy", action: "buy", text: TEXT.joining });
-		const joined = await client.join(saleId, name);
+		const joined = await client.join(saleId);
 		if (joined.isErr()) return fail(joined.error);
 
 		const { ticket } = joined.value;
-		if (joined.value.state === "admitted") return reserve(saleId, name, ticket);
+		if (joined.value.state === "admitted") return reserve(saleId, ticket);
 
 		const onPlace = (place: Place) => {
 			if (place.state === "waiting") {
 				setPhase({ kind: "waiting", place: place.place });
 			} else if (place.state === "admitted") {
 				stop();
-				void reserve(saleId, name, ticket);
+				void reserve(saleId, ticket);
 			} else {
 				stop();
 				setPhase({ kind: "message", text: TEXT.placeLost });
 			}
 		};
 		onPlace(joined.value);
-		stopWatching.current = client.watchPlace(saleId, name, ticket, onPlace);
+		stopWatching.current = client.watchPlace(saleId, ticket, onPlace);
 	};
 
 	const confirm = async () => {
 		if (phase.kind !== "holding") return;
 		const held = phase;
 		setPhase({ kind: "busy", action: "confirm", text: TEXT.paying });
-		const confirmed = await client.confirm(
-			saleId,
-			user.current,
-			held.reservationId,
-		);
+		const confirmed = await client.confirm(saleId, held.reservationId);
 		if (confirmed.isOk()) return setPhase({ kind: "purchased" });
 		if (confirmed.error.errorCode === "payment_failed") {
 			return setPhase({ ...held, notice: TEXT.paymentFailed });
@@ -140,14 +132,10 @@ export function useShopper(
 		fail(confirmed.error);
 	};
 
-	const check = async (raw: string) => {
-		const name = cleanUser(raw);
-		if (name === undefined)
-			return setPhase({ kind: "message", text: TEXT.invalidUser });
+	const check = async () => {
 		stop();
-		user.current = name;
 		setPhase({ kind: "busy", action: "check", text: TEXT.checking });
-		const outcome = await client.outcome(saleId, name);
+		const outcome = await client.outcome(saleId);
 		if (outcome.isErr()) return fail(outcome.error);
 		const found = outcome.value;
 		if (found.state === "purchased") return setPhase({ kind: "purchased" });

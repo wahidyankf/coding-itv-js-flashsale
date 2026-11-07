@@ -5,6 +5,7 @@ import type { SaleView } from "./types";
 const ENV = { FLASH_BE_URL: "http://flash-be.test" };
 const SALE: SaleView = {
 	id: "s1",
+	productId: "p1",
 	name: "Drop",
 	status: "active",
 	startsAt: "2026-06-01T11:00:00.000Z",

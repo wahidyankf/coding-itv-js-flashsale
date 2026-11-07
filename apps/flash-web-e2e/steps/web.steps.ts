@@ -70,6 +70,9 @@ Given(
 async function openPage(page: Page): Promise<void> {
 	await connectWebServer();
 	await page.goto("/");
+	// A sale page first asks who is logged in. The scenario goes on once it knows, so that what the scenario does next
+	// (a login that ends, a press of a button) is not mixed up with that first question.
+	await expect(page.getByText("Checking your login…")).toHaveCount(0);
 }
 
 When("a visitor opens the home page", async ({ page }) => {
