@@ -217,6 +217,7 @@ function setupOf(h: Harness, webFetch: typeof fetch) {
 		},
 		hasBought: (user: string) => h.backend.giveItem(user),
 		holds: (user: string) => h.backend.giveHold(user),
+		purchaseIdOf: (user: string) => h.backend.purchaseIdOf(user),
 		writeLimit: (count: number) => {
 			h.backend.settings.writesPerUser = count;
 		},

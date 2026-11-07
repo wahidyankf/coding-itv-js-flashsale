@@ -1,16 +1,19 @@
-// Unit tests for the rules of the buying card: the hold's countdown, the sentence under the buttons, and which buttons work.
+// Unit tests for the rules of the buying card: the hold's countdown, the sentence under the buttons, the purchase's id line,
+// and which buttons work.
 import { describe, expect, it } from "vitest";
 import { TEXT, waitingText } from "./messages";
 import {
 	holdingPhase,
 	type Phase,
 	phaseText,
+	purchaseIdText,
 	secondsLeft,
 	shopperFlags,
 } from "./shopper-state";
 
 const EXPIRES = "2026-06-01T12:02:00Z";
 const EXPIRES_MS = Date.parse(EXPIRES);
+const PURCHASE_ID = "5d1f0c8e-3b7a-4c2e-9f61-0a8d2e4b7c10";
 const HOLD: Phase = {
 	kind: "holding",
 	reservationId: "r1",
@@ -64,13 +67,28 @@ describe("phaseText", () => {
 	});
 
 	it("says the purchase is confirmed", () => {
-		expect(phaseText({ kind: "purchased" }, 0)).toBe(TEXT.purchased);
+		expect(phaseText({ kind: "purchased", purchaseId: PURCHASE_ID }, 0)).toBe(
+			TEXT.purchased,
+		);
 	});
 
 	it("shows the result the shopper moves on from", () => {
 		expect(phaseText({ kind: "result", text: TEXT.nothing }, 0)).toBe(
 			TEXT.nothing,
 		);
+	});
+});
+
+describe("purchaseIdText", () => {
+	it("shows the id of a confirmed purchase under the Purchase ID label", () => {
+		expect(purchaseIdText({ kind: "purchased", purchaseId: PURCHASE_ID })).toBe(
+			`Purchase ID: ${PURCHASE_ID}`,
+		);
+	});
+
+	it("shows no purchase id while an item is held or nothing is bought", () => {
+		expect(purchaseIdText(HOLD)).toBeUndefined();
+		expect(purchaseIdText({ kind: "idle" })).toBeUndefined();
 	});
 });
 

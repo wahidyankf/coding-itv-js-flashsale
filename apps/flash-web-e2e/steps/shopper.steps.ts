@@ -6,7 +6,11 @@ import type { APIRequestContext } from "@playwright/test";
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { TICKET_HEADER } from "../../flash-be-e2e/steps/support/api.js";
-import { E2E_PASSWORD } from "../../flash-be-e2e/steps/support/auth.js";
+import {
+	E2E_PASSWORD,
+	usernameKey,
+} from "../../flash-be-e2e/steps/support/auth.js";
+import { query } from "../../flash-be-e2e/steps/support/database.js";
 import { pollUntilAdmitted } from "../../flash-be-e2e/steps/support/shoppers.js";
 import { currentSaleId } from "../../flash-be-e2e/steps/support/world.js";
 import { getJson, postJson, salePath } from "./support/api.js";
@@ -145,6 +149,25 @@ Then(
 	/^the page shows the status "([^"]+)"$/,
 	async ({ page }, label: string) => {
 		await expect(page.getByText(`Status: ${label}`)).toBeVisible();
+	},
+);
+
+// The id of the purchase the shopper made in this sale, read from the scenario's own database: the page is checked against
+// the id flash-be really wrote, not against one the test made up.
+Then(
+	/^the page shows the Purchase ID of "([^"]+)"'s purchase$/,
+	async ({ page }, name: string) => {
+		const rows = await query<{ id: string }>(
+			`select purchases.id from purchases
+			 join users on users.id = purchases.user_id
+			 where purchases.sale_id = $1 and users.username = $2
+			   and purchases.deleted_at is null and users.deleted_at is null`,
+			[currentSaleId(), usernameKey(name)],
+		);
+		expect(rows.length, `${name} has no purchase in this sale`).toBe(1);
+		await expect(page.locator("body")).toContainText(
+			`Purchase ID: ${rows[0]?.id}`,
+		);
 	},
 );
 

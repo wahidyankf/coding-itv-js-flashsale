@@ -36,6 +36,8 @@ export type WebWorld = {
 	holdsLastItem: (user: string) => void;
 	hasBought: (user: string) => void;
 	holds: (user: string) => void;
+	// The id flash-be gave the shopper's purchase, or undefined when the shopper has bought nothing.
+	purchaseIdOf: (user: string) => string | undefined;
 	writeLimit: (count: number) => void;
 	paymentDeclines: () => void;
 	holdSeconds: (seconds: number) => void;

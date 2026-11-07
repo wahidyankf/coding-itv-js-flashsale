@@ -275,6 +275,7 @@ function setupOf(h: Harness, browserFetch: typeof fetch) {
 		holdsLastItem: (user: string) => h.backend.giveHold(user),
 		hasBought: (user: string) => h.backend.giveItem(user),
 		holds: (user: string) => h.backend.giveHold(user),
+		purchaseIdOf: (user: string) => h.backend.purchaseIdOf(user),
 		writeLimit: (count: number) => {
 			h.backend.settings.writesPerUser = count;
 		},

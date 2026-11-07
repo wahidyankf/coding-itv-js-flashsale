@@ -9,6 +9,7 @@ import {
 	holdingPhase,
 	type Phase,
 	phaseText,
+	purchasedPhase,
 	secondsLeft,
 } from "./shopper-state";
 import type { Place, SaleStatus } from "./types";
@@ -72,6 +73,20 @@ function useLineEnd(
 	}, [waiting, saleStatus, stop, showResult, describeError]);
 }
 
+// When the login goes, whatever the shopper was doing stops and the page goes back to idle. `setPhase` must be stable,
+// as the state setter is, or the effect would run on every render.
+function useLoginEnd(
+	loggedIn: boolean,
+	stop: () => void,
+	setPhase: (phase: Phase) => void,
+) {
+	useEffect(() => {
+		if (loggedIn) return;
+		stop();
+		setPhase({ kind: "idle" });
+	}, [loggedIn, stop, setPhase]);
+}
+
 // The shopper's phase and the requests that move it on. `text` is the sentence under the buttons.
 export function useShopper({
 	saleId,
@@ -90,11 +105,7 @@ export function useShopper({
 		stopWatching.current = () => {};
 	}, []);
 	useEffect(() => stop, [stop]);
-	useEffect(() => {
-		if (loggedIn) return;
-		stop();
-		setPhase({ kind: "idle" });
-	}, [loggedIn, stop]);
+	useLoginEnd(loggedIn, stop, setPhase);
 
 	// A result is a sentence the shopper reads and moves on from. Every ending of a request shows one this way.
 	const showResult = useCallback(
@@ -162,7 +173,8 @@ export function useShopper({
 		const held = phase;
 		showBusy("confirm", TEXT.paying);
 		const confirmed = await client.confirm(saleId, held.reservationId);
-		if (confirmed.isOk()) return setPhase({ kind: "purchased" });
+		if (confirmed.isOk())
+			return setPhase(purchasedPhase(confirmed.value.purchaseId));
 		// A failed payment keeps the item held, so the shopper can try the payment again.
 		if (confirmed.error.errorCode === "payment_failed") {
 			return setPhase({ ...held, notice: TEXT.paymentFailed });
@@ -176,7 +188,8 @@ export function useShopper({
 		const outcome = await client.outcome(saleId);
 		if (outcome.isErr()) return fail(outcome.error);
 		const found = outcome.value;
-		if (found.state === "purchased") return setPhase({ kind: "purchased" });
+		if (found.state === "purchased")
+			return setPhase(purchasedPhase(found.purchaseId));
 		if (found.state === "holding") {
 			return enterHolding(found.reservationId, found.expiresAt);
 		}

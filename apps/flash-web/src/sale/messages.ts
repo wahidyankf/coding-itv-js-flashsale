@@ -32,6 +32,8 @@ export const TEXT = {
 	paying: "Paying…",
 	checking: "Checking…",
 	purchased: "You got it! Your purchase is confirmed.",
+	// The label of the purchase's id, shown under the sentence once the purchase is confirmed.
+	purchaseId: "Purchase ID",
 	holdEnded: "Your hold has ended. Press Buy Now to try again.",
 	nothing: "You have no purchase and no hold.",
 	placeLost: "Your place was lost. Press Buy Now to join again.",

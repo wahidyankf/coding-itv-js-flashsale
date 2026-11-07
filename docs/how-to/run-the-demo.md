@@ -27,7 +27,8 @@ Both show **On sale** and **Items left: 3**.
 
 1. In the first window, choose **I am new**, sign up as `ana` with the password `a long password`, and press
    **Buy Now**. The page says **An item is held for you. Confirm within 60 seconds.** and counts down.
-2. Press **Confirm purchase**. The page says **You got it! Your purchase is confirmed.**
+2. Press **Confirm purchase**. The page says **You got it! Your purchase is confirmed.** and shows the **Purchase ID**.
+   **Check my status** shows the same ID after a reload.
 3. Point at the second window: **Items left** went to 2 without a reload. The page follows a Server-Sent Events stream.
 4. Press **Buy Now** again in the first window: **You already bought an item.**
 

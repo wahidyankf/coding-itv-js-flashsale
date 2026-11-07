@@ -42,6 +42,16 @@ export function pageSays(world: WebWorld) {
 	return async (_ctx: unknown, text: string) => world.expectPageSays(text);
 }
 
+// The body of "the page shows the Purchase ID of {name}'s purchase": the page shows "Purchase ID: <id>" with the id flash-be
+// gave that shopper's purchase. The id is read from the fake, so a page with another id fails.
+export function showsPurchaseId(world: WebWorld, name: string) {
+	return async () => {
+		const id = world.purchaseIdOf(name);
+		if (id === undefined) throw new Error(`${name} has no purchase to show`);
+		await world.expectPageSays(`Purchase ID: ${id}`);
+	};
+}
+
 // The body of "{string} is logged in": the browser holds a login for the shopper the scenario names.
 export function isLoggedIn(world: WebWorld) {
 	return async (_ctx: unknown, name: string) => world.loggedIn(name);

@@ -26,3 +26,12 @@ Feature: Checking my status
     And she presses Check my status
     When she confirms the purchase
     Then the page says "You got it! Your purchase is confirmed."
+
+  Scenario: A shopper who bought sees the Purchase ID after checking
+    Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
+    And "ana" has bought an item
+    And "ana" is logged in
+    And a visitor has the page open
+    When she presses Check my status
+    Then the page says "You got it! Your purchase is confirmed."
+    And the page shows the Purchase ID of "ana"'s purchase

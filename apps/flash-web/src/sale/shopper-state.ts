@@ -22,12 +22,17 @@ export type Phase =
 			// Set when a payment failed: the item is still held, and the reason stays on screen with it.
 			notice?: string;
 	  }
-	| { kind: "purchased" }
+	| { kind: "purchased"; purchaseId: string }
 	| { kind: "result"; text: string };
 
 // The phase of a hold the server just gave. The server sends the time as text; the page counts in milliseconds.
 export function holdingPhase(reservationId: string, expiresAt: string): Phase {
 	return { kind: "holding", reservationId, expiresAt: Date.parse(expiresAt) };
+}
+
+// The phase of a confirmed purchase. The id is kept, so the page can show it under the sentence.
+export function purchasedPhase(purchaseId: string): Phase {
+	return { kind: "purchased", purchaseId };
 }
 
 // Whole seconds left on a hold, rounded up so the page never shows 0 while time is left. Zero when nothing is held.
@@ -52,6 +57,14 @@ export function phaseText(phase: Phase, seconds: number): string {
 		case "result":
 			return phase.text;
 	}
+}
+
+// The line that carries the id of the shopper's purchase under the sentence. Only a purchase has an id, so every other phase
+// has no line.
+export function purchaseIdText(phase: Phase): string | undefined {
+	return phase.kind === "purchased"
+		? `${TEXT.purchaseId}: ${phase.purchaseId}`
+		: undefined;
 }
 
 // What the buttons show and allow. `action` is the button that was pressed, if one is still working.

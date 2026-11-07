@@ -22,7 +22,7 @@ src/
   decode-report.ts   reports a reply or stream event that failed to decode: where, which field, what was expected
   sale-page.tsx      the page itself: where the sale and the account meet
   sale/              everything about the sale and buying
-    shopper-state.ts   the rules of the buying card as pure functions (phase, countdown, text, which buttons work)
+    shopper-state.ts   the rules of the buying card as pure functions (phase, countdown, text, Purchase ID line, which buttons work)
     use-shopper.ts     the hook that makes the requests and runs the effects
     messages.ts        the sale's words (TEXT) and its error sentences
     client.ts, sse.ts  the sale's calls and the live streams

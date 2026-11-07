@@ -21,5 +21,10 @@ describeFeature(
 			"A shopper who holds an item can confirm after checking",
 			steps.confirmsAfterChecking,
 		);
+
+		Scenario(
+			"A shopper who bought sees the Purchase ID after checking",
+			steps.seesPurchaseId,
+		);
 	},
 );

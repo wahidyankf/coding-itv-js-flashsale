@@ -12,6 +12,7 @@ import {
 	pressBuyNow,
 	SALE_10,
 	type ScenarioBinder,
+	showsPurchaseId,
 	visitorOpensPage,
 } from "./web-steps";
 import type { WebWorld } from "./web-world";
@@ -37,6 +38,10 @@ function buysItem(world: WebWorld): ScenarioBinder {
 		When("she confirms the purchase", confirmsPurchase(world));
 		Then('the page says "You got it! Your purchase is confirmed."', async () =>
 			world.expectPageSays("You got it! Your purchase is confirmed."),
+		);
+		And(
+			'the page shows the Purchase ID of "ana"\'s purchase',
+			showsPurchaseId(world, "ana"),
 		);
 		And("the page shows {int} items left", async (_ctx, left: number) =>
 			world.expectPageSays(`Items left: ${left}`),

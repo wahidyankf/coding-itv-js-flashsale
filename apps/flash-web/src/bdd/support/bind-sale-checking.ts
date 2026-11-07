@@ -9,6 +9,7 @@ import {
 	pageSays,
 	SALE_10,
 	type ScenarioBinder,
+	showsPurchaseId,
 	visitorOpensPage,
 } from "./web-steps";
 import type { WebWorld } from "./web-world";
@@ -43,10 +44,27 @@ function confirmsAfterChecking(world: WebWorld): ScenarioBinder {
 	};
 }
 
+// A shopper who bought an item sees the Purchase ID once the status check says the purchase is confirmed.
+function seesPurchaseId(world: WebWorld): ScenarioBinder {
+	return ({ Given, And, When, Then }) => {
+		Given(SALE_10, openTenSale(world));
+		And('"ana" has bought an item', () => world.hasBought("ana"));
+		And("{string} is logged in", isLoggedIn(world));
+		And("a visitor has the page open", visitorOpensPage(world));
+		When("she presses Check my status", async () => world.pressCheck());
+		Then("the page says {string}", pageSays(world));
+		And(
+			'the page shows the Purchase ID of "ana"\'s purchase',
+			showsPurchaseId(world, "ana"),
+		);
+	};
+}
+
 // The steps of each scenario in the checking feature, by the scenario's name in the layer's test file.
 export function bindSaleChecking(world: WebWorld) {
 	return {
 		checksOutcome: checksOutcome(world),
 		confirmsAfterChecking: confirmsAfterChecking(world),
+		seesPurchaseId: seesPurchaseId(world),
 	};
 }

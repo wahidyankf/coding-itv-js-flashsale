@@ -132,6 +132,7 @@ export function createFakeBackend(now: () => number) {
 		view: () => viewOf(state),
 		placeOf: (user: string) => placeOf(state, user),
 		hasSale: () => state.sale !== undefined,
+		purchaseIdOf: (user: string) => state.bought.get(user)?.purchaseId,
 		// The API. `path` is the path of the contract, such as `/sales/current`.
 		handle(
 			method: string,

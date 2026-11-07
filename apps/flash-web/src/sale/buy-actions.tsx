@@ -1,6 +1,6 @@
 // The buying card for a shopper who is logged in: Buy Now, Check my status, Confirm purchase, and the sentence that says
-// what is happening. The state comes in as props, and the buttons only report presses. Each button's spinner marks the
-// request it started, so the shopper can see which one is working.
+// what is happening, and the Purchase ID once a purchase is confirmed. The state comes in as props, and the buttons only
+// report presses. Each button's spinner marks the request it started, so the shopper can see which one is working.
 import type { FormEvent } from "react";
 import { Spinner } from "../components/spinner";
 import {
@@ -11,7 +11,7 @@ import {
 	TONE,
 } from "../components/ui";
 import { TEXT } from "./messages";
-import { type Phase, shopperFlags } from "./shopper-state";
+import { type Phase, purchaseIdText, shopperFlags } from "./shopper-state";
 import type { SaleStatus } from "./types";
 
 // The sentence's colour follows the phase: a hold and a purchase are the two calm highlights, everything else is plain.
@@ -46,6 +46,8 @@ export function BuyActions({
 	onConfirm,
 }: BuyActionsProps) {
 	const { busy, buying, canBuy, action } = shopperFlags(phase, saleStatus);
+	// The id is shown in full, with no copy button, so the shopper can note it down.
+	const purchase = purchaseIdText(phase);
 	// Enter in a form submits it, so the form checks the same rule as the button before it buys.
 	const submit = (event: FormEvent) => {
 		event.preventDefault();
@@ -100,6 +102,9 @@ export function BuyActions({
 					<span className="mt-1 block text-xs opacity-80">
 						{TEXT.waitingHint}
 					</span>
+				)}
+				{purchase && (
+					<span className="mt-1 block break-all font-mono">{purchase}</span>
 				)}
 			</p>
 		</>

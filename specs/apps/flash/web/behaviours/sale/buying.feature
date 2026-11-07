@@ -13,6 +13,7 @@ Feature: Buying the item
     And the "Confirm purchase" button is enabled
     When she confirms the purchase
     Then the page says "You got it! Your purchase is confirmed."
+    And the page shows the Purchase ID of "ana"'s purchase
     And the page shows 9 items left
 
   Scenario: A waiting shopper sees their place

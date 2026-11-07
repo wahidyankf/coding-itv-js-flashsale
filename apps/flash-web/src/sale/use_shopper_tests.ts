@@ -1,4 +1,5 @@
-// Unit tests for the shopper hook: what it does when there is nothing to confirm, and when the login goes.
+// Unit tests for the shopper hook: what it does when there is nothing to confirm, when the login goes, and which purchase
+// id it keeps once a purchase is confirmed or found.
 import { Err, Ok } from "@flash/typekit";
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
@@ -8,6 +9,9 @@ import { useShopper } from "./use-shopper";
 // The sentence the page gives for a code. The real sentences are tested in error_text_tests.ts; this hook only shows what it
 // is given.
 const describeError = (code: string) => `the page says ${code}`;
+// A fixed clock, before the hold's expiry, so the countdown does not end the hold during a test.
+const NOW = Date.parse("2026-06-01T12:00:00Z");
+const EXPIRES = "2026-06-01T12:02:00Z";
 
 describe("useShopper", () => {
 	it("does not confirm when nothing is held", async () => {
@@ -105,5 +109,73 @@ describe("useShopper", () => {
 		);
 		await act(async () => result.current.buy());
 		expect(onLiveStopped).toHaveBeenCalledOnce();
+	});
+
+	it("keeps the id of the purchase the payment confirms", async () => {
+		const client = {
+			join: vi.fn(
+				async () => new Ok({ userId: "ana", ticket: "t1", state: "admitted" }),
+			),
+			reserve: vi.fn(
+				async () =>
+					new Ok({ userId: "ana", reservationId: "r1", expiresAt: EXPIRES }),
+			),
+			confirm: vi.fn(
+				async () =>
+					new Ok({
+						userId: "ana",
+						purchaseId: "p1",
+						reservationId: "r1",
+						purchasedAt: "2026-06-01T12:01:00Z",
+					}),
+			),
+		} as unknown as SaleClient;
+		const { result } = renderHook(() =>
+			useShopper({
+				saleId: "sale-1",
+				saleStatus: "active",
+				client,
+				loggedIn: true,
+				onLiveStopped: () => {},
+				now: () => NOW,
+				describeError,
+			}),
+		);
+		await act(async () => result.current.buy());
+		await act(async () => result.current.confirm());
+		expect(result.current.phase).toEqual({
+			kind: "purchased",
+			purchaseId: "p1",
+		});
+	});
+
+	it("keeps the id of the purchase a status check finds", async () => {
+		const client = {
+			outcome: vi.fn(
+				async () =>
+					new Ok({
+						userId: "ana",
+						state: "purchased",
+						purchaseId: "p1",
+						reservationId: "r1",
+						purchasedAt: "2026-06-01T12:01:00Z",
+					}),
+			),
+		} as unknown as SaleClient;
+		const { result } = renderHook(() =>
+			useShopper({
+				saleId: "sale-1",
+				saleStatus: "active",
+				client,
+				loggedIn: true,
+				onLiveStopped: () => {},
+				describeError,
+			}),
+		);
+		await act(async () => result.current.check());
+		expect(result.current.phase).toEqual({
+			kind: "purchased",
+			purchaseId: "p1",
+		});
 	});
 });
