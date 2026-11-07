@@ -7,6 +7,7 @@ import { pipeSockets } from "../../../flash-be-e2e/steps/support/relay.js";
 
 // The fixed port of the forwarder. The web server is started once with FLASH_BE_URL pointing here.
 export const FORWARDER_PORT = 18082;
+// The address the web server is started with (FLASH_BE_URL), so every API call of the page goes through the forwarder.
 export const FORWARDER_URL = `http://127.0.0.1:${FORWARDER_PORT}`;
 
 type Mode =

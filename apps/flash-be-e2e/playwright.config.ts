@@ -1,3 +1,4 @@
+// Playwright for flash-be: the scenarios of the API specs, run against a built flash-be on its own port.
 import { defineConfig } from "@playwright/test";
 import { defineBddConfig } from "playwright-bdd";
 

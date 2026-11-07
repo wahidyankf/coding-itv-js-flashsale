@@ -8,9 +8,9 @@ import { bodyOf, routes, send } from "./support/api.js";
 import { createSale, patchSale } from "./support/operator.js";
 import { E2E_REDIS_URL, withRedis } from "./support/processes.js";
 import { currentResponse } from "./support/response.js";
-import { check, join, shoppers } from "./support/shoppers.js";
+import { checkPlace, join, shoppers } from "./support/shoppers.js";
 import { pollUntil, relativeTime, sleep } from "./support/time.js";
-import { world } from "./support/world.js";
+import { currentSaleId } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
 
@@ -30,7 +30,7 @@ Given(
 Given(
 	/^the sale admits (\d+) users per second$/,
 	async ({ request }, rate: string) => {
-		await patchSale(request, world.saleId ?? "", {
+		await patchSale(request, currentSaleId(), {
 			admitPerSecond: Number(rate),
 		});
 	},
@@ -72,7 +72,7 @@ When("admission runs once", async ({ request }) => {
 	const sale = await bodyOf(
 		routes.sale,
 		await send(request, routes.sale, {
-			params: { saleId: world.saleId ?? "" },
+			params: { saleId: currentSaleId() },
 		}),
 	);
 	const first = shoppers().joined[0];
@@ -82,8 +82,8 @@ When("admission runs once", async ({ request }) => {
 	}
 	await pollUntil(
 		async () =>
-			(await check(request, first, shoppers().tickets.get(first)))?.state ===
-			"admitted",
+			(await checkPlace(request, first, shoppers().tickets.get(first)))
+				?.state === "admitted",
 		{
 			withinMs: 5000,
 			everyMs: 25,
@@ -95,14 +95,14 @@ When("admission runs once", async ({ request }) => {
 When(
 	/^"([^"]+)" checks the queue with their ticket$/,
 	async ({ request }, user: string) => {
-		await check(request, user, shoppers().tickets.get(user));
+		await checkPlace(request, user, shoppers().tickets.get(user));
 	},
 );
 
 When(
 	/^"([^"]+)" checks the queue with a wrong ticket$/,
 	async ({ request }, user: string) => {
-		await check(request, user, "not-the-ticket");
+		await checkPlace(request, user, "not-the-ticket");
 	},
 );
 
@@ -124,7 +124,7 @@ Then(
 Then(
 	/^the place in line of "([^"]+)" is (\d+)$/,
 	async ({ request }, user: string, place: string) => {
-		const body = await check(request, user, shoppers().tickets.get(user));
+		const body = await checkPlace(request, user, shoppers().tickets.get(user));
 		expect(body?.state === "waiting" ? body.place : undefined).toBe(
 			Number(place),
 		);
@@ -141,14 +141,14 @@ Then(
 );
 
 Then(/^"([^"]+)" is admitted$/, async ({ request }, user: string) => {
-	const body = await check(request, user, shoppers().tickets.get(user));
+	const body = await checkPlace(request, user, shoppers().tickets.get(user));
 	expect(body?.state).toBe("admitted");
 });
 
 Then(
 	/^"([^"]+)" is waiting at place (\d+)$/,
 	async ({ request }, user: string, place: string) => {
-		const body = await check(request, user, shoppers().tickets.get(user));
+		const body = await checkPlace(request, user, shoppers().tickets.get(user));
 		expect(body).toMatchObject({ state: "waiting", place: Number(place) });
 	},
 );

@@ -1,11 +1,11 @@
 // The HTTP helpers of the web e2e steps: the path of a sale, and the calls made with the Playwright request context or with
 // fetch. The ticket header is not repeated here; it is defined once, in flash-be-e2e's support/api.ts.
+// Decision: docs/explanation/decisions/016-dry-rule-of-three.md (the e2e apps write the paths themselves).
 
 import type { APIRequestContext } from "@playwright/test";
 
 // The path of a sale on the API, as the routes write it.
-export const salePath = (saleId: string | undefined) =>
-	`/sales/${saleId ?? ""}`;
+export const salePath = (saleId: string) => `/sales/${saleId}`;
 
 // A JSON POST with the Playwright request context. The body is sent as JSON, with the headers given.
 export const postJson = (

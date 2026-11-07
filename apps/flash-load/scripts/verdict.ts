@@ -1,5 +1,6 @@
 // The verdict of a run: each check with what it expects and what it saw. The rules are in specs/apps/flash/load/checks.md
 // and limits.md. This file only compares facts, so it does no I/O and the checks can be read on their own.
+// Decision: docs/explanation/decisions/012-load-verdict-from-the-data.md (the pass or fail comes from the data, not from k6).
 import { LIMITS, type Profile } from "../k6/profiles.ts";
 import type { K6Facts, PostgresFacts, RunFacts } from "./collect.ts";
 
@@ -105,9 +106,12 @@ function speedRows(k6: K6Facts): Row[] {
 	];
 }
 
-// A timing as the report shows it, in milliseconds with one decimal. A timing k6 did not measure reads "undefined".
+// The words for a timing k6 did not measure. The report shows them in place of a number.
+const NOT_MEASURED = "not measured";
+
+// A timing as the report shows it, in milliseconds with one decimal. A timing k6 did not measure reads "not measured".
 export function formatMs(value: number | undefined): string {
-	return `${value?.toFixed(1)} ms`;
+	return value === undefined ? NOT_MEASURED : `${value.toFixed(1)} ms`;
 }
 
 // A timed value passes when it is under the limit. A value k6 did not measure fails.

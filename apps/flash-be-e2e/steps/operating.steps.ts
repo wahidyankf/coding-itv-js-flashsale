@@ -22,7 +22,7 @@ import {
 	waitUntilAdmitted,
 } from "./support/shoppers.js";
 import { windowFromNow } from "./support/time.js";
-import { world } from "./support/world.js";
+import { currentSaleId, world } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
 
@@ -63,7 +63,6 @@ async function operate(
 	what: string,
 ) {
 	const headers = await senderHeaders(request, sender);
-	const saleId = world.saleId ?? "";
 	const phrase = `${verb} ${what}`;
 	const change =
 		/^changes that sale to stock (\d+)(?: and a hold time of (\d+) seconds)?$/.exec(
@@ -74,7 +73,7 @@ async function operate(
 	if (change) {
 		setResponse(
 			await send(request, routes.updateSale, {
-				params: { saleId },
+				params: { saleId: currentSaleId() },
 				headers,
 				body: givenFields({
 					stock: Number(change[1]),
@@ -89,7 +88,7 @@ async function operate(
 		);
 		setResponse(
 			await send(request, routes.updateSale, {
-				params: { saleId },
+				params: { saleId: currentSaleId() },
 				headers,
 				body: {
 					startsAt: startsAt.toISOString(),
@@ -99,7 +98,10 @@ async function operate(
 		);
 	} else if (phrase === "removes that sale") {
 		setResponse(
-			await send(request, routes.removeSale, { params: { saleId }, headers }),
+			await send(request, routes.removeSale, {
+				params: { saleId: currentSaleId() },
+				headers,
+			}),
 		);
 	} else if (phrase === "lists the sales") {
 		setResponse(await send(request, routes.listSales, { headers }));
@@ -135,7 +137,7 @@ Then(
 		const sale = await bodyOf(
 			routes.sale,
 			await send(request, routes.sale, {
-				params: { saleId: world.saleId ?? "" },
+				params: { saleId: currentSaleId() },
 			}),
 		);
 		expect(sale).toMatchObject({

@@ -1,6 +1,7 @@
 // The bodies of the private API as the steps read them. They are written by hand: a step only reads the fields it checks,
 // so these types list those fields and no more.
 
+// The public view of a sale. A step reads the fields it checks; the API may send more.
 export type SaleView = {
 	id: string;
 	productId: string;
@@ -29,14 +30,17 @@ export type PlaceView = { userId: string } & (
 	| { state: "absent" }
 );
 
+// The answer to joining a queue: the place and the ticket that proves it.
 export type JoinedView = PlaceView & { ticket: string };
 
+// A hold on an item and when it runs out.
 export type ReservedView = {
 	userId: string;
 	reservationId: string;
 	expiresAt: string;
 };
 
+// A completed purchase.
 export type PurchaseView = {
 	userId: string;
 	purchaseId: string;
@@ -44,11 +48,13 @@ export type PurchaseView = {
 	purchasedAt: string;
 };
 
+// What a shopper's outcome in a sale is: bought, holding an item, or neither.
 export type OutcomeView =
 	| (PurchaseView & { state: "purchased" })
 	| (ReservedView & { state: "holding" })
 	| { userId: string; state: "none" };
 
+// One event of a live stream, with the data it carries.
 export type StreamEvent =
 	| { event: "sale"; data: SaleView }
 	| { event: "place"; data: PlaceView };

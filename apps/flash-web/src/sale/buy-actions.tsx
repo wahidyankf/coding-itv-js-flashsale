@@ -28,6 +28,8 @@ export type BuyActionsProps = {
 	saleStatus: SaleStatus;
 	// The sentence under the buttons, already worked out from the phase.
 	text: string;
+	// True once the live updates have stopped. The waiting hint then goes, because it says the page updates by itself.
+	liveStopped: boolean;
 	onBuy: () => void;
 	onCheck: () => void;
 	onConfirm: () => void;
@@ -38,6 +40,7 @@ export function BuyActions({
 	phase,
 	saleStatus,
 	text,
+	liveStopped,
 	onBuy,
 	onCheck,
 	onConfirm,
@@ -93,7 +96,7 @@ export function BuyActions({
 					)}
 					<span>{text}</span>
 				</span>
-				{phase.kind === "waiting" && (
+				{phase.kind === "waiting" && !liveStopped && (
 					<span className="mt-1 block text-xs opacity-80">
 						{TEXT.waitingHint}
 					</span>

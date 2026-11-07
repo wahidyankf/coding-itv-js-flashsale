@@ -31,10 +31,28 @@
 				}
 			]
 		},
+		"test:unit": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "npm run test:unit",
+				"cwd": "apps/flash-load"
+			}
+		},
+		"test:unit:watch": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "npm run test:unit:watch",
+				"cwd": "apps/flash-load"
+			}
+		},
 		"test:quick": {
 			"executor": "nx:run-commands",
 			"options": {
-				"commands": ["npx nx typecheck flash-load", "npx nx lint flash-load"],
+				"commands": [
+					"npx nx typecheck flash-load",
+					"npx nx lint flash-load",
+					"npx nx test:unit flash-load"
+				],
 				"cwd": ".",
 				"parallel": false
 			}
@@ -42,7 +60,7 @@
 		"test:quick:watch": {
 			"executor": "nx:run-commands",
 			"options": {
-				"command": "npx nx watch --projects=flash-load --initialRun -- npx nx run-many -t typecheck lint -p flash-load --output-style=stream",
+				"command": "npx nx watch --projects=flash-load --initialRun -- npx nx run-many -t typecheck lint test:unit -p flash-load --output-style=stream",
 				"cwd": "."
 			}
 		},

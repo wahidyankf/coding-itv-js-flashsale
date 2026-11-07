@@ -18,7 +18,7 @@ import {
 	waitUntilAdmitted,
 } from "./support/shoppers.js";
 import { sleep } from "./support/time.js";
-import { world } from "./support/world.js";
+import { currentSaleId } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
 
@@ -58,7 +58,7 @@ Given(
 Given(
 	/^the hold time of the sale is (\d+) seconds?$/,
 	async ({ request }, seconds: string) => {
-		await patchSale(request, world.saleId ?? "", {
+		await patchSale(request, currentSaleId(), {
 			holdSeconds: Number(seconds),
 		});
 	},
@@ -73,7 +73,7 @@ Given(
 	async ({ request: _request }) => {
 		const names = ["ready", "buyers", "holds", "ids", "rebuild-lock"];
 		await withRedis(E2E_REDIS_URL, (redis) =>
-			redis.del(names.map((name) => `sale:${world.saleId}:${name}`)),
+			redis.del(names.map((name) => `sale:${currentSaleId()}:${name}`)),
 		);
 	},
 );

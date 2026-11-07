@@ -365,6 +365,12 @@ function expectationsOf(h: Harness) {
 				}
 			}, WAIT);
 		},
+		// The page has already said what it shows next (a step before this one waits for it), so the text is read as it is.
+		async expectPageNotSays(text: string) {
+			if (document.body.textContent?.includes(text)) {
+				throw new Error(`the page still says "${text}"`);
+			}
+		},
 		async expectNoButton(name: string) {
 			await waitFor(() => {
 				if (screen.queryByRole("button", { name })) {

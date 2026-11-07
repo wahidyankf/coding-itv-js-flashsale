@@ -1,3 +1,5 @@
+// Playwright for flash-web: the scenarios of the web specs, run against production builds of flash-web and flash-be. The
+// web server reaches flash-be through the forwarder, so a scenario can cut or change the API.
 import { defineConfig, devices } from "@playwright/test";
 import { defineBddConfig } from "playwright-bdd";
 import { FORWARDER_URL } from "./steps/support/forwarder.js";

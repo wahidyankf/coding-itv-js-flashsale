@@ -33,14 +33,31 @@ export function sleep(ms: number): Promise<void> {
 	return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
+// How many checks fit in `window` when each wait is, on average, half of its backoff bound (full jitter draws a wait
+// uniformly below the bound). The backoff starts at `everyMs` and doubles up to the cap, as retryAsync computes it.
+function checksFor(window: number, everyMs: number): number {
+	let checks = 1;
+	let spent = 0;
+	let bound = Math.min(POLL_CAP_MS, everyMs);
+	while (spent < window) {
+		spent += bound / 2;
+		bound = Math.min(POLL_CAP_MS, bound * 2);
+		checks += 1;
+	}
+	return checks;
+}
+
 // Calls `check` until it returns true, or until `withinMs` has passed, and then throws `failure`. The first check runs at
-// once. Each later check waits a jittered backoff that starts at `everyMs` and doubles up to a second, so a slow state
-// is not hammered. The deadline is the limit that counts: the attempt count is the number of checks `everyMs` would
-// have allowed in the window, so it never cuts a wait short while the deadline still has room.
+// once. Each later check waits a jittered backoff that starts at `everyMs` and doubles up to a second, so a slow state is
+// not hammered. The deadline is what stops the poll. The attempt count is sized from the mean wait, so in expectation the
+// attempts run out at the deadline and not before it. `everyMs` must be above 0, or the count would never grow.
 export async function pollUntil(
 	check: () => Promise<boolean>,
 	options: { withinMs: number; everyMs: number; failure: string },
 ): Promise<void> {
+	if (!(options.everyMs > 0)) {
+		throw new Error(`pollUntil needs everyMs above 0, got ${options.everyMs}`);
+	}
 	// A window that has already passed (a caller computes it from a deadline) still gets one check, as before.
 	const window = Math.max(0, options.withinMs);
 	const deadline = Date.now() + window;
@@ -53,7 +70,7 @@ export async function pollUntil(
 		{
 			baseMs: options.everyMs,
 			capMs: POLL_CAP_MS,
-			maxAttempts: Math.ceil(window / options.everyMs),
+			maxAttempts: checksFor(window, options.everyMs),
 			sleep: waitUntilDeadline,
 			random: Math.random,
 			signal: AbortSignal.timeout(window),

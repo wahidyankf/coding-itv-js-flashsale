@@ -6,6 +6,8 @@
 	"scripts": {
 		"typecheck": "tsc --noEmit -p tsconfig.json",
 		"lint": "biome lint --error-on-warnings .",
+		"test:unit": "vitest run --config vitest.config.ts",
+		"test:unit:watch": "vitest --config vitest.config.ts",
 		"load:smoke": "node scripts/run.ts smoke",
 		"load:full": "node scripts/run.ts full",
 		"load:chaos": "node scripts/run.ts chaos",

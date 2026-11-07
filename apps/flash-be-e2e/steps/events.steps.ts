@@ -11,7 +11,7 @@ import { patchSale } from "./support/operator.js";
 import { setResponse } from "./support/response.js";
 import { shoppers } from "./support/shoppers.js";
 import { openStream, type Stream } from "./support/stream.js";
-import { world } from "./support/world.js";
+import { currentSaleId, world } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
 
@@ -30,7 +30,7 @@ async function watchSale(saleId: string) {
 
 async function watchPlace(request: APIRequestContext, user: string) {
 	const built = await build(routes.placeEvents, {
-		params: { saleId: world.saleId ?? "" },
+		params: { saleId: currentSaleId() },
 		headers: {
 			cookie: await shopperCookie(request, user),
 			[TICKET_HEADER]: shoppers().tickets.get(usernameKey(user)),
@@ -45,12 +45,12 @@ async function watch(url: string, headers: Record<string, string>) {
 }
 
 Given("a client is watching the sale", async ({ request: _request }) => {
-	await watchSale(world.saleId ?? "");
+	await watchSale(currentSaleId());
 	await currentStream().next();
 });
 
 When("a client watches the sale", async ({ request: _request }) => {
-	await watchSale(world.saleId ?? "");
+	await watchSale(currentSaleId());
 });
 
 // A refusal is a plain JSON reply, so the shared status and error steps read it.
@@ -80,7 +80,7 @@ When(
 	async ({ request }, user: string) => {
 		setResponse(
 			await send(request, routes.placeEvents, {
-				params: { saleId: world.saleId ?? "" },
+				params: { saleId: currentSaleId() },
 				headers: {
 					cookie: await shopperCookie(request, user),
 					[TICKET_HEADER]: "not-the-ticket",
@@ -93,7 +93,7 @@ When(
 // The operator moves the start of a sale that has not opened. The private API admits on its own timer, so the shopper is
 // admitted within a tick.
 When("the sale opens", async ({ request }) => {
-	await patchSale(request, world.saleId ?? "", {
+	await patchSale(request, currentSaleId(), {
 		startsAt: new Date(Date.now() - MS_PER_HOUR).toISOString(),
 	});
 });

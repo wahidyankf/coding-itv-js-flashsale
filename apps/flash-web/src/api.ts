@@ -1,5 +1,5 @@
-// What the web app knows about the HTTP API of flash-be: the header names, the few statuses it acts on, the failure a
-// reply can carry, and `callApi`, the one call that turns a reply into a `Result`. Every error of the API has the shape
+// What the web app knows about the HTTP API of flash-be: the header names, the failure a reply can carry, and `callApi`,
+// the one call that turns a reply into a `Result`. Every error of the API has the shape
 // `{ errorCode, errorMessage }`, plus `retryAfterSeconds` on a rate limit.
 import { attempt, attemptAsync, Err, Ok, type Result } from "@flash/typekit";
 

@@ -100,3 +100,14 @@ export function forgetScenario(): void {
 		if (key !== "apiEnv") delete world[key];
 	}
 }
+
+// The sale the scenario is about. A step that means "the sale" reads it here, so a scenario that has not made one fails
+// with a clear message, instead of sending an empty id to the API and getting an unrelated 404.
+export function currentSaleId(): string {
+	if (world.saleId === undefined) {
+		throw new Error(
+			"no sale in this scenario: a Given step has to make one first",
+		);
+	}
+	return world.saleId;
+}

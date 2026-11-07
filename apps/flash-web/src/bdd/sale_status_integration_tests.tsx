@@ -11,6 +11,9 @@ afterAll(() => world.close());
 const SALE_WITH_3 =
 	"a sale with stock 10 and 3 sold that opens 1 hour ago and closes in 1 hour";
 
+// The sentence the page shows while it waits in line and its live updates still run.
+const WAITING_HINT = "You can keep this page open. It updates by itself.";
+
 describeFeature(
 	await loadFeature(specFile("flash/web/behaviours/sale/status.feature")),
 	({ Scenario, ScenarioOutline, BeforeEachScenario, AfterEachScenario }) => {
@@ -154,7 +157,19 @@ describeFeature(
 					openSale(world, 10, 3, "1 hour ago", "in 1 hour"),
 				);
 
+				And("the queue admits shoppers slowly", () => world.slowAdmission());
+
+				And("{string} is logged in", async (_ctx, name: string) =>
+					world.loggedIn(name),
+				);
+
 				And("a visitor has the page open", async () => world.openPage());
+
+				When("she presses Buy Now", async () => world.pressBuyNow());
+
+				And("the page says it updates by itself", async () =>
+					world.expectPageSays(WAITING_HINT),
+				);
 
 				When("the live updates keep failing", async () =>
 					world.liveUpdatesFail(),
@@ -162,6 +177,10 @@ describeFeature(
 
 				Then("the page says {string}", async (_ctx, text: string) =>
 					world.expectPageSays(text),
+				);
+
+				And("the page does not say it updates by itself", async () =>
+					world.expectPageNotSays(WAITING_HINT),
 				);
 			},
 		);

@@ -15,14 +15,22 @@ function body(...chunks: string[]): ReadableStream<Uint8Array> {
 	});
 }
 
-// A body that breaks part way through, as a dropped connection does.
-function droppedBody(): ReadableStream<Uint8Array> {
+// A body that sends the given chunks and then breaks, as a dropped connection does. It breaks only when the reader asks
+// past the last chunk: an error set earlier would discard the chunks still queued.
+function droppedBody(...chunks: string[]): ReadableStream<Uint8Array> {
+	const pending = [...chunks];
 	return new ReadableStream({
-		start(controller) {
-			controller.error(new TypeError("connection reset"));
+		pull(controller) {
+			const next = pending.shift();
+			if (next === undefined)
+				controller.error(new TypeError("connection reset"));
+			else controller.enqueue(encoder.encode(next));
 		},
 	});
 }
+
+// One frame, as flash-be sends it on connect.
+const SALE_FRAME = 'event: sale\ndata: {"n":1}\n\n';
 
 // Yields to the event loop once, without a real wait. A loop that reopens at once must still let timers run.
 const tick = (): Promise<void> =>
@@ -158,9 +166,30 @@ describe("createWatcher", () => {
 		expect(waits).toEqual([1_000, 2_000, 4_000, 8_000, 16_000, 30_000, 30_000]);
 	});
 
-	it("starts the count again once a stream has opened with 200", async () => {
-		// Seven failures, a stream that opens and ends, then eight more failures before the give-up.
-		const plan = [...busy(7), new Response(body()), ...busy(8)];
+	it.each<[string, () => ReadableStream<Uint8Array>]>([
+		["closes", () => body()],
+		["sends only a keep-alive, then closes", () => body(": keep-alive\n\n")],
+		["drops", () => droppedBody()],
+	])(
+		"gives up when every stream opens with 200 and carries no frame (%s), and waits longer each time",
+		async (_how, makeBody) => {
+			const { waits, sleep } = recordWaits();
+			const fetcher = vi.fn(async () => new Response(makeBody()));
+			const onGiveUp = vi.fn();
+			createWatcher({ fetcher, sleep, random: topOfBound })("/x", () => {}, {
+				onGiveUp,
+			});
+			await vi.waitFor(() => expect(onGiveUp).toHaveBeenCalledOnce());
+			expect(fetcher).toHaveBeenCalledTimes(8);
+			expect(waits).toEqual([
+				1_000, 2_000, 4_000, 8_000, 16_000, 30_000, 30_000,
+			]);
+		},
+	);
+
+	it("starts the count again once a stream has delivered a frame", async () => {
+		// Seven failures, a stream with a frame that ends, then eight more failures before the give-up.
+		const plan = [...busy(7), new Response(body(SALE_FRAME)), ...busy(8)];
 		const fetcher = vi.fn(
 			async () => plan.shift() ?? new Response("late", { status: 503 }),
 		);
@@ -172,21 +201,25 @@ describe("createWatcher", () => {
 		expect(fetcher).toHaveBeenCalledTimes(16);
 	});
 
-	it("reopens a stream that drops after it opened, and does not count that as a failure", async () => {
+	it("reopens a stream that drops after it delivered a frame, and does not count that as a failure", async () => {
+		const seen: unknown[] = [];
 		const plan = [
-			new Response(droppedBody()),
+			new Response(droppedBody(SALE_FRAME)),
 			new Response("gone", { status: 404 }),
 		];
 		const fetcher = vi.fn(
 			async () => plan.shift() ?? new Response("late", { status: 503 }),
 		);
 		const onGiveUp = vi.fn();
-		createWatcher({ fetcher, sleep: tick, random: noJitter })("/x", () => {}, {
-			onGiveUp,
-		});
+		createWatcher({ fetcher, sleep: tick, random: noJitter })(
+			"/x",
+			(_event, data) => seen.push(data),
+			{ onGiveUp },
+		);
 		await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
 		await tick();
 		await tick();
+		expect(seen).toEqual([{ n: 1 }]);
 		expect(onGiveUp).not.toHaveBeenCalled();
 	});
 

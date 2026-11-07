@@ -1,13 +1,12 @@
 // Steps that drive the web server from outside: the status of flash-be the web server is shown, the page a visitor opens and
 // what it says, and the plain requests a client sends to the web server. Binds home/app-router.feature,
 // home/backend-status.feature and health/liveness.feature, and the page steps the other flash-web features share. Its After
-// hook clears the reply and the scenario's connections, so a scenario starts with neither.
+// hook runs the shared cleanup, which clears the reply and the scenario's connections, so a scenario starts with neither.
 
 import type { Page } from "@playwright/test";
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import {
-	clearResponse,
 	currentResponse,
 	setResponse,
 } from "../../flash-be-e2e/steps/support/response.js";
@@ -25,9 +24,12 @@ const sharedPort = Number(process.env.FLASH_BE_PORT ?? 8080);
 
 const { Given, When, Then, After } = createBdd();
 
-// Every scenario cleans up what it started: its private flash-be, its database, and where the web server leads.
+// Playwright-bdd passes a step's fixtures as its first argument and the values the step matches after them. A step that
+// uses no fixture still takes the first argument, as `{ request: _request }`: the underscore says it is unused, and the
+// values keep their place in the list.
+
+// Every scenario cleans up what it started: its private flash-be, its database, where the web server leads, and the reply.
 After(async () => {
-	clearResponse();
 	await cleanup();
 });
 

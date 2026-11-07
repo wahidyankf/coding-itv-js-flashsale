@@ -7,7 +7,7 @@ import { createBdd } from "playwright-bdd";
 import { routes, send } from "./support/api.js";
 import { query } from "./support/database.js";
 import { currentResponse, setResponse } from "./support/response.js";
-import { setApiEnv, world } from "./support/world.js";
+import { currentSaleId, setApiEnv, world } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
 
@@ -25,7 +25,7 @@ Given("the sale reads are not cached", async ({ request: _request }) => {
 Given("a client has asked for that sale", async ({ request }) => {
 	setResponse(
 		await send(request, routes.sale, {
-			params: { saleId: world.saleId ?? "" },
+			params: { saleId: currentSaleId() },
 		}),
 	);
 });
@@ -51,7 +51,7 @@ When(
 When("a client asks for that sale again", async ({ request }) => {
 	setResponse(
 		await send(request, routes.sale, {
-			params: { saleId: world.saleId ?? "" },
+			params: { saleId: currentSaleId() },
 		}),
 	);
 });

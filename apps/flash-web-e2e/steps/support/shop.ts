@@ -25,7 +25,10 @@ import {
 	pollUntil,
 	relativeTime,
 } from "../../../flash-be-e2e/steps/support/time.js";
-import { world } from "../../../flash-be-e2e/steps/support/world.js";
+import {
+	currentSaleId,
+	world,
+} from "../../../flash-be-e2e/steps/support/world.js";
 import { fetchJson, salePath } from "./api.js";
 import { forwarder } from "./forwarder.js";
 
@@ -153,7 +156,7 @@ export async function reviseSale(change: SaleChange): Promise<void> {
 		return;
 	}
 	const api = await privateApi();
-	await operator(api, "PATCH", `/admin/sales/${world.saleId}`, {
+	await operator(api, "PATCH", `/admin/sales/${currentSaleId()}`, {
 		...givenFields({
 			holdSeconds: change.holdSeconds,
 			admitPerSecond: change.admitPerSecond,

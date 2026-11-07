@@ -1,6 +1,7 @@
 // The shapes flash-be sends for a sale and a purchase, as the JSON carries them. Dates are ISO strings. Types only: the
 // app's own shapes (the page's first load, the API's failure) live in load.ts and api.ts.
 
+// The states of a sale, as flash-be names them. The page shows each one, and only `active` lets a shopper buy.
 export type SaleStatus = "upcoming" | "active" | "sold_out" | "ended";
 
 // A sale as the API shows it. `remaining` is what is still for sale.

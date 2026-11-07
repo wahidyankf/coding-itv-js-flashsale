@@ -1,6 +1,7 @@
 // The web server's proxy: the browser's requests under /api are checked here, then passed on to flash-be, and the answer
 // is streamed back. Only the routes the browser needs get through, each with its one method, and a POST must come from
 // this site. The address of flash-be is read here, on the server, and never reaches the page.
+// Decision: docs/explanation/decisions/006-browser-talks-to-web-server-only.md.
 import { HTTP_STATUS } from "@flash/flash-commons";
 import { attempt, attemptAsync } from "@flash/typekit";
 import { RETRY_AFTER_HEADER, TICKET_HEADER } from "./api";

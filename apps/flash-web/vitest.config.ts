@@ -1,3 +1,5 @@
+// Unit tests of flash-web: plain *_tests.ts(x) beside the source, in jsdom. `test:unit` runs them, and the 99% gate in
+// vitest.coverage.config.ts counts them together with the integration tests.
 import viteReact from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 

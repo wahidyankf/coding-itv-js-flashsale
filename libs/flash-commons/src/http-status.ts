@@ -2,7 +2,7 @@
 // `404` is written once. These are HTTP's numbers, not this project's contract: which error code answers with which status
 // stays in flash-be, and the e2e and k6 oracles write the contract's codes themselves.
 
-/** The status numbers the apps act on, by name. */
+// The status numbers the apps act on, by name.
 export const HTTP_STATUS = {
 	ok: 200,
 	created: 201,
@@ -18,8 +18,8 @@ export const HTTP_STATUS = {
 	serviceUnavailable: 503,
 } as const;
 
-/** The lowest status that is an error. Every status from here up is a refusal or a failure, so `status >= this` means error. */
+// The lowest status that is an error. Every status from here up is a refusal or a failure, so `status >= this` means error.
 export const FIRST_ERROR_STATUS = HTTP_STATUS.badRequest;
 
-/** The lowest server-side error. Statuses from here up are failures of the server, not of the request. */
+// The lowest server-side error. Statuses from here up are failures of the server, not of the request.
 export const FIRST_SERVER_ERROR_STATUS = HTTP_STATUS.internalServerError;

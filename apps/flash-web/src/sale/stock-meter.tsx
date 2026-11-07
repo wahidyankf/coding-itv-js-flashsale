@@ -9,6 +9,7 @@ export function StockMeter({
 }) {
 	// From 0 to 1. A sale with no stock shows an empty bar, not a division by zero.
 	const left = stock > 0 ? Math.min(1, remaining / stock) : 0;
+	// The width follows the data, and a Tailwind class is fixed when the build runs, so this one value is set inline.
 	return (
 		<div
 			aria-hidden="true"

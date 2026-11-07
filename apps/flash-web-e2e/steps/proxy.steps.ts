@@ -10,7 +10,10 @@ import {
 	setCookiesOf,
 	setResponse,
 } from "../../flash-be-e2e/steps/support/response.js";
-import { world } from "../../flash-be-e2e/steps/support/world.js";
+import {
+	currentSaleId,
+	world,
+} from "../../flash-be-e2e/steps/support/world.js";
 import { salePath } from "./support/api.js";
 import { FORWARDER_URL } from "./support/forwarder.js";
 import { connectWebServer } from "./support/shop.js";
@@ -22,7 +25,7 @@ When("a client joins the queue through the web server", async ({ page }) => {
 	await connectWebServer();
 	// The browser reaches the API through the web server, under /api.
 	setResponse(
-		await page.request.post(`/api${salePath(world.saleId)}/queue`, {
+		await page.request.post(`/api${salePath(currentSaleId())}/queue`, {
 			data: {},
 		}),
 	);

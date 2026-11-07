@@ -1,6 +1,7 @@
 // The sentence the shopper reads for each error code the API can answer with. The account's codes are answered in
 // auth/messages.ts and the sale's in sale/messages.ts. This file joins them and adds the two codes that either can get:
-// a rate limit and a failed network call. It lives in src/ because the account and the sale both need it.
+// a rate limit and a failed network call. Only sale-page.tsx imports it, and passes it to the two hooks, so the account
+// and the sale folders never import each other.
 import { authErrorText } from "./auth/messages";
 import { saleErrorText } from "./sale/messages";
 

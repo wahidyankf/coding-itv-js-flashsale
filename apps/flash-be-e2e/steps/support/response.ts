@@ -1,6 +1,6 @@
 // The reply to the last request a scenario sent. The request steps set it and the Then steps read it, so a step never
-// has to pass a response along. flash-web-e2e clears it after each scenario. flash-be-e2e does not, so a Then that reads a
-// reply must follow a When that sent one in the same scenario.
+// has to pass a response along. cleanup.ts clears it after each scenario, and both e2e apps run that cleanup, so a Then
+// never reads the reply of an earlier scenario. A Then that reads a reply must follow a When that sent one.
 
 import type { APIResponse } from "@playwright/test";
 
@@ -17,6 +17,7 @@ export function currentResponse(): APIResponse {
 	return response;
 }
 
+// Forgets the reply. cleanup.ts calls it after each scenario, so the next scenario starts without one.
 export function clearResponse(): void {
 	response = undefined;
 }

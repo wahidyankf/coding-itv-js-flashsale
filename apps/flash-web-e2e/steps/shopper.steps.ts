@@ -7,7 +7,7 @@ import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { TICKET_HEADER } from "../../flash-be-e2e/steps/support/api.js";
 import { E2E_PASSWORD } from "../../flash-be-e2e/steps/support/auth.js";
-import { world } from "../../flash-be-e2e/steps/support/world.js";
+import { currentSaleId } from "../../flash-be-e2e/steps/support/world.js";
 import { getJson, postJson, salePath } from "./support/api.js";
 import {
 	connectWebServer,
@@ -26,7 +26,7 @@ async function joinAndWait(
 ): Promise<{ api: string; ticket: string; cookie: string }> {
 	const api = await privateApi();
 	const cookie = await loginOrSignUp(user);
-	const sale = `${api}${salePath(world.saleId)}`;
+	const sale = `${api}${salePath(currentSaleId())}`;
 	const joined = await postJson(request, `${sale}/queue`, {}, { cookie });
 	const ticket: string = (await joined.json()).ticket ?? "";
 	await expect
@@ -52,7 +52,7 @@ async function hold(
 	const { api, ticket, cookie } = await joinAndWait(request, user);
 	const reserved = await postJson(
 		request,
-		`${api}${salePath(world.saleId)}/reservations`,
+		`${api}${salePath(currentSaleId())}/reservations`,
 		{},
 		{ cookie, [TICKET_HEADER]: ticket },
 	);
@@ -76,7 +76,7 @@ Given(/^"([^"]+)" has bought an item$/, async ({ request }, user: string) => {
 	const { api, reservationId, cookie } = await hold(request, user);
 	const bought = await postJson(
 		request,
-		`${api}${salePath(world.saleId)}/purchases`,
+		`${api}${salePath(currentSaleId())}/purchases`,
 		{ reservationId },
 		{ cookie },
 	);
@@ -98,7 +98,7 @@ Given(
 		for (let index = 0; index < Number(count); index++) {
 			const joined = await postJson(
 				request,
-				`${api}${salePath(world.saleId)}/queue`,
+				`${api}${salePath(currentSaleId())}/queue`,
 				{},
 				{ cookie: await loginOrSignUp(`shopper${index}`) },
 			);

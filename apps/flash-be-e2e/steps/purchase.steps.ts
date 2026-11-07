@@ -13,7 +13,7 @@ import { query, SYSTEM_USER } from "./support/database.js";
 import { currentResponse, setResponse } from "./support/response.js";
 import { confirm, holdOf, postConfirm, shoppers } from "./support/shoppers.js";
 import { pollUntil } from "./support/time.js";
-import { setApiEnv, world } from "./support/world.js";
+import { currentSaleId, setApiEnv, world } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
 
@@ -21,10 +21,10 @@ const { Given, When, Then } = createBdd();
 async function outcome(
 	request: APIRequestContext,
 	user: string,
-	saleId = world.saleId,
+	saleId = currentSaleId(),
 ) {
 	const reply = await send(request, routes.outcome, {
-		params: { saleId: saleId ?? "" },
+		params: { saleId },
 		headers: { cookie: await shopperCookie(request, user) },
 	});
 	setResponse(reply);
@@ -63,7 +63,7 @@ Given(
 			users.map(async (user) => ({
 				user,
 				reply: await send(request, routes.reserve, {
-					params: { saleId: world.saleId ?? "" },
+					params: { saleId: currentSaleId() },
 					headers: {
 						cookie: await shopperCookie(request, user),
 						[TICKET_HEADER]: shoppers().tickets.get(user) ?? "",

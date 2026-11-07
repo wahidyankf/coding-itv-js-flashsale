@@ -10,7 +10,7 @@ import { ensureDatabase, insertSale } from "./support/database.js";
 import { createSale } from "./support/operator.js";
 import { currentResponse, setResponse } from "./support/response.js";
 import { relativeTime } from "./support/time.js";
-import { world } from "./support/world.js";
+import { currentSaleId, world } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
 
@@ -69,7 +69,7 @@ Given("no sale exists", async ({ request: _request }) => {
 When("a client asks for that sale", async ({ request }) => {
 	setResponse(
 		await send(request, routes.sale, {
-			params: { saleId: world.saleId ?? "" },
+			params: { saleId: currentSaleId() },
 		}),
 	);
 });
@@ -90,7 +90,7 @@ async function saleNow(request: APIRequestContext) {
 	return bodyOf(
 		routes.sale,
 		await send(request, routes.sale, {
-			params: { saleId: world.saleId ?? "" },
+			params: { saleId: currentSaleId() },
 		}),
 	);
 }

@@ -2,7 +2,6 @@
 // effects (the countdown, the place stream, the stop when the login goes). The rules it applies live in shopper-state.ts.
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ApiFailure } from "../api";
-import { errorText } from "../error-text";
 import type { SaleClient } from "./client";
 import { TEXT } from "./messages";
 import {
@@ -28,6 +27,8 @@ export type ShopperOptions = {
 	onLiveStopped: () => void;
 	// The clock. A test can move it; the page uses the real one.
 	now?: () => number;
+	// The sentence for an error code. The page passes it, so the sale folder does not import the account's sentences.
+	describeError: (errorCode: string, retryAfterSeconds?: number) => string;
 };
 
 // The clock that the countdown reads. It moves only while an item is held. When the hold runs out, the shopper is told,
@@ -37,7 +38,7 @@ function useCountdown(
 	now: () => number,
 	showResult: (text: string) => void,
 ) {
-	const [clock, setClock] = useState(now());
+	const [clock, setClock] = useState(() => now());
 	const holding = phase.kind === "holding";
 	useEffect(() => {
 		if (!holding) return;
@@ -52,6 +53,25 @@ function useCountdown(
 	return { clock, setClock };
 }
 
+// The line stops moving when the sale ends or sells out, so a waiting shopper is told instead of kept waiting.
+function useLineEnd(
+	waiting: boolean,
+	saleStatus: SaleStatus,
+	stop: () => void,
+	showResult: (text: string) => void,
+	describeError: (errorCode: string, retryAfterSeconds?: number) => string,
+) {
+	useEffect(() => {
+		if (!waiting) return;
+		if (saleStatus === "ended" || saleStatus === "sold_out") {
+			stop();
+			showResult(
+				describeError(saleStatus === "ended" ? "sale_ended" : "sold_out"),
+			);
+		}
+	}, [waiting, saleStatus, stop, showResult, describeError]);
+}
+
 // The shopper's phase and the requests that move it on. `text` is the sentence under the buttons.
 export function useShopper({
 	saleId,
@@ -60,6 +80,7 @@ export function useShopper({
 	loggedIn,
 	onLiveStopped,
 	now = Date.now,
+	describeError,
 }: ShopperOptions) {
 	const [phase, setPhase] = useState<Phase>({ kind: "idle" });
 	const stopWatching = useRef<() => void>(() => {});
@@ -82,18 +103,16 @@ export function useShopper({
 	);
 	const { clock, setClock } = useCountdown(phase, now, showResult);
 
-	// The line stops moving when the sale ends or sells out, so a waiting shopper is told instead of kept waiting.
-	const waiting = phase.kind === "waiting";
-	useEffect(() => {
-		if (!waiting) return;
-		if (saleStatus === "ended" || saleStatus === "sold_out") {
-			stop();
-			showResult(errorText(saleStatus === "ended" ? "sale_ended" : "sold_out"));
-		}
-	}, [waiting, saleStatus, stop, showResult]);
+	useLineEnd(
+		phase.kind === "waiting",
+		saleStatus,
+		stop,
+		showResult,
+		describeError,
+	);
 
 	const fail = ({ errorCode, retryAfterSeconds }: ApiFailure) =>
-		showResult(errorText(errorCode, retryAfterSeconds));
+		showResult(describeError(errorCode, retryAfterSeconds));
 
 	// Shows an item held for the shopper. The countdown starts from this moment, not from the last tick.
 	const enterHolding = (reservationId: string, expiresAt: string) => {
@@ -101,11 +120,11 @@ export function useShopper({
 		setPhase(holdingPhase(reservationId, expiresAt));
 	};
 
-	const busy = (action: Action, text: string) =>
+	const showBusy = (action: Action, text: string) =>
 		setPhase({ kind: "busy", action, text });
 
 	const reserve = async (id: string, ticket: string) => {
-		busy("buy", TEXT.reserving);
+		showBusy("buy", TEXT.reserving);
 		const reserved = await client.reserve(id, ticket);
 		if (reserved.isErr()) return fail(reserved.error);
 		enterHolding(reserved.value.reservationId, reserved.value.expiresAt);
@@ -124,7 +143,7 @@ export function useShopper({
 
 	const buy = async () => {
 		stop();
-		busy("buy", TEXT.joining);
+		showBusy("buy", TEXT.joining);
 		const joined = await client.join(saleId);
 		if (joined.isErr()) return fail(joined.error);
 		const { ticket } = joined.value;
@@ -141,7 +160,7 @@ export function useShopper({
 	const confirm = async () => {
 		if (phase.kind !== "holding") return;
 		const held = phase;
-		busy("confirm", TEXT.paying);
+		showBusy("confirm", TEXT.paying);
 		const confirmed = await client.confirm(saleId, held.reservationId);
 		if (confirmed.isOk()) return setPhase({ kind: "purchased" });
 		// A failed payment keeps the item held, so the shopper can try the payment again.
@@ -153,7 +172,7 @@ export function useShopper({
 
 	const check = async () => {
 		stop();
-		busy("check", TEXT.checking);
+		showBusy("check", TEXT.checking);
 		const outcome = await client.outcome(saleId);
 		if (outcome.isErr()) return fail(outcome.error);
 		const found = outcome.value;

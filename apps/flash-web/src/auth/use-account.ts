@@ -2,7 +2,6 @@
 // and asks the server. It also sets the state when a log in, a sign up or a log out finishes, and when the login is
 // found gone for good.
 import { useCallback, useEffect, useRef, useState } from "react";
-import { errorText } from "../error-text";
 import type { AuthClient } from "./client";
 import { AUTH_TEXT } from "./messages";
 import type { Account, AuthMode } from "./types";
@@ -14,10 +13,12 @@ export type AccountState =
 	| { kind: "anonymous"; notice?: string }
 	| { kind: "in"; account: Account };
 
-// `onExpired` is the page's way of hearing that a request found the login gone for good.
+// `onExpired` is the page's way of hearing that a request found the login gone for good. `describeError` turns an error
+// code into the sentence to show; the page passes it, so this folder does not import the sale's sentences.
 export function useAccount(
 	auth: AuthClient,
 	onExpired: (listener: () => void) => () => void,
+	describeError: (errorCode: string, retryAfterSeconds?: number) => string,
 ) {
 	const [state, setState] = useState<AccountState>({ kind: "checking" });
 	// A reply that comes after the page was left must not set state.
@@ -53,12 +54,15 @@ export function useAccount(
 					? await auth.login(username, password)
 					: await auth.register(username, password);
 			if (done.isErr()) {
-				return errorText(done.error.errorCode, done.error.retryAfterSeconds);
+				return describeError(
+					done.error.errorCode,
+					done.error.retryAfterSeconds,
+				);
 			}
 			setState({ kind: "in", account: done.value });
 			return undefined;
 		},
-		[auth],
+		[auth, describeError],
 	);
 
 	// The cookies are cleared by the server. Even if the call fails, the page stops acting as logged in: the next request

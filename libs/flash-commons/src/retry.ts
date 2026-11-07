@@ -1,4 +1,5 @@
 // Retry with exponential backoff, a max attempt count and full jitter.
+// Decision: docs/explanation/decisions/017-retry-backoff-jitter.md (why each retry has a max and full jitter).
 //
 // The library is pure: it has no timers, no randomness and no I/O. The caller injects sleep and random, so the same code
 // runs in Node, the browser and k6. A task reports failure as an Err value, and retry returns the last Result, so no
@@ -6,23 +7,21 @@
 
 import type { Result } from "@flash/typekit";
 
-/** How long to wait between tries, in milliseconds. The wait doubles from baseMs and stops growing at capMs. */
+// How long to wait between tries, in milliseconds. The wait doubles from baseMs and stops growing at capMs.
 export type BackoffPolicy = { baseMs: number; capMs: number };
 
-/** A backoff policy plus the total number of tries, the first one included. */
+// A backoff policy plus the total number of tries, the first one included.
 export type RetryPolicy = BackoffPolicy & { maxAttempts: number };
 
-/** The options of the sync retry: the policy, the injected wait and randomness, and an optional retry test. */
+// The options of the sync retry: the policy, the injected wait and randomness, and an optional retry test.
 export type RetryOptions<E> = RetryPolicy & {
 	shouldRetry?: (error: E) => boolean;
 	sleep: (ms: number) => void;
 	random: () => number;
 };
 
-/**
- * The options of the async retry. The same as RetryOptions, with an async sleep and an optional signal. The signal
- * stops further tries; the first try always runs.
- */
+// The options of the async retry. The same as RetryOptions, with an async sleep and an optional signal. The signal
+// stops further tries; the first try always runs.
 export type RetryAsyncOptions<E> = RetryPolicy & {
 	shouldRetry?: (error: E) => boolean;
 	sleep: (ms: number) => Promise<void>;
@@ -40,11 +39,9 @@ const SINGLE_TRY = 1;
 
 const alwaysRetry = (): boolean => true;
 
-/**
- * The jittered wait before the next try. The bound is the smaller of capMs and baseMs * 2 ** attempt, and the wait is
- * random() times the bound, so it is in [0, bound). Full jitter spreads many clients out so they do not retry together.
- * Attempt 0 is the wait after the first failure. The attempt is a whole number; random returns a value in [0, 1).
- */
+// The jittered wait before the next try. The bound is the smaller of capMs and baseMs * 2 ** attempt, and the wait is
+// random() times the bound, so it is in [0, bound). Full jitter spreads many clients out so they do not retry together.
+// Attempt 0 is the wait after the first failure. The attempt is a whole number; random returns a value in [0, 1).
 export function backoffDelayMs(
 	attempt: number,
 	policy: BackoffPolicy,
@@ -66,11 +63,9 @@ function triesFor(maxAttempts: number): number {
 		: SINGLE_TRY;
 }
 
-/**
- * Runs the task until it returns an Ok, or until the tries are used up, and returns the last Result. A failure that
- * shouldRetry refuses ends it at once. The task gets its 0-based attempt number. A wait comes before every try after
- * the first, and none follows the last failed try.
- */
+// Runs the task until it returns an Ok, or until the tries are used up, and returns the last Result. A failure that
+// shouldRetry refuses ends it at once. The task gets its 0-based attempt number. A wait comes before every try after
+// the first, and none follows the last failed try.
 export function retry<T, E>(
 	task: (attempt: number) => Result<T, E>,
 	options: RetryOptions<E>,
@@ -94,10 +89,8 @@ function isAborted(signal: AbortSignal | undefined): boolean {
 	return signal?.aborted === true;
 }
 
-/**
- * The async form of retry, for a task that returns a promise. The same rules apply. An aborted signal is checked before
- * each wait and again after it, so no try starts once the caller has given up. The Result of the last try is returned.
- */
+// The async form of retry, for a task that returns a promise. The same rules apply. An aborted signal is checked before
+// each wait and again after it, so no try starts once the caller has given up. The Result of the last try is returned.
 export async function retryAsync<T, E>(
 	task: (attempt: number) => Promise<Result<T, E>>,
 	options: RetryAsyncOptions<E>,

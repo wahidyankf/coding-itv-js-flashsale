@@ -1,6 +1,8 @@
 // A Server-Sent Events reader built on fetch, for the sale's two live streams. The browser's EventSource cannot send a
 // header, and the queue ticket travels in one, so the page reads the stream itself. The same code runs in the browser
 // and in tests. A failed connection is retried with exponential backoff and full jitter, through @flash/flash-commons.
+// Decision: docs/explanation/decisions/008-server-sent-events.md (why the streams are read this way).
+// Decision: docs/explanation/decisions/017-retry-backoff-jitter.md (why every outage has a max attempt count).
 import {
 	backoffDelayMs,
 	HTTP_STATUS,
@@ -28,7 +30,7 @@ export type Watcher = (
 // injected, so a test runs without the real clock.
 export type WatchOptions = {
 	fetcher?: typeof fetch;
-	// The backoff and the attempt count of one outage. A stream that opens with 200 starts the count again.
+	// The backoff and the attempt count of one outage. A stream that delivers a frame starts the count again.
 	policy?: RetryPolicy;
 	sleep?: (ms: number) => Promise<void>;
 	random?: () => number;
@@ -47,7 +49,7 @@ const LIVE_POLICY: RetryPolicy = {
 
 type Frame = { event: string; data: unknown };
 type Listener = (event: string, data: unknown) => void;
-// `refused`: asking again would get the same answer, so the watcher stops. `failed`: no stream came, so the try counts.
+// `refused`: asking again would get the same answer, so the watcher stops. `failed`: no frame came, so the try counts.
 type Failure = "refused" | "failed";
 
 // Splits the text that arrived so far into complete frames. Returns the frames and the rest. A keep-alive comment and a
@@ -90,8 +92,10 @@ async function readFrames(
 	}
 }
 
-// One connection: asks for the stream. Ok means the server opened it with a 200; the stream is then read until it ends
-// or breaks, and either way the connection had succeeded. A refusal (401, 404) and any other failure are Err.
+// One connection: asks for the stream. A refusal (401, 404) is Err "refused". Any other failure, and a stream that ends
+// or breaks before it delivered a frame, is Err "failed". A stream that delivered a frame is Ok, whether it then ends or
+// breaks. A keep-alive is not a frame: flash-be sends the first event on connect, so a stream that carries none is not
+// healthy, and it must not reset the count.
 async function connectOnce(
 	fetcher: typeof fetch,
 	url: string,
@@ -113,14 +117,20 @@ async function connectOnce(
 	}
 	if (!response.ok) return new Err("failed");
 	const body = response.body;
-	// A drop mid-stream is not a failed attempt; the stream is simply opened again. The error is not needed.
-	if (body) await attemptAsync(() => readFrames(body, onEvent), Error);
-	return new Ok(undefined);
+	const received = { frame: false };
+	const onFrame: Listener = (event, data) => {
+		received.frame = true;
+		onEvent(event, data);
+	};
+	// A drop mid-stream is not reported: whether a frame came is what decides the try. The error is not needed.
+	if (body) await attemptAsync(() => readFrames(body, onFrame), Error);
+	return received.frame ? new Ok(undefined) : new Err("failed");
 }
 
 // The watcher keeps a stream open until it is stopped. Each outage gets up to `maxAttempts` tries, waiting a jittered
-// backoff between them. When a stream opens and then ends, the next try starts a fresh count after a short wait. When
-// the last try of an outage fails, the watcher stops and tells the subscription. A refusal stops it at once.
+// backoff between them. A try that delivers a frame starts a fresh count after a short wait. A try that ends or breaks
+// with no frame is a failure, so a server that keeps accepting and closing still reaches the give-up. When the last try
+// of an outage fails, the watcher stops and tells the subscription. A refusal stops it at once.
 export function createWatcher(options: WatchOptions = {}): Watcher {
 	const policy = options.policy ?? LIVE_POLICY;
 	const sleep = options.sleep ?? pause;
@@ -144,7 +154,7 @@ export function createWatcher(options: WatchOptions = {}): Watcher {
 				);
 				if (controller.signal.aborted) return;
 				if (outcome.isOk()) {
-					// The stream opened and ended. It is opened again after a short wait, counting from the first attempt.
+					// The stream delivered frames and then ended. It is opened again after a short wait, counting from the first attempt.
 					await sleep(backoffDelayMs(0, policy, random));
 					continue;
 				}

@@ -7,9 +7,7 @@ import { bodyOf, routes, send, TICKET_HEADER } from "./api.js";
 import { shopperCookie, usernameKey } from "./auth.js";
 import { setResponse } from "./response.js";
 import { pollUntil } from "./time.js";
-import { type ShopperState, world } from "./world.js";
-
-type Request = APIRequestContext;
+import { currentSaleId, type ShopperState, world } from "./world.js";
 
 // How long the whole group of shoppers may take to be admitted, counted from the first check.
 const ADMISSION_WAIT_MS = 8000;
@@ -33,12 +31,12 @@ export function holdOf(user: string) {
 
 // Joins the queue of the sale (the running one by default). The ticket is kept the first time only.
 export async function join(
-	request: Request,
+	request: APIRequestContext,
 	user: string,
-	saleId = world.saleId,
+	saleId = currentSaleId(),
 ) {
 	const reply = await send(request, routes.joinQueue, {
-		params: { saleId: saleId ?? "" },
+		params: { saleId },
 		headers: { cookie: await shopperCookie(request, user) },
 	});
 	setResponse(reply);
@@ -53,9 +51,13 @@ export async function join(
 
 // Asks for a place in the queue, with the ticket given or the one the shopper was issued. Returns the place when the API
 // gave one, and nothing when it refused.
-export async function check(request: Request, user: string, ticket?: string) {
+export async function checkPlace(
+	request: APIRequestContext,
+	user: string,
+	ticket?: string,
+) {
 	const reply = await send(request, routes.checkPlace, {
-		params: { saleId: world.saleId ?? "" },
+		params: { saleId: currentSaleId() },
 		headers: {
 			cookie: await shopperCookie(request, user),
 			[TICKET_HEADER]: ticket,
@@ -68,13 +70,13 @@ export async function check(request: Request, user: string, ticket?: string) {
 // Sends the request that holds an item, with the shopper's ticket unless another one is given, and returns the reply
 // without keeping it. Use reserve to keep the hold.
 export async function postReserve(
-	request: Request,
+	request: APIRequestContext,
 	user: string,
 	options: { ticket?: string; saleId?: string } = {},
 ) {
 	const ticket = options.ticket ?? shoppers().tickets.get(usernameKey(user));
 	return send(request, routes.reserve, {
-		params: { saleId: options.saleId ?? world.saleId ?? "" },
+		params: { saleId: options.saleId ?? currentSaleId() },
 		headers: {
 			cookie: await shopperCookie(request, user),
 			[TICKET_HEADER]: ticket,
@@ -84,7 +86,7 @@ export async function postReserve(
 
 // Holds an item for the shopper and keeps the hold, unless the shopper already has one.
 export async function reserve(
-	request: Request,
+	request: APIRequestContext,
 	user: string,
 	options: { ticket?: string; saleId?: string } = {},
 ) {
@@ -97,13 +99,16 @@ export async function reserve(
 
 // The admission runs on the API's own timer, so a shopper who joined is admitted within a tick or two. Waits until every
 // shopper is admitted, and fails the step when one is still waiting after the time limit.
-export async function waitUntilAdmitted(request: Request, users: string[]) {
+export async function waitUntilAdmitted(
+	request: APIRequestContext,
+	users: string[],
+) {
 	const deadline = Date.now() + ADMISSION_WAIT_MS;
 	for (const user of users) {
 		const key = usernameKey(user);
 		await pollUntil(
 			async () =>
-				(await check(request, key, shoppers().tickets.get(key)))?.state ===
+				(await checkPlace(request, key, shoppers().tickets.get(key)))?.state ===
 				"admitted",
 			{
 				withinMs: deadline - Date.now(),
@@ -117,14 +122,14 @@ export async function waitUntilAdmitted(request: Request, users: string[]) {
 // Sends the request that confirms the purchase. The hold is the shopper's own, unless `owner` names another shopper or
 // `reservationId` gives one directly. A shopper with no hold sends an empty id, which the API refuses.
 export async function postConfirm(
-	request: Request,
+	request: APIRequestContext,
 	user: string,
 	options: { reservationId?: string; owner?: string } = {},
 ) {
 	const reservationId =
 		options.reservationId ?? holdOf(options.owner ?? user)?.reservationId;
 	return send(request, routes.confirm, {
-		params: { saleId: world.saleId ?? "" },
+		params: { saleId: currentSaleId() },
 		headers: { cookie: await shopperCookie(request, user) },
 		body: { reservationId: reservationId ?? "" },
 	});
@@ -133,7 +138,7 @@ export async function postConfirm(
 // Confirms the purchase and keeps the answer. The time it took is recorded for the speed scenarios, and a purchase the
 // shopper does not have yet is kept.
 export async function confirm(
-	request: Request,
+	request: APIRequestContext,
 	user: string,
 	options: { reservationId?: string; owner?: string } = {},
 ) {

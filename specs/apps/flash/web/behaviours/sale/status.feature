@@ -52,6 +52,11 @@ Feature: Sale status on the page
   @e2e-exempt
   Scenario: The page says so when live updates stop
     Given a sale with stock 10 and 3 sold that opens 1 hour ago and closes in 1 hour
+    And the queue admits shoppers slowly
+    And "ana" is logged in
     And a visitor has the page open
+    When she presses Buy Now
+    And the page says it updates by itself
     When the live updates keep failing
     Then the page says "Live updates stopped. Reload the page to see the latest sale."
+    And the page does not say it updates by itself

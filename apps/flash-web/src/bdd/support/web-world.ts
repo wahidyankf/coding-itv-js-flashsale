@@ -55,6 +55,8 @@ export type WebWorld = {
 	advance: (seconds: number) => Promise<void>;
 	// What the visitor sees. Each waits for the page to catch up, so a slow layer does not fail a correct page.
 	expectPageSays: (text: string) => Promise<void>;
+	// The page does not show this text now. A check that a sentence has gone, such as a hint once the live updates stop.
+	expectPageNotSays: (text: string) => Promise<void>;
 	expectButton: (name: string, state: "enabled" | "disabled") => Promise<void>;
 	expectNoButton: (name: string) => Promise<void>;
 	// The browser keeps neither cookie of a login.

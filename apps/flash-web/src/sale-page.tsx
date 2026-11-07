@@ -1,5 +1,6 @@
 // The sale page: the sale card, the buying card and the account line, put together for a shopper. It is the one place the
-// sale and the account meet, so it sits in src/ and neither the sale nor the account folder imports the other.
+// sale and the account meet, so it sits in src/ and neither the sale nor the account folder imports the other. It also
+// passes the sentences for the error codes to the two hooks.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AccountBar } from "./auth/account-bar";
 import { AuthCard } from "./auth/auth-card";
@@ -7,6 +8,7 @@ import { AUTH_TEXT } from "./auth/messages";
 import { useAccount } from "./auth/use-account";
 import { Spinner } from "./components/spinner";
 import { CARD, MUTED_TEXT } from "./components/ui";
+import { errorText } from "./error-text";
 import { BuyActions } from "./sale/buy-actions";
 import type { SaleLoad } from "./sale/load";
 import { TEXT } from "./sale/messages";
@@ -75,7 +77,12 @@ export function SalePage({ load, api }: { load: SaleLoad; api?: WebApi }) {
 					{TEXT.liveStopped}
 				</p>
 			)}
-			<SaleShop sale={sale} web={web} onLiveStopped={stopLive} />
+			<SaleShop
+				sale={sale}
+				web={web}
+				liveStopped={liveStopped}
+				onLiveStopped={stopLive}
+			/>
 		</>
 	);
 }
@@ -85,19 +92,22 @@ export function SalePage({ load, api }: { load: SaleLoad; api?: WebApi }) {
 function SaleShop({
 	sale,
 	web,
+	liveStopped,
 	onLiveStopped,
 }: {
 	sale: SaleView;
 	web: WebApi;
+	liveStopped: boolean;
 	onLiveStopped: () => void;
 }) {
-	const account = useAccount(web.auth, web.onExpired);
+	const account = useAccount(web.auth, web.onExpired, errorText);
 	const shopper = useShopper({
 		saleId: sale.id,
 		saleStatus: sale.status,
 		client: web.sale,
 		loggedIn: account.state.kind === "in",
 		onLiveStopped,
+		describeError: errorText,
 	});
 
 	return (
@@ -131,6 +141,7 @@ function SaleShop({
 						phase={shopper.phase}
 						saleStatus={sale.status}
 						text={shopper.text}
+						liveStopped={liveStopped}
 						onBuy={() => void shopper.buy()}
 						onCheck={() => void shopper.check()}
 						onConfirm={() => void shopper.confirm()}

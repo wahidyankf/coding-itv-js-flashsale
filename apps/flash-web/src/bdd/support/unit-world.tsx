@@ -281,6 +281,9 @@ function expectationsOf(h: Harness) {
 		async expectPageSays(text: string) {
 			expect(document.body.textContent).toContain(text);
 		},
+		async expectPageNotSays(text: string) {
+			expect(document.body.textContent).not.toContain(text);
+		},
 		async expectButton(name: string, state: "enabled" | "disabled") {
 			const button = screen.getByRole("button", { name }) as HTMLButtonElement;
 			expect(button.disabled).toBe(state === "disabled");

@@ -1,3 +1,5 @@
+// Vitest for libs/flash-commons: plain unit tests beside the source, in Node. `test:unit` runs them with the coverage
+// report. The library has no Gherkin.
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
