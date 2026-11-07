@@ -12,6 +12,7 @@ const SALE = __ENV.SALE_ID ?? "";
 
 // The API, as the shopper meets it. A refusal is `{ errorCode, errorMessage }` with the status that goes with it.
 const TICKET_HEADER = "x-queue-ticket";
+const ACCESS_COOKIE = "access_token";
 const STATUS = {
 	ok: 200,
 	created: 201,
@@ -113,7 +114,12 @@ type Body = {
 	purchaseId?: string;
 	errorCode?: string;
 };
-type Answer = { status: number; body: Body };
+type Answer = {
+	status: number;
+	body: Body;
+	// The value of the access cookie the reply set, if it set one.
+	accessToken?: string;
+};
 
 // The reply when the API did not refuse it.
 function bodyOf(answer: Answer): Body | undefined {
@@ -128,6 +134,9 @@ function errorOf(answer: Answer): string | undefined {
 }
 
 type Send = { headers?: Record<string, string>; body?: object };
+
+// Every shopper has one password, which no account of this stack protects anything with.
+const PASSWORD = "load-test-password";
 
 // One request. The user's address goes in X-Forwarded-For, which the API trusts behind the proxy, so each shopper is
 // limited on their own and not as one address.
@@ -145,6 +154,9 @@ function call(
 			"x-forwarded-for": address,
 		},
 		tags: { name },
+		// A virtual user plays many shoppers one after the other, so no cookie may stay with it. Each shopper sends their
+		// own cookie header.
+		jar: new http.CookieJar(),
 	};
 	const url = `${BASE}${path}`;
 	const response =
@@ -156,9 +168,11 @@ function call(
 	if (response.status === STATUS.rateLimited) rateLimited.add(1);
 	// A gateway error page is not JSON; the status says enough.
 	const isJson = String(response.headers["Content-Type"]).includes("json");
+	const accessToken = response.cookies[ACCESS_COOKIE]?.[0]?.value;
 	return {
 		status: response.status,
 		body: isJson ? (response.json() as Body) : {},
+		...(accessToken && { accessToken }),
 	};
 }
 
@@ -167,12 +181,23 @@ const address = (index: number) =>
 
 const pause = ({ min, spread }: Pause) => sleep(min + Math.random() * spread);
 
+// A shopper signs up, which also logs them in, and gets the cookie header every later request carries. Nothing but a
+// refusal of the account itself stops them: without a login the shopper cannot take part.
+function signUp(user: string, where: string): string | undefined {
+	const account = call("POST", "/auth/register", "register", where, {
+		body: { username: user, password: PASSWORD },
+	});
+	return account.accessToken && `${ACCESS_COOKIE}=${account.accessToken}`;
+}
+
 // One shopper, from the first click to the answer to "did I get it".
 function visit(user: string, index: number): void {
 	const where = address(index);
+	const cookie = signUp(user, where);
+	if (!cookie) return;
 	const join = () =>
 		call("POST", `/sales/${SALE}/queue`, "join", where, {
-			body: { userId: user },
+			headers: { cookie },
 		});
 
 	let joined = join();
@@ -188,14 +213,14 @@ function visit(user: string, index: number): void {
 	const entry = bodyOf(joined);
 	if (!entry) return;
 
-	const headers = { [TICKET_HEADER]: entry.ticket ?? "" };
+	const headers = { cookie, [TICKET_HEADER]: entry.ticket ?? "" };
 
 	// Wait to be let in. The page does the same by following the place stream.
 	let state = entry.state ?? "";
 	for (let polls = 0; state !== "admitted" && polls < MAX_POLLS; polls++) {
 		pause(POLL_PAUSE);
 		const place = bodyOf(
-			call("GET", `/sales/${SALE}/queue/${user}`, "place", where, { headers }),
+			call("GET", `/sales/${SALE}/queue/me`, "place", where, { headers }),
 		);
 		if (!place) return;
 		state = place.state ?? "";
@@ -212,7 +237,6 @@ function visit(user: string, index: number): void {
 	const reserve = () =>
 		call("POST", `/sales/${SALE}/reservations`, "reserve", where, {
 			headers,
-			body: { userId: user },
 		});
 	const hold = reserve();
 	if (errorOf(hold) === "sold_out") {
@@ -228,7 +252,8 @@ function visit(user: string, index: number): void {
 
 	const confirm = (name: string) =>
 		call("POST", `/sales/${SALE}/purchases`, name, where, {
-			body: { userId: user, reservationId: held.reservationId },
+			headers: { cookie },
+			body: { reservationId: held.reservationId },
 		});
 	let bought = confirm("purchase");
 	for (
@@ -261,12 +286,9 @@ function visit(user: string, index: number): void {
 	}
 
 	// "Did I get it" must agree with what happened.
-	const outcome = call(
-		"GET",
-		`/sales/${SALE}/purchases/${user}`,
-		"outcome",
-		where,
-	);
+	const outcome = call("GET", `/sales/${SALE}/purchases/me`, "outcome", where, {
+		headers: { cookie },
+	});
 	check(null, {
 		"the outcome agrees with the purchase": () =>
 			outcome.status === STATUS.ok &&
@@ -290,9 +312,12 @@ export function latecomer(): void {
 export function hammer(): void {
 	const id = exec.vu.idInTest;
 	const user = `hammer-${id}`;
+	const where = `192.0.2.${id}`;
+	const cookie = signUp(user, where);
+	if (!cookie) return;
 	for (let sent = 0; sent < HAMMER_REQUESTS; sent++) {
-		call("POST", `/sales/${SALE}/queue`, "hammer", `192.0.2.${id}`, {
-			body: { userId: user },
+		call("POST", `/sales/${SALE}/queue`, "hammer", where, {
+			headers: { cookie },
 		});
 	}
 }

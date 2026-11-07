@@ -1,6 +1,6 @@
 // Starts the production stack (compose.prod.yaml) under its own project name, with random secrets and free ports, and
-// walks one shopper through it: an operator creates a sale through the API, the shopper joins, holds an item, pays and
-// asks if they got it, all through the web server. Then the stack and its volumes are removed.
+// walks one shopper through it: an operator (made with the create-operator command) logs in and creates a sale through
+// the API, the shopper signs up, joins, holds an item, pays and asks if they got it, all through the web server. Then the stack and its volumes are removed.
 // Usage: npm run smoke:prod   (needs Docker; builds the images, so the first run takes a few minutes)
 import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -37,14 +37,19 @@ const secret = () => randomBytes(24).toString("hex");
 
 const bePort = await freePort();
 const webPort = await freePort();
-const adminToken = secret();
+const origin = `http://127.0.0.1:${webPort}`;
+// The operator the walk logs in as, and the password of every account of the walk.
+const OPERATOR = "smoke-operator";
+const SHOPPER = "smoke";
+const password = secret();
 const env = {
 	...process.env,
 	POSTGRES_USER: "flash",
 	POSTGRES_PASSWORD: secret(),
 	POSTGRES_DB: "flash",
 	TICKET_SECRET: secret(),
-	ADMIN_TOKEN: adminToken,
+	// The walk talks plain HTTP to the stack, which cannot carry Secure cookies.
+	COOKIE_SECURE: "false",
 	FLASH_BE_PORT: String(bePort),
 	FLASH_WEB_PORT: String(webPort),
 };
@@ -65,12 +70,21 @@ function step(label) {
 async function call(base, method, path, { headers = {}, body } = {}) {
 	const reply = await fetch(`${base}${path}`, {
 		method,
-		headers: body
-			? { ...headers, "content-type": "application/json" }
-			: headers,
+		headers: {
+			...headers,
+			...(body ? { "content-type": "application/json" } : {}),
+			// The web server refuses a POST that does not come from its own page.
+			...(method === "GET" ? {} : { origin }),
+		},
 		body: body ? JSON.stringify(body) : undefined,
 	});
-	return { status: reply.status, body: await reply.json() };
+	// The cookies the reply set, as the `cookie` header that sends them back.
+	const cookie = reply.headers
+		.getSetCookie()
+		.filter((value) => !value.includes("Max-Age=0"))
+		.map((value) => value.split(";")[0])
+		.join("; ");
+	return { status: reply.status, body: await reply.json(), cookie };
 }
 
 // A reply that is not the one expected stops the walk, with what came back.
@@ -118,7 +132,14 @@ async function walk() {
 	if (ready.status !== STATUS.ok)
 		throw new Error(`/ready answered ${ready.status}`);
 
-	step("an operator with a wrong token is refused");
+	step(
+		"a shopper signs up through the web server and is refused on the admin route",
+	);
+	const account = await web("POST", "/auth/register", {
+		body: { username: SHOPPER, password },
+	});
+	expectOk("sign up", account, STATUS.created);
+	const shopperCookie = account.cookie;
 	const body = {
 		stock: 2,
 		holdSeconds: 60,
@@ -126,19 +147,42 @@ async function walk() {
 		endsAt: new Date(Date.now() + 60 * MINUTE_MS).toISOString(),
 	};
 	expectRefusal(
-		"wrong token",
+		"no login",
+		await api("POST", "/admin/sales", { body }),
+		"not_authenticated",
+	);
+	expectRefusal(
+		"shopper",
 		await api("POST", "/admin/sales", {
-			headers: { authorization: "Bearer not-the-token-at-all" },
+			headers: { cookie: shopperCookie },
 			body,
 		}),
-		"invalid_admin_token",
+		"forbidden",
 	);
 
-	step("an operator creates a sale through the API");
+	step(
+		"an operator is made with the command, logs in and creates a sale through the API",
+	);
+	compose(
+		"run",
+		"--rm",
+		"--no-deps",
+		"flash-be-1",
+		"node",
+		"dist/create-operator.js",
+		"--username",
+		OPERATOR,
+		"--password",
+		password,
+	);
+	const operator = await api("POST", "/auth/login", {
+		body: { username: OPERATOR, password },
+	});
+	expectOk("operator login", operator, STATUS.ok);
 	const sale = expectOk(
 		"create sale",
 		await api("POST", "/admin/sales", {
-			headers: { authorization: `Bearer ${adminToken}` },
+			headers: { cookie: operator.cookie },
 			body,
 		}),
 		STATUS.created,
@@ -147,7 +191,11 @@ async function walk() {
 	step("the web server does not pass the admin route on");
 	const blocked = await fetch(`http://127.0.0.1:${webPort}/api/admin/sales`, {
 		method: "POST",
-		headers: { "content-type": "application/json" },
+		headers: {
+			"content-type": "application/json",
+			cookie: operator.cookie,
+			origin,
+		},
 		body: "{}",
 	});
 	if (blocked.status !== STATUS.notFound) {
@@ -164,12 +212,13 @@ async function walk() {
 		throw new Error("the current sale is not the new one");
 
 	step("the shopper joins the queue and is admitted");
+	const logged = { cookie: shopperCookie };
 	const salePath = `/sales/${sale.id}`;
 	const joined = expectOk(
 		"join",
-		await web("POST", `${salePath}/queue`, { body: { userId: "smoke" } }),
+		await web("POST", `${salePath}/queue`, { headers: logged }),
 	);
-	const headers = { [TICKET_HEADER]: joined.ticket };
+	const headers = { ...logged, [TICKET_HEADER]: joined.ticket };
 	let state = joined.state;
 	for (
 		let tries = 0;
@@ -179,7 +228,7 @@ async function walk() {
 		await sleep(ADMISSION_CHECK_MS);
 		const place = expectOk(
 			"place",
-			await web("GET", `${salePath}/queue/smoke`, { headers }),
+			await web("GET", `${salePath}/queue/me`, { headers }),
 			STATUS.ok,
 		);
 		state = place.state;
@@ -191,7 +240,6 @@ async function walk() {
 		"reserve",
 		await web("POST", `${salePath}/reservations`, {
 			headers,
-			body: { userId: "smoke" },
 		}),
 	);
 
@@ -203,7 +251,8 @@ async function walk() {
 		attempt++
 	) {
 		const paid = await web("POST", `${salePath}/purchases`, {
-			body: { userId: "smoke", reservationId: held.reservationId },
+			headers: logged,
+			body: { reservationId: held.reservationId },
 		});
 		if (paid.status < STATUS.firstError) purchase = paid.body;
 		else if (paid.body.errorCode !== "payment_failed") {
@@ -216,7 +265,7 @@ async function walk() {
 	step("the shopper asks if they got it, and cannot buy twice");
 	const outcome = expectOk(
 		"outcome",
-		await web("GET", `${salePath}/purchases/smoke`),
+		await web("GET", `${salePath}/purchases/me`, { headers: logged }),
 		STATUS.ok,
 	);
 	if (outcome.state !== "purchased") {
@@ -224,10 +273,7 @@ async function walk() {
 	}
 	expectRefusal(
 		"second reserve",
-		await web("POST", `${salePath}/reservations`, {
-			headers,
-			body: { userId: "smoke" },
-		}),
+		await web("POST", `${salePath}/reservations`, { headers }),
 		"already_purchased",
 	);
 }

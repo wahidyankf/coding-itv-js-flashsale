@@ -255,11 +255,13 @@ async function main(): Promise<number> {
 		.split("|")
 		.map(Number);
 	const purchases = Number(
-		sql(`select count(*) from purchases where sale_id = '${saleId}'`),
+		sql(
+			`select count(*) from purchases where sale_id = '${saleId}' and deleted_at is null`,
+		),
 	);
 	const twice = Number(
 		sql(
-			`select count(*) from (select user_id from purchases where sale_id = '${saleId}' group by user_id having count(*) > 1) d`,
+			`select count(*) from (select user_id from purchases where sale_id = '${saleId}' and deleted_at is null group by user_id having count(*) > 1) d`,
 		),
 	);
 

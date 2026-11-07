@@ -1,5 +1,29 @@
 # Requests to the flash-web server, which passes the sale routes on to flash-be. The routes are in docs/reference/http-endpoints.md.
 @web = http://localhost:3000
+# Login is by cookie, and the pass-through route sends the cookies on. Sign up or log in first; the REST Client extension
+# and kulala.nvim keep the cookies for the next request. The web server refuses a POST from another origin, so a client
+# that sends an Origin header must send http://localhost:3000.
+
+### Web: sign up as a shopper through the pass-through route (sets the two cookies)
+POST {{web}}/api/auth/register
+Content-Type: application/json
+
+{ "username": "ana", "password": "a long password" }
+
+### Web: log in through the pass-through route
+POST {{web}}/api/auth/login
+Content-Type: application/json
+
+{ "username": "ana", "password": "a long password" }
+
+### Web: who am I?
+GET {{web}}/api/auth/me
+
+### Web: renew the login
+POST {{web}}/api/auth/refresh
+
+### Web: log out
+POST {{web}}/api/auth/logout
 
 ### Web: health check (Start server route, run with `npx nx dev flash-web`)
 GET {{web}}/api/health
@@ -15,33 +39,27 @@ GET {{web}}/api/sales/00000000-0000-4000-8000-000000000000/events
 
 ### Web: join the queue through the pass-through route (replace the sale id; the reply holds your ticket)
 POST {{web}}/api/sales/00000000-0000-4000-8000-000000000000/queue
-Content-Type: application/json
-
-{ "userId": "ana" }
 
 ### Web: check your place through the pass-through route (send the ticket from the join reply)
-GET {{web}}/api/sales/00000000-0000-4000-8000-000000000000/queue/ana
+GET {{web}}/api/sales/00000000-0000-4000-8000-000000000000/queue/me
 x-queue-ticket: paste-the-ticket-here
 
 ### Web: live place in the queue through the pass-through route (send the ticket; stays open)
-GET {{web}}/api/sales/00000000-0000-4000-8000-000000000000/queue/ana/events
+GET {{web}}/api/sales/00000000-0000-4000-8000-000000000000/queue/me/events
 x-queue-ticket: paste-the-ticket-here
 
 ### Web: reserve one item through the pass-through route (send the ticket from the join reply)
 POST {{web}}/api/sales/00000000-0000-4000-8000-000000000000/reservations
-Content-Type: application/json
 x-queue-ticket: paste-the-ticket-here
-
-{ "userId": "ana" }
 
 ### Web: pay for the held item through the pass-through route
 POST {{web}}/api/sales/00000000-0000-4000-8000-000000000000/purchases
 Content-Type: application/json
 
-{ "userId": "ana", "reservationId": "00000000-0000-4000-8000-000000000001" }
+{ "reservationId": "00000000-0000-4000-8000-000000000001" }
 
 ### Web: did I get it? through the pass-through route
-GET {{web}}/api/sales/00000000-0000-4000-8000-000000000000/purchases/ana
+GET {{web}}/api/sales/00000000-0000-4000-8000-000000000000/purchases/me
 
 ### Web: a path that is not allowed answers 404 not_found
 GET {{web}}/api/sales/current/secret

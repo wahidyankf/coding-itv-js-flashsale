@@ -10,8 +10,9 @@ x-api: &api
     DATABASE_URL: postgres://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:?}
     REDIS_URL: redis://redis:6379
     TICKET_SECRET: ${TICKET_SECRET:?set TICKET_SECRET in .env}
-    # Optional. Empty means the admin routes are off.
-    ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+    # The login cookies are for HTTPS only, which is right behind a TLS terminator. Set COOKIE_SECURE=false in .env to try
+    # this stack over plain HTTP on one machine, where a browser would drop a Secure cookie.
+    COOKIE_SECURE: ${COOKIE_SECURE:-true}
     FLASH_BE_PORT: 8080
     TRUST_PROXY: "true"
   depends_on:
