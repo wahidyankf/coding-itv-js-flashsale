@@ -24,3 +24,5 @@ the other options, and link to those pages.
 - [013-nx-as-a-command-runner.md](013-nx-as-a-command-runner.md) - Nx runs commands only, with no plugins.
 - [014-gherkin-scenarios-at-three-layers.md](014-gherkin-scenarios-at-three-layers.md) - scenarios are bound at unit, integration and end-to-end level, and a check finds the gaps.
 - [015-code-structure-limits.md](015-code-structure-limits.md) - size and nesting limits come from Biome's built-in rules; doc comments are kept by review.
+- [016-dry-rule-of-three.md](016-dry-rule-of-three.md) - logic used in three places becomes one piece; shared behaviour lives in `libs/flash-commons`; test oracles keep their own copies.
+- [017-retry-backoff-jitter.md](017-retry-backoff-jitter.md) - every retry uses exponential backoff, full jitter and a max attempt count, except the Redis reconnect.
