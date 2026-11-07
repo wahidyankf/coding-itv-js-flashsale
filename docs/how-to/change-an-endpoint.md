@@ -10,8 +10,9 @@ The API is plain code. There is no shared contract library, so a change goes to 
 3. **Fix the callers** by searching for the path: `apps/flash-web` (the client in `src/sale/client.ts`, and the allow-list of
    the proxy in `src/proxy.ts` if the route should pass through the web server), the e2e steps, `apps/flash-load/k6/shop.ts`
    and `scripts/smoke/prod.mjs`. If the web page shows a new error code, add its text to `apps/flash-web/src/sale/messages.ts`.
-4. **Update the docs:** the route in [HTTP endpoints](../reference/http-endpoints.md), and the manual requests in
-   `api-flash-be.http` and `api-flash-web.http`.
+4. **Update the docs:** the route in [HTTP endpoints](../reference/http-endpoints.md), the manual requests in
+   `api-flash-be.http` and `api-flash-web.http`, and `api-flash-demo.http` with [the demo](run-the-demo.md) if the
+   demo sends the route.
 5. **Run the checks** for the projects you touched.
 
    ```bash

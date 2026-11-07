@@ -1,90 +1,136 @@
-# Requests to the flash-be API. The routes and their replies are in docs/reference/http-endpoints.md.
-@backend = http://localhost:8080
-# Login is by cookie: a login or sign-up reply sets access_token and refresh_token, and kulala.nvim and the REST Client
-# extension keep them for the next request. The API starts with COOKIE_SECURE=false for local development, so the cookies
-# work over plain HTTP. In another client, send them back in a Cookie header.
+# Every route of the flash-be API, one request each, grouped as in docs/reference/http-endpoints.md (the replies and
+# every error are there). The demo story is api-flash-demo.http.
+#
+# Before you start: `npm run demo:setup` (the dev stack, the migrations, the operator `ops` and a sale), then
+# `npx nx dev flash-be`.
+#
+# The format is kulala.nvim (https://github.com/wahidyankf/kulala.nvim). A request named with `# @name` keeps its
+# reply, and later requests read the sale id, the ticket and the reservation id from it: send "the current sale",
+# "join the queue" and "hold one item" before the requests that use them. The Shared block attaches kulala's cookie jar
+# to every request, so a login is kept like in a browser. The API runs with COOKIE_SECURE=false locally, so the cookies
+# work over plain HTTP.
 
-### Backend: liveness (no dependencies, run with `npx nx dev flash-be`)
+### Shared
+# @attach-cookie-jar
+@backend = http://localhost:8080
+
+###############################################################################
+# Health
+###############################################################################
+
+### Liveness (no dependencies, always 200)
 GET {{backend}}/health
 
-### Backend: readiness (checks Postgres and Redis, needs `npx nx db:up flash-be`)
+### Readiness (Postgres and Redis; 503 when one fails)
 GET {{backend}}/ready
 
-### Backend: the current sale (the running sale, else the next one to open, else 404; up to SALE_CACHE_MS old; seed one with `npx nx db:seed-sale flash-be --stock=100`)
+###############################################################################
+# The sale (public reads, cached for up to SALE_CACHE_MS)
+###############################################################################
+
+### The current sale (the running one, else the next to open, else 404 sale_not_found)
+# @name current
 GET {{backend}}/sales/current
 
-### Backend: one sale by id (replace the id with the one the seed command printed)
-GET {{backend}}/sales/00000000-0000-4000-8000-000000000000
+### One sale by id (404 sale_not_found for an unknown or malformed id)
+GET {{backend}}/sales/{{current.response.body.$.id}}
 
-### Backend: sign up as a shopper (sets the two cookies; 409 username_taken; the password needs 8 to 128 characters)
-POST {{backend}}/auth/register
-Content-Type: application/json
+### Live sale status (Server-Sent Events: event: sale; curl closes it after 5 seconds here)
+# @accept chunked
+# @curl-max-time 5
+GET {{backend}}/sales/{{current.response.body.$.id}}/events
 
-{ "username": "ana", "password": "a long password" }
+###############################################################################
+# Operator routes (401 not_authenticated without a login, 403 forbidden for a shopper)
+###############################################################################
 
-### Backend: log in (sets the two cookies; the same reply for a wrong name and a wrong password)
-POST {{backend}}/auth/login
-Content-Type: application/json
-
-{ "username": "ana", "password": "a long password" }
-
-### Backend: who am I? (needs the access_token cookie; 401 not_authenticated once it has ended)
-GET {{backend}}/auth/me
-
-### Backend: renew the login (sent only to /auth, with the refresh_token cookie; sets a new pair, and the old refresh token stops working)
-POST {{backend}}/auth/refresh
-
-### Backend: log out (ends the session and clears the cookies)
-POST {{backend}}/auth/logout
-
-### Backend: log in as an operator (make the account first with `npx nx db:create-operator flash-be --username=ops --password="a long password"`)
+### Log in as the operator (made with `npx nx db:create-operator flash-be --username=ops --password=correct-horse-battery`)
 POST {{backend}}/auth/login
 Content-Type: application/json
 
 { "username": "ops", "password": "correct-horse-battery" }
 
-### Backend: create a sale (needs a login as an operator: 401 not_authenticated without one, 403 forbidden for a shopper, 409 when the window overlaps)
-# Optional fields: name, productId, holdSeconds, admitPerSecond.
+### Create a sale (201; optional: name, productId, holdSeconds, admitPerSecond; 409 sale_overlaps when the window overlaps)
+# @name created
 POST {{backend}}/admin/sales
 Content-Type: application/json
 
-{ "stock": 100, "startsAt": "2030-01-01T12:00:00Z", "endsAt": "2030-01-01T13:00:00Z" }
+{ "stock": 100, "startsAt": "2036-01-01T12:00:00Z", "endsAt": "2036-01-01T13:00:00Z" }
 
-### Backend: list every sale (operator; the one that opens last first, with sold, holdSeconds and admitPerSecond)
+### List every sale (the one that opens last first, with sold, holdSeconds and admitPerSecond)
 GET {{backend}}/admin/sales
 
-### Backend: change a sale (operator; send only the fields to change: name, stock, startsAt, endsAt, holdSeconds, admitPerSecond; 409 sale_locked once it has started and the change moves the start or lowers the stock)
-PATCH {{backend}}/admin/sales/00000000-0000-4000-8000-000000000000
+### Change a sale (only the fields sent: name, stock, startsAt, endsAt, holdSeconds, admitPerSecond; 409 sale_locked)
+PATCH {{backend}}/admin/sales/{{created.response.body.$.id}}
 Content-Type: application/json
 
 { "stock": 150 }
 
-### Backend: remove a sale (operator; 409 sale_has_purchases when someone bought; replace the id)
-DELETE {{backend}}/admin/sales/00000000-0000-4000-8000-000000000000
+### Remove a sale (soft delete; 409 sale_has_purchases when someone bought)
+DELETE {{backend}}/admin/sales/{{created.response.body.$.id}}
 
-### Backend: join the queue (log in first; replace the sale id; the reply holds your ticket; write requests can answer 429 with Retry-After)
-POST {{backend}}/sales/00000000-0000-4000-8000-000000000000/queue
+###############################################################################
+# Accounts and login (the shopper logged in here is the one the queue routes below use)
+###############################################################################
 
-### Backend: check your place (send the ticket from the join reply)
-GET {{backend}}/sales/00000000-0000-4000-8000-000000000000/queue/me
-x-queue-ticket: paste-the-ticket-here
-
-### Backend: reserve one item (needs the ticket and an admitted user; the reply holds the reservation id and its end)
-POST {{backend}}/sales/00000000-0000-4000-8000-000000000000/reservations
-x-queue-ticket: paste-the-ticket-here
-
-### Backend: pay for the held item (send the reservation id from the reserve reply; sending it again is safe)
-POST {{backend}}/sales/00000000-0000-4000-8000-000000000000/purchases
+### Sign up as a shopper (201 and the two cookies; 409 username_taken; a password has 8 to 128 characters)
+POST {{backend}}/auth/register
 Content-Type: application/json
 
-{ "reservationId": "00000000-0000-4000-8000-000000000001" }
+{ "username": "shopper-api", "password": "a long password" }
 
-### Backend: did I get it? (purchased, holding or none)
-GET {{backend}}/sales/00000000-0000-4000-8000-000000000000/purchases/me
+### Log in (200 and the two cookies; the same 401 invalid_credentials for a wrong name and a wrong password)
+POST {{backend}}/auth/login
+Content-Type: application/json
 
-### Backend: live sale status (Server-Sent Events; stays open, sends an event when the sale changes)
-GET {{backend}}/sales/00000000-0000-4000-8000-000000000000/events
+{ "username": "shopper-api", "password": "a long password" }
 
-### Backend: live place in the queue (send the ticket from the join reply; stays open)
-GET {{backend}}/sales/00000000-0000-4000-8000-000000000000/queue/me/events
-x-queue-ticket: paste-the-ticket-here
+### Who am I? (401 not_authenticated with no login)
+GET {{backend}}/auth/me
+
+### Renew the login (the refresh cookie is sent to /auth only; a new pair is set; replaying the old one ends the session)
+POST {{backend}}/auth/refresh
+
+###############################################################################
+# The waiting queue (log in as a shopper first; the three POST routes can answer 429 with Retry-After)
+###############################################################################
+
+### Join the queue (201 on a new place, 200 when you have one; the reply holds the ticket)
+# @name join
+POST {{backend}}/sales/{{current.response.body.$.id}}/queue
+
+### Check your place (waiting with place, admitted, or absent; the delay lets one admission tick pass)
+# @delay 1500
+GET {{backend}}/sales/{{current.response.body.$.id}}/queue/me
+x-queue-ticket: {{join.response.body.$.ticket}}
+
+### Live place in the queue (Server-Sent Events: event: place; curl closes it after 5 seconds here)
+# @accept chunked
+# @curl-max-time 5
+GET {{backend}}/sales/{{current.response.body.$.id}}/queue/me/events
+x-queue-ticket: {{join.response.body.$.ticket}}
+
+###############################################################################
+# Holds and purchases
+###############################################################################
+
+### Hold one item (201 on a new hold, 200 for the same hold; 403 not_admitted while waiting)
+# @name reserve
+POST {{backend}}/sales/{{current.response.body.$.id}}/reservations
+x-queue-ticket: {{join.response.body.$.ticket}}
+
+### Pay for the held item (201, or 200 with the same purchase when sent again; 402 payment_failed keeps the hold)
+POST {{backend}}/sales/{{current.response.body.$.id}}/purchases
+Content-Type: application/json
+
+{ "reservationId": "{{reserve.response.body.$.reservationId}}" }
+
+### Did I get it? (purchased, holding or none)
+GET {{backend}}/sales/{{current.response.body.$.id}}/purchases/me
+
+###############################################################################
+# The end of the session
+###############################################################################
+
+### Log out (ends the session and clears the cookies; safe to send twice)
+POST {{backend}}/auth/logout

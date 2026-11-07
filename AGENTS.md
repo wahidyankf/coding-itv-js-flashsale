@@ -17,14 +17,19 @@ Flash sale monorepo with five apps in `apps/` and one library in `libs/`: `flash
 `.claude/` holds Claude Code config only, with no copy for other tools. Each file is complete in itself and takes its rules from this file.
 
 - Skill `grill-me` (`.claude/skills/grill-me/SKILL.md`): asks a real decision as options with one recommendation, through `AskUserQuestion`, and records the answer.
-- Subagents in `.claude/agents/`:
-  - `swe-developer` (Haiku): builds behaviour test-first, or applies findings.
-  - `swe-debugger`: fixes failing checks at their cause.
-  - `swe-reviewer`: audits source and bindings, read-only.
-  - `swe-architect`: designs before building and reviews after; it writes only decision records, in `docs/explanation/decisions/`.
-  - `swe-api-tester`: tests the running API at `localhost:8080`.
-  - `swe-web-tester`: tests the running page at `localhost:3000` in a browser.
-  - `swe-orchestrator`: dispatches the others. Run it as the main thread (`claude --agent swe-orchestrator`), because a subagent cannot start agents.
+- Subagents in `.claude/agents/`. Pick the one that owns the work:
+
+  | Work                                                                              | Use                                                                                                                      |
+  | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+  | write or change code, tests, scenarios or config (`package.json`, `project.json`) | `swe-developer` (Haiku), test-first; also applies findings from a review or a test                                       |
+  | a type check, lint or test command fails                                          | `swe-debugger`: one cause at a time, never a suppressed check                                                            |
+  | a change touches a module boundary, a new dependency or a trade-off               | `swe-architect` before building and again before done; it writes only decision records, in `docs/explanation/decisions/` |
+  | review changed code, components or bindings                                       | `swe-reviewer`, read-only                                                                                                |
+  | check the running API at `localhost:8080`                                         | `swe-api-tester`                                                                                                         |
+  | check the running page at `localhost:3000` in a browser                           | `swe-web-tester`                                                                                                         |
+  | a goal that needs several of the above                                            | `swe-orchestrator`, as the main thread (`claude --agent swe-orchestrator`), because a subagent cannot start agents       |
+  | docs (`docs/`, `README.md`, this file) and the `.http` files                      | the main session; no agent owns them                                                                                     |
+  | a choice with more than one defensible answer                                     | the skill `grill-me`                                                                                                     |
 - All of them except `swe-developer` run on Sonnet. None of them commits. Their scratch records go to `local-tmp/`, which git ignores.
 - Biome skips `.claude/` (`biome.json`): its Markdown formatter would break the YAML frontmatter. `npm run docs:check` still checks these files.
 - When a rule here changes and an agent repeats it (checks, ports, paths), update that agent too.
@@ -136,7 +141,8 @@ Flash sale monorepo with five apps in `apps/` and one library in `libs/`: `flash
 - The operator routes are `POST`, `GET` (list), `PATCH` and `DELETE` under `/admin/sales`. They need the login of an operator (`401 not_authenticated`, `403 forbidden` for a shopper) and are never passed on by `flash-web`. Keep them
   off the allow-list of the `flash-web` proxy; a test there fails if one is on it. Overlap is refused there only, not in the seed command. A started sale keeps its start and cannot lose stock, a sale that is over cannot change, and a sale with a purchase cannot be removed.
 - `GET /sales/current` and the admission timer use one rule (`pickCurrent`, `admitCurrentSale`): the running sale, else the next to open, else none. Do not use "the sale that opens last".
-- `api-flash-be.http` and `api-flash-web.http` hold manual requests, one file per app. Update them when an endpoint changes. It does not replace tests.
+- `api-flash-be.http` and `api-flash-web.http` hold one request per route, one file per app. `api-flash-demo.http` is the demo story in order (`docs/how-to/run-the-demo.md`). All three use the kulala.nvim format (https://github.com/wahidyankf/kulala.nvim): a `Shared` block with `# @attach-cookie-jar`, and `# @name` (letters and `_` only) for a reply that later requests read. Update them when an endpoint changes. They do not replace tests.
+- The `demo:*` scripts in the root `package.json` set up and run the demo. `demo:reset` wipes the local data; never run it without being asked.
 
 ## Code style
 

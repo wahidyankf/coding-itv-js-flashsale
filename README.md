@@ -17,6 +17,8 @@ If you have five minutes, read these files in this order:
 | `apps/flash-web/src/sale/sale-page.tsx`                               | the page: status, name, Buy Now, feedback. Tailwind classes make it responsive and follow the system light or dark theme |
 | `apps/flash-load/k6/profiles.ts`, `apps/flash-load/scripts/run.ts`    | the stress profiles, and the verdict that is read from the data                                                          |
 
+To show it running, follow [run the demo](docs/how-to/run-the-demo.md).
+
 That is the core. The rest is support that keeps the code checked as it grows: Nx targets, the `typekit`
 library, the hexagon layers, the behaviour-coverage check, the docs check and the lint rules. You can ignore all of
 it to understand the system; it only matters when you change the code.
@@ -246,8 +248,22 @@ curl -s -b cookies.txt -X POST http://localhost:8080/admin/sales \
   -d '{"stock":3,"startsAt":"2030-01-01T12:00:00Z","endsAt":"2030-01-01T13:00:00Z"}'
 ```
 
-Open <http://localhost:3000>, type a name and press **Buy Now**, then **Confirm purchase**. The step-by-step version is
-[the tutorial](docs/tutorials/run-flash-sale-locally.md).
+Open <http://localhost:3000>, sign up (**I am new**), press **Buy Now**, then **Confirm purchase**. The step-by-step
+version is [the tutorial](docs/tutorials/run-flash-sale-locally.md).
+
+### The demo
+
+The same setup in three commands, and a ten-minute walk through the page, the API, Redis going down and a load run, is
+in [run the demo](docs/how-to/run-the-demo.md):
+
+```bash
+npm run demo:reset             # wipes the local data (skip it to keep yours)
+npm run demo:setup             # Postgres + Redis, migrations, the operator ops, a sale of 3 items
+npm run demo:dev               # API on :8080 and web on :3000
+```
+
+The requests of the demo are in [api-flash-demo.http](api-flash-demo.http). `demo:redis:stop`, `demo:redis:start` and
+`demo:load` are the other steps.
 
 ### Everything in containers
 
@@ -349,5 +365,5 @@ in [what the load runs found](docs/explanation/load-test-findings.md). The profi
 
 - [docs/](docs/README.md): a tutorial, how-to guides, reference and explanations.
 - [specs/](specs/README.md): the apps' Gherkin behaviour scenarios and the C4 architecture. Specs win when they disagree with the docs.
-- [api-flash-be.http](api-flash-be.http) and [api-flash-web.http](api-flash-web.http): manual requests for the API and the web server.
+- [api-flash-be.http](api-flash-be.http) and [api-flash-web.http](api-flash-web.http): every route of the API and of the web server, one request each. [api-flash-demo.http](api-flash-demo.http): the demo, in order. All three are in the [kulala.nvim](https://github.com/wahidyankf/kulala.nvim) format.
 - [AGENTS.md](AGENTS.md): rules for people and tools that change the code.

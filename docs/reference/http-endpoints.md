@@ -50,7 +50,7 @@ All bodies are JSON. Dates are ISO strings.
 | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET /health`                                                                   | `{ "status": "ok" }`                                                                                                                         |
 | `GET /ready`                                                                    | `{ "status": "ok" \| "unavailable", "checks": { "database": "ok" \| "error", "redis": "ok" \| "error" } }`                                   |
-| `GET /sales/current`, `GET /sales/:saleId`                                      | `{ "id", "name", "status", "startsAt", "endsAt", "stock", "remaining" }` (a `SaleView`)                                                      |
+| `GET /sales/current`, `GET /sales/:saleId`                                      | `{ "id", "productId", "name", "status", "startsAt", "endsAt", "stock", "remaining" }` (a `SaleView`)                                         |
 | `POST /sales/:saleId/queue`                                                     | `{ "userId", "ticket", "state": "waiting", "place" }` or `{ "userId", "ticket", "state": "admitted" }`                                       |
 | `GET /sales/:saleId/queue/me`                                                   | `{ "userId", "state": "waiting", "place" }`, `{ "userId", "state": "admitted" }` or `{ "userId", "state": "absent" }`                        |
 | `POST /sales/:saleId/reservations`                                              | `{ "userId", "reservationId", "expiresAt" }`                                                                                                 |
@@ -253,7 +253,7 @@ the item can go to someone else.
 
 | Status | `errorCode`         | When                                                                       |
 | ------ | ------------------- | -------------------------------------------------------------------------- |
-| `400`  | `invalid_user`      | the user id is missing or invalid                                          |
+| `401`  | `not_authenticated` | there is no login                                                          |
 | `401`  | `invalid_ticket`    | the ticket is missing or is not the one issued for this sale and user      |
 | `403`  | `not_admitted`      | the user is still waiting, or has no place in the queue and has not bought |
 | `404`  | `sale_not_found`    | the sale id is unknown or malformed                                        |
@@ -261,6 +261,7 @@ the item can go to someone else.
 | `409`  | `sale_ended`        | the window has closed                                                      |
 | `409`  | `sold_out`          | no item is free: sold items plus live holds fill the stock                 |
 | `409`  | `already_purchased` | the user already bought an item in this sale                               |
+| `429`  | `rate_limited`      | too many requests from this user or this address (see Rate limits)         |
 | `503`  | `unavailable`       | the reservation state could not be rebuilt in time; try again              |
 
 A sale that is not selling answers before the ticket is checked. The scenarios are in
@@ -268,16 +269,16 @@ A sale that is not selling answers before the ticket is checked. The scenarios a
 
 ## Purchases
 
-`POST /sales/:saleId/purchases` pays for the held item. The body holds the user id and the reservation id from the
-reservation reply.
+`POST /sales/:saleId/purchases` pays for the held item of the shopper who is logged in. The body holds the reservation id
+from the reservation reply: `{ "reservationId" }`.
 
 The reservation id is the idempotency key. Sending the same request again returns `200` with the same purchase, and the
 shopper is charged once.
 
 | Status | `errorCode`             | When                                                                                              |
 | ------ | ----------------------- | ------------------------------------------------------------------------------------------------- |
-| `400`  | `invalid_user`          | the user id is missing or invalid                                                                 |
 | `400`  | `invalid_reservation`   | the reservation id is missing or is not an id                                                     |
+| `401`  | `not_authenticated`     | there is no login                                                                                 |
 | `402`  | `payment_failed`        | the payment provider declined; the hold stays, so the shopper can try again until it ends         |
 | `404`  | `sale_not_found`        | the sale id is unknown or malformed                                                               |
 | `404`  | `reservation_not_found` | no hold of this user has this id (also for somebody else's reservation id)                        |
@@ -285,8 +286,10 @@ shopper is charged once.
 | `409`  | `already_purchased`     | the user already bought an item in this sale                                                      |
 | `409`  | `sale_ended`            | the window has closed                                                                             |
 | `409`  | `sold_out`              | the hold ended during the payment and the last item went to someone else; the payment is refunded |
+| `429`  | `rate_limited`          | too many requests from this user or this address (see Rate limits)                                |
 
-`GET /sales/:saleId/purchases/me` answers "did I get it?" for the shopper who is logged in. `state` is one of:
+`GET /sales/:saleId/purchases/me` answers "did I get it?" for the shopper who is logged in (`401` `not_authenticated`
+without a login). `state` is one of:
 
 | `state`     | Meaning                                              |
 | ----------- | ---------------------------------------------------- |
@@ -354,12 +357,12 @@ The scenarios are in [`specs/apps/flash/be/behaviours/degraded/`](../../specs/ap
 
 ## flash-web (port 3000)
 
-| Method | Path           | Response                                                                                                                             |
-| ------ | -------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| GET    | `/`            | HTML page. It shows the current sale, a form to buy, and `Backend: ok` when `flash-be` answers `GET /health` with `{"status":"ok"}`. |
-| GET    | `/api/health`  | `200` `{"status":"ok"}`                                                                                                              |
-| any    | `/api/sales/*` | The routes below, passed on to `flash-be`. Anything else under this path answers `404` with `errorCode` `not_found`.                 |
-| any    | `/api/auth/*`  | The login routes below, passed on to `flash-be`, with the cookies.                                                                   |
+| Method | Path           | Response                                                                                                                                       |
+| ------ | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/`            | HTML page. It shows the current sale, a login form or Buy Now, and `Backend: ok` when `flash-be` answers `GET /health` with `{"status":"ok"}`. |
+| GET    | `/api/health`  | `200` `{"status":"ok"}`                                                                                                                        |
+| any    | `/api/sales/*` | The routes below, passed on to `flash-be`. Anything else under this path answers `404` with `errorCode` `not_found`.                           |
+| any    | `/api/auth/*`  | The login routes below, passed on to `flash-be`, with the cookies.                                                                             |
 
 ### The sale routes
 
@@ -379,7 +382,7 @@ The browser reaches the sale and the login only through `/api/sales` and `/api/a
 | GET    | `/:saleId/purchases/me`    | "did I get it"         |
 
 Under `/api/auth` the pairs are `POST /register`, `POST /login`, `POST /refresh`, `POST /logout` and `GET /me`. The
-operator routes are in no list: `/api/admin/...` answers `404`.
+operator routes are in no list: `/api/admin/...` is not passed on and answers the page's `404` (HTML, not JSON).
 
 A request is refused at once with `404 not_found`, and `flash-be` is not asked, when its method and path are not in the
 table, or when a sale id is not a UUID. A `POST` that a browser sends from another site is refused with `403`
@@ -429,5 +432,15 @@ stack over plain HTTP.
 
 ## Manual requests
 
-[`api-flash-be.http`](../../api-flash-be.http) and [`api-flash-web.http`](../../api-flash-web.http) hold the requests above in the kulala.nvim format, one file per app. Every route of the API is in the first file, and every route the web server passes on is in the second. The login requests set the cookies, and the clients keep them for the requests after. An operator account is made first with
-`npx nx db:create-operator flash-be` (see [seed a sale](../how-to/seed-a-sale.md)).
+Three files at the root hold requests in the [kulala.nvim](https://github.com/wahidyankf/kulala.nvim) format. A request
+named with `# @name` keeps its reply, so later requests read the sale id, the ticket and the reservation id from it, and
+a `Shared` block attaches kulala's cookie jar to every request, so a login is kept.
+
+| File                                               | What it holds                                                           |
+| -------------------------------------------------- | ----------------------------------------------------------------------- |
+| [`api-flash-be.http`](../../api-flash-be.http)     | every route of the API, one request each                                |
+| [`api-flash-web.http`](../../api-flash-web.http)   | every route the web server passes on, and what it refuses               |
+| [`api-flash-demo.http`](../../api-flash-demo.http) | the demo story in order (see [run the demo](../how-to/run-the-demo.md)) |
+
+The operator account is made first with `npx nx db:create-operator flash-be` or `npm run demo:setup` (see
+[seed a sale](../how-to/seed-a-sale.md)).

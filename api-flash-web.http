@@ -1,71 +1,98 @@
-# Requests to the flash-web server, which passes the sale routes on to flash-be. The routes are in docs/reference/http-endpoints.md.
-@web = http://localhost:3000
-# Login is by cookie, and the pass-through route sends the cookies on. Sign up or log in first; the REST Client extension
-# and kulala.nvim keep the cookies for the next request. The web server refuses a POST from another origin, so a client
-# that sends an Origin header must send http://localhost:3000.
+# Every route that the flash-web server passes on to flash-be, one request each, plus what it refuses before it asks
+# the API. The routes and the replies are in docs/reference/http-endpoints.md; the demo story is api-flash-demo.http.
+#
+# Before you start: `npm run demo:setup`, then `npm run demo:dev` (the API and the web server).
+#
+# The format is kulala.nvim (https://github.com/wahidyankf/kulala.nvim). A request named with `# @name` keeps its
+# reply: send "the current sale", "join the queue" and "hold one item" before the requests that use them. The Shared
+# block attaches kulala's cookie jar to every request, and the web server passes the cookies on. It refuses a POST
+# whose Origin is another site.
 
-### Web: sign up as a shopper through the pass-through route (sets the two cookies)
+### Shared
+# @attach-cookie-jar
+@web = http://localhost:3000
+
+### Health of the web server itself (no call to the API)
+GET {{web}}/api/health
+
+### Sign up as a shopper (201 and the two cookies; the refresh cookie comes back for /api/auth, the path the browser calls)
 POST {{web}}/api/auth/register
 Content-Type: application/json
 
-{ "username": "ana", "password": "a long password" }
+{ "username": "shopper-web", "password": "a long password" }
 
-### Web: log in through the pass-through route
+### Log in (when sign-up answers 409 username_taken)
 POST {{web}}/api/auth/login
 Content-Type: application/json
 
-{ "username": "ana", "password": "a long password" }
+{ "username": "shopper-web", "password": "a long password" }
 
-### Web: who am I?
+### Who am I?
 GET {{web}}/api/auth/me
 
-### Web: renew the login
-POST {{web}}/api/auth/refresh
-
-### Web: log out
-POST {{web}}/api/auth/logout
-
-### Web: health check (Start server route, run with `npx nx dev flash-web`)
-GET {{web}}/api/health
-
-### Web: the current sale through the pass-through route (what the page calls; run with `npx nx dev flash-web`)
+### The current sale (what the page reads)
+# @name current
 GET {{web}}/api/sales/current
 
-### Web: one sale by id through the pass-through route (replace the sale id)
-GET {{web}}/api/sales/00000000-0000-4000-8000-000000000000
+### One sale by id
+GET {{web}}/api/sales/{{current.response.body.$.id}}
 
-### Web: live sale status through the pass-through route (Server-Sent Events; stays open)
-GET {{web}}/api/sales/00000000-0000-4000-8000-000000000000/events
+### Join the queue
+# @name join
+POST {{web}}/api/sales/{{current.response.body.$.id}}/queue
 
-### Web: join the queue through the pass-through route (replace the sale id; the reply holds your ticket)
-POST {{web}}/api/sales/00000000-0000-4000-8000-000000000000/queue
+### Check your place (waiting, admitted or absent; the delay lets one admission tick pass)
+# @delay 1500
+GET {{web}}/api/sales/{{current.response.body.$.id}}/queue/me
+x-queue-ticket: {{join.response.body.$.ticket}}
 
-### Web: check your place through the pass-through route (send the ticket from the join reply)
-GET {{web}}/api/sales/00000000-0000-4000-8000-000000000000/queue/me
-x-queue-ticket: paste-the-ticket-here
+### Hold one item
+# @name reserve
+POST {{web}}/api/sales/{{current.response.body.$.id}}/reservations
+x-queue-ticket: {{join.response.body.$.ticket}}
 
-### Web: live place in the queue through the pass-through route (send the ticket; stays open)
-GET {{web}}/api/sales/00000000-0000-4000-8000-000000000000/queue/me/events
-x-queue-ticket: paste-the-ticket-here
-
-### Web: reserve one item through the pass-through route (send the ticket from the join reply)
-POST {{web}}/api/sales/00000000-0000-4000-8000-000000000000/reservations
-x-queue-ticket: paste-the-ticket-here
-
-### Web: pay for the held item through the pass-through route
-POST {{web}}/api/sales/00000000-0000-4000-8000-000000000000/purchases
+### Pay for the held item
+POST {{web}}/api/sales/{{current.response.body.$.id}}/purchases
 Content-Type: application/json
 
-{ "reservationId": "00000000-0000-4000-8000-000000000001" }
+{ "reservationId": "{{reserve.response.body.$.reservationId}}" }
 
-### Web: did I get it? through the pass-through route
-GET {{web}}/api/sales/00000000-0000-4000-8000-000000000000/purchases/me
+### Did I get it?
+GET {{web}}/api/sales/{{current.response.body.$.id}}/purchases/me
 
-### Web: a path that is not allowed answers 404 not_found
+### Live sale status (Server-Sent Events, streamed through the web server; closes after 5 seconds here)
+# @accept chunked
+# @curl-max-time 5
+GET {{web}}/api/sales/{{current.response.body.$.id}}/events
+
+### Live place in the queue (closes after 5 seconds here)
+# @accept chunked
+# @curl-max-time 5
+GET {{web}}/api/sales/{{current.response.body.$.id}}/queue/me/events
+x-queue-ticket: {{join.response.body.$.ticket}}
+
+### Renew the login
+POST {{web}}/api/auth/refresh
+
+### Log out
+POST {{web}}/api/auth/logout
+
+###############################################################################
+# What the web server refuses before it asks the API.
+###############################################################################
+
+### A path that is not on the list: 404 not_found
 GET {{web}}/api/sales/current/secret
 
-### Web: the operator routes are never passed on, so they answer 404 not_found (manage sales on the API, see api-flash-be.http)
-POST {{web}}/api/admin/sales
+### A sale id that is not a UUID: 404 not_found
+GET {{web}}/api/sales/not-a-uuid
+
+### A POST from another site: 403 cross_site
+POST {{web}}/api/auth/login
+Origin: http://evil.example
 Content-Type: application/json
 
-{ "stock": 100, "startsAt": "2030-01-01T12:00:00Z", "endsAt": "2030-01-01T13:00:00Z" }
+{ "username": "shopper-web", "password": "a long password" }
+
+### The operator routes are never passed on: 404 (manage sales on the API, see api-flash-be.http)
+GET {{web}}/api/admin/sales
