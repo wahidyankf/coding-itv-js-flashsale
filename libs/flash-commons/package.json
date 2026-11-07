@@ -1,0 +1,29 @@
+{
+	"name": "@flash/flash-commons",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "Small shared behaviour for the apps: retry with exponential backoff, a max attempt count and full jitter. Pure: no timers, randomness or I/O of its own.",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc -p tsconfig.build.json",
+		"typecheck": "tsc --noEmit -p tsconfig.json",
+		"lint": "biome lint --error-on-warnings .",
+		"test:unit": "vitest run --config vitest.config.ts --coverage.enabled",
+		"test:coverage": "vitest run --config vitest.config.ts --coverage.enabled",
+		"test:unit:watch": "vitest --config vitest.config.ts"
+	},
+	"dependencies": {
+		"@flash/typekit": "*"
+	}
+}
