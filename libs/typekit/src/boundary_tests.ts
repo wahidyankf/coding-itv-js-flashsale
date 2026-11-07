@@ -1,3 +1,4 @@
+// Unit tests for attempt and attemptAsync: which thrown values become Err, which pass through, and the guard rule.
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { attempt, attemptAsync } from "./boundary.js";
 import { Err, Ok, type Result } from "./result.js";

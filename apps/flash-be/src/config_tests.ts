@@ -1,3 +1,4 @@
+// Unit tests for config.ts: the local defaults, the production rules, the values read from the environment, and that .env.example matches the code.
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";

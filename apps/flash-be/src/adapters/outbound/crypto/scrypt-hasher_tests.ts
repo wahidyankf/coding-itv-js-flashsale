@@ -1,3 +1,4 @@
+// Unit tests for the scrypt password hasher (adapter layer, outbound): a salted hash, a check that accepts only its own password, and a refusal of a value of another scheme.
 import { describe, expect, it } from "vitest";
 import { createScryptHasher } from "./scrypt-hasher.js";
 

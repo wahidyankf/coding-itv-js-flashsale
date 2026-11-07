@@ -29,6 +29,8 @@ export type Rotation = {
 	now: Date;
 };
 
+// The logins that are open, stored by the hash of their tokens. A copy of the table cannot log anyone in, and Postgres
+// decides whether a login still counts.
 export type SessionRepository = {
 	// Records a login.
 	create: (session: NewSession) => Promise<void>;

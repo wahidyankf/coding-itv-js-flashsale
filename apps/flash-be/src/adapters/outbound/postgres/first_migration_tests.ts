@@ -1,3 +1,4 @@
+// Unit test for the first migration's up and down, run against a recording database, so it needs no Postgres.
 import { expect, it } from "vitest";
 import { recordingDb } from "../../../bdd/support/recording-db.js";
 import { down, up } from "./migrations/0001_create_products.js";

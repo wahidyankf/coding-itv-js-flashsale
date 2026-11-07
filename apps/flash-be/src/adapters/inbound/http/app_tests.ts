@@ -1,3 +1,4 @@
+// Unit tests for the HTTP app at the edge, over fake dependencies with no database or Redis: error replies, refused bodies, login limits and cookies.
 import { Err, Ok } from "@flash/typekit";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Dependencies } from "../../../application/dependencies.js";

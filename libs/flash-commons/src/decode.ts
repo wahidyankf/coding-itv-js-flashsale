@@ -5,14 +5,17 @@
 //
 // The kit is pure: no I/O, no timers, no randomness. An object ignores the keys it does not name, so a reply that gains a
 // field breaks no reader; a field it does name must be there and must have the right shape.
+// It sits in the pure main entry of @flash/flash-commons, beside retry and the time units.
 
 import { Err, Ok, type Result } from "@flash/typekit";
 
-// Where a value went wrong, and what it should have been. `path` is dotted, such as `sale.stock`; the root value has the
-// empty path. `expected` is a short phrase for a developer, such as "an integer".
+// The one error a decoder returns. It names the field that was wrong, so a log or a message can say where without the
+// payload itself. `path` is dotted, such as `sale.stock`; the root value has the empty path, and `expected` is a short
+// phrase for a developer, such as "an integer".
 export type DecodeError = { path: string; expected: string };
 
-// Reads a value of unknown shape. It returns the typed value, or the first error it finds.
+// How the kit reads a value of unknown shape. A decoder never throws on a bad value: it returns an Err, so the caller
+// must handle the bad payload as a value.
 export type Decoder<T> = (value: unknown) => Result<T, DecodeError>;
 
 // A field that may be left out of an object. Built by `optional`.

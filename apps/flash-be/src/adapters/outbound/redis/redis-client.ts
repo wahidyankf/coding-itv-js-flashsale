@@ -42,5 +42,5 @@ export async function createRedis(url: string) {
 	return client;
 }
 
-// The type of the connected client that `createRedis` returns.
+// The client type the Redis adapters take, so none of them depends on how the client is built.
 export type RedisClient = Awaited<ReturnType<typeof createRedis>>;

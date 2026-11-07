@@ -1,3 +1,4 @@
+// Integration test for committing a purchase over the dev Postgres: the same reservation gives the same purchase, a shopper buys once, and the stock is never oversold.
 import { afterAll, describe, expect, it } from "vitest";
 import { insertSale } from "../../../bdd/support/seed.js";
 import { usernameOf } from "../../../bdd/support/users.js";

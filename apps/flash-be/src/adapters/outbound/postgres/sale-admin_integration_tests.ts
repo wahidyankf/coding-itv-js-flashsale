@@ -1,3 +1,4 @@
+// Integration test for the Postgres sale admin over the dev database: a change or a removal of a sale that is not there is refused.
 import { Ok } from "@flash/typekit";
 import { afterAll, describe, expect, it } from "vitest";
 import { config } from "../../../config.js";

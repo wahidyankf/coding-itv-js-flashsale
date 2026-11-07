@@ -1,3 +1,4 @@
+// Unit tests for the cookie helpers of the HTTP edge: reading one cookie, setting the login cookies, and cutting a user agent.
 import { describe, expect, it } from "vitest";
 import { cookieValue, cutUserAgent, setCookie } from "./cookies.js";
 

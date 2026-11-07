@@ -11,7 +11,7 @@ import { ERROR_STATUS } from "../errors.js";
 const checkWord = (check: Result<void, Error>): "ok" | "error" =>
 	check.isOk() ? "ok" : "error";
 
-// Registers `/health` and `/ready`.
+// Registers `/health` and `/ready`. The e2e configs and specs depend on both, so their answers are a contract.
 export function registerHealthRoutes(
 	app: FastifyInstance,
 	deps: Dependencies,

@@ -4,6 +4,7 @@
 import { createHash } from "node:crypto";
 import type { UserId, Username } from "./user.js";
 
+// Who a login may act as. Only an operator may manage sales; a shopper may queue, hold and buy.
 export type Role = "shopper" | "operator";
 
 // Who is making a request: the user row, the name the shopper typed, and what they may do.
@@ -21,10 +22,14 @@ const ACCESS_TTL_MINUTES = 15;
 // A week without a visit ends the login; every use of the refresh token starts a new week.
 const REFRESH_TTL_DAYS = 7;
 
+// How long an access token lasts, in seconds. It is short on purpose, so a stolen access token is useful for little time.
 export const ACCESS_TTL_SECONDS = ACCESS_TTL_MINUTES * SECONDS_PER_MINUTE;
+// How long a refresh token lasts, in seconds, counted from its last use. Each refresh is used once, then replaced.
 export const REFRESH_TTL_SECONDS = REFRESH_TTL_DAYS * SECONDS_PER_DAY;
 
+// The shortest password the rules accept. Length is the only rule; the edge checks that the body is text first.
 export const PASSWORD_MIN_LENGTH = 8;
+// The longest password the rules accept. The HTTP and CLI edges refuse a longer one before the service hashes anything.
 export const PASSWORD_MAX_LENGTH = 128;
 
 // A password is any text of a usable length. The rules stay short on purpose; a long phrase beats a pattern. The edge

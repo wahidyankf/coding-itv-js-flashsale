@@ -24,7 +24,7 @@ const placeBody = (user: Username, place: QueuePlace) => ({
 // One event of a shopper's place: whose it is, and the place it now has.
 type PlaceEvent = { event: "place"; data: ReturnType<typeof placeBody> };
 
-// Registers the queue routes. `stream` paces the place stream.
+// Registers the queue routes. The shopper is the one who is logged in (`.../queue/me`), and `stream` paces the place stream.
 export function registerQueueRoutes(
 	app: FastifyInstance,
 	deps: Dependencies,

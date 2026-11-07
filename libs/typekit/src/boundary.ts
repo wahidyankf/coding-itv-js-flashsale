@@ -3,7 +3,7 @@
 // attempt and attemptAsync turn a call that may throw into a Result. The failures to catch are named at the call site as
 // error classes. Only a thrown value that is an instance of one of them becomes Err, and the fault is that value itself.
 // Anything else is thrown on unchanged. There is no default guard and no catch-all, so naming none is a type error and,
-// at run time, a TypeError.
+// at run time, a TypeError. It sits between the callers and the Result type in result.ts.
 
 import { Err, Ok, type Result } from "./result.js";
 
@@ -31,6 +31,8 @@ function requireGuard(guards: readonly unknown[]): void {
 	}
 }
 
+// Runs a call that may throw and returns its outcome as a Result. Only the error classes the caller names become Err;
+// any other exception is rethrown, so a bug is never hidden as a failure. At least one class must be named.
 export function attempt<T, const G extends Guards>(
 	call: () => T,
 	...guards: G
@@ -45,6 +47,8 @@ export function attempt<T, const G extends Guards>(
 	}
 }
 
+// The async form of attempt, for a call that returns a promise. The same rule holds: only the named classes become Err,
+// and any other rejection is rethrown.
 export async function attemptAsync<T, const G extends Guards>(
 	call: () => PromiseLike<T>,
 	...guards: G

@@ -1,3 +1,4 @@
+// Unit tests for the CLI's failure message: the text for an ordinary failure, a connection failure with its reasons, and a database that cannot be reached.
 import { describe, expect, it } from "vitest";
 import { failureMessage } from "./failure-message.js";
 

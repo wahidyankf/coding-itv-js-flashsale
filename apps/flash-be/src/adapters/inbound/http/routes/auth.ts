@@ -64,7 +64,8 @@ function cookieJarOf(secure: boolean) {
 	};
 }
 
-// Registers the auth routes. `cookies.secure` says whether the cookies may only travel over HTTPS.
+// Registers the /auth routes, which have their own rate limit. `cookies.secure` says whether the cookies may only travel over
+// HTTPS.
 export function registerAuthRoutes(
 	app: FastifyInstance,
 	deps: Dependencies,

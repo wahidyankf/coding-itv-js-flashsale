@@ -1,6 +1,7 @@
 // What a run reads once k6 has finished: what Postgres says about the sale, what Redis lists, and what the k6 summary
 // says. The verdict compares these facts with each other; this file does no judging. It also counts the requests each
 // API instance logged, so the report shows whether the instances shared the work.
+// Part of the load runner in scripts/: the one place a run reads Postgres, Redis and the k6 summary once k6 has finished.
 import { readFileSync } from "node:fs";
 import type { ProfileName } from "../k6/profiles.ts";
 import {
@@ -17,6 +18,8 @@ const INSTANCE_COUNT = 3;
 // The log line the API writes for each request it receives.
 const REQUEST_LOG_LINE = '"incoming request"';
 
+// What Postgres says about the sale after a run. The verdict checks that nothing was oversold and that no shopper bought
+// twice, so these counts must come from the database itself.
 export type PostgresFacts = {
 	stock: number;
 	sold: number;
@@ -25,6 +28,8 @@ export type PostgresFacts = {
 	twice: number;
 };
 
+// What k6 counted and timed in one run, read from its summary. The verdict judges these against the limits in
+// k6/profiles.ts; the counts are k6's own, not the app's.
 export type K6Facts = {
 	purchased: number;
 	rateLimited: number;
@@ -35,6 +40,7 @@ export type K6Facts = {
 	purchaseP95: number | undefined;
 };
 
+// Everything one run reads once k6 has finished. The verdict and the report take it whole, so they judge the same facts.
 export type RunFacts = {
 	postgres: PostgresFacts;
 	k6: K6Facts;

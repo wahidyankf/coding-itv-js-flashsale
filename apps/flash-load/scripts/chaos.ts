@@ -1,5 +1,6 @@
 // The chaos timers of a run. The chaos profile stops Redis part way through the run and starts it again later, while
 // shoppers keep arriving. With --calm no timer is set, so the same run is a control without the failure.
+// Part of the load runner in scripts/. The runner starts the timers before k6, and cancels the ones not yet fired when k6 ends.
 import { MS_PER_SECOND } from "@flash/flash-commons";
 import type { Profile } from "../k6/profiles.ts";
 import { composeRedis } from "./compose.ts";
@@ -7,6 +8,8 @@ import { composeRedis } from "./compose.ts";
 // The report's wording for each action on Redis.
 const PAST_TENSE = { stop: "stopped", start: "started" } as const;
 
+// The chaos timers of one run. `events` is the list the report shows; `cancel` stops the timers that have not fired, so an
+// early end leaves no Redis action behind.
 export type Chaos = {
 	// What the timers did, in the order they fired. The report lists it.
 	events: string[];

@@ -1,3 +1,4 @@
+// Unit tests for Result: the guards, the types, map and mapErr, match, and the rule that a Result cannot be changed.
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { Err, Ok, type Result } from "./result.js";
 

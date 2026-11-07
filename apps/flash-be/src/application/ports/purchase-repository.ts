@@ -19,6 +19,8 @@ export type CommitResult =
 	| { kind: "sold_out" }
 	| { kind: "already_purchased" };
 
+// Purchases and their holds, kept in Postgres. The commit checks the stock and writes the purchase in one transaction, so
+// Postgres has the last word on who got the item.
 export type PurchaseRepository = {
 	// The purchase made with this reservation id, if any.
 	findByReservation(reservationId: string): Promise<Purchase | undefined>;

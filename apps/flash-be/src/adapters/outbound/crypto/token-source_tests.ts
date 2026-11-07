@@ -1,3 +1,4 @@
+// Unit test for the random token source (adapter layer, outbound): each token is new, and it is 32 random bytes in base64url.
 import { describe, expect, it } from "vitest";
 import { randomTokenSource } from "./token-source.js";
 

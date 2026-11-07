@@ -5,6 +5,6 @@ import type { TokenSource } from "../../../application/ports/token-source.js";
 
 const TOKEN_BYTES = 32;
 
-// The token source of the running process. Each call reads fresh randomness.
+// Random tokens for the running process. Each call draws fresh randomness, so no token can be guessed from another.
 export const randomTokenSource: TokenSource = () =>
 	randomBytes(TOKEN_BYTES).toString("base64url");

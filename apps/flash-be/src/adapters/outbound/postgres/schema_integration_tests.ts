@@ -1,3 +1,4 @@
+// Integration test for the migrated schema over the dev Postgres: the tables, the columns and the audit columns match the Database type.
 import { sql } from "kysely";
 import { afterAll, describe, expect, it } from "vitest";
 import { config } from "../../../config.js";

@@ -5,7 +5,9 @@
 //
 // Both classes carry both type parameters, so every method has the same signature on Ok and on Err and can be called on
 // the union. They are frozen and their fields are readonly, so a write is a type error and, at run time, a TypeError.
+// The types live here. boundary.ts is the one place a throw becomes one, and index.ts is the public entry.
 
+// The success side of a Result. It holds the value, and the value is reachable only after isOk or match narrows the union.
 export class Ok<out T, out E = never> {
 	readonly value: T;
 
@@ -35,6 +37,7 @@ export class Ok<out T, out E = never> {
 	}
 }
 
+// The failure side of a Result. It holds a named fault, not an exception, so the failure is in the type and no caller can miss it.
 export class Err<out T = never, out E = never> {
 	readonly error: E;
 
@@ -64,4 +67,6 @@ export class Err<out T = never, out E = never> {
 	}
 }
 
+// A fallible call's answer: Ok with the value, or Err with the fault. The fault type E is part of the signature, so every
+// failure a caller must handle is visible in the type.
 export type Result<T, E> = Ok<T, E> | Err<T, E>;

@@ -36,6 +36,8 @@ export type Login = {
 // command line) before the service sees them, so they arrive typed.
 export type RegisterError = "username_taken";
 
+// The accounts and logins use case as the HTTP adapter calls it. Every answer is a Result, so a refused sign-up or login is
+// a value the route maps to a reply, never an exception.
 export type AuthService = {
 	// Makes a shopper account and logs it in.
 	register: (
@@ -145,6 +147,8 @@ async function authenticateWith(
 	return new Ok(found.principal);
 }
 
+// Builds the auth use case over its ports. composition.ts passes in the real stores, hasher, clock and token source; a test
+// passes fakes.
 export function createAuthService(
 	accounts: AccountRepository,
 	sessions: SessionRepository,

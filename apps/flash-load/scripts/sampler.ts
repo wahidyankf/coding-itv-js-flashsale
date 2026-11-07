@@ -1,11 +1,14 @@
 // Samples Postgres while k6 runs: how many sessions wait for a lock, how many are active, and how many sit inside a
 // transaction. A hot sale row or an exhausted pool shows up here. The sampler asks again as soon as each answer is in,
-// so the number of samples depends on how fast psql answers.
+// so the number of samples depends on how fast psql answers. Part of the load runner in scripts/.
 import { spawn } from "node:child_process";
 import { composeArgs, psqlArgs } from "./compose.ts";
 
+// One reading of the Postgres sessions: how many wait on a lock, how many are active, and how many sit idle in a
+// transaction.
 export type Sample = { locked: number; active: number; idle: number };
 
+// A running sampler. stop() ends the asking and returns every sample, so the report can show how the database behaved.
 export type Sampler = {
 	// Stops asking and resolves with every sample taken so far.
 	stop(): Promise<Sample[]>;

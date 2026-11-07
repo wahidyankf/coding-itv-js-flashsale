@@ -3,7 +3,7 @@
 //
 // The library is pure: it has no timers, no randomness and no I/O. The caller injects sleep and random, so the same code
 // runs in Node, the browser and k6. A task reports failure as an Err value, and retry returns the last Result, so no
-// exception is caught here.
+// exception is caught here. It is part of the pure main entry; the real wait is the caller's, from `/timers`.
 
 import type { Result } from "@flash/typekit";
 

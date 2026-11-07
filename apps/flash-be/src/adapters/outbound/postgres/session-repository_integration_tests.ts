@@ -1,3 +1,4 @@
+// Integration test for the Postgres session repository over the dev Postgres: refresh tokens that have ended, removed users, and revoking a login.
 import { MS_PER_HOUR } from "@flash/flash-commons";
 import { sql } from "kysely";
 import { afterAll, beforeEach, expect, it } from "vitest";

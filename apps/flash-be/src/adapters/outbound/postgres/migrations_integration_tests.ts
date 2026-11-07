@@ -1,3 +1,4 @@
+// Integration test for the migrations over a scratch database on the dev Postgres: they roll back one at a time.
 import { sql } from "kysely";
 import { afterAll, expect, it } from "vitest";
 import { createScratchDatabase } from "../../../bdd/support/scratch-db.js";

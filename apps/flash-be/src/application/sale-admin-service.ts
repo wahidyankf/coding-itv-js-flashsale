@@ -25,6 +25,8 @@ export type CreateSaleError =
 	| "sale_overlaps"
 	| "product_not_found";
 
+// The operator's writes to sales, as the HTTP adapter calls them. Each call names the operator who acts, so the sale
+// records its author.
 export type SaleAdminService = {
 	// Creates a sale. `actor` is the operator who made it, recorded as the author.
 	create: (

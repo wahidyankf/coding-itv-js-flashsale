@@ -1,5 +1,8 @@
+// Vitest for libs/typekit: plain unit tests beside the source, in Node. test:unit runs them with the coverage report.
+// The library has no Gherkin.
 import { defineConfig } from "vitest/config";
 
+// The unit-test config and its 99% coverage floor, the bar this library keeps.
 export default defineConfig({
 	test: {
 		name: "unit",

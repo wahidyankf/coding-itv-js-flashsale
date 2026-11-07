@@ -10,7 +10,7 @@ import { saleDraftBody, salePatchBody } from "./bodies.js";
 import { createGuards, operatorOf, type SaleParams } from "./guards.js";
 import { sendError, sendResult } from "./reply.js";
 
-// Registers the operator's sale routes.
+// Registers the operator's sale routes under /admin/sales. Each needs an operator's login, and flash-web never passes them on.
 export function registerAdminRoutes(
 	app: FastifyInstance,
 	deps: Dependencies,

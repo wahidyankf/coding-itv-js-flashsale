@@ -1,3 +1,4 @@
+// Unit tests that run the README example, so the example stays type-checked and its answers stay true.
 import { describe, expect, it } from "vitest";
 import { attempt } from "./index.js";
 

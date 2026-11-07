@@ -1,6 +1,6 @@
 // The one place that talks to the load stack: `docker compose` on this app's compose.yaml, and the commands run inside
 // its containers (psql, redis-cli). Every compose call goes through here, so the compose file, the exec arguments and
-// the report paths are each written once.
+// the report paths are each written once. Part of the load runner in scripts/.
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 
@@ -20,6 +20,8 @@ export const TEAR_DOWN_ARGS = ["down", "-v", "--remove-orphans"];
 // psql as the flash role on the flash database: unaligned output, no headers. The query is the last argument.
 const PSQL_ARGS = ["psql", "-U", "flash", "-d", "flash", "-tA", "-c"];
 
+// The outcome of one docker compose command. A failed command has a status here rather than an exception, so cleanup
+// can still run after it.
 export type ComposeResult = {
 	status: number | null;
 	stdout: string;

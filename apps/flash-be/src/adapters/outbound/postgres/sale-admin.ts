@@ -205,7 +205,8 @@ async function listSales(db: Kysely<Database>): Promise<Sale[]> {
 	return rows.map(toSale);
 }
 
-// The sale admin over Postgres. Each method is one step above, so the factory only names them.
+// The operator's sale writes over Postgres. Each write runs in one transaction under the sale-window lock, so its check and
+// its write cannot be split.
 export function createPostgresSaleAdmin(db: Kysely<Database>): SaleAdmin {
 	return {
 		create: (input, actor) => createSale(db, input, actor),

@@ -2,5 +2,5 @@
 // fixed clock instead, so a scenario never depends on when it runs.
 import type { Clock } from "../../../application/ports/clock.js";
 
-// The clock of the running process. Each call reads the time now.
+// The real clock. Every production read of the time goes through it, and a test passes a fixed clock in its place.
 export const systemClock: Clock = () => new Date();

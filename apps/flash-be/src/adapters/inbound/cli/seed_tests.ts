@@ -1,3 +1,4 @@
+// Unit tests for the seed command's options: the defaults, every option it reads, and the refusals of a bad name, date or flag.
 import { Ok } from "@flash/typekit";
 import { describe, expect, it } from "vitest";
 import { parseSeedArgs } from "./seed-args.js";

@@ -2,9 +2,9 @@
 // and the two checks the form makes on a user name and a password. The two checks copy flash-be, and
 // `same_as_be_tests.ts` fails when a copy drifts from it.
 
-// The password rule of flash-be: 8 to 128 characters.
+// The shortest password: a copy of flash-be's rule, which same_as_be_tests.ts keeps equal.
 export const PASSWORD_MIN_LENGTH = 8;
-// The longest password flash-be accepts.
+// The longest password: a copy of flash-be's rule, which same_as_be_tests.ts keeps equal.
 export const PASSWORD_MAX_LENGTH = 128;
 
 const USERNAME_RULE = "1 to 64 letters, digits or . _ @ + - characters.";

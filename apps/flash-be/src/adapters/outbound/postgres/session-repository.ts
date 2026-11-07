@@ -196,7 +196,8 @@ async function revokeSessions(
 	return ended.map((row) => row.access_hash);
 }
 
-// The session store over Postgres. The methods are the steps above; the factory only connects them.
+// The session store over Postgres: the record that decides whether a login still counts. Redis may cache it, but never
+// overrides it.
 export function createSessionRepository(
 	db: Kysely<Database>,
 ): SessionRepository {

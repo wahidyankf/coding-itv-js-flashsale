@@ -13,6 +13,8 @@ export type NewAccount = {
 	createdBy?: UserId | undefined;
 };
 
+// The accounts that can log in. The unique index on a live name is what stops two sign-ups from both winning, so the
+// store, not the service, has the last word on a name.
 export type AccountRepository = {
 	// Adds the account, unless a live account already has its name. The unique index decides, so two sign-ups for one
 	// name cannot both succeed.

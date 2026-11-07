@@ -1,5 +1,5 @@
 // The time units that every app converts with. One definition here, so no app writes 1000 or 60_000 itself.
-// They convert a length; they are not a contract, so each app may use them freely.
+// They convert a length; they are not a contract, so each app may use them freely. Part of the pure main entry.
 
 // Milliseconds in one second. The API counts seconds; JavaScript timers count milliseconds.
 export const MS_PER_SECOND = 1000;

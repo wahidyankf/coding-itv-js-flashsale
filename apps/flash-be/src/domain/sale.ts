@@ -2,6 +2,8 @@
 // moment `now`, and returns a value. Services decide on the Sale with these functions, never on the public view.
 import { MS_PER_SECOND } from "@flash/flash-commons";
 
+// The sale the rules judge: its window, its stock and what has sold. Services decide on this type; the public view is
+// built from it, never the other way round.
 export type Sale = {
 	id: string;
 	// The product this sale sells. Many sales can sell one product, one after the other.

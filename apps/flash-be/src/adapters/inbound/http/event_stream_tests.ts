@@ -1,3 +1,4 @@
+// Unit tests for the event streams at the HTTP edge, over fake dependencies: the SSE text, keep-alives, reads that fail, and clients that leave.
 import { Err, Ok } from "@flash/typekit";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { afterEach, describe, expect, it } from "vitest";

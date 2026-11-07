@@ -3,7 +3,8 @@
 // the HTTP contract; the routes and the event stream send these objects as they are. The status comes from the service.
 import { remaining, type Sale, type SaleStatus } from "../../../domain/sale.js";
 
-// A sale as shoppers see it.
+// A sale as shoppers see it. The operator-only numbers (sold, hold length, admit rate) are left out, so a shopper's page
+// cannot show them.
 export type SaleView = {
 	id: string;
 	productId: string;

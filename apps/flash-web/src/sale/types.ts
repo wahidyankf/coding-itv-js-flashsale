@@ -1,7 +1,7 @@
 // The shapes flash-be sends for a sale and a purchase, as the JSON carries them, each with the decoder that checks it. Dates
-// are ISO strings. A decoder runs on every reply and every stream event before the page uses it (api.ts and client.ts), so
-// a payload of the wrong shape never reaches the page. The app's own shapes (the page's first load, the API's failure) live
-// in load.ts and api.ts.
+// are ISO strings. A decoder runs on every reply and every stream event before the page uses it (api.ts, client.ts and
+// load.ts), so a payload of the wrong shape never reaches the page. The app's own shapes (the page's first load, the API's
+// failure) live in load.ts and api.ts. It sits in the sale feature; the server load and the browser client both use it.
 import {
 	both,
 	type Decoder,
@@ -19,6 +19,7 @@ import {
 
 // The states of a sale, as flash-be names them. The page shows each one, and only `active` lets a shopper buy.
 const SALE_STATUSES = ["upcoming", "active", "sold_out", "ended"] as const;
+// The sale's state as the page knows it. The values are flash-be's, so a new state there needs one here too.
 export type SaleStatus = (typeof SALE_STATUSES)[number];
 
 // A sale as the API shows it. `remaining` is what is still for sale.
@@ -32,6 +33,7 @@ export type SaleView = {
 	stock: number;
 	remaining: number;
 };
+// Checks a sale reply before the page uses it. A missing or wrong field is refused, and the error names the field.
 export const decodeSaleView: Decoder<SaleView> = object({
 	id: uuid,
 	productId: uuid,
@@ -43,7 +45,8 @@ export const decodeSaleView: Decoder<SaleView> = object({
 	remaining: nonNegativeInteger,
 });
 
-// Where the shopper stands in the line. The ticket and the name that come with a place are not needed to show it.
+// Where the shopper stands in the line: waiting at a place, admitted to buy, or not in the line at all. The views below add
+// the shopper's id and the ticket.
 export type Place =
 	| { state: "waiting"; place: number }
 	| { state: "admitted" }
@@ -57,6 +60,7 @@ const decodePlace: Decoder<Place> = tagged("state", {
 
 // A place in the line, with the shopper it is for.
 export type PlaceView = Place & { userId: string };
+// Checks a place reply: the place and the shopper's id. An empty id is refused, so a place is never tied to nobody.
 export const decodePlaceView: Decoder<PlaceView> = both(
 	object({ userId: nonEmptyText }),
 	decodePlace,
@@ -64,6 +68,7 @@ export const decodePlaceView: Decoder<PlaceView> = both(
 
 // The answer to joining the line: the place, and the ticket that proves it.
 export type JoinedView = PlaceView & { ticket: string };
+// Checks the reply to joining the line. The ticket is required, because the shopper proves their place with it later.
 export const decodeJoinedView: Decoder<JoinedView> = both(
 	object({ ticket: text }),
 	decodePlaceView,
@@ -75,6 +80,7 @@ export type ReservedView = {
 	reservationId: string;
 	expiresAt: string;
 };
+// Checks a hold reply. The expiry must be a real ISO date, because the page counts the hold down to it.
 export const decodeReservedView: Decoder<ReservedView> = object({
 	userId: nonEmptyText,
 	reservationId: uuid,
@@ -88,6 +94,7 @@ export type PurchaseView = {
 	reservationId: string;
 	purchasedAt: string;
 };
+// Checks a purchase reply, the proof that the shopper got the item. Each id must be a UUID, as flash-be writes them.
 export const decodePurchaseView: Decoder<PurchaseView> = object({
 	userId: nonEmptyText,
 	purchaseId: uuid,
@@ -101,6 +108,8 @@ export type OutcomeView =
 	| (PurchaseView & { state: "purchased" })
 	| (ReservedView & { state: "holding" })
 	| { userId: string; state: "none" };
+// Checks the answer to "did I get it?". The state picks the fields that are required, so each of the three answers is
+// checked in full.
 export const decodeOutcomeView: Decoder<OutcomeView> = tagged("state", {
 	purchased: both(decodePurchaseView, object({ state: literal("purchased") })),
 	holding: both(decodeReservedView, object({ state: literal("holding") })),

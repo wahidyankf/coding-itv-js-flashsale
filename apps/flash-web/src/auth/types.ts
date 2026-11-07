@@ -1,4 +1,5 @@
 // Who is logged in, as flash-be tells it, and the decoder that checks it. The tokens are in cookies that the page cannot read.
+// It sits in the account feature; the account client and the page's web API (web-api.ts) both decode with it.
 import {
 	type Decoder,
 	nonEmptyText,
@@ -8,7 +9,9 @@ import {
 
 const ROLES = ["shopper", "operator"] as const;
 
+// The signed-in account as flash-be sends it: a user name and a role. The page shows it; the tokens stay in cookies it cannot read.
 export type Account = { username: string; role: (typeof ROLES)[number] };
+// Checks an account reply before the page uses it. An unknown role is refused, so the page never acts on one.
 export const decodeAccount: Decoder<Account> = object({
 	username: nonEmptyText,
 	role: oneOf(ROLES),

@@ -10,7 +10,7 @@ import {
 } from "./guards.js";
 import { createdOrOk, sendResult } from "./reply.js";
 
-// Registers the reservation route.
+// Registers the reservation route. The hold is for the shopper who is logged in, never for one a URL names.
 export function registerReservationRoutes(
 	app: FastifyInstance,
 	deps: Dependencies,

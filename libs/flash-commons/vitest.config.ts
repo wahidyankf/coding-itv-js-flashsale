@@ -2,6 +2,7 @@
 // report. The library has no Gherkin.
 import { defineConfig } from "vitest/config";
 
+// The unit-test config for the library, with the 99% coverage floor it keeps.
 export default defineConfig({
 	test: {
 		name: "unit",

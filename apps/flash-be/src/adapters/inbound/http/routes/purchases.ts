@@ -43,7 +43,7 @@ function outcomeReply(
 	}
 }
 
-// Registers the purchase routes.
+// Registers the purchase routes. The shopper is the one who is logged in (`.../purchases/me`); no URL names a user.
 export function registerPurchaseRoutes(
 	app: FastifyInstance,
 	deps: Dependencies,

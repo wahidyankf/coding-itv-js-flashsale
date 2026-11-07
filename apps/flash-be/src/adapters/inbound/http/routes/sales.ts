@@ -13,7 +13,8 @@ import { sendError } from "./reply.js";
 // One event of a sale's stream: the sale as it is now.
 type SaleEvent = { event: "sale"; data: SaleView };
 
-// Registers the sale routes. `stream` paces the live stream.
+// Registers the public sale routes: the current sale, one sale, and its live stream. None needs a login. `stream` paces the
+// live stream.
 export function registerSaleRoutes(
 	app: FastifyInstance,
 	deps: Dependencies,

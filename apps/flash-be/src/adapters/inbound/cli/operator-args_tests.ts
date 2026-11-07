@@ -1,3 +1,4 @@
+// Unit tests for the operator command's input: the refusals and the words each one prints, and the flags it reads.
 import { Err, Ok } from "@flash/typekit";
 import { describe, expect, it } from "vitest";
 import { normalizeUser } from "../../../domain/user.js";

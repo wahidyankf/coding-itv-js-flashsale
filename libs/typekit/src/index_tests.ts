@@ -1,3 +1,4 @@
+// Unit test for the public surface of @flash/typekit: the names index.ts exports, and no others.
 import { describe, expect, it } from "vitest";
 import * as typekit from "./index.js";
 

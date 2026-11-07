@@ -18,8 +18,12 @@ export type NewSale = {
 // The defaults for what an operator or the seed command leaves out. The length of the window is the seed command's only:
 // an operator gives both ends of the window.
 export const DEFAULT_SALE_NAME = "Flash sale";
+// How long a hold lasts, in seconds, when the operator or the seed command leaves it out. A hold is what a shopper keeps
+// while they pay.
 export const DEFAULT_HOLD_SECONDS = 120;
+// How many shoppers the queue admits each second when no rate is given.
 export const DEFAULT_ADMIT_PER_SECOND = 50;
+// How long a seeded sale runs when no end is given. Only the seed command uses it; an operator always gives both ends.
 export const DEFAULT_SALE_DURATION_MINUTES = 60;
 const NAME_MAX_LENGTH = 120;
 
@@ -94,6 +98,8 @@ export type SalePatch = {
 		| undefined;
 };
 
+// Why a change to a sale is refused: the change is not valid, or the sale is locked. A sale that is over is locked; a sale
+// that has started keeps its start and cannot lose stock.
 export type ChangeSaleError = "invalid_sale" | "sale_locked";
 
 // The sale after a change, or why it cannot change. The same rules as a new sale apply to the result. On top of that,

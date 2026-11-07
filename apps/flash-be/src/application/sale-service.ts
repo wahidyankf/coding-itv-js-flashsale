@@ -23,6 +23,8 @@ export function withStatus(sale: Sale, now: Date): SaleWithStatus {
 	return { sale, status: saleStatus(sale, now) };
 }
 
+// Reads of sales for the shoppers and the write routes. A public read may be up to the cache time old; the details the
+// write routes decide on are always fresh.
 export type SaleService = {
 	// The sale shoppers are shown now, with its status. It may be up to the cache time old.
 	current: () => Promise<SaleWithStatus | undefined>;
