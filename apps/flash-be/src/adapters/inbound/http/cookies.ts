@@ -3,8 +3,11 @@
 
 // The two cookies of a login. The access token is short and goes with every request. The refresh token lives longer,
 // is sent only to the auth routes, and is replaced each time it is used.
+// The name of the cookie that holds the access token.
 export const ACCESS_COOKIE = "access_token";
+// The name of the cookie that holds the refresh token.
 export const REFRESH_COOKIE = "refresh_token";
+// The only path the refresh cookie is sent to, so it travels to the auth routes and nowhere else.
 export const REFRESH_COOKIE_PATH = "/auth";
 
 // A user agent is text from the client, so only this much of it is kept for the record of a login.

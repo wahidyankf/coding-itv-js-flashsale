@@ -1,9 +1,14 @@
-// The words of the HTTP side of the API: header names, statuses, and the error codes with their sentences.
+// The words of the HTTP side of the API: header names, statuses, and the error codes with their sentences. Inbound HTTP
+// adapter. The rules that raise these errors are in the domain and the application, not here.
 
+// The header that carries the queue ticket. A ticket is sent in it, and nowhere else.
 export const TICKET_HEADER = "x-queue-ticket";
 
+// The success statuses the routes use: 200 for a read or a change, 201 for something new.
 export const HTTP_STATUS = { ok: 200, created: 201 } as const;
+// The first status of the client-error range (4xx): a request the client got wrong.
 export const FIRST_CLIENT_ERROR_STATUS = 400;
+// The first status of the server-error range (5xx): our fault, logged and answered as `internal`.
 export const FIRST_SERVER_ERROR_STATUS = 500;
 
 // Every error code of the API and the HTTP status that answers it. A code has one status everywhere.
@@ -39,6 +44,7 @@ export const ERROR_STATUS = {
 	unavailable: 503,
 } as const;
 
+// Every error code the API can answer with. Adding a code means adding it to ERROR_STATUS and ERROR_MESSAGE.
 export type ErrorCode = keyof typeof ERROR_STATUS;
 
 // One sentence for each error code, for a developer reading a reply or a log. `internal` says nothing of the cause.

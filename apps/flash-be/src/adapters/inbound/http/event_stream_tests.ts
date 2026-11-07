@@ -1,10 +1,11 @@
 import { Err, Ok } from "@flash/typekit";
+import type { FastifyReply, FastifyRequest } from "fastify";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Dependencies } from "../../../application/dependencies.js";
 import { healthyDeps } from "../../../bdd/support/deps.js";
 import { fakeSale } from "../../../bdd/support/fake-sales.js";
 import { buildApp } from "./app.js";
-import { formatEvent } from "./event-stream.js";
+import { formatEvent, serveEvents } from "./event-stream.js";
 
 // Edges of the stream that the scenarios do not reach: a keep-alive, a sale that vanishes, a place that was lost.
 const fast = { intervalMs: 10, heartbeatMs: 0 };
@@ -44,6 +45,42 @@ async function readUntil(
 	controller.abort();
 	return seen;
 }
+
+// A reply and a request with only the parts `serveEvents` touches. Each write and the close listener are recorded.
+function streamDouble() {
+	const written: string[] = [];
+	let onClose: () => void = () => {};
+	const reply = {
+		hijack: () => {},
+		raw: { writeHead: () => {}, write: (text: string) => written.push(text) },
+	} as unknown as FastifyReply;
+	const request = {
+		raw: {
+			on: (_event: string, listener: () => void) => {
+				onClose = listener;
+			},
+		},
+	} as unknown as FastifyRequest;
+	return { written, reply, request, close: () => onClose() };
+}
+
+describe("serveEvents", () => {
+	it("sends nothing, not even a keep-alive, and logs nothing when the read has nothing to tell", async () => {
+		const stream = streamDouble();
+		const logged: unknown[] = [];
+		serveEvents(
+			stream.request,
+			stream.reply,
+			async () => undefined,
+			{ intervalMs: 1000, heartbeatMs: 0 },
+			(error) => logged.push(error),
+		);
+		await new Promise((resolve) => setTimeout(resolve, 5));
+		stream.close();
+		expect(stream.written).toEqual([]);
+		expect(logged).toEqual([]);
+	});
+});
 
 describe("the event stream", () => {
 	it("formats an event as the SSE wire text", () => {

@@ -1,3 +1,5 @@
+// The HTTP server of flash-be, built on Fastify. It is an inbound adapter: it turns a request into a call on the
+// application and a result into a reply. The routes are in ./routes, the error replies in ./errors.ts.
 import Fastify, { type FastifyInstance } from "fastify";
 import type { Dependencies } from "../../../application/dependencies.js";
 import {
@@ -8,8 +10,10 @@ import {
 	FIRST_SERVER_ERROR_STATUS,
 } from "./errors.js";
 import { DEFAULT_STREAM_OPTIONS, type StreamOptions } from "./event-stream.js";
-import { registerRoutes } from "./routes.js";
+import { registerRoutes } from "./routes/index.js";
 
+// Builds the HTTP app over the given dependencies, without listening. The options are the ones the entry point or a test
+// sets: whether to log, whether to trust a proxy's address, the stream pacing, and whether cookies need HTTPS.
 export function buildApp(
 	deps: Dependencies,
 	options: {
