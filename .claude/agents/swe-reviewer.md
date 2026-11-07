@@ -47,7 +47,9 @@ Six checks.
    review does. The rule of three from `AGENTS.md`: a third copy is a finding, and a value 3 or more places across the
    apps share belongs in `libs/flash-commons`, except what the e2e and load oracles write themselves. A retry that does
    not go through `@flash/flash-commons` with backoff, a max attempt count and jitter is a finding. A new kind of file
-   that its app's `README.md` does not name is a finding.
+   that its app's `README.md` does not name is a finding. A page in `docs/`, `specs/`, a `README.md`, `AGENTS.md` or
+   `.claude/` that still names a path, name, route, error code, env var, command or number the change altered is a
+   finding.
 3. **Stack and domain rules** from `AGENTS.md`: the oversell and one-per-shopper guards in Postgres stay
    (`sold < stock`, the partial unique indexes, the `CHECK`); Redis commands on the sale path fail at once; nothing is
    hard-deleted and every read adds `deleted_at IS NULL`; tokens never reach a body, URL, or log; no route takes a user

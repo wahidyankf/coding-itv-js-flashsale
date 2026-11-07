@@ -52,8 +52,9 @@ New or changed behaviour, test-first, reusing what the repository holds.
 5. **Make it right, then fast only on a measurement.** Edit surgically.
 6. **Check before handing over.** Run `npx nx test:quick <app>` over every changed app, `npx nx test:coverage <app>`
    for the 99% floor (it needs Docker), `npm run lint`, and the e2e or load runs the change affects. Name every check
-   still not run, and every document the change leaves stale (`docs/reference/http-endpoints.md`, the `.http` files,
-   `specs/apps/flash/c4/`, `README.md`, `AGENTS.md`).
+   still not run, and every document the change leaves stale. Search `docs/`, `specs/`, every `README.md`, `AGENTS.md`
+   and `.claude/` for each path, name, route, error code, env var, command and number you changed (for example
+   `docs/reference/http-endpoints.md`, the `.http` files and `specs/apps/flash/c4/`).
 
 An interface change in `flash-web` stays within Tailwind classes, stays readable from a phone to a desktop and in light
 and dark mode, and never uses colour as the only signal. A missing design decision is a question for the caller, never a

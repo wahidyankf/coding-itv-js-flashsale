@@ -10,26 +10,33 @@ Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `fla
 ## Docs and specs
 
 - `docs/` is the documentation for users and developers, split into Diátaxis modes. Start at [docs/README.md](docs/README.md).
+- Every `.md` file can be reached from the root `README.md` by following links, one level at a time: the root README
+  links the top indexes (`docs/README.md`, `specs/README.md`, `AGENTS.md`, the app and library READMEs), and each folder
+  README links its direct children. A new page gets a link in its folder's README; nothing is listed only in the root.
+- A code change updates the docs that describe it, in the same change. Before you call it done, search `docs/`,
+  `specs/`, every `README.md`, `AGENTS.md` and `.claude/` for each path, name, route, error code, env var, command and
+  number you changed, and fix every page that is now wrong. Docs are the main session's job, so an agent names each
+  stale page to its caller instead of leaving it.
 - `specs/` holds the apps' behaviour scenarios (`specs/apps/flash/be` and `web`), their C4 model, and the load test rules (`specs/apps/flash/load/`). Start at [specs/README.md](specs/README.md). Specs win when they disagree with `docs/`.
 
 ## Claude Code agents and skills
 
 `.claude/` holds Claude Code config only, with no copy for other tools. Each file is complete in itself and takes its rules from this file.
 
-- Skill `grill-me` (`.claude/skills/grill-me/SKILL.md`): asks a real decision as options with one recommendation, through `AskUserQuestion`, and records the answer.
+- Skill `grill-me` ([`.claude/skills/grill-me/SKILL.md`](.claude/skills/grill-me/SKILL.md)): asks a real decision as options with one recommendation, through `AskUserQuestion`, and records the answer.
 - Subagents in `.claude/agents/`. Pick the one that owns the work:
 
-  | Work                                                                              | Use                                                                                                                      |
-  | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-  | write or change code, tests, scenarios or config (`package.json`, `project.json`) | `swe-developer` (Haiku), test-first; also applies findings from a review or a test                                       |
-  | a type check, lint or test command fails                                          | `swe-debugger`: one cause at a time, never a suppressed check                                                            |
-  | a change touches a module boundary, a new dependency or a trade-off               | `swe-architect` before building and again before done; it writes only decision records, in `docs/explanation/decisions/` |
-  | review changed code, components or bindings                                       | `swe-reviewer`, read-only                                                                                                |
-  | check the running API at `localhost:8080`                                         | `swe-api-tester`                                                                                                         |
-  | check the running page at `localhost:3000` in a browser                           | `swe-web-tester`                                                                                                         |
-  | a goal that needs several of the above                                            | `swe-orchestrator`, as the main thread (`claude --agent swe-orchestrator`), because a subagent cannot start agents       |
-  | docs (`docs/`, `README.md`, this file) and the `.http` files                      | the main session; no agent owns them                                                                                     |
-  | a choice with more than one defensible answer                                     | the skill `grill-me`                                                                                                     |
+  | Work                                                                              | Use                                                                                                                                                         |
+  | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | write or change code, tests, scenarios or config (`package.json`, `project.json`) | [`swe-developer`](.claude/agents/swe-developer.md) (Haiku), test-first; also applies findings from a review or a test                                       |
+  | a type check, lint or test command fails                                          | [`swe-debugger`](.claude/agents/swe-debugger.md): one cause at a time, never a suppressed check                                                             |
+  | a change touches a module boundary, a new dependency or a trade-off               | [`swe-architect`](.claude/agents/swe-architect.md) before building and again before done; it writes only decision records, in `docs/explanation/decisions/` |
+  | review changed code, components or bindings                                       | [`swe-reviewer`](.claude/agents/swe-reviewer.md), read-only                                                                                                 |
+  | check the running API at `localhost:8080`                                         | [`swe-api-tester`](.claude/agents/swe-api-tester.md)                                                                                                        |
+  | check the running page at `localhost:3000` in a browser                           | [`swe-web-tester`](.claude/agents/swe-web-tester.md)                                                                                                        |
+  | a goal that needs several of the above                                            | [`swe-orchestrator`](.claude/agents/swe-orchestrator.md), as the main thread (`claude --agent swe-orchestrator`), because a subagent cannot start agents    |
+  | docs (`docs/`, `README.md`, this file) and the `.http` files                      | the main session; no agent owns them                                                                                                                        |
+  | a choice with more than one defensible answer                                     | the skill `grill-me`                                                                                                                                        |
 - All of them except `swe-developer` run on Sonnet. None of them commits. Their scratch records go to `local-tmp/`, which git ignores.
 - Biome skips `.claude/` (`biome.json`): its Markdown formatter would break the YAML frontmatter. `npm run docs:check` still checks these files.
 - When a rule here changes and an agent repeats it (checks, ports, paths), update that agent too.
@@ -56,7 +63,7 @@ Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `fla
   scenario (`docs/how-to/change-an-endpoint.md`). An error reply is `{ errorCode, errorMessage }` (plus `retryAfterSeconds`
   for `429`); the status is not in the body.
 - Biome formats and lints (tabs, double quotes). Do not add Prettier or ESLint.
-- `flash-web` is styled with Tailwind classes in the components (`src/styles.css` only imports Tailwind). Do not add inline
+- `flash-web` is styled with Tailwind classes in the components (`src/styles.css` only imports Tailwind and sets `color-scheme`). Do not add inline
   style blocks or another CSS library. The page must stay readable from a phone to a desktop and in light and dark mode. Colour
   is never the only signal: the words stay on screen.
 - Failures are values. Product code (`apps/*/src`, `libs/*/src`, not tests or `src/bdd`) has no `catch` clause and no
@@ -87,7 +94,7 @@ Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `fla
   `docs/explanation/decisions/016-dry-rule-of-three.md`.
 - Every retry uses `retry` or `retryAsync` (or `backoffDelayMs`) from `@flash/flash-commons`: exponential backoff, a max attempt count and full
   jitter. The only retry without a max is the Redis reconnect, by design. See `docs/explanation/decisions/017-retry-backoff-jitter.md` and
-  `docs/reference/flash-commons.md`.
+  `docs/reference/retry-policies.md`.
 - A change that adds a new kind of file or folder updates the `README.md` of its app, so the README tree and the code stay the same.
 - Commit messages follow Conventional Commits (commitlint hook). Make one coherent change per commit.
 - Docs are checked by RHINO, which reads the policy in `repo-config.yml`. Run `npm run docs:install` once per machine,
@@ -106,11 +113,10 @@ Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `fla
   (`npx nx db:up flash-be`) and are not part of `test:quick`.
 - Vitest globals are off. Call `cleanup` in `afterEach` when rendering components.
 - Choose the kind of test by one question: if this breaks, does a shopper or an operator see the difference? If yes, write
-  a Gherkin scenario in `specs/apps/flash/` (behaviour that is part of the contract: HTTP, queue, hold, payment). If only a developer cares, write a plain Vitest test next to
-  the code (branches and edge cases in one function, rules of structure such as `architecture_tests.ts`, the mapping of
-  config and environment variables, types, internal helpers, tests that only reach a branch for coverage). Write new behaviour as a scenario first,
-  then add plain tests for the branches that do not deserve one. A scenario that needs both `@integration-exempt` and
-  `@e2e-exempt` in an app is a sign of a detail: make it a plain test. See `docs/explanation/scenario-or-plain-test.md`.
+  a Gherkin scenario in `specs/apps/flash/` (behaviour that is part of the contract: HTTP, queue, hold, payment). If only a developer cares (a branch, a rule of
+  structure, config mapping, an internal helper), write a plain Vitest test next to the code. Write new behaviour as a
+  scenario first, then plain tests for the branches. A scenario that needs both `@integration-exempt` and `@e2e-exempt`
+  is a detail: make it a plain test. See [scenario or plain test](docs/explanation/scenario-or-plain-test.md).
 - Only the apps use Gherkin. `libs/` and `scripts/` have plain Vitest tests and no `specs/` scenarios. Behaviour scenarios
   are canonical in `specs/apps/flash/`. Bind each one at unit. Bind integration and e2e too, unless the
   scenario has `@integration-exempt` or `@e2e-exempt`. One scenario may carry both tags. Each tag needs the comment
@@ -129,7 +135,7 @@ Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `fla
   `UNIQUE(sale_id, user_id)` and the `CHECK (sold <= stock)` must stay, whatever Redis says. Redis is a fast gate that
   Postgres can rebuild. A change to the sale path needs a concurrency scenario, and `flash-load` must still pass.
 - Redis keys are `sale:<saleId>:` plus `{ready,buyers,holds,ids,rebuild-lock}` for the hold gate, and plus
-  `{queue,queue-seq,admitted,admit-lead}` for the queue. Sessions are cached under `session:<access hash>`. Every command on the sale path must fail at
+  `{queue,queue-seq,admitted,admit-lead}` for the queue. Sessions are cached under `session:<access hash>`, and the rate counters are under `ratelimit:`. Every command on the sale path must fail at
   once when Redis is down. Use single scripts, not `MULTI`, which waits for the connection.
 - `flash-be` is a hexagon (see `docs/explanation/hexagonal-architecture.md`). Rules go in `src/domain` (no I/O, only Node
   built-ins, `@flash/typekit` and the main entry of `@flash/flash-commons`, never `/timers`). Use cases go in `src/application`, which reach stores only through `src/application/ports`. Adapters go in
@@ -163,4 +169,4 @@ Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `fla
 
 - Keep comments, commit messages, and notes brief. Explain why, not what.
 - Use neutral domain names in docs and commits: say "shopper", "sale", "hold" and "purchase".
-- Use clear, simple English that is easy for non-native speakers to read.
+- Use clear, simple, and natural English that is easy for non-native speakers to understand.

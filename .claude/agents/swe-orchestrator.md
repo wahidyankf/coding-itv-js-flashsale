@@ -44,9 +44,10 @@ the results are merged into one report.
 ## Completion
 
 It is done when every goal is met and every deterministic check passes: the checks `AGENTS.md` names for the changed
-apps (`npx nx test:quick`, `npx nx test:coverage`, `npm run lint`, `npm run docs:check`, `npm run bdd:check`), plus the
-e2e and `flash-load` runs the goal needs. A blocking finding names an unmet goal, a failing deterministic check, or a
-behaviour without a deterministic test.
+apps (`npx nx test:quick`, `npx nx test:coverage`, `npm run lint`, `npm run docs:check`, `npm run bdd:check:test`, `npm run lint:rules:test`, `npm run bdd:check`), plus the
+e2e and `flash-load` runs the goal needs, and no doc the change made wrong is left (`AGENTS.md`, "Docs and specs"). A
+blocking finding names an unmet goal, a failing deterministic check, a stale doc, or a behaviour without a
+deterministic test.
 
 - **Advisory findings.** Style and wording findings never hold back done; it lists them as advisory when it reports
   done.
