@@ -11,6 +11,7 @@ import { actorId, ensureUser } from "../../adapters/outbound/postgres/users.js";
 import { SYSTEM_USERNAME } from "../../domain/actors.js";
 import { hashToken, type Role } from "../../domain/auth.js";
 
+// The fields a scenario gives a sale when it writes one to Postgres. A field left out takes the seed's default.
 export type SaleSeed = {
 	name?: string | undefined;
 	stock?: number | undefined;

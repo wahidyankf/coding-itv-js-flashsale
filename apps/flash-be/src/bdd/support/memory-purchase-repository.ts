@@ -6,6 +6,8 @@ import type { Reservation } from "../../domain/reservation.js";
 import type { Sale } from "../../domain/sale.js";
 import type { Username } from "../../domain/user.js";
 
+// The purchase store of the unit layer, with the buyers of a sale and a way to record a sale made by another instance,
+// so a scenario can prove a second instance cannot sell the same item.
 export type MemoryPurchaseRepository = PurchaseRepository & {
 	purchases: Purchase[];
 	buyersOf: (saleId: string) => Username[];

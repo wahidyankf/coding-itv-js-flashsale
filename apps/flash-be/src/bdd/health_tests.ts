@@ -1,28 +1,26 @@
-// Scenario bindings for the health checks (test layer, bdd). /health says the process is up; /ready says the stores answer.
+// Binds specs/apps/flash/be/behaviours/health/ at the unit layer: each dependency is a switch the scenario flips, and the app
+// is built on those switches. Liveness is bound here, with both dependencies down, because only this layer has them down
+// without a socket. The readiness steps are in support/bind-health.ts.
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import type { FastifyInstance } from "fastify";
-import { afterEach, expect } from "vitest";
+import { afterAll, expect } from "vitest";
 import { buildApp } from "../adapters/inbound/http/app.js";
-import type { Dependencies } from "../application/dependencies.js";
+import { bindHealthReadiness } from "./support/bind-health.js";
 import { healthyDeps } from "./support/deps.js";
+import { unitHealthWorld } from "./support/health-unit.js";
 import { specFile } from "./support/paths.js";
 import type { Response } from "./support/response.js";
 
 const apps: FastifyInstance[] = [];
-
-afterEach(async () => {
+afterAll(async () => {
 	await Promise.all(apps.splice(0).map((app) => app.close()));
 });
-
-function appWith(deps: Dependencies): FastifyInstance {
-	const app = buildApp(deps, { cookieSecure: false });
-	apps.push(app);
-	return app;
-}
 
 const failing = async () => {
 	throw new Error("unavailable");
 };
+
+const steps = bindHealthReadiness(() => unitHealthWorld(apps));
 
 describeFeature(
 	await loadFeature(specFile("flash/be/behaviours/health/liveness.feature")),
@@ -33,11 +31,11 @@ describeFeature(
 				let response: Response;
 
 				When("a client sends GET /health", async () => {
-					const app = appWith({
-						...healthyDeps,
-						checkDatabase: failing,
-						checkGate: failing,
-					});
+					const app = buildApp(
+						{ ...healthyDeps, checkDatabase: failing, checkGate: failing },
+						{ cookieSecure: false },
+					);
+					apps.push(app);
 					response = await app.inject({ method: "GET", url: "/health" });
 				});
 
@@ -56,137 +54,18 @@ describeFeature(
 describeFeature(
 	await loadFeature(specFile("flash/be/behaviours/health/readiness.feature")),
 	({ Scenario }) => {
-		Scenario(
-			"Readiness is ok when Postgres and Redis answer",
-			({ When, Then, And }) => {
-				let response: Response;
-
-				When("a client sends GET /ready", async () => {
-					response = await appWith(healthyDeps).inject({
-						method: "GET",
-						url: "/ready",
-					});
-				});
-
-				Then("the response status is 200", () => {
-					expect(response.statusCode).toBe(200);
-				});
-
-				And('the readiness checks report database "ok" and redis "ok"', () => {
-					expect(response.json().checks).toEqual({
-						database: "ok",
-						redis: "ok",
-					});
-				});
-			},
-		);
+		Scenario("Readiness is ok when Postgres and Redis answer", steps.readyOk);
 
 		Scenario(
 			"Readiness is unavailable when Postgres fails",
-			({ Given, When, Then, And }) => {
-				let deps: Dependencies = healthyDeps;
-				let response: Response;
-
-				Given("Postgres does not answer", () => {
-					deps = { ...healthyDeps, checkDatabase: failing };
-				});
-
-				When("a client sends GET /ready", async () => {
-					response = await appWith(deps).inject({
-						method: "GET",
-						url: "/ready",
-					});
-				});
-
-				Then("the response status is 503", () => {
-					expect(response.statusCode).toBe(503);
-				});
-
-				And(
-					'the readiness checks report database "error" and redis "ok"',
-					() => {
-						expect(response.json().checks).toEqual({
-							database: "error",
-							redis: "ok",
-						});
-					},
-				);
-			},
+			steps.postgresFails,
 		);
 
-		Scenario(
-			"Readiness is unavailable when Redis fails",
-			({ Given, When, Then, And }) => {
-				let deps: Dependencies = healthyDeps;
-				let response: Response;
-
-				Given("Redis does not answer", () => {
-					deps = { ...healthyDeps, checkGate: failing };
-				});
-
-				When("a client sends GET /ready", async () => {
-					response = await appWith(deps).inject({
-						method: "GET",
-						url: "/ready",
-					});
-				});
-
-				Then("the response status is 503", () => {
-					expect(response.statusCode).toBe(503);
-				});
-
-				And(
-					'the readiness checks report database "ok" and redis "error"',
-					() => {
-						expect(response.json().checks).toEqual({
-							database: "ok",
-							redis: "error",
-						});
-					},
-				);
-			},
-		);
+		Scenario("Readiness is unavailable when Redis fails", steps.redisFails);
 
 		Scenario(
 			"Readiness recovers after Redis drops the API's connection",
-			({ Given, When, And, Then }) => {
-				// A unit test cannot cut a real socket, so the drop is a flag that the fake Redis check reads.
-				let redisUp = true;
-				let response: Response;
-
-				Given("the API is running and Redis answers", () => {
-					redisUp = true;
-				});
-
-				When("Redis drops the API's connection", () => {
-					redisUp = false;
-				});
-
-				And("Redis reconnects", () => {
-					redisUp = true;
-				});
-
-				And("a client sends GET /ready", async () => {
-					const checkGate = async () => {
-						if (!redisUp) throw new Error("connection dropped");
-					};
-					response = await appWith({ ...healthyDeps, checkGate }).inject({
-						method: "GET",
-						url: "/ready",
-					});
-				});
-
-				Then("the response status is 200", () => {
-					expect(response.statusCode).toBe(200);
-				});
-
-				And('the readiness checks report database "ok" and redis "ok"', () => {
-					expect(response.json().checks).toEqual({
-						database: "ok",
-						redis: "ok",
-					});
-				});
-			},
+			steps.recoversAfterDrop,
 		);
 	},
 );

@@ -7,6 +7,7 @@ import { MS_PER_HOUR, MS_PER_SECOND } from "@flash/flash-commons";
 import { sleep } from "@flash/flash-commons/timers";
 import type { FastifyInstance } from "fastify";
 import { type Kysely, sql } from "kysely";
+import { expect } from "vitest";
 import { buildApp } from "../../adapters/inbound/http/app.js";
 import { DEFAULT_STREAM_OPTIONS } from "../../adapters/inbound/http/event-stream.js";
 import { createMemoryRateLimitStore } from "../../adapters/outbound/memory/memory-rate-limit-store.js";
@@ -51,11 +52,12 @@ import {
 import {
 	ADMIT_EVERYONE_WAITING,
 	LIMITS_OUT_OF_REACH,
-	notWired,
+	placeholders,
 	type ShopScenario,
 } from "./queue-scenario.js";
 import { QUEUE_OPTIONS } from "./queue-world.js";
 import { insertPurchase, insertSale, loginAs } from "./seed.js";
+import type { ShopLayer } from "./shop-steps.js";
 import { switchable } from "./switchable.js";
 
 // The stores, services and switches the whole run shares. Each scenario reads them through `scenario()`.
@@ -320,22 +322,7 @@ function integrationScenario(
 		purchases: new Map(),
 		replies: [],
 		watcher: undefined,
-		join: notWired,
-		check: notWired,
-		reserve: notWired,
-		reserveAll: notWired,
-		repeat: notWired,
-		joinMany: notWired,
-		readSale: notWired,
-		readCurrentSale: notWired,
-		watchSale: notWired,
-		watchPlace: notWired,
-		confirm: notWired,
-		startConfirm: notWired,
-		finishConfirm: notWired,
-		confirmAllHolders: notWired,
-		outcome: notWired,
-		saleView: notWired,
+		...placeholders(),
 		...saleRowActions(db, parts, () => scenario),
 		...timeAndPaymentActions(parts, () => scenario),
 		...faultActions(parts),
@@ -373,6 +360,24 @@ export async function openQueueIntegration() {
 			await redis.close();
 			await db.destroy();
 			await parts.closedDb.destroy();
+		},
+	};
+}
+
+// How far a hold's end may sit from the test's own clock over the real stores: the app and the test share one clock, but
+// each reads it a few milliseconds apart.
+const HOLD_END_TOLERANCE_MS = 5000;
+
+// The integration layer's ShopLayer over the run's real stores: sales are timed from the wall clock when the layer is
+// made, and a hold's end is checked within the tolerance above, because the app runs on real time.
+export function integrationShopLayer(newWorld: () => ShopScenario): ShopLayer {
+	return {
+		now: new Date(),
+		newWorld,
+		expectHoldEndsIn: (endsAt, seconds) => {
+			expect(
+				Math.abs(endsAt - Date.now() - seconds * MS_PER_SECOND),
+			).toBeLessThan(HOLD_END_TOLERANCE_MS);
 		},
 	};
 }

@@ -5,6 +5,7 @@
 import { randomUUID } from "node:crypto";
 import { MS_PER_HOUR, MS_PER_SECOND } from "@flash/flash-commons";
 import type { FastifyInstance } from "fastify";
+import { expect } from "vitest";
 import { buildApp } from "../../adapters/inbound/http/app.js";
 import { DEFAULT_STREAM_OPTIONS } from "../../adapters/inbound/http/event-stream.js";
 import { createMemoryRateLimitStore } from "../../adapters/outbound/memory/memory-rate-limit-store.js";
@@ -55,14 +56,16 @@ import {
 import {
 	ADMIT_EVERYONE_WAITING,
 	LIMITS_OUT_OF_REACH,
-	notWired,
+	placeholders,
 	type SaleOverrides,
 	type ShopScenario,
 } from "./queue-scenario.js";
 import { sharedCounter } from "./shared-counter.js";
+import type { ShopLayer } from "./shop-steps.js";
 import { switchable } from "./switchable.js";
 import { usernameOf } from "./users.js";
 
+// The types a queue scenario is built from, re-exported so the unit layer's test file imports them from one place.
 export type {
 	EventWatcher,
 	QueueScenario,
@@ -73,12 +76,14 @@ export type {
 // The queue settings the unit layer runs with. The tick and the admission take the configuration defaults, so the unit
 // layer and a server agree on them; only the ticket secret is set here.
 const queueDefaults = buildConfig({});
+// The queue settings of the unit layer: a fixed ticket secret, and the server's own tick and admission lifetime.
 export const QUEUE_OPTIONS = {
 	ticketSecret: "unit-secret",
 	admissionTickMs: queueDefaults.admissionTickMs,
 	admissionTtlSeconds: queueDefaults.admissionTtlSeconds,
 };
 
+// One queue scenario at the unit layer: the app and each in-memory store, so a step can set or read any of them.
 export type UnitQueueScenario = ShopScenario & {
 	app: FastifyInstance;
 	store: MemoryQueueStore;
@@ -223,28 +228,6 @@ function unitApp(parts: UnitParts): FastifyInstance {
 			events: { ...DEFAULT_STREAM_OPTIONS, intervalMs: 20 },
 		},
 	);
-}
-
-// The request methods start as placeholders; the request helpers replace them once the scenario exists.
-function placeholders() {
-	return {
-		join: notWired,
-		check: notWired,
-		reserve: notWired,
-		reserveAll: notWired,
-		repeat: notWired,
-		joinMany: notWired,
-		readSale: notWired,
-		readCurrentSale: notWired,
-		watchSale: notWired,
-		watchPlace: notWired,
-		confirm: notWired,
-		startConfirm: notWired,
-		finishConfirm: notWired,
-		confirmAllHolders: notWired,
-		outcome: notWired,
-		saleView: notWired,
-	};
 }
 
 // The sales, the line and the admission, as a scenario changes them. `current` returns the scenario being built, so
@@ -431,4 +414,17 @@ export function queueWorld(start: Date): UnitQueueScenario {
 		eventRequests(app, scenario),
 	);
 	return Object.assign(scenario, limitRequests(scenario));
+}
+
+// The unit layer's ShopLayer: a fresh in-memory scenario for each call, sales timed from a fixed moment, and a hold's end
+// checked exactly against that moment, so the in-memory clock is the only time there is.
+export function unitShopLayer(): ShopLayer {
+	const now = new Date("2026-06-01T12:00:00Z");
+	return {
+		now,
+		newWorld: () => queueWorld(now),
+		expectHoldEndsIn: (endsAt, seconds) => {
+			expect(endsAt).toBe(now.getTime() + seconds * MS_PER_SECOND);
+		},
+	};
 }

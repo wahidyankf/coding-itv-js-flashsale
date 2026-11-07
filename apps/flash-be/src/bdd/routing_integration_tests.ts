@@ -1,11 +1,14 @@
+// Binds specs/apps/flash/be/behaviours/routing/unknown-routes.feature at the integration layer: each request goes to a new app
+// over the run's real Postgres and Redis clients. The steps are in support/bind-routing.ts, the same as at the unit layer.
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
-import type { FastifyInstance, LightMyRequestResponse } from "fastify";
-import { afterAll, expect } from "vitest";
+import type { FastifyInstance } from "fastify";
+import { afterAll } from "vitest";
 import { buildApp } from "../adapters/inbound/http/app.js";
 import { createDb } from "../adapters/outbound/postgres/database.js";
 import { createRedis } from "../adapters/outbound/redis/redis-client.js";
 import { dependenciesFrom } from "../composition.js";
 import { config } from "../config.js";
+import { bindRouting, type RoutingWorld } from "./support/bind-routing.js";
 import { specFile } from "./support/paths.js";
 
 // vitest-cucumber runs every step as its own test, so cleanup waits for the whole file.
@@ -29,102 +32,36 @@ async function newApp(): Promise<FastifyInstance> {
 	return app;
 }
 
-async function post(url: string, payload: string) {
-	const app = await newApp();
-	return app.inject({
-		method: "POST",
-		url,
-		headers: { "content-type": "application/json" },
-		payload,
-	});
-}
+const world: RoutingWorld = {
+	get: async (url) => (await newApp()).inject({ method: "GET", url }),
+	post: async (url, body) =>
+		(await newApp()).inject({
+			method: "POST",
+			url,
+			headers: { "content-type": "application/json" },
+			payload: body,
+		}),
+};
+
+const steps = bindRouting(() => world);
 
 describeFeature(
 	await loadFeature(
 		specFile("flash/be/behaviours/routing/unknown-routes.feature"),
 	),
 	({ Scenario, ScenarioOutline }) => {
-		Scenario("Unknown routes return 404", ({ When, Then, And }) => {
-			let response: LightMyRequestResponse | undefined;
-
-			When("a client sends GET /nope", async () => {
-				const app = await newApp();
-				response = await app.inject({ method: "GET", url: "/nope" });
-			});
-
-			Then("the response status is 404", () => {
-				expect(response?.statusCode).toBe(404);
-			});
-
-			And("the error is {string}", (_ctx, error: string) => {
-				expect(response?.json().errorCode).toBe(error);
-			});
-		});
+		Scenario("Unknown routes return 404", steps.unknownRoute);
 
 		Scenario(
 			"An error reply carries a sentence as well as a code",
-			({ When, Then, And }) => {
-				let response: LightMyRequestResponse | undefined;
-
-				When("a client sends GET /nope", async () => {
-					response = await (await newApp()).inject({
-						method: "GET",
-						url: "/nope",
-					});
-				});
-
-				Then("the response status is 404", () => {
-					expect(response?.statusCode).toBe(404);
-				});
-
-				And("the error message is {string}", (_ctx, message: string) => {
-					expect(response?.json().errorMessage).toBe(message);
-				});
-			},
+			steps.errorSentence,
 		);
 
-		Scenario(
-			"A request body that is not JSON is refused",
-			({ When, Then, And }) => {
-				let response: LightMyRequestResponse | undefined;
-
-				When(
-					"a client sends POST /sales/00000000-0000-4000-8000-000000000000/queue with a body that is not JSON",
-					async () => {
-						response = await post(
-							"/sales/00000000-0000-4000-8000-000000000000/queue",
-							"{oops",
-						);
-					},
-				);
-
-				Then("the response status is {int}", (_ctx, status: number) => {
-					expect(response?.statusCode).toBe(status);
-				});
-
-				And("the error is {string}", (_ctx, error: string) => {
-					expect(response?.json().errorCode).toBe(error);
-				});
-			},
-		);
+		Scenario("A request body that is not JSON is refused", steps.notJson);
 
 		ScenarioOutline(
 			"A request body with a missing or mistyped field is refused with the code of that field",
-			({ When, Then, And }, examples) => {
-				let response: LightMyRequestResponse | undefined;
-
-				When("a client sends POST <path> with the body <body>", async () => {
-					response = await post(String(examples.path), String(examples.body));
-				});
-
-				Then("the response status is {int}", (_ctx, status: number) => {
-					expect(response?.statusCode).toBe(status);
-				});
-
-				And('the error is "<error>"', () => {
-					expect(response?.json().errorCode).toBe(String(examples.error));
-				});
-			},
+			steps.badField,
 		);
 	},
 	{ excludeTags: ["integration-exempt"] },

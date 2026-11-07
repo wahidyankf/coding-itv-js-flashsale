@@ -10,6 +10,7 @@ import {
 import { isLive } from "../../domain/time.js";
 import type { Username } from "../../domain/user.js";
 
+// The reservation store of the unit layer. `broken` makes a save fail, as an unreachable Postgres does.
 export type MemoryReservationRepository = ReservationRepository & {
 	// While broken, saving a reservation fails, as when Postgres is unreachable.
 	broken: boolean;

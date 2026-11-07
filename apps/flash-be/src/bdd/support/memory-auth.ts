@@ -39,6 +39,8 @@ type Row = {
 	deleted: boolean;
 };
 
+// The in-memory login of the unit layer: the auth service, the logins and what the stores hold, so a scenario checks
+// the hashes without Postgres.
 export type MemoryAuth = {
 	service: AuthService;
 	// A cookie header for a user who is logged in, made on first use. `role` matters only the first time.

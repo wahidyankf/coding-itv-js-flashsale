@@ -1,3 +1,6 @@
+// Binds specs/apps/flash/be/behaviours/db/migrations.feature at the integration layer: the migrations run against an empty
+// scratch database, and each scenario queries it. The unit layer checks the same scenarios against the SQL the migrations
+// send (db_tests.ts). The two differ on purpose, so the steps stay in each file.
 import { randomUUID } from "node:crypto";
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import type { Kysely } from "kysely";
@@ -49,11 +52,28 @@ async function migrate(db: Kysely<Database>): Promise<void> {
 	if (error) throw error;
 }
 
+// A scratch database with every migration run on it, for a scenario that needs the tables.
+async function scratchMigrated(): Promise<Kysely<Database>> {
+	const db = await scratch();
+	await migrate(db);
+	return db;
+}
+
 async function exists(db: Kysely<Database>, table: string): Promise<boolean> {
 	const result = await sql<{
 		name: string | null;
 	}>`select to_regclass(${`public.${table}`}) as name`.execute(db);
 	return result.rows[0]?.name === table;
+}
+
+// The message of the error an attempt raises, or "" when it succeeds, so a scenario checks which constraint refused it.
+async function refusalOf(attempt: () => Promise<unknown>): Promise<string> {
+	try {
+		await attempt();
+		return "";
+	} catch (error) {
+		return String((error as Error).message);
+	}
 }
 
 const WINDOW = {
@@ -241,25 +261,20 @@ describeFeature(
 			"The database refuses a sale that has sold more than its stock",
 			({ Given, When, Then }) => {
 				let db: Kysely<Database>;
-				let failure: unknown;
+				let refusal: string;
 
 				Given("a database migrated to the latest version", async () => {
-					db = await scratch();
-					await migrate(db);
+					db = await scratchMigrated();
 				});
 
 				When("a sale with stock 5 and 6 sold is inserted", async () => {
-					try {
-						await insertSale(db, { stock: 5, sold: 6, ...WINDOW });
-					} catch (error) {
-						failure = error;
-					}
+					refusal = await refusalOf(() =>
+						insertSale(db, { stock: 5, sold: 6, ...WINDOW }),
+					);
 				});
 
 				Then("the database refuses the row", () => {
-					expect(String((failure as Error | undefined)?.message)).toContain(
-						"sales_sold_within_stock",
-					);
+					expect(refusal).toContain("sales_sold_within_stock");
 				});
 			},
 		);
@@ -268,31 +283,26 @@ describeFeature(
 			"The database refuses a sale that has no product",
 			({ Given, When, Then }) => {
 				let db: Kysely<Database>;
-				let failure: unknown;
+				let refusal: string;
 
 				Given("a database migrated to the latest version", async () => {
-					db = await scratch();
-					await migrate(db);
+					db = await scratchMigrated();
 				});
 
 				When("a sale with no product is inserted", async () => {
-					try {
-						await sql`insert into sales (name, starts_at, ends_at, stock, created_by)
+					refusal = await refusalOf(() =>
+						sql`insert into sales (name, starts_at, ends_at, stock, created_by)
 							values ('Flash sale', now(), now() + interval '1 hour', 5,
 								(select id from users where username = ${SYSTEM_USERNAME}))`.execute(
 							db,
-						);
-					} catch (error) {
-						failure = error;
-					}
+						),
+					);
 				});
 
 				Then(
 					"the database refuses the sale because its product is missing",
 					() => {
-						expect(String((failure as Error | undefined)?.message)).toContain(
-							"product_id",
-						);
+						expect(refusal).toContain("product_id");
 					},
 				);
 			},
@@ -302,33 +312,28 @@ describeFeature(
 			"The database refuses a user with a role it does not know",
 			({ Given, When, Then }) => {
 				let db: Kysely<Database>;
-				let failure: unknown;
+				let refusal: string;
 
 				Given("a database migrated to the latest version", async () => {
-					db = await scratch();
-					await migrate(db);
+					db = await scratchMigrated();
 				});
 
 				When(
 					"a user with the role {string} is inserted",
 					async (_ctx, role: string) => {
-						try {
-							await sql`insert into users (username, role, created_by)
+						refusal = await refusalOf(() =>
+							sql`insert into users (username, role, created_by)
 								values ('ana', ${role}, (select id from users where username = ${SYSTEM_USERNAME}))`.execute(
 								db,
-							);
-						} catch (error) {
-							failure = error;
-						}
+							),
+						);
 					},
 				);
 
 				Then(
 					"the database refuses the user because its role is unknown",
 					() => {
-						expect(String((failure as Error | undefined)?.message)).toContain(
-							"users_role_known",
-						);
+						expect(refusal).toContain("users_role_known");
 					},
 				);
 			},
@@ -339,11 +344,10 @@ describeFeature(
 			({ Given, And, When, Then }) => {
 				let db: Kysely<Database>;
 				let saleId: string;
-				let failure: unknown;
+				let refusal: string;
 
 				Given("a database migrated to the latest version", async () => {
-					db = await scratch();
-					await migrate(db);
+					db = await scratchMigrated();
 				});
 
 				And("a sale with stock 5 exists", async () => {
@@ -353,7 +357,7 @@ describeFeature(
 				When(
 					"the user {string} is recorded as a buyer twice in that sale",
 					async (_ctx, user: string) => {
-						try {
+						refusal = await refusalOf(async () => {
 							for (let attempt = 0; attempt < 2; attempt++) {
 								await insertPurchase(db, {
 									saleId,
@@ -362,16 +366,12 @@ describeFeature(
 									paymentRef: `pay-${attempt}`,
 								});
 							}
-						} catch (error) {
-							failure = error;
-						}
+						});
 					},
 				);
 
 				Then("the database refuses the second purchase", () => {
-					expect(String((failure as Error | undefined)?.message)).toContain(
-						"purchases_one_per_user",
-					);
+					expect(refusal).toContain("purchases_one_per_user");
 				});
 			},
 		);

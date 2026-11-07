@@ -1,8 +1,9 @@
-import { randomUUID } from "node:crypto";
+// Binds specs/apps/flash/be/behaviours/sale/admin.feature (creating) at the unit layer: the operator world over in-memory
+// stores. The steps are in support/bind-admin-creating.ts.
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import type { FastifyInstance } from "fastify";
-import { afterAll, expect } from "vitest";
-import type { Response } from "./support/operating.js";
+import { afterAll } from "vitest";
+import { bindAdminCreating } from "./support/bind-admin-creating.js";
 import { unitOperatingWorld } from "./support/operating-unit.js";
 import { specFile } from "./support/paths.js";
 
@@ -11,367 +12,56 @@ afterAll(async () => {
 	await Promise.all(apps.splice(0).map((app) => app.close()));
 });
 
-const newWorld = () => unitOperatingWorld(apps);
-
-const startOf = "opening in {int} minutes for {int} minutes";
+const steps = bindAdminCreating(() => unitOperatingWorld(apps));
 
 describeFeature(
 	await loadFeature(specFile("flash/be/behaviours/sale/admin.feature")),
 	({ Scenario, ScenarioOutline }) => {
 		Scenario(
 			"An operator creates a sale and shoppers see it",
-			({ Given, When, Then, And }) => {
-				const world = newWorld();
-				let response: Response;
-
-				Given("an operator is logged in", () => world.loginOperator());
-
-				When(
-					`the operator creates a sale with stock {int}, ${startOf}`,
-					async (_ctx, stock: number, startsIn: number, minutes: number) => {
-						response = await world.createSale(stock, startsIn, minutes);
-					},
-				);
-
-				Then("the response status is {int}", (_ctx, status: number) => {
-					expect(response.statusCode).toBe(status);
-				});
-
-				And(
-					"the new sale is {string} with {int} items remaining",
-					(_ctx, status: string, remaining: number) => {
-						expect(response.json()).toMatchObject({ status, remaining });
-					},
-				);
-
-				And("the current sale is the new sale", async () => {
-					expect((await world.readCurrentSale()).json().id).toBe(
-						response.json().id,
-					);
-				});
-			},
+			steps.createsSale,
 		);
 
 		Scenario(
 			"A request from someone who is not logged in is refused",
-			({ When, Then, And }) => {
-				const world = newWorld();
-				let response: Response;
-
-				When(
-					`someone who is not logged in creates a sale with stock {int}, ${startOf}`,
-					async (_ctx, stock: number, startsIn: number, minutes: number) => {
-						response = await world.createSale(
-							stock,
-							startsIn,
-							minutes,
-							"nobody",
-						);
-					},
-				);
-
-				Then("the response status is {int}", (_ctx, status: number) => {
-					expect(response.statusCode).toBe(status);
-				});
-
-				And("the error is {string}", (_ctx, error: string) => {
-					expect(response.json().errorCode).toBe(error);
-				});
-
-				And("the number of sales is {int}", async (_ctx, count: number) => {
-					expect(await world.salesCount()).toBe(count);
-				});
-			},
+			steps.refusesAnonymous,
 		);
 
-		Scenario("A shopper cannot create a sale", ({ Given, When, Then, And }) => {
-			const world = newWorld();
-			let response: Response;
-
-			Given("a shopper is logged in", () => world.loginShopper("ana"));
-
-			When(
-				`the shopper creates a sale with stock {int}, ${startOf}`,
-				async (_ctx, stock: number, startsIn: number, minutes: number) => {
-					response = await world.createSale(
-						stock,
-						startsIn,
-						minutes,
-						"shopper",
-					);
-				},
-			);
-
-			Then("the response status is {int}", (_ctx, status: number) => {
-				expect(response.statusCode).toBe(status);
-			});
-
-			And("the error is {string}", (_ctx, error: string) => {
-				expect(response.json().errorCode).toBe(error);
-			});
-
-			And("the number of sales is {int}", async (_ctx, count: number) => {
-				expect(await world.salesCount()).toBe(count);
-			});
-		});
+		Scenario("A shopper cannot create a sale", steps.shopperRefused);
 
 		ScenarioOutline(
 			"A sale that cannot work is refused",
-			({ Given, When, Then, And }, examples) => {
-				const world = newWorld();
-				let response: Response;
-
-				Given("an operator is logged in", () => world.loginOperator());
-
-				When(
-					"the operator creates a sale with stock <stock>, opening in 10 minutes for <duration> minutes",
-					async () => {
-						response = await world.createSale(
-							Number(examples.stock),
-							10,
-							Number(examples.duration),
-						);
-					},
-				);
-
-				Then("the response status is {int}", (_ctx, status: number) => {
-					expect(response.statusCode).toBe(status);
-				});
-
-				And("the error is {string}", (_ctx, error: string) => {
-					expect(response.json().errorCode).toBe(error);
-				});
-
-				And("the number of sales is {int}", async (_ctx, count: number) => {
-					expect(await world.salesCount()).toBe(count);
-				});
-			},
+			steps.refusesUnworkable,
 		);
 
 		Scenario(
 			"A sale whose window overlaps another sale is refused",
-			({ Given, And, When, Then }) => {
-				const world = newWorld();
-				let response: Response;
-
-				Given("an operator is logged in", () => world.loginOperator());
-
-				And(
-					`a sale was created with stock {int}, ${startOf}`,
-					async (_ctx, stock: number, startsIn: number, minutes: number) => {
-						expect(
-							(await world.createSale(stock, startsIn, minutes)).statusCode,
-						).toBe(201);
-					},
-				);
-
-				When(
-					`the operator creates a sale with stock {int}, ${startOf}`,
-					async (_ctx, stock: number, startsIn: number, minutes: number) => {
-						response = await world.createSale(stock, startsIn, minutes);
-					},
-				);
-
-				Then("the response status is {int}", (_ctx, status: number) => {
-					expect(response.statusCode).toBe(status);
-				});
-
-				And("the error is {string}", (_ctx, error: string) => {
-					expect(response.json().errorCode).toBe(error);
-				});
-
-				And("the number of sales is {int}", async (_ctx, count: number) => {
-					expect(await world.salesCount()).toBe(count);
-				});
-			},
+			steps.refusesOverlap,
 		);
 
 		Scenario(
 			"A sale that opens when another one closes is accepted",
-			({ Given, And, When, Then }) => {
-				const world = newWorld();
-				let response: Response;
-
-				Given("an operator is logged in", () => world.loginOperator());
-
-				And(
-					`a sale was created with stock {int}, ${startOf}`,
-					async (_ctx, stock: number, startsIn: number, minutes: number) => {
-						expect(
-							(await world.createSale(stock, startsIn, minutes)).statusCode,
-						).toBe(201);
-					},
-				);
-
-				When(
-					`the operator creates a sale with stock {int}, ${startOf}`,
-					async (_ctx, stock: number, startsIn: number, minutes: number) => {
-						response = await world.createSale(stock, startsIn, minutes);
-					},
-				);
-
-				Then("the response status is {int}", (_ctx, status: number) => {
-					expect(response.statusCode).toBe(status);
-				});
-
-				And("the number of sales is {int}", async (_ctx, count: number) => {
-					expect(await world.salesCount()).toBe(count);
-				});
-			},
+			steps.acceptsAfterClose,
 		);
 
 		Scenario(
 			"Operators who create the same window at once get one sale",
-			({ Given, When, Then, And }) => {
-				const world = newWorld();
-				let responses: Response[] = [];
-
-				Given("an operator is logged in", () => world.loginOperator());
-
-				When(
-					`{int} operators create a sale with stock {int}, ${startOf}, at the same moment`,
-					async (
-						_ctx,
-						operators: number,
-						stock: number,
-						startsIn: number,
-						minutes: number,
-					) => {
-						responses = await Promise.all(
-							Array.from({ length: operators }, () =>
-								world.createSale(stock, startsIn, minutes),
-							),
-						);
-					},
-				);
-
-				Then(
-					"exactly {int} of them gets status {int}",
-					(_ctx, count: number, status: number) => {
-						expect(
-							responses.filter((r) => r.statusCode === status),
-						).toHaveLength(count);
-					},
-				);
-
-				And(
-					"the others get status {int} with the error {string}",
-					(_ctx, status: number, error: string) => {
-						const others = responses.filter((r) => r.statusCode !== 201);
-						expect(others.length).toBeGreaterThan(0);
-						for (const other of others) {
-							expect(other.statusCode).toBe(status);
-							expect(other.json().errorCode).toBe(error);
-						}
-					},
-				);
-
-				And("the number of sales is {int}", async (_ctx, count: number) => {
-					expect(await world.salesCount()).toBe(count);
-				});
-			},
+			steps.oneSaleForSameWindow,
 		);
 
 		Scenario(
 			"An operator creates a sale for a product that exists",
-			({ Given, And, When, Then }) => {
-				const world = newWorld();
-				let response: Response;
-
-				Given("an operator is logged in", () => world.loginOperator());
-
-				And("a product named {string} exists", async (_ctx, name: string) => {
-					await world.makeProduct(name);
-				});
-
-				When(
-					`the operator creates a sale of that product with stock {int}, ${startOf}`,
-					async (_ctx, stock: number, startsIn: number, minutes: number) => {
-						response = await world.createSale(stock, startsIn, minutes);
-					},
-				);
-
-				Then("the response status is {int}", (_ctx, status: number) => {
-					expect(response.statusCode).toBe(status);
-				});
-
-				And("the new sale sells that product", async () => {
-					expect(response.json().productId).toBe(world.lastProductId);
-					expect(await world.productsOfSales()).toEqual([world.lastProductId]);
-				});
-			},
+			steps.createsForProduct,
 		);
 
 		Scenario(
 			"A sale for a product that does not exist is refused",
-			({ Given, When, Then, And }) => {
-				const world = newWorld();
-				let response: Response;
-
-				Given("an operator is logged in", () => world.loginOperator());
-
-				When(
-					`the operator creates a sale of a product that does not exist with stock {int}, ${startOf}`,
-					async (_ctx, stock: number, startsIn: number, minutes: number) => {
-						response = await world.createSaleFor(
-							stock,
-							startsIn,
-							minutes,
-							randomUUID(),
-						);
-					},
-				);
-
-				Then("the response status is {int}", (_ctx, status: number) => {
-					expect(response.statusCode).toBe(status);
-				});
-
-				And("the error is {string}", (_ctx, error: string) => {
-					expect(response.json().errorCode).toBe(error);
-				});
-
-				And("the number of sales is {int}", async (_ctx, count: number) => {
-					expect(await world.salesCount()).toBe(count);
-				});
-			},
+			steps.refusesUnknownProduct,
 		);
 
 		Scenario(
 			"Sales created without a product share one product",
-			({ Given, And, When, Then }) => {
-				const world = newWorld();
-				let response: Response;
-
-				Given("an operator is logged in", () => world.loginOperator());
-
-				And(
-					`a sale was created with stock {int}, ${startOf}`,
-					async (_ctx, stock: number, startsIn: number, minutes: number) => {
-						expect(
-							(await world.createSale(stock, startsIn, minutes)).statusCode,
-						).toBe(201);
-					},
-				);
-
-				When(
-					`the operator creates a sale with stock {int}, ${startOf}`,
-					async (_ctx, stock: number, startsIn: number, minutes: number) => {
-						response = await world.createSale(stock, startsIn, minutes);
-					},
-				);
-
-				Then("the response status is {int}", (_ctx, status: number) => {
-					expect(response.statusCode).toBe(status);
-				});
-
-				And("the number of sales is {int}", async (_ctx, count: number) => {
-					expect(await world.salesCount()).toBe(count);
-				});
-
-				And("the sales sell {int} product", async (_ctx, products: number) => {
-					expect(await world.productsOfSales()).toHaveLength(products);
-				});
-			},
+			steps.sharesProduct,
 		);
 	},
 );

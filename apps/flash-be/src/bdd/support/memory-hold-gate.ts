@@ -12,6 +12,7 @@ type SaleState = {
 	holds: Map<string, { reservationId: string; expiresAt: number }>;
 };
 
+// The hold gate of the unit layer, with a way to forget a sale's state, as a rebuild after a restart would.
 export type MemoryHoldGate = HoldGate & { forget: (saleId: string) => void };
 
 // The reservation state in memory, for unit tests. It follows the same rules as the Redis script.

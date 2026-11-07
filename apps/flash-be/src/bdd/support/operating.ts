@@ -4,14 +4,14 @@
 import { MS_PER_MINUTE } from "@flash/flash-commons";
 import type { FastifyInstance } from "fastify";
 import type { Role } from "../../domain/auth.js";
+import { type Method, sendRequest } from "./http.js";
 import type { Response } from "./response.js";
 
+// The reply type the operator steps read, re-exported so a caller of this world needs no second import.
 export type { Response };
 
 // Who sends a request: the operator who is logged in, a shopper who is logged in, or someone who is not.
 export type Sender = "operator" | "shopper" | "nobody";
-
-type Method = "GET" | "POST" | "PATCH" | "DELETE";
 
 // What differs between layers: the app over the layer's store, the clock, the logins, and what only the store can do.
 export type OperatingLayer = {
@@ -68,15 +68,7 @@ function send(
 ): Promise<Response> {
 	const cookie =
 		sender === undefined ? undefined : scene.memory.cookies[sender];
-	return scene.layer.app().inject({
-		method,
-		url,
-		headers: {
-			...(cookie === undefined ? {} : { cookie }),
-			...(payload === undefined ? {} : { "content-type": "application/json" }),
-		},
-		...(payload === undefined ? {} : { payload: JSON.stringify(payload) }),
-	});
+	return sendRequest(scene.layer.app(), method, url, { cookie, payload });
 }
 
 // When a sale starts and ends, counted in minutes from `now`, as the API reads the times.
@@ -202,3 +194,6 @@ export function operatorWorld(layer: OperatingLayer) {
 		},
 	};
 }
+
+// The operator world a scenario is built from, whichever layer makes it. The operator steps are bound over this type.
+export type OperatorWorld = ReturnType<typeof operatorWorld>;

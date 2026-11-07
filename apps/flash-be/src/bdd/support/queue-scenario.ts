@@ -15,6 +15,7 @@ export type EventWatcher = {
 	close: () => void;
 };
 
+// The reply type the queue steps read, re-exported so a caller of this world needs no second import.
 export type { Response };
 
 // The sale fields a scenario sets when it makes a sale. Both layers honour exactly these four, so nothing else is passed.
@@ -98,6 +99,29 @@ export type ShopScenario = QueueScenario & {
 // The placeholder a request method holds until the request helpers replace it. Calling one is a bug in the scenario.
 export function notWired(): never {
 	throw new Error("replaced when the scenario is built");
+}
+
+// Every request method of a queue scenario, held as a placeholder. Both layers start from these, and the request helpers
+// replace each one once the scenario exists, so a method that is never replaced fails at once.
+export function placeholders() {
+	return {
+		join: notWired,
+		check: notWired,
+		reserve: notWired,
+		reserveAll: notWired,
+		repeat: notWired,
+		joinMany: notWired,
+		readSale: notWired,
+		readCurrentSale: notWired,
+		watchSale: notWired,
+		watchPlace: notWired,
+		confirm: notWired,
+		startConfirm: notWired,
+		finishConfirm: notWired,
+		confirmAllHolders: notWired,
+		outcome: notWired,
+		saleView: notWired,
+	};
 }
 
 // The rate limits a scenario starts with: far out of reach, so only the rate limit scenarios ever meet them. Copy it,

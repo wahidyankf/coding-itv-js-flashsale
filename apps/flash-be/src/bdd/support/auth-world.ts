@@ -1,8 +1,10 @@
 // The shopper's side of the accounts scenarios: a cookie jar that keeps cookies the way a browser does, and the requests
 // a shopper sends. Each layer supplies its app, how an access token ends, and what the stores hold.
 import type { FastifyInstance } from "fastify";
+import { sendRequest } from "./http.js";
 import type { Response } from "./response.js";
 
+// The reply type the auth steps read, re-exported so a caller of this world needs no second import.
 export type { Response };
 
 // What differs between layers: the app, how an access token ends, and what the stores hold.
@@ -57,22 +59,10 @@ export function authWorld(layer: AuthLayer) {
 		options: { payload?: unknown; from?: Jar; record?: boolean } = {},
 	) => {
 		const cookie = cookieFor(options.from ?? jar, url);
-		return layer
-			.app()
-			.inject({
-				method,
-				url,
-				headers: {
-					...(cookie === undefined ? {} : { cookie }),
-					...(options.payload === undefined
-						? {}
-						: { "content-type": "application/json" }),
-				},
-				...(options.payload === undefined
-					? {}
-					: { payload: JSON.stringify(options.payload) }),
-			})
-			.then((reply) => take(reply, options.record));
+		return sendRequest(layer.app(), method, url, {
+			cookie,
+			payload: options.payload,
+		}).then((reply) => take(reply, options.record));
 	};
 	const cookieValueOf = (from: Jar, name: string) =>
 		from.get(name)?.value ?? "";
@@ -115,3 +105,6 @@ export function authWorld(layer: AuthLayer) {
 		},
 	};
 }
+
+// The shopper's world a scenario is built from, whichever layer makes it. The auth steps are bound over this type.
+export type AuthWorld = ReturnType<typeof authWorld>;

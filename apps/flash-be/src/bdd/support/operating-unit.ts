@@ -12,6 +12,7 @@ import { memoryAuth } from "./memory-auth.js";
 import { memorySaleAdmin } from "./memory-sale-admin.js";
 import { operatorWorld } from "./operating.js";
 
+// The fixed moment the unit layer of the operator features runs at, so "in 10 minutes" means the same in every run.
 export const NOW = new Date("2026-06-01T12:00:00Z");
 const clock = () => NOW;
 

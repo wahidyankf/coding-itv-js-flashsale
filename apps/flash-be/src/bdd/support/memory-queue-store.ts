@@ -7,9 +7,10 @@ import type { QueueStore } from "../../application/ports/queue-store.js";
 import type { QueuePlace } from "../../domain/queue.js";
 import type { Username } from "../../domain/user.js";
 
-// The queue state in memory, for unit tests. It follows the same rules as the Redis store.
+// The queue store of the unit layer. `clear` empties it, as losing Redis does, so a scenario can prove the queue recovers.
 export type MemoryQueueStore = QueueStore & { clear: () => void };
 
+// The queue state in memory, for unit tests. It follows the same rules as the Redis store.
 export function memoryQueueStore(clock: Clock): MemoryQueueStore {
 	const waiting = new Map<string, Username[]>();
 	const admitted = new Map<string, Map<string, number>>();

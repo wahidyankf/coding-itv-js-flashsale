@@ -1,3 +1,6 @@
+// Binds specs/apps/flash/be/behaviours/sale/seeding.feature at the unit layer: the seed writes into a recording database, so each
+// Then checks the one insert the seed sends and its values. The integration layer checks the same scenarios against a real
+// database (seeding_integration_tests.ts). The two differ on purpose, so the steps stay in each file.
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import type { Kysely } from "kysely";
 import { expect } from "vitest";
@@ -7,15 +10,15 @@ import { seedSale } from "../adapters/outbound/postgres/sale-seeder.js";
 import { specFile } from "./support/paths.js";
 import { recordingDb } from "./support/recording-db.js";
 
+// A recording database, as the scenarios hold it.
+type Recording = ReturnType<typeof recordingDb>;
+
 // A fixed moment, so the window is the same in every run.
 const NOW = new Date("2026-06-01T12:00:00Z");
 // Whoever acts: the recording database has no users, so any id will do.
 const ACTOR = "00000000-0000-4000-8000-0000000000bb";
 
-function statementsInto(
-	db: ReturnType<typeof recordingDb>,
-	table: string,
-): ReturnType<typeof recordingDb>["statements"] {
+function statementsInto(db: Recording, table: string) {
 	return db.statements.filter((s) =>
 		s.sql.startsWith(`insert into "${table}"`),
 	);
@@ -32,13 +35,25 @@ function seedArgs(stock: number, startsIn: number, duration: number): string[] {
 	];
 }
 
+// Seeds a sale from the step's numbers, as the CLI does: the arguments are parsed, then the sale is written.
+async function seedFrom(
+	db: Recording,
+	stock: number,
+	startsIn: number,
+	duration: number,
+): Promise<void> {
+	const parsed = parseSeedArgs(seedArgs(stock, startsIn, duration), NOW);
+	if (parsed.isErr()) throw new Error(parsed.error);
+	await seedSale(db.db as unknown as Kysely<Database>, parsed.value, ACTOR);
+}
+
 describeFeature(
 	await loadFeature(specFile("flash/be/behaviours/sale/seeding.feature")),
 	({ Scenario }) => {
 		Scenario(
 			"Seeding creates a sale with the given stock and window",
 			({ Given, When, Then, And }) => {
-				let db: ReturnType<typeof recordingDb>;
+				let db: Recording;
 
 				Given("a database migrated to the latest version", () => {
 					db = recordingDb();
@@ -47,16 +62,7 @@ describeFeature(
 				When(
 					"the sale is seeded with stock {int}, opening in {int} minutes for {int} minutes",
 					async (_ctx, stock: number, startsIn: number, duration: number) => {
-						const parsed = parseSeedArgs(
-							seedArgs(stock, startsIn, duration),
-							NOW,
-						);
-						if (parsed.isErr()) throw new Error(parsed.error);
-						await seedSale(
-							db.db as unknown as Kysely<Database>,
-							parsed.value,
-							ACTOR,
-						);
+						await seedFrom(db, stock, startsIn, duration);
 					},
 				);
 
@@ -84,7 +90,7 @@ describeFeature(
 		Scenario(
 			"Seeding refuses a stock that is not a positive integer",
 			({ Given, When, Then, And }) => {
-				let db: ReturnType<typeof recordingDb>;
+				let db: Recording;
 				let failure: unknown;
 
 				Given("a database migrated to the latest version", () => {
@@ -95,16 +101,7 @@ describeFeature(
 					"the sale is seeded with stock {int}, opening in {int} minutes for {int} minutes",
 					async (_ctx, stock: number, startsIn: number, duration: number) => {
 						try {
-							const parsed = parseSeedArgs(
-								seedArgs(stock, startsIn, duration),
-								NOW,
-							);
-							if (parsed.isErr()) throw new Error(parsed.error);
-							await seedSale(
-								db.db as unknown as Kysely<Database>,
-								parsed.value,
-								ACTOR,
-							);
+							await seedFrom(db, stock, startsIn, duration);
 						} catch (error) {
 							failure = error;
 						}

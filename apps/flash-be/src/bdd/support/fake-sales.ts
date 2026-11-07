@@ -25,6 +25,8 @@ export function fakeSale(overrides: Partial<Sale>): Sale {
 	};
 }
 
+// An in-memory sale repository over a list of sales, so the unit layer reads sales without a database. It returns copies,
+// as the database does, so a cache never sees a later change to a stored row.
 export function fakeRepository(sales: Sale[]): SaleRepository {
 	return {
 		// Copies, as a database does: a cache must not see later changes to the stored row.

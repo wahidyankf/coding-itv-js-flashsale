@@ -1,3 +1,6 @@
+// Binds specs/apps/flash/be/behaviours/db/migrations.feature at the unit layer: the migrations run against a database that only
+// records the SQL it is sent, so each Then checks the statements the migrations send. The integration layer checks the same
+// scenarios against a real database (db_integration_tests.ts). The two differ on purpose, so the steps stay in each file.
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import { expect } from "vitest";
 import { up as upProducts } from "../adapters/outbound/postgres/migrations/0001_create_products.js";
@@ -7,6 +10,9 @@ import { up as upAuth } from "../adapters/outbound/postgres/migrations/0004_auth
 import { SYSTEM_USERNAME } from "../domain/actors.js";
 import { specFile } from "./support/paths.js";
 import { recordingDb } from "./support/recording-db.js";
+
+// A recording database, as the scenarios hold it.
+type Recording = ReturnType<typeof recordingDb>;
 
 const TABLES = [
 	"sales",
@@ -25,26 +31,27 @@ const AUDIT_COLUMNS = [
 	"deleted_by",
 ];
 
-// Runs every migration, in order, against a database that only records.
-async function migrated(): Promise<ReturnType<typeof recordingDb>> {
-	const db = recordingDb();
+// Runs every migration, in order, on a database that only records.
+async function runMigrations(db: Recording): Promise<void> {
 	await upProducts(db.db);
 	await up(db.db);
 	await upUsers(db.db);
 	await upAuth(db.db);
+}
+
+// A recording database with every migration run on it.
+async function migrated(): Promise<Recording> {
+	const db = recordingDb();
+	await runMigrations(db);
 	return db;
 }
 
-function sent(db: ReturnType<typeof recordingDb>, pattern: RegExp): boolean {
+function sent(db: Recording, pattern: RegExp): boolean {
 	return db.queries.some((sql) => pattern.test(sql));
 }
 
 // Whether the migrations give the table the column: in its `create table`, or in an `alter table ... add column`.
-function hasColumn(
-	db: ReturnType<typeof recordingDb>,
-	table: string,
-	column: string,
-): boolean {
+function hasColumn(db: Recording, table: string, column: string): boolean {
 	return (
 		sent(db, new RegExp(`create table "${table}" \\([^;]*"${column}" `, "s")) ||
 		sent(db, new RegExp(`alter table "${table}" add column "${column}" `))
@@ -57,17 +64,14 @@ describeFeature(
 		Scenario(
 			"The migrations create the sales, purchases, reservations, products, users and sessions tables",
 			({ Given, When, Then }) => {
-				let db: ReturnType<typeof recordingDb>;
+				let db: Recording;
 
 				Given("a database with no tables", () => {
 					db = recordingDb();
 				});
 
 				When("the migrations run to the latest version", async () => {
-					await upProducts(db.db);
-					await up(db.db);
-					await upUsers(db.db);
-					await upAuth(db.db);
+					await runMigrations(db);
 				});
 
 				Then(
@@ -87,17 +91,14 @@ describeFeature(
 		Scenario(
 			"Every table records who created, changed and deleted a row",
 			({ Given, When, Then }) => {
-				let db: ReturnType<typeof recordingDb>;
+				let db: Recording;
 
 				Given("a database with no tables", () => {
 					db = recordingDb();
 				});
 
 				When("the migrations run to the latest version", async () => {
-					await upProducts(db.db);
-					await up(db.db);
-					await upUsers(db.db);
-					await upAuth(db.db);
+					await runMigrations(db);
 				});
 
 				Then(
@@ -118,17 +119,14 @@ describeFeature(
 		Scenario(
 			"The migrations leave one user, the system, that acts for the migrations",
 			({ Given, When, Then }) => {
-				let db: ReturnType<typeof recordingDb>;
+				let db: Recording;
 
 				Given("a database with no tables", () => {
 					db = recordingDb();
 				});
 
 				When("the migrations run to the latest version", async () => {
-					await upProducts(db.db);
-					await up(db.db);
-					await upUsers(db.db);
-					await upAuth(db.db);
+					await runMigrations(db);
 				});
 
 				// Without a database, the unit proof is what the migrations send: the system is inserted as its own author, the
@@ -153,7 +151,7 @@ describeFeature(
 		Scenario(
 			"An existing database keeps its data when it is migrated",
 			({ Given, And, When, Then }) => {
-				let db: ReturnType<typeof recordingDb>;
+				let db: Recording;
 
 				Given(
 					"a database migrated to the version before users and products",
@@ -206,7 +204,7 @@ describeFeature(
 		Scenario(
 			"The database refuses a sale that has sold more than its stock",
 			({ Given, When, Then }) => {
-				let db: ReturnType<typeof recordingDb>;
+				let db: Recording;
 
 				Given("a database migrated to the latest version", async () => {
 					db = await migrated();
@@ -234,7 +232,7 @@ describeFeature(
 		Scenario(
 			"The database refuses a sale that has no product",
 			({ Given, When, Then }) => {
-				let db: ReturnType<typeof recordingDb>;
+				let db: Recording;
 
 				Given("a database migrated to the latest version", async () => {
 					db = await migrated();
@@ -265,7 +263,7 @@ describeFeature(
 		Scenario(
 			"The database refuses a user with a role it does not know",
 			({ Given, When, Then }) => {
-				let db: ReturnType<typeof recordingDb>;
+				let db: Recording;
 
 				Given("a database migrated to the latest version", async () => {
 					db = await migrated();
@@ -299,7 +297,7 @@ describeFeature(
 		Scenario(
 			"The database refuses a second purchase by the same user in one sale",
 			({ Given, And, When, Then }) => {
-				let db: ReturnType<typeof recordingDb>;
+				let db: Recording;
 
 				Given("a database migrated to the latest version", async () => {
 					db = await migrated();

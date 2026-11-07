@@ -1,12 +1,14 @@
+// Binds specs/apps/flash/be/behaviours/sale/status.feature at the integration layer: sales are rows in the run's database, and
+// the app over the real clients reads them. The steps are in support/bind-status.ts, the same as at the unit layer.
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
-import { afterAll, expect } from "vitest";
+import { afterAll } from "vitest";
 import { buildApp } from "../adapters/inbound/http/app.js";
 import { createDb } from "../adapters/outbound/postgres/database.js";
 import { createRedis } from "../adapters/outbound/redis/redis-client.js";
 import { dependenciesFrom } from "../composition.js";
 import { config } from "../config.js";
+import { bindSaleStatus, type SaleWorld } from "./support/bind-status.js";
 import { specFile } from "./support/paths.js";
-import type { Response } from "./support/response.js";
 import { insertSale, resetSales } from "./support/seed.js";
 import { relativeTime } from "./support/time.js";
 
@@ -23,6 +25,22 @@ afterAll(async () => {
 	await db.destroy();
 });
 
+// The store is the run's database, and the app reads it. A window is counted from the moment the sale is added.
+const world: SaleWorld = {
+	addSale: async ({ opens, closes, ...fields }) => {
+		const now = new Date();
+		return insertSale(db, {
+			...fields,
+			startsAt: relativeTime(opens, now),
+			endsAt: relativeTime(closes, now),
+		});
+	},
+	noSales: () => resetSales(db),
+	get: (url) => app.inject({ method: "GET", url }),
+};
+
+const steps = bindSaleStatus(() => world);
+
 describeFeature(
 	await loadFeature(specFile("flash/be/behaviours/sale/status.feature")),
 	({ Scenario, ScenarioOutline, BeforeEachScenario }) => {
@@ -32,226 +50,27 @@ describeFeature(
 
 		ScenarioOutline(
 			"The sale reports its status from its window and its stock",
-			({ Given, When, Then, And }, examples) => {
-				let saleId: string;
-				let response: Response;
-
-				Given(
-					"a sale with stock <stock> and <sold> sold that opens <opens> and closes <closes>",
-					async () => {
-						const now = new Date();
-						saleId = await insertSale(db, {
-							stock: Number(examples.stock),
-							sold: Number(examples.sold),
-							startsAt: relativeTime(String(examples.opens), now),
-							endsAt: relativeTime(String(examples.closes), now),
-						});
-					},
-				);
-
-				When("a client asks for that sale", async () => {
-					response = await app.inject({
-						method: "GET",
-						url: `/sales/${saleId}`,
-					});
-				});
-
-				Then("the response status is 200", () => {
-					expect(response.statusCode).toBe(200);
-				});
-
-				And('the sale status is "<status>"', () => {
-					expect(response.json().status).toBe(examples.status);
-				});
-
-				And("<remaining> items remain", () => {
-					expect(response.json().remaining).toBe(Number(examples.remaining));
-				});
-			},
+			steps.reportsStatus,
 		);
 
 		Scenario(
 			"The current sale is the one that is running, even when a later sale is scheduled",
-			({ Given, And, When, Then }) => {
-				let response: Response;
-				const ids = new Map<string, string>();
-				const seed = async (name: string, opens: string, closes: string) => {
-					const now = new Date();
-					ids.set(
-						name,
-						await insertSale(db, {
-							name,
-							startsAt: relativeTime(opens, now),
-							endsAt: relativeTime(closes, now),
-						}),
-					);
-				};
-
-				Given(
-					"a sale named {string} that opens {any} and closes {any}",
-					async (_ctx, name: string, opens: string, closes: string) =>
-						seed(name, opens, closes),
-				);
-
-				And(
-					"a sale named {string} that opens {any} and closes {any}",
-					async (_ctx, name: string, opens: string, closes: string) =>
-						seed(name, opens, closes),
-				);
-
-				When("a client asks for the current sale", async () => {
-					response = await app.inject({ method: "GET", url: "/sales/current" });
-				});
-
-				Then("the response status is 200", () => {
-					expect(response.statusCode).toBe(200);
-				});
-
-				And("the sale name is {string}", (_ctx, name: string) => {
-					expect(response.json().name).toBe(name);
-				});
-			},
+			steps.currentSale,
 		);
 
 		Scenario(
 			"With no running sale the current sale is the one that opens next",
-			({ Given, And, When, Then }) => {
-				let response: Response;
-				const ids = new Map<string, string>();
-				const seed = async (name: string, opens: string, closes: string) => {
-					const now = new Date();
-					ids.set(
-						name,
-						await insertSale(db, {
-							name,
-							startsAt: relativeTime(opens, now),
-							endsAt: relativeTime(closes, now),
-						}),
-					);
-				};
-
-				Given(
-					"a sale named {string} that opens {any} and closes {any}",
-					async (_ctx, name: string, opens: string, closes: string) =>
-						seed(name, opens, closes),
-				);
-
-				And(
-					"a sale named {string} that opens {any} and closes {any}",
-					async (_ctx, name: string, opens: string, closes: string) =>
-						seed(name, opens, closes),
-				);
-
-				When("a client asks for the current sale", async () => {
-					response = await app.inject({ method: "GET", url: "/sales/current" });
-				});
-
-				Then("the response status is 200", () => {
-					expect(response.statusCode).toBe(200);
-				});
-
-				And("the sale name is {string}", (_ctx, name: string) => {
-					expect(response.json().name).toBe(name);
-				});
-			},
+			steps.currentSale,
 		);
 
 		Scenario(
 			"A sale that is over is not the current sale, but it can still be read by its id",
-			({ Given, And, When, Then }) => {
-				let response: Response;
-				const ids = new Map<string, string>();
-				const seed = async (name: string, opens: string, closes: string) => {
-					const now = new Date();
-					ids.set(
-						name,
-						await insertSale(db, {
-							name,
-							startsAt: relativeTime(opens, now),
-							endsAt: relativeTime(closes, now),
-						}),
-					);
-				};
-
-				Given(
-					"a sale named {string} that opens {any} and closes {any}",
-					async (_ctx, name: string, opens: string, closes: string) =>
-						seed(name, opens, closes),
-				);
-
-				When("a client asks for the current sale", async () => {
-					response = await app.inject({ method: "GET", url: "/sales/current" });
-				});
-
-				Then("the response status is 404", () => {
-					expect(response.statusCode).toBe(404);
-				});
-
-				And("the error is {string}", (_ctx, error: string) => {
-					expect(response.json().errorCode).toBe(error);
-				});
-
-				And(
-					"the sale named {string} has the status {string} when read by its id",
-					async (_ctx, name: string, status: string) => {
-						const read = await app.inject({
-							method: "GET",
-							url: `/sales/${ids.get(name)}`,
-						});
-						expect(read.json().status).toBe(status);
-					},
-				);
-			},
+			steps.overKeepsId,
 		);
 
-		Scenario(
-			"There is no current sale before one is created",
-			({ Given, When, Then, And }) => {
-				let response: Response;
+		Scenario("There is no current sale before one is created", steps.noCurrent);
 
-				Given("no sale exists", async () => {
-					await resetSales(db);
-				});
-
-				When("a client asks for the current sale", async () => {
-					response = await app.inject({ method: "GET", url: "/sales/current" });
-				});
-
-				Then("the response status is 404", () => {
-					expect(response.statusCode).toBe(404);
-				});
-
-				And("the error is {string}", (_ctx, error: string) => {
-					expect(response.json().errorCode).toBe(error);
-				});
-			},
-		);
-
-		ScenarioOutline(
-			"An unknown sale is refused",
-			({ Given, When, Then, And }, examples) => {
-				let response: Response;
-
-				Given("no sale exists", async () => {
-					await resetSales(db);
-				});
-
-				When('a client asks for the sale with id "<id>"', async () => {
-					response = await app.inject({
-						method: "GET",
-						url: `/sales/${examples.id}`,
-					});
-				});
-
-				Then("the response status is 404", () => {
-					expect(response.statusCode).toBe(404);
-				});
-
-				And("the error is {string}", (_ctx, error: string) => {
-					expect(response.json().errorCode).toBe(error);
-				});
-			},
-		);
+		ScenarioOutline("An unknown sale is refused", steps.unknownSale);
 	},
 	{ excludeTags: ["integration-exempt"] },
 );

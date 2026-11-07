@@ -8,6 +8,7 @@ import {
 	PostgresQueryCompiler,
 } from "kysely";
 
+// One statement a recording database was sent: its SQL and the values it was given, for the migration and seed checks.
 export type Statement = { sql: string; parameters: readonly unknown[] };
 
 // A Kysely instance that never opens a connection. It records each SQL statement and its parameters, so a

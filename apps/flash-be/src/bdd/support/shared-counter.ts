@@ -6,6 +6,8 @@ import type {
 	RateLimitStore,
 } from "../../application/ports/rate-limit-store.js";
 
+// Puts a local rate-limit store behind the shared store port, so a unit scenario switches the shared store off the same way
+// it switches Redis off. Each hit is answered as a success.
 export function sharedCounter(local: LocalRateLimitStore): RateLimitStore {
 	return {
 		hit: async (key, windowMs, now) =>
