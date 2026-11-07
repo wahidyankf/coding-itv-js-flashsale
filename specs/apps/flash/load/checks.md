@@ -1,7 +1,8 @@
 # Checks
 
 The checks that decide the verdict of a load run. The runner reads Postgres and Redis after k6 finishes, then compares
-k6 with them. The implementation is in `apps/flash-load/scripts/run.ts`.
+k6 with them. The data is read in `apps/flash-load/scripts/collect.ts` and the checks are judged in
+`apps/flash-load/scripts/verdict.ts`; `run.ts` runs the phases in order.
 
 | Check                    | Passes when                                               | Profiles      |
 | ------------------------ | --------------------------------------------------------- | ------------- |

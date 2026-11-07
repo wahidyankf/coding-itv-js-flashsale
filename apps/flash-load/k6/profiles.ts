@@ -1,5 +1,7 @@
 // The load profiles and the limits a run must meet. The k6 script and the runner both read this file, so the two never
 // disagree. The limits were fixed before the first run and are not changed to make a run pass.
+
+// One load profile: how many shoppers come, how fast, and which faults the run injects.
 export type Profile = {
 	// Items for sale, and how long a hold lasts in seconds.
 	stock: number;
@@ -9,7 +11,8 @@ export type Profile = {
 	// Distinct shoppers, and how fast they arrive. Shoppers divided by the rate is the length of the run.
 	users: number;
 	arrivalsPerSecond: number;
-	// Shoppers who arrive once every hold has lapsed, ten a second. They take the items that abandoned holds gave back.
+	// Shoppers who arrive once every hold has lapsed, at the rate of `LATECOMERS_PER_SECOND` in k6/shop.ts. They take the
+	// items that abandoned holds gave back.
 	latecomers: number;
 	// Shoppers who flood the queue to prove they are limited and not failed.
 	hammerUsers: number;
@@ -25,6 +28,7 @@ export type Profile = {
 	judgeSpeed: boolean;
 };
 
+// Every profile the runner knows. The name is also the command: `npm run load:<name>`.
 export const PROFILES = {
 	smoke: {
 		stock: 20,
@@ -111,9 +115,10 @@ export const PROFILES = {
 	},
 } as const satisfies Record<string, Profile>;
 
+// The name of a profile, as the command line and the PROFILE variable of the k6 script spell it.
 export type ProfileName = keyof typeof PROFILES;
 
-// Fixed before the first run.
+// The speed and error limits of a run. Fixed before the first run, and the same for every profile that judges speed.
 export const LIMITS = {
 	// 95 of 100 reserve requests answer faster than this.
 	reserveP95Ms: 300,
@@ -123,4 +128,5 @@ export const LIMITS = {
 	serverErrors: 0,
 } as const;
 
+// The profile names, in the order PROFILES lists them. The runner checks its argument against them.
 export const PROFILE_NAMES = Object.keys(PROFILES) as ProfileName[];

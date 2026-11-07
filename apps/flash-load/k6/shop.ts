@@ -1,3 +1,6 @@
+// The k6 script of the load test. Each iteration is one shopper's visit to the sale: sign up, join the queue, wait to be
+// admitted, reserve an item, confirm the purchase, then ask whether they got it. scripts/bundle.ts bundles this file and
+// its imports into one file, which k6 runs, so it may use only the k6 modules and the files of this app, never Node.
 import { check, sleep } from "k6";
 import exec from "k6/execution";
 import http from "k6/http";
@@ -5,14 +8,19 @@ import { Counter } from "k6/metrics";
 import type { Options } from "k6/options";
 import { LIMITS, PROFILES, type ProfileName } from "./profiles.ts";
 
+// The runner passes the profile and the sale through the environment (k6 `-e`).
 const profileName = (__ENV.PROFILE ?? "smoke") as ProfileName;
 const profile = PROFILES[profileName];
 const BASE = __ENV.BASE_URL ?? "http://nginx";
-const SALE = __ENV.SALE_ID ?? "";
+const SALE_ID = __ENV.SALE_ID ?? "";
+// The path of the sale. Every request for the sale starts with it.
+const SALE_PATH = `/sales/${SALE_ID}`;
 
 // The API, as the shopper meets it. A refusal is `{ errorCode, errorMessage }` with the status that goes with it.
 const TICKET_HEADER = "x-queue-ticket";
 const ACCESS_COOKIE = "access_token";
+// The state the queue gives a shopper once they may buy.
+const ADMITTED = "admitted";
 const STATUS = {
 	ok: 200,
 	created: 201,
@@ -22,6 +30,7 @@ const STATUS = {
 	firstServerError: 500,
 } as const;
 const FIRST_ERROR_STATUS = 400;
+// An IPv4 address is four bytes; a shopper's index is spread over the last three of them.
 const BYTE = 255;
 const BYTE_BITS = 8;
 
@@ -72,6 +81,8 @@ const speed = {
 	server_errors: [`count<=${LIMITS.serverErrors}`],
 };
 
+// The k6 options: three scenarios (the shoppers, the latecomers and the hammer), each with its own rate or count, and
+// the speed limits as thresholds.
 export const options: Options = {
 	scenarios: {
 		shoppers: {
@@ -120,6 +131,10 @@ type Answer = {
 	// The value of the access cookie the reply set, if it set one.
 	accessToken?: string;
 };
+type Send = { headers?: Record<string, string>; body?: object };
+
+// What one visit carries from step to step: the shopper's address, their cookie, and the ticket that holds their place.
+type Visit = { ip: string; cookie: string; ticket: string };
 
 // The reply when the API did not refuse it.
 function bodyOf(answer: Answer): Body | undefined {
@@ -133,25 +148,23 @@ function errorOf(answer: Answer): string | undefined {
 		: undefined;
 }
 
-type Send = { headers?: Record<string, string>; body?: object };
-
 // Every shopper has one password, which no account of this stack protects anything with.
 const PASSWORD = "load-test-password";
 
-// One request. The user's address goes in X-Forwarded-For, which the API trusts behind the proxy, so each shopper is
+// One request. The shopper's address goes in X-Forwarded-For, which the API trusts behind the proxy, so each shopper is
 // limited on their own and not as one address.
 function call(
 	method: "GET" | "POST",
 	path: string,
 	name: string,
-	address: string,
+	ip: string,
 	{ headers = {}, body }: Send = {},
 ): Answer {
 	const params = {
 		headers: {
 			...headers,
 			...(body && { "content-type": "application/json" }),
-			"x-forwarded-for": address,
+			"x-forwarded-for": ip,
 		},
 		tags: { name },
 		// A virtual user plays many shoppers one after the other, so no cookie may stay with it. Each shopper sends their
@@ -176,31 +189,40 @@ function call(
 	};
 }
 
+// The address of shopper `index`. Every shopper has their own, so the API limits each of them on their own.
 const address = (index: number) =>
 	`10.${(index >> (BYTE_BITS * 2)) & BYTE}.${(index >> BYTE_BITS) & BYTE}.${index & BYTE}`;
 
 const pause = ({ min, spread }: Pause) => sleep(min + Math.random() * spread);
 
+// The headers of a request that carries only the shopper's cookie.
+function cookieHeaders(cookie: string): Record<string, string> {
+	return { cookie };
+}
+
+// The headers of a shopper who holds a place in the queue: the cookie and the ticket the queue gave.
+function ticketHeaders(me: Visit): Record<string, string> {
+	return { ...cookieHeaders(me.cookie), [TICKET_HEADER]: me.ticket };
+}
+
 // A shopper signs up, which also logs them in, and gets the cookie header every later request carries. Nothing but a
 // refusal of the account itself stops them: without a login the shopper cannot take part.
-function signUp(user: string, where: string): string | undefined {
-	const account = call("POST", "/auth/register", "register", where, {
+function signUp(user: string, ip: string): string | undefined {
+	const account = call("POST", "/auth/register", "register", ip, {
 		body: { username: user, password: PASSWORD },
 	});
 	return account.accessToken && `${ACCESS_COOKIE}=${account.accessToken}`;
 }
 
-// One shopper, from the first click to the answer to "did I get it".
-function visit(user: string, index: number): void {
-	const where = address(index);
-	const cookie = signUp(user, where);
-	if (!cookie) return;
+// Joins the queue. A shopper refused for going too fast tries again a few times, then gives up. Returns the reply that
+// holds the shopper's place, or undefined when there is none.
+function joinQueue(ip: string, cookie: string): Body | undefined {
 	const join = () =>
-		call("POST", `/sales/${SALE}/queue`, "join", where, {
-			headers: { cookie },
+		call("POST", `${SALE_PATH}/queue`, "join", ip, {
+			headers: cookieHeaders(cookie),
 		});
-
 	let joined = join();
+	// The one retry of a join. It is the only place a join is sent again.
 	for (
 		let tries = 0;
 		errorOf(joined) === "rate_limited" && tries < MAX_JOIN_RETRIES;
@@ -210,93 +232,139 @@ function visit(user: string, index: number): void {
 		joined = join();
 	}
 	// 409 means the sale is over or sold out. That is a fair answer, not a failure.
-	const entry = bodyOf(joined);
-	if (!entry) return;
+	return bodyOf(joined);
+}
 
-	const headers = { cookie, [TICKET_HEADER]: entry.ticket ?? "" };
+// Whether the sale has stopped letting shoppers in: it is sold out or it has ended.
+function saleIsOver(ip: string): boolean {
+	const sale = bodyOf(call("GET", SALE_PATH, "sale", ip));
+	return sale?.status === "sold_out" || sale?.status === "ended";
+}
 
-	// Wait to be let in. The page does the same by following the place stream.
-	let state = entry.state ?? "";
-	for (let polls = 0; state !== "admitted" && polls < MAX_POLLS; polls++) {
+// Waits to be let in. The page does the same by following the place stream. The shopper also reads the sale, because
+// the queue stops admitting when the sale is over or sold out, and a shopper who is not admitted then stops waiting.
+// Returns true when the shopper is admitted.
+function waitForAdmission(me: Visit, joinedState: string): boolean {
+	let state = joinedState;
+	for (let polls = 0; state !== ADMITTED && polls < MAX_POLLS; polls++) {
 		pause(POLL_PAUSE);
 		const place = bodyOf(
-			call("GET", `/sales/${SALE}/queue/me`, "place", where, { headers }),
+			call("GET", `${SALE_PATH}/queue/me`, "place", me.ip, {
+				headers: ticketHeaders(me),
+			}),
 		);
-		if (!place) return;
+		if (!place) return false;
 		state = place.state ?? "";
-		if (state === "admitted") break;
-		// The queue stops admitting when the sale is over or sold out. The page learns that from the sale stream and
-		// stops waiting, so a shopper here reads the sale alongside the place.
-		const sale = bodyOf(call("GET", `/sales/${SALE}`, "sale", where));
-		if (sale?.status === "sold_out" || sale?.status === "ended") return;
+		if (state !== ADMITTED && saleIsOver(me.ip)) return false;
 	}
-	if (state !== "admitted") return;
+	return state === ADMITTED;
+}
 
-	// Ask for an item once. A sold out answer is final for this shopper: holds that lapse later are for those who
-	// arrive later, which the latecomers below stand for.
-	const reserve = () =>
-		call("POST", `/sales/${SALE}/reservations`, "reserve", where, {
-			headers,
-		});
-	const hold = reserve();
+// The reserve request. A shopper who asks again is refused: one item per shopper.
+function askForItem(me: Visit): Answer {
+	return call("POST", `${SALE_PATH}/reservations`, "reserve", me.ip, {
+		headers: ticketHeaders(me),
+	});
+}
+
+// Asks for one item. A sold out answer is final for this shopper: holds that lapse later are for those who arrive later,
+// which the latecomers below stand for. Returns the hold, or undefined when the shopper gets none.
+function reserveItem(me: Visit): Body | undefined {
+	const hold = askForItem(me);
 	if (errorOf(hold) === "sold_out") {
 		soldOutReplies.add(1);
-		return;
+		return undefined;
 	}
 	const held = bodyOf(hold);
-	if (!held) return;
-	if (hold.status === STATUS.created) reserved.add(1);
+	if (held && hold.status === STATUS.created) reserved.add(1);
+	return held;
+}
 
-	if (Math.random() < profile.abandonShare) return;
-	pause(THINK_BEFORE_PAYING);
+// One confirm request. The name is the request's tag in the k6 results.
+function buy(
+	me: Visit,
+	reservationId: string | undefined,
+	name: string,
+): Answer {
+	return call("POST", `${SALE_PATH}/purchases`, name, me.ip, {
+		headers: cookieHeaders(me.cookie),
+		body: { reservationId },
+	});
+}
 
-	const confirm = (name: string) =>
-		call("POST", `/sales/${SALE}/purchases`, name, where, {
-			headers: { cookie },
-			body: { reservationId: held.reservationId },
-		});
-	let bought = confirm("purchase");
+// Confirms the purchase. A declined payment is tried again, up to MAX_PAYMENT_ATTEMPTS in all. Returns the last reply.
+function payForItem(me: Visit, reservationId: string | undefined): Answer {
+	let bought = buy(me, reservationId, "purchase");
+	// The one retry of a payment. It is the only place a confirm is sent again for a declined payment.
 	for (
 		let attempt = 1;
 		attempt < MAX_PAYMENT_ATTEMPTS && bought.status === STATUS.paymentFailed;
 		attempt++
 	) {
 		pause(BEFORE_PAYMENT_RETRY);
-		bought = confirm("purchase");
+		bought = buy(me, reservationId, "purchase");
 	}
-	const purchase = bodyOf(bought);
-	if (bought.status === STATUS.created) purchased.add(1);
+	return bought;
+}
 
-	// One shopper in five presses the button again. The second answer must repeat the first, and a second item must
-	// not be given.
-	if (
-		bought.status === STATUS.created &&
-		Math.random() < REPEAT_CONFIRM_SHARE
-	) {
-		const again = confirm("purchase_again");
-		const second = reserve();
-		check(null, {
-			"a repeated confirm gives the same purchase": () =>
-				again.status === STATUS.ok &&
-				bodyOf(again)?.purchaseId === purchase?.purchaseId,
-			"a second reserve is refused": () =>
-				second.status === STATUS.alreadyPurchased &&
-				errorOf(second) === "already_purchased",
-		});
-	}
+// A share of buyers (REPEAT_CONFIRM_SHARE) presses confirm again. The second confirm must give back the same purchase,
+// and a second reserve must be refused.
+function checkRepeatPurchase(
+	me: Visit,
+	reservationId: string | undefined,
+	bought: Answer,
+): void {
+	const firstPurchaseId = bodyOf(bought)?.purchaseId;
+	const again = buy(me, reservationId, "purchase_again");
+	const second = askForItem(me);
+	check(null, {
+		"a repeated confirm gives the same purchase": () =>
+			again.status === STATUS.ok &&
+			bodyOf(again)?.purchaseId === firstPurchaseId,
+		"a second reserve is refused": () =>
+			second.status === STATUS.alreadyPurchased &&
+			errorOf(second) === "already_purchased",
+	});
+}
 
-	// "Did I get it" must agree with what happened.
-	const outcome = call("GET", `/sales/${SALE}/purchases/me`, "outcome", where, {
-		headers: { cookie },
+// "Did I get it" must agree with what happened.
+function checkOutcome(me: Visit, gotItem: boolean): void {
+	const outcome = call("GET", `${SALE_PATH}/purchases/me`, "outcome", me.ip, {
+		headers: cookieHeaders(me.cookie),
 	});
 	check(null, {
 		"the outcome agrees with the purchase": () =>
 			outcome.status === STATUS.ok &&
-			(bodyOf(outcome)?.state === "purchased") ===
-				(bought.status === STATUS.created),
+			(bodyOf(outcome)?.state === "purchased") === gotItem,
 	});
 }
 
+// One shopper, from the first click to the answer to "did I get it".
+function visit(user: string, index: number): void {
+	const ip = address(index);
+	const cookie = signUp(user, ip);
+	if (!cookie) return;
+	const place = joinQueue(ip, cookie);
+	if (!place) return;
+	const me: Visit = { ip, cookie, ticket: place.ticket ?? "" };
+	if (!waitForAdmission(me, place.state ?? "")) return;
+	const held = reserveItem(me);
+	if (!held) return;
+	// A share of shoppers (abandonShare in the profile) walks away with the hold and does not confirm.
+	if (Math.random() < profile.abandonShare) return;
+	pause(THINK_BEFORE_PAYING);
+	const bought = payForItem(me, held.reservationId);
+	const gotItem = bought.status === STATUS.created;
+	if (gotItem) {
+		purchased.add(1);
+		if (Math.random() < REPEAT_CONFIRM_SHARE) {
+			checkRepeatPurchase(me, held.reservationId, bought);
+		}
+	}
+	checkOutcome(me, gotItem);
+}
+
+// One shopper at the steady rate of the main sale. Each iteration is one new shopper.
 export function shopper(): void {
 	const index = exec.scenario.iterationInTest + 1;
 	visit(`shopper-${index}`, index);
@@ -308,16 +376,17 @@ export function latecomer(): void {
 	visit(`late-${index}`, LATECOMER_ID_OFFSET + index);
 }
 
-// A shopper who sends request after request. Past the limit the API must answer 429, never an error.
+// A shopper who sends request after request. Past the limit the API must answer 429, never an error. The hammer uses
+// addresses of the documentation range (192.0.2.0/24), apart from the shoppers' range.
 export function hammer(): void {
 	const id = exec.vu.idInTest;
 	const user = `hammer-${id}`;
-	const where = `192.0.2.${id}`;
-	const cookie = signUp(user, where);
+	const ip = `192.0.2.${id}`;
+	const cookie = signUp(user, ip);
 	if (!cookie) return;
 	for (let sent = 0; sent < HAMMER_REQUESTS; sent++) {
-		call("POST", `/sales/${SALE}/queue`, "hammer", where, {
-			headers: { cookie },
+		call("POST", `${SALE_PATH}/queue`, "hammer", ip, {
+			headers: cookieHeaders(cookie),
 		});
 	}
 }
