@@ -3,7 +3,7 @@
 	"version": "0.1.0",
 	"private": true,
 	"type": "module",
-	"description": "Typed Result and attempt helpers. A TypeScript port of py-typekit.",
+	"description": "Typed Result and attempt helpers: a failure is a value in the function's type, so a caller cannot forget it.",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"exports": {
