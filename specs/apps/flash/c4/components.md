@@ -40,7 +40,7 @@ flowchart LR
 - **CLI adapter** reads the options of the two commands: `seed-sale.ts` (a sale) and `create-operator.ts` (the first
   operator account). Each wires itself to the database and calls a use case (the seed service, `createOperator`).
 - **Application** (`application/`) has one service per use case: the sale status with its read cache, the waiting queue,
-  reserving, paying, the rate limiter, the operator's sale service (create, change, remove, list), the auth service (sign up, log in, refresh, log out, and who a cookie is) and the admission step that serves the current sale. A service orders the steps and calls ports. Its ports are in
+  reserving, paying, the rate limiter, the operator's sale service (create, change, remove, list), the auth service (sign up, log in, refresh, log out, and who a cookie is) and the admission step that serves the current sale. Its ports are in
   `application/ports/`: `SaleRepository`, `QueueStore`, `HoldGate`, `ReservationRepository`, `PurchaseRepository`,
   `RateLimitStore`, `Payment`, `Clock`, `SaleSeeder`, `SaleAdmin`, `AccountRepository`, `SessionRepository`, `PasswordHasher` and `TokenSource`.
 - **Domain** (`domain/`) holds the rules and imports nothing else: when a sale is upcoming, active, sold out or

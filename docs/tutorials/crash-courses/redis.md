@@ -159,13 +159,14 @@ npx vitest run --config vitest.integration.config.ts src/adapters/outbound/redis
       Tests  2 passed (2)
 ```
 
-## Traps we hit
+## Traps to avoid
 
 - **The default reconnect gives up.** After a socket timeout the node-redis default strategy answers `false` and never
   reconnects, so the API would stay without Redis until a restart. `reconnectStrategy` answers a wait for every cause.
-- **A lost queue gave the wrong error.** The load stack runs Redis without persistence, so a restart empties the queue,
-  and a shopper who had just bought got `403 not_admitted`. The route now asks Postgres and answers
-  `409 already_purchased`.
+- **A lost queue must not hide a purchase.** A Redis restart can empty the queue, so a shopper who just bought has no
+  place in line. The reservation service then asks Postgres, and `reserveRefusalOf` in
+  [`domain/queue.ts`](../../../apps/flash-be/src/domain/queue.ts) answers `409 already_purchased`, not
+  `403 not_admitted`.
 - **Redis and Postgres differ by one millisecond.** The script counts a hold that ends exactly now as live (`>=`), and
   Postgres does not (`>`). The gap errs on the safe side: Redis may refuse, but never oversells.
 

@@ -115,7 +115,7 @@ Statements   : 100% ( 33/33 )
 The README example runs as a test too: from `libs/typekit`,
 `npx vitest run --config vitest.config.ts src/example_tests.ts` passes 2 tests.
 
-## Traps we hit
+## Traps to avoid
 
 - **Text that is not JSON.** `JSON.parse` throws a `SyntaxError`, so `readBody` in
   [`api.ts`](../../../apps/flash-web/src/api.ts) wraps it in `attempt(..., SyntaxError)`. A 2xx reply whose body does not

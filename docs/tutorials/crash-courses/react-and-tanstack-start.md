@@ -162,7 +162,7 @@ npx vitest run --config vitest.config.ts src/sale/shopper_state_tests.ts src/com
       Tests  21 passed (21)
 ```
 
-## Traps we hit
+## Traps to avoid
 
 - **The refresh cookie path.** `flash-be` sets the refresh cookie for `/auth`, but the browser reaches it as `/api/auth`
   and would never send it back. `rewritePath` in [`proxy.ts`](../../../apps/flash-web/src/proxy.ts) moves it.

@@ -118,7 +118,7 @@ The output starts with the version, and each prefix becomes a media query (trimm
 
 `sm:` is `40rem`, `md:` is `48rem` and `lg:` is `64rem`. Stop the dev page with Ctrl+C when you are done.
 
-## Traps we hit
+## Traps to avoid
 
 - **Class names built from pieces.** Tailwind reads the files as text, so `` `bg-${tone}-100` `` never becomes a class.
   `ui.ts` writes every class out in full, and `sale-status-card.tsx` maps each status to a full class list (`BADGE`).

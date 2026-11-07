@@ -125,7 +125,7 @@ One of the error lines, for the secret named above:
 error while interpolating services.flash-be-1.environment.TICKET_SECRET: required variable TICKET_SECRET is missing a value: set TICKET_SECRET in .env
 ```
 
-## Traps we hit
+## Traps to avoid
 
 - **`down -v` is not a restart.** It deletes the volumes. `npm run demo:reset` and `npx nx db:reset flash-be` run it, so
   never run them unless you mean to wipe the local data. Use `docker:dev:down` to stop the stack and keep it.

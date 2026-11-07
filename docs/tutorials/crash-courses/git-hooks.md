@@ -74,11 +74,11 @@ added stuff
 ✖   found 2 problems, 0 warnings
 ```
 
-## Traps we hit
+## Traps to avoid
 
-- **Formatting was not checked.** lint-staged formats only the staged code and JSON, and the apps' `lint` ran only
-  `biome lint`, so the format of Markdown, JSON and the scripts was never enforced. `npm run lint` is now `biome check`
-  on the whole repository and the first step of pre-push (commit `de01b9b`). Run `npm run lint` before you push docs.
+- **A commit does not check the format of everything.** lint-staged formats only the staged code and JSON, and the
+  apps' `lint` targets run only `biome lint`. The format of the Markdown files is checked by `npm run lint`
+  (`biome check` on the whole repository), the first step of pre-push. Run it before you push docs.
 - **Push fails when Docker is down.** The last step starts the dev stack. Start Docker before you push.
 - **Do not skip the gate.** `git push --no-verify`, `git commit --no-verify` and `HUSKY=0` all skip the hooks, and with
   no CI nothing runs the checks later. AGENTS.md allows `--no-verify` only when the user asks. If a step fails, fix the

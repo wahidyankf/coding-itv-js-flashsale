@@ -126,7 +126,7 @@ The output, trimmed:
 `|unit|` is the `name` of the config. Change `"admitted"` to `"waiting"` in the first test and run it again to see a
 failure.
 
-## Traps we hit
+## Traps to avoid
 
 - **Unit coverage is not the gate.** `test:unit` reports coverage with no floor, because the database code of
   `flash-be` is covered only by the integration tests. Run `test:coverage` before you trust the number.

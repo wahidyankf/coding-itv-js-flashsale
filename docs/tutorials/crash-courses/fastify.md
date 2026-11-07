@@ -161,7 +161,7 @@ The output, trimmed:
 
 Each of these tests sends a login with `app.inject` and reads the `set-cookie` headers of the reply.
 
-## Traps we hit
+## Traps to avoid
 
 - **Open streams keep the server open.** By default `app.close()` closes only idle connections, and an event stream is
   never idle. `forceCloseConnections: true` in `app.ts` closes them too.

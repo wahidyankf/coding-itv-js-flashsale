@@ -136,7 +136,7 @@ npx vitest run --config vitest.config.ts --reporter=verbose -t "Joining twice" s
       Tests  7 passed | 28 skipped (35)
 ```
 
-## Traps we hit
+## Traps to avoid
 
 - **Steps that repeat a pattern.** When one scenario uses a pattern several times (`"ana" joins the queue`, then
   `"ben" joins the queue`), [`bind-queue-joining.ts`](../../../apps/flash-be/src/bdd/support/bind-queue-joining.ts)

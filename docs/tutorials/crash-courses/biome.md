@@ -103,7 +103,7 @@ npm run lint:rules:test
       Tests  5 passed (5)
 ```
 
-## Traps we hit
+## Traps to avoid
 
 - **A git-ignored file is skipped.** `vcs.useIgnoreFile` is on, so `npx biome lint local-tmp/x.ts` reports
   "No files were processed". Try a rule on a file in a tracked folder instead.

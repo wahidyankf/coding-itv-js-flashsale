@@ -173,7 +173,7 @@ npx vitest run --config vitest.integration.config.ts src/adapters/outbound/postg
       Tests  3 passed (3)
 ```
 
-## Traps we hit
+## Traps to avoid
 
 - **`ON CONFLICT` must name the partial index.** A partial unique index is matched only when the conflict target repeats
   its `WHERE`. `upsertHold` in

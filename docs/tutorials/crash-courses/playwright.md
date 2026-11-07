@@ -141,7 +141,7 @@ Open `.features-gen/queue/joining.feature.spec.js` to see each Gherkin line turn
 starts the dev stack itself, or `npx nx test:e2e flash-web-e2e` after `npx nx db:up flash-be`. How to bind a step is in
 [add a behaviour](../../how-to/add-a-behaviour.md#4-bind-the-end-to-end-layer).
 
-## Traps we hit
+## Traps to avoid
 
 - **The page first asks who is logged in.** A step that clicks before that answer arrives races with it.
   `openPage` in [`web.steps.ts`](../../../apps/flash-web-e2e/steps/web.steps.ts) waits until "Checking your login…" is

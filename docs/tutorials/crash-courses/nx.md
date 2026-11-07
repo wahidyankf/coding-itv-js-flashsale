@@ -150,7 +150,7 @@ npx nx run-many -t lint -p typekit flash-commons
 See what your change touches with `npx nx show projects --affected --base=origin/main`. The list depends on your branch
 and your working tree.
 
-## Traps we hit
+## Traps to avoid
 
 - **Nx output hides the logs.** The summary prints only `2 tasks: 2 succeeded`. Add `--output-style=static` to see each
   command and its output, or `--output-style=stream` for a server that keeps running.

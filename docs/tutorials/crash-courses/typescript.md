@@ -133,10 +133,11 @@ Trimmed output:
  NX   Successfully ran target typecheck for project flash-commons and 1 task it depends on
 ```
 
-## Traps we hit
+## Traps to avoid
 
-- **A cast hides a wrong shape.** `flash-web` once checked only that a reply was JSON and then cast it, so a reply with a
-  missing field went into the page state. Every reply is now decoded ([018](../../explanation/decisions/018-decode-payloads-at-the-edge.md)).
+- **A cast hides a wrong shape.** `JSON.parse(text) as Sale` compiles, but a reply with a missing field would still go
+  into the page state. So `flash-web` decodes every reply instead of casting it
+  ([018](../../explanation/decisions/018-decode-payloads-at-the-edge.md)).
 - **A stale library build.** The apps import `libs/typekit/dist` and `libs/flash-commons/dist`, not their source. Run the
   apps' checks through Nx, which builds both libraries first; a bare `tsc` in an app may read an old `dist`.
 - **`as` is not a fix.** The two casts in `decode.ts` each have a comment that says why TypeScript cannot follow the
