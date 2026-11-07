@@ -5,7 +5,7 @@ and slow every other shopper down. The API therefore limits write requests befor
 
 ## What is limited
 
-Only the three write routes: join the queue, reserve and confirm. Reads are cheap and are not limited.
+The three write routes (join the queue, reserve and confirm) and, apart, the auth routes. Reads are cheap and are not limited.
 A rejected request gets status `429`, the body `{"errorCode":"rate_limited","errorMessage":"...","retryAfterSeconds":n}` and a
 `Retry-After` header, so a well-behaved client knows when to come back.
 
@@ -13,8 +13,13 @@ A rejected request gets status `429`, the body `{"errorCode":"rate_limited","err
 
 - **Per user** (30 requests in 10 seconds by default). It stops one shopper who presses the button in a loop. It does not
   harm a user who is behind a shared address.
-- **Per address** (600 in 10 seconds by default). It stops one machine that sends many different user ids, which the
+- **Per address** (600 in 10 seconds by default). It stops one machine that sends many different accounts, which the
   per-user counter cannot see. It is higher because an office or a school may share one address.
+
+- **Auth routes** (20 requests per address in 10 seconds by default, `AUTH_RATE_LIMIT_PER_IP`). Sign-up, login, refresh and
+  logout have a count of their own, so a crowd that arrives for a sale cannot lock itself out of the login, and a password
+  cannot be guessed at speed. It is by address only, because a request that is not logged in has no user yet. The
+  `/admin` routes are counted by address in the same way, under their own key.
 
 A request is refused when either counter is over its limit. A refused request still counts, so a client that keeps
 retrying does not get through earlier.

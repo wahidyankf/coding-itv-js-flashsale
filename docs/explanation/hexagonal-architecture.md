@@ -9,10 +9,10 @@ src/
   domain/          rules and values; imports only Node built-ins and @flash/typekit
   application/     services (use cases) and ports/
   adapters/
-    inbound/       http (Fastify routes, SSE), cli (seed options)
-    outbound/      postgres, redis, memory, payment, system (clock)
+    inbound/       http (Fastify routes, SSE), cli (seed and create-operator options)
+    outbound/      postgres, redis, crypto (scrypt), memory, payment, system (clock)
   composition.ts   the one place that picks an adapter for a port
-  main.ts          entry points: main, migrate, seed-sale
+  main.ts          entry points: main, migrate, seed-sale, create-operator
 ```
 
 ## The three layers

@@ -1,8 +1,75 @@
 # Sequences
 
-Three flows that cross the parts of `flash-be`. The sequence diagrams show the order of the calls. The prose below each
+Four flows that cross the parts of `flash-be`. The sequence diagrams show the order of the calls. The prose below each
 one states the rule behind it. A request from the shopper is written with its method and path, where `:id` is the
 sale id. The paths are in the [endpoint reference](../../../../docs/reference/http-endpoints.md).
+
+## Log in
+
+```mermaid
+sequenceDiagram
+  accTitle: Log in and use the session
+  accDescr: The shopper sends a user name and a password. The API reads the user from Postgres, checks the password against its scrypt hash, and writes a session row that holds only the hashes of two new tokens. The reply sets the access and refresh cookies. A later request carries the access cookie; the API looks its hash up in the Redis session cache and falls back to Postgres on a miss. When the access token has ended, the shopper trades the refresh cookie for a new pair, and the old refresh token stops working.
+  participant S as Shopper
+  participant A as flash-be
+  participant R as Redis
+  participant P as Postgres
+  S->>A: POST /auth/login
+  A->>P: read the user
+  A->>A: check the password
+  A->>P: save the session and the login time
+  A-->>S: set access_token and refresh_token
+  S->>A: POST /sales/:id/queue (access_token)
+  A->>R: read the session
+  R-->>A: miss
+  A->>P: read the session by token hash
+  A->>R: keep the session until the token ends
+  S->>A: POST /auth/refresh (refresh_token)
+  A->>P: lock the session, swap the pair, keep the old refresh hash
+  A->>R: forget the old access token
+  A-->>S: set a new access_token and refresh_token
+```
+
+- The tokens are 32 random bytes. Only their SHA-256 goes to Postgres and to the Redis key, so a copy of either store
+  cannot be used to log in. The password is stored as a scrypt hash with its own salt.
+- A wrong name and a wrong password get the same answer (`invalid_credentials`).
+- The refresh token is used once. When a token that was already replaced comes back, the session is marked deleted, because
+  someone holds a copy. The Redis copy of the access token is forgotten on every rotation and on logout, so a revoked
+  token stops working at once rather than at the end of its cache time.
+- The cookies are `HttpOnly` and `SameSite=Lax`, and `Secure` in production. The refresh cookie is sent to `/auth` only.
+
+### The calls in full
+
+```sql
+-- read the user (login)
+SELECT "id", "username", "role", "password_hash" FROM "users"
+WHERE "username" = $1 AND "deleted_at" IS NULL;
+
+-- save the session and the login time: one transaction. The user is the author of their own session.
+INSERT INTO "sessions" ("user_id", "access_hash", "access_expires_at", "refresh_hash", "refresh_expires_at",
+  "ip", "user_agent", "created_by")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $1);
+UPDATE "users" SET "last_login_at" = $8 WHERE "id" = $1;
+
+-- read the session by token hash (on a miss in Redis)
+SELECT "users"."id", "users"."username", "users"."role", "sessions"."access_expires_at"
+FROM "sessions" INNER JOIN "users" ON "users"."id" = "sessions"."user_id"
+WHERE "sessions"."access_hash" = $1 AND "sessions"."deleted_at" IS NULL
+  AND "sessions"."access_expires_at" > $2 AND "users"."deleted_at" IS NULL;
+
+-- swap the pair (refresh): one transaction. The old refresh hash is kept in previous_refresh_hash.
+SELECT * FROM "sessions" WHERE "refresh_hash" = $1 AND "deleted_at" IS NULL FOR UPDATE;
+UPDATE "sessions" SET "access_hash" = $2, "access_expires_at" = $3, "previous_refresh_hash" = $1,
+  "refresh_hash" = $4, "refresh_expires_at" = $5, "updated_at" = now(), "updated_by" = "user_id"
+WHERE "id" = $6;
+-- a refresh token that was already replaced (SELECT ... WHERE "previous_refresh_hash" = $1) ends its session
+UPDATE "sessions" SET "deleted_at" = now(), "deleted_by" = "user_id" WHERE "id" = $6;
+```
+
+```text
+GET session:<access hash>        -- the session cache; SET with EX until the access token ends
+DEL session:<access hash>        -- on a refresh, a replay and a logout
+```
 
 ## Reserve and pay
 
@@ -14,7 +81,8 @@ sequenceDiagram
   participant A as flash-be
   participant R as Redis
   participant P as Postgres
-  S->>A: POST /sales/:id/queue
+  S->>A: POST /sales/:id/queue (access_token)
+  A->>A: read the session
   A->>R: add to the line
   A-->>S: ticket and place
   A->>R: admit the next shoppers
@@ -29,6 +97,7 @@ sequenceDiagram
   A-->>S: purchase id
 ```
 
+- The shopper is the account of the session cookie, never a name in the path or the body.
 - The line and the admission live in Redis. A tick admits shoppers at the sale's rate; one instance wins each tick.
 - The gate script runs as one step in Redis. It refuses when buyers plus live holds reach the stock. An expired hold
   stops counting by its time, so nothing sweeps it.
@@ -87,19 +156,24 @@ return 1
 Postgres. The purchase is one transaction, in this order.
 
 ```sql
--- save the hold (the same statement runs when the hold is repeated)
-INSERT INTO "reservations" ("id", "sale_id", "user_id", "expires_at")
-VALUES ($1, $2, $3, $4)
-ON CONFLICT ("sale_id", "user_id") DO UPDATE SET "id" = $5, "expires_at" = $6;
+-- save the hold (the same statement runs when the hold is repeated). $3 is the id of the user row.
+INSERT INTO "reservations" ("id", "sale_id", "user_id", "expires_at", "created_by")
+VALUES ($1, $2, $3, $4, $3)
+ON CONFLICT ("sale_id", "user_id") WHERE "deleted_at" IS NULL
+DO UPDATE SET "id" = $5, "expires_at" = $6, "updated_at" = now(), "updated_by" = $3;
 
 -- lock, count, insert: one transaction
 SELECT "id" FROM "sales" WHERE "id" = $1 FOR UPDATE;
-SELECT * FROM "purchases" WHERE "reservation_id" = $1;
-SELECT "id" FROM "purchases" WHERE "sale_id" = $1 AND "user_id" = $2;
-UPDATE "sales" SET "sold" = sold + 1 WHERE "id" = $1 AND sold < stock;
-INSERT INTO "purchases" ("sale_id", "user_id", "reservation_id", "payment_ref")
-VALUES ($1, $2, $3, $4) RETURNING *;
-DELETE FROM "reservations" WHERE "sale_id" = $1 AND "user_id" = $2;
+SELECT "purchases".*, "users"."username" FROM "purchases"
+INNER JOIN "users" ON "users"."id" = "purchases"."user_id"
+WHERE "purchases"."deleted_at" IS NULL AND "purchases"."reservation_id" = $1;
+SELECT "id" FROM "purchases" WHERE "sale_id" = $1 AND "user_id" = $2 AND "deleted_at" IS NULL;
+UPDATE "sales" SET "sold" = sold + 1, "updated_at" = now(), "updated_by" = $2
+WHERE "id" = $1 AND "deleted_at" IS NULL AND sold < stock;
+INSERT INTO "purchases" ("sale_id", "user_id", "reservation_id", "payment_ref", "created_by")
+VALUES ($1, $2, $3, $4, $2) RETURNING *;
+UPDATE "reservations" SET "deleted_at" = now(), "deleted_by" = $2
+WHERE "sale_id" = $1 AND "user_id" = $2 AND "deleted_at" IS NULL;
 ```
 
 - The first `SELECT` locks the sale row, so shoppers who confirm take turns.
@@ -107,6 +181,9 @@ DELETE FROM "reservations" WHERE "sale_id" = $1 AND "user_id" = $2;
   Both end the transaction without a change.
 - The `UPDATE` changes no row when the stock is gone, and the `CHECK` on the table repeats that rule. In that case the
   transaction stops with `sold_out`.
+- The hold is not deleted. It is marked deleted by the buyer, and the partial unique index only counts live rows.
+- `$2` is the buyer's `users.id`, found by name once in the transaction (`SELECT "id" FROM "users" WHERE "username" = $1
+  AND "deleted_at" IS NULL`).
 - The `CONFIRM` script runs after the commit.
 
 ## The hold ends during payment
@@ -136,7 +213,9 @@ sequenceDiagram
 The calls are those of the first flow. _check the hold_ is this statement, run before the charge:
 
 ```sql
-SELECT * FROM "reservations" WHERE "sale_id" = $1 AND "user_id" = $2;
+SELECT "reservations".*, "users"."username" FROM "reservations"
+INNER JOIN "users" ON "users"."id" = "reservations"."user_id"
+WHERE "reservations"."deleted_at" IS NULL AND "reservations"."sale_id" = $1 AND "users"."username" = $2;
 ```
 
 _lock, count, insert_ is the purchase transaction above. _no item left_ is its `UPDATE ... WHERE sold < stock` that
@@ -178,21 +257,26 @@ The calls, in full. _gate script_ is the `RESERVE` script of the first flow.
 
 ```sql
 -- lock the sale row, then count sold and holds: one transaction, no Redis
-SELECT "sold" FROM "sales" WHERE "id" = $1 FOR UPDATE;
-SELECT "id" FROM "purchases" WHERE "sale_id" = $1 AND "user_id" = $2;
-SELECT "id", "expires_at" FROM "reservations" WHERE "sale_id" = $1 AND "user_id" = $2;
+SELECT "sold" FROM "sales" WHERE "id" = $1 AND "deleted_at" IS NULL FOR UPDATE;
+SELECT "id" FROM "purchases" WHERE "sale_id" = $1 AND "user_id" = $2 AND "deleted_at" IS NULL;
+SELECT "id", "expires_at" FROM "reservations"
+WHERE "sale_id" = $1 AND "user_id" = $2 AND "deleted_at" IS NULL;
 SELECT COUNT(*) AS "count" FROM "reservations"
-WHERE "sale_id" = $1 AND "expires_at" > $2 AND "user_id" != $3;
+WHERE "sale_id" = $1 AND "deleted_at" IS NULL AND "expires_at" > $2 AND "user_id" != $3;
 -- save the hold
-INSERT INTO "reservations" ("id", "sale_id", "user_id", "expires_at")
-VALUES ($1, $2, $3, $4)
-ON CONFLICT ("sale_id", "user_id") DO UPDATE SET "id" = $5, "expires_at" = $6;
+INSERT INTO "reservations" ("id", "sale_id", "user_id", "expires_at", "created_by")
+VALUES ($1, $2, $3, $4, $3)
+ON CONFLICT ("sale_id", "user_id") WHERE "deleted_at" IS NULL
+DO UPDATE SET "id" = $5, "expires_at" = $6, "updated_at" = now(), "updated_by" = $3;
 
 -- rebuild buyers and holds: one transaction, under the same lock
 SELECT "id" FROM "sales" WHERE "id" = $1 FOR UPDATE;
-SELECT "user_id" FROM "purchases" WHERE "sale_id" = $1;
-SELECT "user_id", "id", "expires_at" FROM "reservations"
-WHERE "sale_id" = $1 AND "expires_at" > $2;
+SELECT "users"."username" FROM "purchases"
+INNER JOIN "users" ON "users"."id" = "purchases"."user_id"
+WHERE "purchases"."sale_id" = $1 AND "purchases"."deleted_at" IS NULL;
+SELECT "users"."username", "reservations"."id", "reservations"."expires_at" FROM "reservations"
+INNER JOIN "users" ON "users"."id" = "reservations"."user_id"
+WHERE "reservations"."sale_id" = $1 AND "reservations"."deleted_at" IS NULL AND "reservations"."expires_at" > $2;
 ```
 
 - The `sold` of the locked row plus the count is compared with the stock. A shopper who already holds or bought gets

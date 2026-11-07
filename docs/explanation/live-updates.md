@@ -12,7 +12,7 @@ never has to carry anything upward.
 
 ## What a stream does
 
-Two streams exist: the sale (`/sales/:saleId/events`) and a shopper's place (`/sales/:saleId/queue/:userId/events`).
+Two streams exist: the sale (`/sales/:saleId/events`) and a shopper's place (`/sales/:saleId/queue/me/events`, which needs the login cookie).
 Each reads its source every `EVENTS_INTERVAL_MS`, compares the result with what it last sent, and writes an event only
 when it differs. A quiet sale produces no traffic except a keep-alive comment every 15 seconds, which stops proxies
 from closing an idle connection.

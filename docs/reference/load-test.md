@@ -31,7 +31,11 @@ flowchart LR
 and nginx with `least_conn`. k6 runs as a container on the same network and reaches nginx by name. nginx publishes one
 port on the loopback address only. Each instance runs with the product defaults for payment (150 ms, 2 percent
 declined), rate limits (30 per user and 600 per address in 10 seconds) and the sale cache (1 second). `TRUST_PROXY` is
-on, so each virtual shopper gets an address of their own through `X-Forwarded-For`.
+on, so each virtual shopper gets an address of their own through `X-Forwarded-For`. Every shopper signs up first
+(`POST /auth/register`, with a real scrypt hash) and sends the `access_token` cookie that comes back. k6 keeps one cookie
+jar for each virtual user, and one virtual user plays many shoppers, so the script builds the `cookie` header itself and
+uses a fresh jar for each call. The sign-ups share the address-based limit of the auth routes (20 per address per window),
+which is why each shopper has an address.
 
 ## Profiles
 

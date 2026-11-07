@@ -9,7 +9,7 @@ flowchart LR
   accTitle: flash-be components
   accDescr: The HTTP and command line adapters call the application services. The services use the domain model and call the ports. The Postgres, Redis, memory, payment and clock adapters implement the ports. The composition root chooses which adapter sits behind each port.
   http["HTTP adapter<br/>Fastify routes, SSE"]
-  cli["CLI adapter<br/>seed command"]
+  cli["CLI adapter<br/>seed and create-operator"]
   app["Application<br/>services and ports"]
   domain["Domain<br/>sale, hold, purchase rules"]
   driven["Driven adapters<br/>Postgres, Redis, memory,<br/>payment, clock"]
@@ -34,29 +34,32 @@ flowchart LR
 ## Components in Prose
 
 - **HTTP adapter** (`adapters/inbound/http/`) maps paths to the services and turns their results into status codes.
-  It also turns a sale or a shopper's place into Server-Sent Events, and guards the operator routes (create, change, remove and list a sale)
-  with a token, checked before the body. It holds no rules.
-- **CLI adapter** (`adapters/inbound/cli/`) reads the seed command's options. `seed-sale.ts` wires it to the database.
+  It also turns a sale or a shopper's place into Server-Sent Events, sets and clears the two login cookies, and guards the
+  routes: a route that needs a login reads the access cookie, and the operator routes (create, change, remove and list a
+  sale) need the role operator, checked before the body. It holds no rules.
+- **CLI adapter** reads the options of the two commands: `seed-sale.ts` (a sale) and `create-operator.ts` (the first
+  operator account). Each wires itself to the database.
 - **Application** (`application/`) has one service per use case: the sale status with its read cache, the waiting queue,
-  reserving, paying, the rate limiter, the operator's sale service (create, change, remove, list) and the admission step that serves the current sale. A service orders the steps and calls ports. Its ports are in
+  reserving, paying, the rate limiter, the operator's sale service (create, change, remove, list), the auth service (sign up, log in, refresh, log out, and who a cookie is) and the admission step that serves the current sale. A service orders the steps and calls ports. Its ports are in
   `application/ports/`: `SaleRepository`, `QueueStore`, `HoldGate`, `ReservationRepository`, `PurchaseRepository`,
-  `RateLimitStore`, `Payment`, `Clock`, `SaleSeeder` and `SaleAdmin`.
+  `RateLimitStore`, `Payment`, `Clock`, `SaleSeeder`, `SaleAdmin`, `AccountStore`, `SessionStore` and `PasswordHasher`.
 - **Domain** (`domain/`) holds the rules and imports nothing else: when a sale is upcoming, active, sold out or
-  ended, who may queue or reserve, how long a hold lives, how many shoppers one tick admits, what a user id and a
-  ticket are, and whether a new sale has a usable window and overlaps another.
-- **Driven adapters** (`adapters/outbound/`) implement the ports. `postgres/` reads and writes the sales, holds and
-  purchases and runs the migrations. `redis/` holds the gate script, the queue and the rate counters. `memory/` counts
+  ended, who may queue or reserve, how long a hold lives, how many shoppers one tick admits, what a user name, a
+  password, a token, a cookie and a role are, and whether a new sale has a usable window and overlaps another.
+- **Driven adapters** (`adapters/outbound/`) implement the ports. `postgres/` reads and writes the sales, holds,
+  purchases, users and sessions and runs the migrations. `redis/` holds the gate script, the queue, the rate counters and
+  the cache of live sessions. `crypto/` hashes passwords with scrypt. `memory/` counts
   rate limits when Redis fails. `payment/` is the mock provider. `system/` reads the clock.
 - **Composition root** (`main.ts`, `composition.ts`) is the only place that picks an adapter for a port.
 
 ## Constraints
 
-- Postgres wins every disagreement with Redis. The constraints `sold <= stock` and one purchase per user and sale are
+- Postgres wins every disagreement with Redis. The constraints `sold <= stock` and one live purchase per user and sale are
   in the schema, so no part can break them.
 - Dependencies point inward. The domain imports nothing but Node built-ins, and `@flash/typekit` (no dependency, no I/O). The
   application imports the domain and its own ports. An inbound adapter never imports an outbound adapter, and an outbound adapter imports only ports and the
   domain. `apps/flash-be/src/architecture_tests.ts` fails the unit tests when an import breaks this.
 - The same rules run against memory in unit tests, because the ports `QueueStore`, `HoldGate`,
-  `ReservationRepository`, `PurchaseRepository` and `SaleAdmin` have in-memory copies in `src/bdd/support/`. They are
+  `ReservationRepository`, `PurchaseRepository`, `SaleAdmin`, `AccountStore` and `SessionStore` have in-memory copies in `src/bdd/support/`. They are
   test code. `RateLimitStore` has an in-memory adapter that product code also uses, when Redis fails, and `Payment` is
   a mock.

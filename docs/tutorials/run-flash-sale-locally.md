@@ -86,15 +86,21 @@ npx nx dev flash-web
 Open <http://localhost:3000>. The page shows **Flash Sale**, the status **On sale**, the times the sale **Opens** and
 **Closes**, **Items left: 3** and the line **Backend: ok**.
 
-## 8. Buy an item
+## 8. Sign up and buy an item
 
-1. Type `ana` in **Your name** and press **Buy Now**. The shopper is let in at once, because nobody is waiting. The
-   page says **An item is held for you. Confirm within 60 seconds.** (the hold time you seeded) and the seconds count down.
-2. Press **Confirm purchase**. The page says **You got it! Your purchase is confirmed.** and **Items left** drops to 2.
-3. Press **Buy Now** again with the same name. The page says **You already bought an item.** One shopper can buy one
-   item.
-4. Type another name and press **Check my status** to ask "did I get it" without buying. A shopper who has nothing
-   sees **You have no purchase and no hold.**
+1. The page shows **Log in to buy** instead of the buying buttons. Choose **I am new**, type `ana` in **Username** and a
+   password of at least 8 characters (for example `a long password`), and press **Sign up**. You are logged in at once and
+   the page says **Signed in as ana**. The login is two cookies that the browser keeps; the page never sees the tokens.
+2. Press **Buy Now**. The shopper is let in at once, because nobody is waiting. The page says **An item is held for you.
+   Confirm within 60 seconds.** (the hold time you seeded) and the seconds count down.
+3. Press **Confirm purchase**. The page says **You got it! Your purchase is confirmed.** and **Items left** drops to 2.
+4. Press **Buy Now** again. The page says **You already bought an item.** One shopper can buy one item.
+5. Press **Log out**, choose **I have an account** and log in as `ben` with another password to see a shopper who has
+   nothing: the page says **You have no purchase and no hold.** after **Check my status**.
+
+A wrong password says **Wrong name or password.**, and a name that is taken says **That name is taken. Choose another
+one.** If your login ends while the page is open (the access cookie lasts 15 minutes and the page renews it by itself),
+the page says **Your login has ended. Please log in again.** See [explanation: authentication](../explanation/authentication.md).
 
 When the last item is bought, the status changes to **Sold out** and **Buy Now** is disabled. The page follows the sale
 by itself, so you do not need to reload it.

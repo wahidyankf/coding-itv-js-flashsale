@@ -25,12 +25,12 @@ it to understand the system; it only matters when you change the code.
 
 | The brief asks for                | Where it is                                                                                                                                                                                                                             |
 | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A configurable start and end time | `sales.starts_at` and `ends_at`. Set them with `POST /admin/sales` (absolute times, needs `ADMIN_TOKEN`) or with the seed command (minutes from now). `PATCH` and `DELETE /admin/sales/:saleId` change and remove a sale                |
+| A configurable start and end time | `sales.starts_at` and `ends_at`. Set them with `POST /admin/sales` (absolute times, needs an operator login) or with the seed command (minutes from now). `PATCH` and `DELETE /admin/sales/:saleId` change and remove a sale            |
 | One product, limited stock        | `sales.stock`, with `UPDATE ... WHERE sold < stock` and `CHECK (sold <= stock)` in Postgres                                                                                                                                             |
 | One item per user                 | `UNIQUE(sale_id, user_id)` on purchases and on reservations; a Redis set of buyers in front of it                                                                                                                                       |
 | An endpoint for the sale status   | `GET /sales/current` and `GET /sales/:saleId`, plus a live stream at `.../events`                                                                                                                                                       |
 | An endpoint to attempt a purchase | Three calls, because a rush needs a queue: `POST /sales/:saleId/queue` (join, get a ticket), `POST .../reservations` (hold one item), `POST .../purchases` (pay). **Buy Now** makes the first two; **Confirm purchase** makes the third |
-| An endpoint to check the outcome  | `GET /sales/:saleId/purchases/:userId`: a purchase, a live hold, or nothing                                                                                                                                                             |
+| An endpoint to check the outcome  | `GET /sales/:saleId/purchases/me`: a purchase, a live hold, or nothing (for the shopper who is logged in)                                                                                                                               |
 | A simple React frontend           | `apps/flash-web`                                                                                                                                                                                                                        |
 | A system diagram                  | below; the C4 views are in [specs/apps/flash/c4](specs/apps/flash/c4/README.md)                                                                                                                                                         |
 | Unit and integration tests        | next to the code; the apps add Gherkin scenarios bound at unit, integration and end-to-end level (see [Tests](#tests))                                                                                                                  |
@@ -87,7 +87,8 @@ flowchart LR
   class pg,redis store
 ```
 
-1. **Join the queue.** The shopper enters a name and presses Buy Now. The API puts them in a waiting queue and returns
+0. **Sign up or log in.** The shopper gets two cookies (a short access token and a longer refresh token); every call below is made as that account, so no call names a user.
+1. **Join the queue.** The shopper presses Buy Now. The API puts them in a waiting queue and returns
    a signed ticket. A set number of shoppers is let in each second, so a rush becomes a steady flow.
 2. **Hold an item.** An admitted shopper reserves. A Redis script counts the stock, the holds and the buyers in one
    step and takes one item for a limited time. The hold is also written to Postgres.
@@ -165,22 +166,22 @@ any request, so adding capacity is adding instances.
 
 ## Design choices and trade-offs
 
-| Choice                                  | Why                                                                                                                                                        | What it costs                                                      |
-| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| Redis Lua script as the hot path        | One script counts and takes an item atomically, so thousands of requests per second do not touch the database row                                          | A second store to run, and a rebuild when it is lost               |
-| Postgres as the source of truth         | `UPDATE ... WHERE sold < stock`, `UNIQUE(sale_id, user_id)` and `CHECK (sold <= stock)` still refuse an oversell if Redis is wrong or empty                | Every purchase pays one short transaction                          |
-| Reserve, then confirm                   | A shopper is not charged for an item that is gone, and an abandoned hold frees the item                                                                    | A hold takes stock from others until it ends                       |
-| Waiting queue with a ticket             | Smooths a rush and cannot be skipped by posting to the reserve route                                                                                       | Shoppers wait; the queue needs an admitter that runs once per sale |
-| Serving without Redis                   | Redis down means the queue fails open, reserve runs on Postgres under a row lock, and `/ready` reports 503. Redis is rebuilt from Postgres when it returns | The Postgres path is slower under load                             |
-| Sale read cache of one second, with SSE | Many readers cost one database read a second. Writes never use the cache                                                                                   | The page can be a second old                                       |
-| Rate limit per user and per address     | A flood gets `429` with `Retry-After`, not a slow server                                                                                                   | Shoppers behind one address share a limit                          |
-| In-process mock payment                 | The flow, the refund and the retry rules are real; no provider is needed                                                                                   | It proves nothing about a real provider                            |
-| Names, not accounts                     | A queue ticket binds a name to a request. No sign-up is needed                                                                                             | A name can be taken by anyone; this is not authentication          |
+| Choice                                  | Why                                                                                                                                                                    | What it costs                                                      |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Redis Lua script as the hot path        | One script counts and takes an item atomically, so thousands of requests per second do not touch the database row                                                      | A second store to run, and a rebuild when it is lost               |
+| Postgres as the source of truth         | `UPDATE ... WHERE sold < stock`, `UNIQUE(sale_id, user_id)` and `CHECK (sold <= stock)` still refuse an oversell if Redis is wrong or empty                            | Every purchase pays one short transaction                          |
+| Reserve, then confirm                   | A shopper is not charged for an item that is gone, and an abandoned hold frees the item                                                                                | A hold takes stock from others until it ends                       |
+| Waiting queue with a ticket             | Smooths a rush and cannot be skipped by posting to the reserve route                                                                                                   | Shoppers wait; the queue needs an admitter that runs once per sale |
+| Serving without Redis                   | Redis down means the queue fails open, reserve runs on Postgres under a row lock, and `/ready` reports 503. Redis is rebuilt from Postgres when it returns             | The Postgres path is slower under load                             |
+| Sale read cache of one second, with SSE | Many readers cost one database read a second. Writes never use the cache                                                                                               | The page can be a second old                                       |
+| Rate limit per user and per address     | A flood gets `429` with `Retry-After`, not a slow server                                                                                                               | Shoppers behind one address share a limit                          |
+| In-process mock payment                 | The flow, the refund and the retry rules are real; no provider is needed                                                                                               | It proves nothing about a real provider                            |
+| Accounts and cookie sessions            | Sign-up with a password (scrypt), an access and a refresh cookie, only token hashes stored, roles `shopper` and `operator` ([how](docs/explanation/authentication.md)) | No password reset, e-mail check or two-factor step                 |
 
 Longer explanations are in [docs/explanation](docs/explanation/README.md), and the architecture diagrams are in
 [specs/apps/flash/c4](specs/apps/flash/c4/README.md). One sale runs at a time, and each sale is one type of product with a stock of units. `GET /sales/current` is the sale that
 is running, or else the next one to open. The admin routes refuse a window that overlaps another sale; the seed command
-does not check. There is no admin page: an operator uses the API with the token.
+does not check. There is no admin page: an operator logs in through the API and uses it with the cookies.
 
 ## How it scales, and where it stops
 
@@ -205,7 +206,7 @@ for a second, and watchers share one read through the event stream.
 - The per-address rate limit counts the address nginx sees. Behind `flash-web` that is the web server for every shopper,
   so shoppers who buy through the page share one address limit (`RATE_LIMIT_PER_IP`, 600 writes per 10 seconds); the
   per-user limit still applies to each of them. A real deployment would put the browser's address in front of that.
-- The payment is a mock, and a name is not an account (see the table above).
+- The payment is a mock, and there is no password reset or e-mail check (see the table above).
 - The load numbers below come from one laptop where k6 and every server share the CPUs, so they show how the system
   behaves, not how fast production would be.
 
@@ -231,14 +232,17 @@ npx nx dev flash-web           # web on http://localhost:3000
 npm run docker:dev:down        # stop Postgres + Redis
 ```
 
-To create the sale through the API instead of the seed command, set `ADMIN_TOKEN` in `.env` (16 characters or more) and
-restart the API. Send an absolute window. A window that overlaps another sale gets `409`. The same token lists
-(`GET /admin/sales`), changes (`PATCH /admin/sales/:saleId`) and removes (`DELETE /admin/sales/:saleId`) sales; the rules
-are in [seed a sale](docs/how-to/seed-a-sale.md#change-list-or-remove-a-sale):
+To create the sale through the API instead of the seed command, make an operator account on the server and log in (an
+operator cannot sign up through the API). Send an absolute window. A window that overlaps another sale gets `409`. The
+same login lists (`GET /admin/sales`), changes (`PATCH /admin/sales/:saleId`) and removes (`DELETE /admin/sales/:saleId`)
+sales; the rules are in [seed a sale](docs/how-to/seed-a-sale.md#change-list-or-remove-a-sale):
 
 ```bash
-curl -s -X POST http://localhost:8080/admin/sales \
-  -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" \
+npx nx db:create-operator flash-be --username=ops --password=correct-horse-battery
+curl -s -c cookies.txt -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" -d '{"username":"ops","password":"correct-horse-battery"}'
+curl -s -b cookies.txt -X POST http://localhost:8080/admin/sales \
+  -H "Content-Type: application/json" \
   -d '{"stock":3,"startsAt":"2030-01-01T12:00:00Z","endsAt":"2030-01-01T13:00:00Z"}'
 ```
 
@@ -250,12 +254,14 @@ Open <http://localhost:3000>, type a name and press **Buy Now**, then **Confirm 
 ```bash
 npm run docker:prod:up         # build the images, migrate, start the stack
 docker compose -f compose.prod.yaml exec flash-be-1 node dist/seed-sale.js --stock=5 --duration-minutes=60
+docker compose -f compose.prod.yaml exec flash-be-1 node dist/create-operator.js --username ops --password "..."
 curl localhost:8080/ready      # Postgres and Redis ok
 open localhost:3000            # the sale page
 npm run docker:prod:down       # stop the stack (volumes are kept)
 ```
 
-Production compose reads `POSTGRES_*`, `TICKET_SECRET` and the ports from `.env`, and fails when one is missing.
+Production compose reads `POSTGRES_*`, `TICKET_SECRET` and the ports from `.env`, and fails when one is missing. The login cookies are `Secure`
+there (`COOKIE_SECURE`, default `true`), so put a TLS terminator in front, or set `COOKIE_SECURE=false` in `.env` to try the stack over plain HTTP.
 Three `flash-be` instances run behind nginx, which is the API port on the host. Postgres, Redis and the instances are not
 published. `npm run smoke:prod` builds the stack under its own name and walks one shopper through it
 (see [the smoke test](docs/how-to/smoke-test-the-production-stack.md)).

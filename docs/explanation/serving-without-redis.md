@@ -8,14 +8,15 @@ of truth. Postgres is, so a Redis outage must slow the sale down and must not br
 The Redis client is set to fail at once while the connection is down, instead of queueing commands until it returns. A
 request therefore learns within a few milliseconds that Redis is gone, and each step has its own answer:
 
-| Step                 | Without Redis                                                                                        |
-| -------------------- | ---------------------------------------------------------------------------------------------------- |
-| Join the queue       | The shopper gets a valid ticket and is admitted at once. There is no line to wait in.                |
-| Check the place      | A valid ticket is enough; the answer is `admitted`.                                                  |
-| Reserve              | Postgres decides alone (see below).                                                                  |
-| Confirm the purchase | Unchanged. It already works from Postgres. Telling Redis about the purchase is skipped.              |
-| Rate limits          | Each process counts in its own memory, so the limit stays on and grows with the number of processes. |
-| `GET /ready`         | `503` with `redis: error`. The process still serves the other routes.                                |
+| Step                 | Without Redis                                                                                                |
+| -------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Join the queue       | The shopper gets a valid ticket and is admitted at once. There is no line to wait in.                        |
+| Check the place      | A valid ticket is enough; the answer is `admitted`.                                                          |
+| Reserve              | Postgres decides alone (see below).                                                                          |
+| Confirm the purchase | Unchanged. It already works from Postgres. Telling Redis about the purchase is skipped.                      |
+| Log in and out       | Unchanged. Sessions are in Postgres; Redis only caches them, so each request reads Postgres for its session. |
+| Rate limits          | Each process counts in its own memory, so the limit stays on and grows with the number of processes.         |
+| `GET /ready`         | `503` with `redis: error`. The process still serves the other routes.                                        |
 
 ```mermaid
 flowchart TD

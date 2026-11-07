@@ -6,7 +6,7 @@ Postgres, and it gives everyone a fair order.
 
 ## How it works
 
-- A shopper joins with a user id and gets a place and a **ticket**.
+- A shopper who is logged in joins and gets a place and a **ticket**. The shopper is the account of the session cookie.
 - Every second, one instance moves the first `admit_per_second` shoppers of the current sale from "waiting" to "admitted". An
   admission stays valid for ten minutes by default.
 - Only an admitted shopper can reserve an item. This keeps the queue from being skipped by calling the reserve route
@@ -56,8 +56,9 @@ sale keeps moving, and the later sale starts to admit when it becomes current. A
 
 The ticket is a signature (HMAC) of the sale id and the user id, made with `TICKET_SECRET`. Any instance can issue and
 check it, so it needs no storage and it stays valid after a Redis restart. It proves that the holder asked the server
-for a place for that user. It does not prove who the holder is: there are no accounts, so anyone who types the same user
-id gets the same ticket. The trade-off is deliberate. The queue is a fairness and load tool, not a login.
+for a place for that user. It does not prove who the holder is. The login does: every queue route also needs the session
+cookie, and the ticket is checked against the user of that session, so a ticket of another shopper is refused with
+`invalid_ticket`. The queue is a fairness and load tool, and the login is what says who the shopper is.
 
 ## Trade-offs
 

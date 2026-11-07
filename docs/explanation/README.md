@@ -14,7 +14,8 @@ behaviour, read the specs.
 - [sale-read-cache.md](sale-read-cache.md) - why sale reads may be one second old, and why writes never are.
 - [serving-without-redis.md](serving-without-redis.md) - what each step does when Redis is down, and how Redis catches up when it returns.
 - [live-updates.md](live-updates.md) - why the page hears about changes over Server-Sent Events, and what a stream costs.
-- [admin-and-sale-windows.md](admin-and-sale-windows.md) - why the admin route only creates a sale, how its token is guarded, and why windows may not overlap.
+- [authentication.md](authentication.md) - why a login is two cookies, how tokens and passwords are stored, and what roles may do.
+- [admin-and-sale-windows.md](admin-and-sale-windows.md) - how the operator routes change a sale, who may use them, and why windows may not overlap.
 - [web-server-proxy.md](web-server-proxy.md) - why the browser talks to its own web server, and what the page does while a shopper waits.
 - [load-test-findings.md](load-test-findings.md) - what the load runs showed, and what was fixed because of them.
 - [failures-as-values.md](failures-as-values.md) - why failures and absences are values, and how the lint rules keep it so.

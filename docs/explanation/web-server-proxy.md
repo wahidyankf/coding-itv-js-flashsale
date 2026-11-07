@@ -1,7 +1,7 @@
 # The web server in front of the API
 
-The page never calls `flash-be` itself. Every request goes to the web app's own server under `/api/sales`, and the
-server passes it on. This page gives the reasons and what it costs.
+The page never calls `flash-be` itself. Every request goes to the web app's own server under `/api/sales` or `/api/auth`, and the
+server passes it on, with the login cookies. This page gives the reasons and what it costs.
 
 ## Why not call the API from the browser
 
@@ -11,8 +11,9 @@ server passes it on. This page gives the reasons and what it costs.
 - **One origin.** The browser makes same-origin requests, so no CORS rules are needed and none can be got wrong.
 - **One place to narrow the surface.** The server passes on a short list of method and path pairs (the `ALLOWED` list in
   `apps/flash-web/src/proxy.ts`) and nothing else, so a path such as `../ready` cannot be used to reach other routes. The
-  operator routes (`/admin/sales` with POST, GET, PATCH and DELETE) are not on the list. A sale id must be a UUID and a name must fit the name pattern,
-  or the answer is `404 not_found`. The server also sends on only the headers the API needs.
+  operator routes (`/admin/sales` with POST, GET, PATCH and DELETE) are not on the list. A sale id must be a UUID, or the answer is `404 not_found`. The
+  server also sends on only the headers the API needs (the `cookie` header among them), and moves the refresh cookie from
+  `/auth` to `/api/auth`. A POST from another origin is refused with `403 cross_site`.
 
 ```mermaid
 flowchart LR

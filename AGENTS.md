@@ -92,7 +92,7 @@ Flash sale monorepo with five apps in `apps/` and one library in `libs/`: `flash
   `UNIQUE(sale_id, user_id)` and the `CHECK (sold <= stock)` must stay, whatever Redis says. Redis is a fast gate that
   Postgres can rebuild. A change to the sale path needs a concurrency scenario, and `flash-load` must still pass.
 - Redis keys are `sale:<saleId>:` plus `{ready,buyers,holds,ids,rebuild-lock}` for the hold gate, and plus
-  `{queue,queue-seq,admitted,admit-lead}` for the queue. Every command on the sale path must fail at
+  `{queue,queue-seq,admitted,admit-lead}` for the queue. Sessions are cached under `session:<access hash>`. Every command on the sale path must fail at
   once when Redis is down. Use single scripts, not `MULTI`, which waits for the connection.
 - `flash-be` is a hexagon (see `docs/explanation/hexagonal-architecture.md`). Rules go in `src/domain` (no I/O, only Node
   built-ins and `@flash/typekit`). Use cases go in `src/application`, which reach stores only through `src/application/ports`. Adapters go in
@@ -103,9 +103,20 @@ Flash sale monorepo with five apps in `apps/` and one library in `libs/`: `flash
   `apps/flash-be/src/adapters/outbound/postgres/migrations`. Use Kysely as a query builder. Do not add an ORM.
 - Config is built once from `process.env` in `src/config.ts`. `buildConfig` is exported for tests. Local defaults match
   `compose.dev.yaml`. In production, a missing required URL must fail fast.
+- Accounts and sessions (`docs/explanation/authentication.md`): shoppers and operators log in with a user name and a password.
+  Two cookies carry the session: `access_token` (15 minutes, path `/`) and `refresh_token` (7 days, path `/auth`, used once,
+  replaying an old one ends the session). Both are `HttpOnly` and `SameSite=Lax`, and `Secure` when `COOKIE_SECURE` is true.
+  Never put a token in a body, a URL or a log, and store only SHA-256 hashes of tokens and scrypt hashes of passwords. No
+  route takes a user id: the shopper is `/queue/me`, `/purchases/me` and the session. The first operator is made with
+  `create-operator`; sign-up can only make a shopper. The `/auth` routes have their own rate limit (`AUTH_RATE_LIMIT_PER_IP`).
+- Nothing is hard-deleted. Every table has `created_at`, `created_by`, `updated_at`, `updated_by`, `deleted_at` and
+  `deleted_by` (the `*_by` columns point at `users`). A removal sets `deleted_at` and `deleted_by`; every read adds
+  `deleted_at IS NULL`, and the unique indexes are partial (`WHERE deleted_at IS NULL`). Product code never calls
+  `deleteFrom(`; `architecture_tests.ts` fails if it does. A new table gets the six columns and an entry in the `Database`
+  type, and `schema_integration_tests.ts` checks both.
 - Env vars are listed in `.env.example`. Never commit `.env`. Do not use the example passwords outside local
   development.
-- The operator routes are `POST`, `GET` (list), `PATCH` and `DELETE` under `/admin/sales`. They need `ADMIN_TOKEN` and are never passed on by `flash-web`. Keep them
+- The operator routes are `POST`, `GET` (list), `PATCH` and `DELETE` under `/admin/sales`. They need the login of an operator (`401 not_authenticated`, `403 forbidden` for a shopper) and are never passed on by `flash-web`. Keep them
   off the allow-list of the `flash-web` proxy; a test there fails if one is on it. Overlap is refused there only, not in the seed command. A started sale keeps its start and cannot lose stock, a sale that is over cannot change, and a sale with a purchase cannot be removed.
 - `GET /sales/current` and the admission timer use one rule (`pickCurrent`, `admitCurrentSale`): the running sale, else the next to open, else none. Do not use "the sale that opens last".
 - `api-flash-be.http` and `api-flash-web.http` hold manual requests, one file per app. Update them when an endpoint changes. It does not replace tests.

@@ -1,19 +1,21 @@
 # Admin and sale windows
 
 An operator can create a sale in two ways: the seed command, which needs a shell on the server, and `POST /admin/sales`,
-which needs a token. The same token also changes, removes and lists sales. This page explains the product rule behind
+which needs the login of an operator. The same login also changes, removes and lists sales. This page explains the product rule behind
 the sales, why a started sale is limited, and where the rules stop.
 
 ## What is for sale
 
 The brief sells one type of product in limited quantity, and each user may buy one unit. In the code:
 
-- A sale is one product type with `stock` units. There is no product table and no product per sale.
+- A sale sells one product, a row of the `products` table, with `stock` units. A product can have many sales over time
+  (`sales.product_id`). `POST /admin/sales` takes an optional `productId`; without it, a product is made from `name`.
+  There is no product CRUD and no price: the brief needs neither.
 - One user gets one unit and holds one item at a time in a sale. The tables keep it with `UNIQUE(sale_id, user_id)` on
   reservations and on purchases, and Redis keeps a set of buyers in front of them.
-- A user is a name the shopper types. It is trimmed and lowercased (`domain/user.ts`), so `Ana ` and `ana` are one person.
-  There is no sign-in for shoppers; this is a choice, because the brief asks for "a username or email" and nothing more.
-  Anyone can use any name.
+- A user is a row of the `users` table with a user name and a password hash. The name is trimmed and lowercased
+  (`domain/user.ts`), so `Ana ` and `ana` are one person. A shopper signs up and logs in with a cookie session; see
+  [authentication](authentication.md). A name belongs to the one who signed up first.
 
 ## Changing and removing a sale
 
@@ -37,20 +39,24 @@ Why a running sale keeps its start and cannot lose stock:
 A sale with a purchase is never removed (`409 sale_has_purchases`), because the shopper has paid. Holds do not stop a
 removal: they go with the sale. The next reservation of a shopper then finds no sale.
 
+Nothing is deleted from the database. A removal sets `deleted_at` and `deleted_by` on the sale and on its holds, in one
+transaction, and every read leaves out rows that have `deleted_at`. The row stays for the record, and the unique indexes
+(`UNIQUE(sale_id, user_id)`) only count rows that are not deleted, so a shopper's name is free again in a new sale.
+
 ```mermaid
 sequenceDiagram
   accTitle: Change or remove a sale
-  accDescr: The operator sends a change or a remove with the token. The API starts a Postgres transaction. A change takes the advisory lock, then locks the sale row, reads it, applies the rules, checks that the new window does not overlap another sale, and writes. A remove locks the sale row, looks for a purchase, and deletes the sale when there is none. A shopper who confirms a purchase takes the same sale row lock first, so a purchase cannot slip in between the check and the delete.
+  accDescr: The operator sends a change or a remove with the login cookie. The API starts a Postgres transaction. A change takes the advisory lock, then locks the sale row, reads it, applies the rules, checks that the new window does not overlap another sale, and writes. A remove locks the sale row, looks for a purchase, and marks the sale and its holds as deleted when there is none. A shopper who confirms a purchase takes the same sale row lock first, so a purchase cannot slip in between the check and the delete.
   participant O as Operator
   participant A as flash-be
   participant P as Postgres
-  O->>A: PATCH or DELETE with token
+  O->>A: PATCH or DELETE with the cookie
   A->>P: begin
   A->>P: advisory lock (change only)
   A->>P: lock the sale row
   A->>P: read the sale
   A->>A: apply the rules
-  A->>P: overlap check, then write or delete
+  A->>P: overlap check, then write or mark deleted
   A->>P: commit
   A-->>O: the sale, or the error
 ```
@@ -59,17 +65,18 @@ The sale row lock is the same one that `commit` takes in the purchase repository
 time that changes applies to the next reservation at once, because the reservation path reads it from Postgres each time.
 Redis needs no reset. See [reservations and recovery](reservations-and-recovery.md).
 
-## The token
+## Who may use the operator routes
 
-The token comes from `ADMIN_TOKEN`. Without it the admin routes answer `404 not_found`, as if they did not exist, so a
-deployment that never set it exposes nothing. The value must be at least 16 characters, or the API refuses to start.
+The routes need a session whose account has the role `operator`. A request without a login is refused with `401`
+`not_authenticated`, and a shopper who is logged in with `403` `forbidden`. How the session works is in
+[authentication](authentication.md).
 
-- It is sent as `Authorization: Bearer <token>`.
-- Both sides are hashed with SHA-256 before the comparison, which runs in constant time, so the length and content of a
-  guess leak nothing.
-- It runs in the `onRequest` hook, before the body is read, so a client without the token learns nothing from a broken
-  body. The address is counted by the rate limiter first, so guesses are counted too.
-- It is never logged: the start-up line only says `admin=on` or `admin=off`.
+- The first operator is made on the server with `create-operator` (see [seed a sale](../how-to/seed-a-sale.md)). Nobody can
+  become an operator through the API.
+- The check runs in the `onRequest` hook, before the body is read, so a client without the login learns nothing from a
+  broken body. The address is counted by the rate limiter first, so guesses are counted too.
+- The author of each change is kept: `created_by`, `updated_by` and `deleted_by` of the sale hold the operator's user id.
+  The seed command writes the `$system` user instead.
 - The web server does not pass `/api/admin` on. Its proxy has an allow-list of method and path pairs, no `/admin` route
   is on it, and a test fails if one ever is.
 

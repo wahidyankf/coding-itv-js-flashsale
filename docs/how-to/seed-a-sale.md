@@ -44,14 +44,27 @@ The scenarios for this command are in
 
 ## Create the sale through the API instead
 
-With `ADMIN_TOKEN` set for the API (at least 16 characters; see [`.env.example`](../../.env.example)), an operator can
-create a sale over HTTP, with an absolute window:
+An operator creates a sale over HTTP, with an absolute window, after logging in. The first operator is made on the server,
+because nobody can become one through the API (the password has 8 to 128 characters; the Nx target needs one without spaces):
 
 ```bash
-curl -s -X POST http://localhost:8080/admin/sales \
-  -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" \
+npx nx db:create-operator flash-be --username=ops --password=correct-horse-battery
+```
+
+In the production image the same command is `node dist/create-operator.js --username ops --password "..."`.
+
+Then log in. `-c` saves the cookies in a file and `-b` sends them back:
+
+```bash
+curl -s -c cookies.txt -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" -d '{"username":"ops","password":"correct-horse-battery"}'
+curl -s -b cookies.txt -X POST http://localhost:8080/admin/sales \
+  -H "Content-Type: application/json" \
   -d '{"stock":100,"startsAt":"2030-01-01T12:00:00Z","endsAt":"2030-01-01T13:00:00Z"}'
 ```
+
+The login cookies last 15 minutes; `POST /auth/refresh` with the same cookie file renews them. The local `.env.example` sets
+`COOKIE_SECURE=false`, because a `Secure` cookie is not sent over plain HTTP.
 
 The reply is `201` with the sale. A window that overlaps another sale is refused with `409` `sale_overlaps`. The seed
 command above does not check this, so it can still create overlapping sales; the API is the safe way to set up a real
@@ -59,19 +72,19 @@ sale. See [admin and sale windows](../explanation/admin-and-sale-windows.md).
 
 ## Change, list or remove a sale
 
-The same token works for three more routes. `<id>` is the `id` of the sale.
+The same login works for three more routes. `<id>` is the `id` of the sale.
 
 ```bash
 # every sale, the one that opens last first
-curl -s http://localhost:8080/admin/sales -H "Authorization: Bearer $ADMIN_TOKEN"
+curl -s -b cookies.txt http://localhost:8080/admin/sales
 
 # change a sale: send only the fields that change
-curl -s -X PATCH http://localhost:8080/admin/sales/<id> \
-  -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" \
+curl -s -b cookies.txt -X PATCH http://localhost:8080/admin/sales/<id> \
+  -H "Content-Type: application/json" \
   -d '{"stock":150}'
 
 # remove a sale
-curl -s -X DELETE http://localhost:8080/admin/sales/<id> -H "Authorization: Bearer $ADMIN_TOKEN"
+curl -s -b cookies.txt -X DELETE http://localhost:8080/admin/sales/<id>
 ```
 
 The rules, in short:
@@ -81,7 +94,7 @@ The rules, in short:
   A change that does not follow this is refused with `409` `sale_locked`.
 - A sale that is over cannot change (`409` `sale_locked`).
 - A window that would overlap another sale is refused with `409` `sale_overlaps`.
-- A sale that has a purchase is not removed (`409` `sale_has_purchases`). Any other sale is removed with its holds.
+- A sale that has a purchase is not removed (`409` `sale_has_purchases`). Any other sale is marked deleted with its holds (the rows stay).
 
 The bodies and every error are in [HTTP endpoints](../reference/http-endpoints.md#changing-a-sale-operator). The scenarios
 are in
