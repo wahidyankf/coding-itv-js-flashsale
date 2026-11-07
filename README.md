@@ -372,14 +372,16 @@ relative:
 | chaos   | 1000/1000 | 3.0 ms      | 155 ms       | 0             |
 
 **The two herd runs.** `burst` and `contention` put 700 shoppers into the system within one second, which the other runs
-never do. In all four runs every invariant held: no oversell (100/100 and 50/50 sold), no shopper bought twice, k6,
-Postgres and Redis agreed, and there were no server errors. The speed limits **did not hold** as k6 measures them on
-this machine:
+never do. In all six runs every invariant held: no oversell (100/100 and 50/50 sold), no shopper bought twice, k6,
+Postgres and Redis agreed, and there were no server errors. The speed limits **did not hold** in most runs as k6 measures
+them on this machine:
 
-| Profile    | Sold    | Reserve p95 (k6) | Purchase p95 (k6) | Reserve p95 in the API | Verdict                              |
-| ---------- | ------- | ---------------- | ----------------- | ---------------------- | ------------------------------------ |
-| burst      | 100/100 | 701 and 2,379 ms | 724 and 1,949 ms  | 5.3 ms                 | invariants pass, speed fails         |
-| contention | 50/50   | 349 and 551 ms   | 213 and 194 ms    | 5.5 ms                 | invariants pass, reserve speed fails |
+| Profile                        | Sold    | Reserve p95 (k6) | Purchase p95 (k6) | Reserve p95 in the API | Verdict                                                            |
+| ------------------------------ | ------- | ---------------- | ----------------- | ---------------------- | ------------------------------------------------------------------ |
+| burst                          | 100/100 | 701 and 2,379 ms | 724 and 1,949 ms  | 5.3 ms                 | invariants pass, speed fails                                       |
+| contention                     | 50/50   | 349 and 551 ms   | 213 and 194 ms    | 5.5 ms                 | invariants pass, reserve speed fails                               |
+| burst, after the refactor      | 100/100 | 70 ms            | 521 ms            | not logged             | invariants pass, purchase speed fails, k6 started one shopper late |
+| contention, after the refactor | 50/50   | 27 ms            | 297 ms            | not logged             | every check passes                                                 |
 
 The API logged a reserve at about 5 ms (95th percentile), and Postgres never had a session waiting for a lock, so the
 handlers and the database are not where the time goes. What k6 measures also includes 770 virtual users sharing six CPUs

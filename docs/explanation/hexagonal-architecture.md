@@ -96,7 +96,46 @@ it must not know. It runs with the unit tests, so the pre-push hook enforces it.
 
 ## Where the ports bend
 
-Two ports carry a callback because the store must run the caller's code inside a lock: `ReservationRepository.rebuild`
-hands the snapshot to a function while the sale row is locked, and `reserveWithoutRedis` asks whether Redis is ready
-again under the same lock. The lock is a Postgres detail, but the order of steps is a rule, so the callback is the
-smallest port that keeps both.
+Three ports carry a callback because the store must run the caller's code inside a lock: `ReservationRepository.rebuild`
+hands the snapshot to a function while the sale row is locked, `reserveWithoutGate` asks whether the gate (Redis) is ready
+again under the same lock, and `SaleAdmin.update` hands the stored sale to the domain's `changeSaleFrom`, which decides
+the change. The lock is a Postgres detail, but the order of steps is a rule, so the callback is the smallest port that
+keeps both.
+
+The cost: in the first two, a Redis call (the restore, the readiness check) runs while the Postgres row lock of the sale
+is held, so a slow Redis would hold every shopper of that sale. The Redis client fails at once instead of waiting
+(no offline queue, single scripts), which bounds that wait; a Redis that accepts connections and never answers is the
+case [decision 003](decisions/003-keep-selling-without-redis.md) names for a second look.
+
+## The sale as the consistency boundary
+
+In DDD terms the sale is the aggregate: its row is the root, and its holds and purchases belong to it by `sale_id`.
+The rules that must hold at every moment are about one sale: `sold` never passes `stock`, and one shopper has at most one
+purchase in it. Every write that can break them takes the sale row lock first (`SELECT ... FOR UPDATE`): the commit of a
+purchase, a reservation without Redis, a rebuild, and an operator's change or removal. So the lock of the root is the
+boundary, and a shopper waits only behind shoppers of the same sale.
+
+These rules are not methods on a `Sale` object. Two shoppers paying at the same moment read the same `sold`, so a check
+in memory would pass for both; only the database can decide under the lock. The SQL (`UPDATE ... WHERE sold < stock`,
+the `CHECK`, the partial unique index) is therefore the rule's last word, and the domain holds the same rule as pure
+functions (`hasRoom` and the reservation decision) that the memory copies and the fast path follow. The Redis script is
+the third copy, for speed, and Postgres can rebuild it ([decision 002](decisions/002-redis-gate-postgres-last-word.md)).
+
+One step crosses the boundary: a commit or a reservation looks up the shopper's user row by name inside the sale's
+transaction, and creates it for a name that has none (a rebuild or a test). It is one indexed read, and the user row is
+not locked, so it adds no wait between sales.
+
+## Two names for a shopper
+
+A shopper has a user name and a user id. The queue, the holds, the purchases and the Redis keys use the name
+(`Username`), because it is what the session knows and what a shopper sees. The Postgres foreign keys use the id
+(`UserId`), because a row points at a row. `Principal` carries both, and the Postgres adapter turns a name into an id
+where a row needs it. One identity would be cleaner; two keep the hot path free of a lookup and the API free of ids
+(no route takes a user id). The reply field `"userId"` holds the name, kept for the contract.
+
+## Words
+
+- **Hold** is the shopper's word: one item kept for a short time. **Reservation** is its record: the row, the route
+  (`/reservations`) and its id. They are the same thing.
+- **Gate** is the fast check in front of Postgres. Today it is Redis.
+- **Admitted** means the queue let the shopper through; only an admitted shopper may hold an item.

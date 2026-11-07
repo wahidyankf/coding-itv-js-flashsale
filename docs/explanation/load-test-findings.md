@@ -35,6 +35,8 @@ and `UPDATE ... WHERE sold < stock` held.
 | burst 2      | 701 ms      | 724 ms       | 0       | API logs kept                          |
 | contention 1 | 349 ms      | 213 ms       | 0       | reserve over the limit, purchase under |
 | contention 2 | 551 ms      | 194 ms       | 0       | API logs kept                          |
+| burst 3      | 70 ms       | 521 ms       | 1       | after the refactor; purchase over      |
+| contention 3 | 27 ms       | 297 ms       | 0       | after the refactor; both under         |
 
 **Where the time is not.** In the runs with logs, the API logged a reserve at a median of 1.5 ms and a 95th percentile of
 5.3 to 5.5 ms (largest 46 ms). A purchase took 155 ms in the median, which is the 150 ms of the mock payment. A join took
