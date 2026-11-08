@@ -36,7 +36,9 @@ sequenceDiagram
 - The **refresh token** is long (7 days) and only goes to `/api/v1/auth`, so it travels in far fewer requests. Each use replaces
   it, and the token it replaced is kept as the previous one. If that previous token comes back, it is a sign of a copy,
   so the whole session ends, and the real owner logs in again. An older token is refused.
-  A week without a visit also ends the login; every use starts a new week.
+  A week without a visit also ends the login; every use starts a new week. A refresh token that has run out gets
+  `401 invalid_refresh_token` and both cookies are cleared, but the row is not marked deleted, because nothing was
+  copied: the login simply ended.
 - Both are random (32 bytes). Only the SHA-256 of a token is stored, in Postgres and in the Redis key. A copy of the
   database or of Redis cannot be used to act as a user. A fast hash is right for a token with this much randomness; a
   password needs a slow one.
@@ -69,7 +71,8 @@ API. A request without a login gets `401 not_authenticated`; a shopper on an ope
 ## Sessions in the database
 
 A `sessions` row is one login: the two hashes, their ends, the previous refresh hash, and the address and the user agent of
-the login. Nothing is erased. A logout or a replayed refresh token marks the row deleted. `users.last_login_at`
+the login. Nothing is erased. A logout or a replayed refresh token marks the row deleted; a refresh token that ran out
+leaves it as it is. `users.last_login_at`
 says whether an account is still used.
 
 ## Known limits
