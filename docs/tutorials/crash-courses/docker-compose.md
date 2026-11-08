@@ -30,7 +30,7 @@ another tool; it is the plain choice for one machine.
 
 Each file starts with `name:` (`flash-dev`, `flash-prod`, `flash-load`). Containers and volumes get that prefix, such as
 `flash-dev-postgres-1` and `flash-dev_postgres-data`, so the three stacks never share a container or a disk. The smoke
-test goes further and starts `compose.prod.yaml` under its own name, `flash-smoke`
+test goes further and starts [`compose.prod.yaml`](../../../compose.prod.yaml) under its own name, `flash-smoke`
 ([smoke test the production stack](../../how-to/smoke-test-the-production-stack.md)).
 
 ### Healthchecks and start order
@@ -45,7 +45,7 @@ healthcheck:
   retries: 15
 ```
 
-In `compose.prod.yaml` the API waits for `flash-be-migrate` with `condition: service_completed_successfully` and for
+In [`compose.prod.yaml`](../../../compose.prod.yaml) the API waits for `flash-be-migrate` with `condition: service_completed_successfully` and for
 Redis with `service_healthy`. nginx waits until all three API instances are healthy. Their healthcheck lives in
 [`apps/flash-be/Dockerfile`](../../../apps/flash-be/Dockerfile) and calls `/health`, not `/ready`
 ([liveness and readiness](../../explanation/liveness-and-readiness.md)). The `--wait` flag in the `up` commands makes
@@ -63,7 +63,7 @@ Compose fills `${...}` from the shell and from the root `.env`:
 
 ### Three API instances from one block
 
-`compose.prod.yaml` writes the API service once as a YAML anchor and reuses it:
+[`compose.prod.yaml`](../../../compose.prod.yaml) writes the API service once as a YAML anchor and reuses it:
 
 ```yaml
 x-api: &api
@@ -131,7 +131,7 @@ error while interpolating services.flash-be-1.environment.TICKET_SECRET: require
   never run them unless you mean to wipe the local data. Use `docker:dev:down` to stop the stack and keep it.
 - **A Secure cookie over plain HTTP.** The prod stack sets `COOKIE_SECURE` to `true` by default, and a browser drops
   such a cookie over `http://`. Set `COOKIE_SECURE=false` in `.env` to try the stack on one machine, as the comment in
-  `compose.prod.yaml` says.
+  [`compose.prod.yaml`](../../../compose.prod.yaml) says.
 
 ## Read next
 

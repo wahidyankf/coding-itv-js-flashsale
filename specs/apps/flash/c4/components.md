@@ -33,25 +33,25 @@ flowchart LR
 
 ## Components in Prose
 
-- **HTTP adapter** (`adapters/inbound/http/`, with one file per area in `routes/`) maps paths to the services and turns their results into status codes.
+- **HTTP adapter** ([`adapters/inbound/http/`](../../../../apps/flash-be/src/adapters/inbound/http), with one file per area in `routes/`) maps paths to the services and turns their results into status codes.
   It also turns a sale or a shopper's place into Server-Sent Events, sets and clears the two login cookies, and guards the
   routes: a route that needs a login reads the access cookie, and the operator routes (create, change, remove and list a
   sale) need the role operator, checked before the body. It holds no rules.
-- **CLI adapter** reads the options of the two commands: `seed-sale.ts` (a sale) and `create-operator.ts` (the first
+- **CLI adapter** reads the options of the two commands: [`seed-sale.ts`](../../../../apps/flash-be/src/seed-sale.ts) (a sale) and [`create-operator.ts`](../../../../apps/flash-be/src/create-operator.ts) (the first
   operator account). Each wires itself to the database and calls a use case (the seed service, `createOperator`).
 - **Application** (`application/`) has one service per use case: the sale status with its read cache, the waiting queue,
   reserving, paying, the rate limiter, the operator's sale service (create, change, remove, list), the auth service (sign up, log in, refresh, log out, and who a cookie is) and the admission step that serves the current sale. Its ports are in
-  `application/ports/`: `SaleRepository`, `QueueStore`, `HoldGate`, `ReservationRepository`, `PurchaseRepository`,
+  [`application/ports/`](../../../../apps/flash-be/src/application/ports): `SaleRepository`, `QueueStore`, `HoldGate`, `ReservationRepository`, `PurchaseRepository`,
   `RateLimitStore`, `Payment`, `Clock`, `SaleSeeder`, `SaleAdmin`, `AccountRepository`, `SessionRepository`, `PasswordHasher` and `TokenSource`.
 - **Domain** (`domain/`) holds the rules and does no I/O: when a sale is upcoming, active, sold out or
   ended, who may queue or reserve, how long a hold lives, how many shoppers one tick admits, what a user name, a
   password, a token and a role are, who is an operator, and whether a new sale has a usable window and overlaps another.
-- **Driven adapters** (`adapters/outbound/`) implement the ports. `postgres/` reads and writes the sales, holds,
+- **Driven adapters** ([`adapters/outbound/`](../../../../apps/flash-be/src/adapters/outbound)) implement the ports. `postgres/` reads and writes the sales, holds,
   purchases, users and sessions and runs the migrations. `redis/` holds the gate script, the queue, the rate counters and
   the cache of live sessions. `crypto/` hashes passwords with scrypt and makes random tokens. `memory/` counts
   rate limits when Redis fails. `payment/` is the mock provider. `system/` reads the clock.
-- **Composition root** (`main.ts`, `composition.ts`) picks an adapter for each port of the API. The command entry
-  points `seed-sale.ts` and `create-operator.ts` pick their own. No other file does.
+- **Composition root** ([`main.ts`](../../../../apps/flash-be/src/main.ts), [`composition.ts`](../../../../apps/flash-be/src/composition.ts)) picks an adapter for each port of the API. The command entry
+  points [`seed-sale.ts`](../../../../apps/flash-be/src/seed-sale.ts) and [`create-operator.ts`](../../../../apps/flash-be/src/create-operator.ts) pick their own. No other file does.
 
 ## Constraints
 
@@ -59,8 +59,8 @@ flowchart LR
   in the schema, so no part can break them.
 - Dependencies point inward. The domain imports nothing but Node built-ins, `@flash/typekit` and the main entry of `@flash/flash-commons` (both pure, no I/O; the timer helper on `/timers` is refused). The
   application imports the domain and its own ports. An inbound adapter never imports an outbound adapter, and an outbound adapter takes nothing from the
-  application but its ports. No adapter imports the wiring (`composition.ts`, `config.ts`). `apps/flash-be/src/architecture_tests.ts` fails the unit tests when an import breaks this.
+  application but its ports. No adapter imports the wiring ([`composition.ts`](../../../../apps/flash-be/src/composition.ts), [`config.ts`](../../../../apps/flash-be/src/config.ts)). [`apps/flash-be/src/architecture_tests.ts`](../../../../apps/flash-be/src/architecture_tests.ts) fails the unit tests when an import breaks this.
 - The same rules run against memory in unit tests, because the ports `QueueStore`, `HoldGate`,
-  `ReservationRepository`, `PurchaseRepository`, `SaleAdmin`, `AccountRepository` and `SessionRepository` have in-memory copies in `src/bdd/support/`. They are
+  `ReservationRepository`, `PurchaseRepository`, `SaleAdmin`, `AccountRepository` and `SessionRepository` have in-memory copies in [`src/bdd/support/`](../../../../apps/flash-be/src/bdd/support). They are
   test code. `RateLimitStore` has an in-memory adapter that product code also uses, when Redis fails, and `Payment` is
   a mock.

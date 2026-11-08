@@ -30,12 +30,12 @@ steps/
 
 ## To add something
 
-| To add …                         | Put it in …                                  | Also update …                                                     |
-| -------------------------------- | -------------------------------------------- | ----------------------------------------------------------------- |
-| a step                           | the `<area>.steps.ts` of its feature file    | `npm run bdd:check`                                               |
-| a helper two step files need     | `steps/support/`                             | its doc comment                                                   |
-| a wait for something to be ready | `pollUntil` in `support/time.ts`             | nothing: it already backs off with jitter and a max attempt count |
-| a wait for a shopper's admission | `pollUntilAdmitted` in `support/shoppers.ts` | name its wait (`ADMISSION_WAIT_MS` in web-e2e's `shop.ts`)        |
+| To add …                         | Put it in …                                                               | Also update …                                                                                        |
+| -------------------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| a step                           | the `<area>.steps.ts` of its feature file                                 | `npm run bdd:check`                                                                                  |
+| a helper two step files need     | [`steps/support/`](steps/support)                                         | its doc comment                                                                                      |
+| a wait for something to be ready | `pollUntil` in [`support/time.ts`](steps/support/time.ts)                 | nothing: it already backs off with jitter and a max attempt count                                    |
+| a wait for a shopper's admission | `pollUntilAdmitted` in [`support/shoppers.ts`](steps/support/shoppers.ts) | name its wait (`ADMISSION_WAIT_MS` in web-e2e's [`shop.ts`](../flash-web-e2e/steps/support/shop.ts)) |
 
 The steps write the API's paths, headers, error codes and expected statuses themselves. They do not import them from
 `flash-be`, so a renamed route or header fails here before a real client sees it

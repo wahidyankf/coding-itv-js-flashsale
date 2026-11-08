@@ -112,8 +112,8 @@ sequenceDiagram
 ### The calls in full
 
 Each call is written as the code sends it, and the comments use the labels of the diagram. In the SQL, `$1`, `$2`
-and so on are parameters. The sources are `redis-queue-store.ts`, `redis-hold-gate.ts`,
-`reservation-repository.ts` and `purchase-repository.ts` in `apps/flash-be/src/adapters/outbound`.
+and so on are parameters. The sources are [`redis-queue-store.ts`](../../../../apps/flash-be/src/adapters/outbound/redis/redis-queue-store.ts), [`redis-hold-gate.ts`](../../../../apps/flash-be/src/adapters/outbound/redis/redis-hold-gate.ts),
+[`reservation-repository.ts`](../../../../apps/flash-be/src/adapters/outbound/postgres/reservation-repository.ts) and [`purchase-repository.ts`](../../../../apps/flash-be/src/adapters/outbound/postgres/purchase-repository.ts) in `apps/flash-be/src/adapters/outbound`.
 
 Redis, where each script runs as one step. `KEYS` and `ARGV` are the keys `sale:<saleId>:...` and the arguments of
 the call.

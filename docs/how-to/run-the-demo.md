@@ -40,7 +40,7 @@ while `sold < stock`, and `UNIQUE(sale_id, user_id)` stops a second purchase wha
 
 ## 2. The API, request by request
 
-Open `api-flash-demo.http` and send requests 1 to 25. The ones to stop at:
+Open [`api-flash-demo.http`](../../api-flash-demo.http) and send requests 1 to 25. The ones to stop at:
 
 | Request | What it shows                                                                              |
 | ------- | ------------------------------------------------------------------------------------------ |

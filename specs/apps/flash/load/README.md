@@ -2,7 +2,7 @@
 
 The specification of the load test, `apps/flash-load`. It sends shoppers at three `flash-be` instances behind nginx with
 k6, then decides the verdict from Postgres and Redis, not from what k6 reports. The load test has no Gherkin scenarios.
-Its rules are written here, and the code reads the same numbers from `apps/flash-load/k6/profiles.ts`.
+Its rules are written here, and the code reads the same numbers from [`apps/flash-load/k6/profiles.ts`](../../../../apps/flash-load/k6/profiles.ts).
 
 ## Rules
 

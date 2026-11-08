@@ -50,12 +50,12 @@ Biome's `useExhaustiveSwitchCases` turns a forgotten case into an error at build
 
 ## How the rules are kept
 
-- **No `catch` in product code.** A Biome plugin, `.biome/no-catch.grit`, errors on a `catch` clause and on a `.catch(` call
+- **No `catch` in product code.** A Biome plugin, [`.biome/no-catch.grit`](../../.biome/no-catch.grit), errors on a `catch` clause and on a `.catch(` call
   in `apps/*/src` and `libs/*/src`. `try` with `finally` is allowed, because it cleans up and handles nothing. Tests,
-  `src/bdd` and the library's own `boundary.ts` are exempt.
+  `src/bdd` and the library's own [`boundary.ts`](../../libs/typekit/src/boundary.ts) are exempt.
 - **Exhaustive switches.** `useExhaustiveSwitchCases` is an error.
 - **Inner layers may use it.** The domain and application layers import `@flash/typekit`, because it has no dependency and
-  no I/O. `architecture_tests.ts` allows it and the main entry of `@flash/flash-commons` (not `/timers`), and no other
+  no I/O. [`architecture_tests.ts`](../../apps/flash-be/src/architecture_tests.ts) allows it and the main entry of `@flash/flash-commons` (not `/timers`), and no other
   package.
 - **The rules have tests.** `npm run lint:rules:test` runs the real linter on sample code. It runs in the pre-push hook.
 

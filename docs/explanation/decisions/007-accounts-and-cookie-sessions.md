@@ -12,7 +12,7 @@ the place, the hold or the purchase of another shopper, and the operator routes 
 ## Decision
 
 - A user has a user name and a password (8 to 128 characters), hashed with scrypt. Sign-up makes a shopper. An operator is made on the server with `create-operator`.
-- A session is two cookies: `access_token` (15 minutes, path `/`) and `refresh_token` (7 days, path `/auth`, used once).
+- A session is two cookies: `access_token` (15 minutes, path [`/`](.)) and `refresh_token` (7 days, path `/auth`, used once).
   Replaying an old refresh token ends the session. Only SHA-256 hashes of tokens are stored, in Postgres, with Redis as a cache.
 - No route takes a user id. The shopper is the session (`/queue/me`, `/purchases/me`). Cookies are `SameSite=Lax`, and `Secure` when `COOKIE_SECURE` is true.
 - The identifier of the task is still there: it is the user name.

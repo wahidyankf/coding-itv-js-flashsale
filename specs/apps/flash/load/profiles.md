@@ -82,5 +82,5 @@ that reaches the reserve script and the database guard under real contention.
 ## Sizing the herd profiles
 
 The herd profiles use 700 shoppers, the largest herd the client machine was known to start. A first try with 2,000 never
-began. The size is set before a run, and the reason is written next to the numbers in `profiles.ts`. The speed limits are
+began. The size is set before a run, and the reason is written next to the numbers in [`profiles.ts`](../../../../apps/flash-load/k6/profiles.ts). The speed limits are
 the same as for every other profile.

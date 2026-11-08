@@ -12,7 +12,7 @@ the choice.
 of the same rule would slowly say three different things. One scenario, bound at each layer, keeps them the same.
 
 **What we did not pick.** Decision 014 turned down plain tests only (no shared contract), a scenario at the end-to-end
-layer only (too slow for the pre-push hook), a scenario for every detail (`specs/` would become unreadable), and a
+layer only (too slow for the pre-push hook), a scenario for every detail ([`specs/`](../../../specs) would become unreadable), and a
 separate Cucumber runner (a second setup for coverage and watch mode).
 
 **What it costs.** Up to three bindings per scenario, and a written reason for each layer that is skipped. The check
@@ -24,7 +24,7 @@ Review covers that. The order of the work is drawn in [add a behaviour](../../ho
 ### The feature file is the contract
 
 Features live in `specs/apps/flash/be/behaviours/<area>/` and `specs/apps/flash/web/behaviours/<area>/`. When they
-disagree with `docs/`, the specs win. From
+disagree with [`docs/`](../..), the specs win. From
 [`queue/joining.feature`](../../../specs/apps/flash/be/behaviours/queue/joining.feature):
 
 ```gherkin

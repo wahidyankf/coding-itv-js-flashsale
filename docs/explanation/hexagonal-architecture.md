@@ -13,7 +13,7 @@ The folder tree, file by file, is in the [flash-be README](../../apps/flash-be/R
   There is no I/O and no clock read, so a unit test needs no fake.
 - **Application.** One service per use case (sale status, queue, reserve, pay, rate limit, login, operator changes, seed). A service orders the steps
   and calls ports. It decides nothing that a domain function can decide. Ports are small types in
-  `application/ports/`, named in the language of the sale: `HoldGate`, `QueueStore`, `PurchaseRepository`. The suffix says what a port is: a
+  [`application/ports/`](../../apps/flash-be/src/application/ports), named in the language of the sale: `HoldGate`, `QueueStore`, `PurchaseRepository`. The suffix says what a port is: a
   **Repository** is the Postgres record of a thing, a **Store** holds keyed state, and a **Gate** is the fast check in
   front of Postgres. Randomness is a port too (`TokenSource`), so the domain only takes values.
 - **Adapters.** Inbound adapters drive the application (HTTP, and the `seed-sale` and `create-operator` commands). Outbound adapters implement ports
@@ -65,12 +65,12 @@ Dependencies point inward: adapters know the application and the domain, the app
 domain knows nothing. The only packages the inner layers may import are [`@flash/typekit`](../../libs/typekit/README.md)
 (see [failures as values](failures-as-values.md)) and [`@flash/flash-commons`](../../libs/flash-commons/README.md). Both are
 pure: no I/O, no timer and no randomness of their own. The one timer helper, `@flash/flash-commons/timers`, is refused
-in the domain and the application; `composition.ts` passes the real `sleep` in, and a test passes its own. The HTTP words (error codes, statuses, sentences, cookies) live in
+in the domain and the application; [`composition.ts`](../../apps/flash-be/src/composition.ts) passes the real `sleep` in, and a test passes its own. The HTTP words (error codes, statuses, sentences, cookies) live in
 the inbound HTTP adapter, and the rules the domain needs, such as the user id rule, live in the domain.
 Inbound adapters never import outbound adapters, and outbound adapters import only ports and the
-domain. Only `composition.ts` and the entry points see both sides.
+domain. Only [`composition.ts`](../../apps/flash-be/src/composition.ts) and the entry points see both sides.
 
-`apps/flash-be/src/architecture_tests.ts` reads the imports of every source file and fails when one crosses a layer
+[`apps/flash-be/src/architecture_tests.ts`](../../apps/flash-be/src/architecture_tests.ts) reads the imports of every source file and fails when one crosses a layer
 it must not know. It runs with the unit tests, so the pre-push hook enforces it.
 
 ## What it buys, and what it costs

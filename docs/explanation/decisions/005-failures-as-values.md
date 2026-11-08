@@ -14,7 +14,7 @@ thrown error is invisible in a function's type, so a caller can forget it, and n
 - `@flash/typekit` (`libs/typekit`) has `Ok`, `Err`, `Result` and `attempt`. A call that may throw goes through `attempt`
   or `attemptAsync`, which name the failure they expect. Anything else keeps going up and becomes a `500 internal`.
 - A lookup that may find nothing returns `T | undefined`. There is no `Option` type.
-- A Biome plugin (`.biome/no-catch.grit`) rejects `catch` and `.catch(` in product code. `useExhaustiveSwitchCases` makes a
+- A Biome plugin ([`.biome/no-catch.grit`](../../../.biome/no-catch.grit)) rejects `catch` and `.catch(` in product code. `useExhaustiveSwitchCases` makes a
   new error code fail the build until a route maps it. `npm run lint:rules:test` tests these rules.
 
 ## Alternatives considered

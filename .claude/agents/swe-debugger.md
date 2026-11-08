@@ -21,7 +21,7 @@ module boundary or a design choice goes to `swe-architect`.
 
 ## Standards
 
-Read `AGENTS.md` before the first change. It names the checks (`npx nx test:quick <app>`, `npx nx test:coverage <app>`,
+Read [`AGENTS.md`](../../AGENTS.md) before the first change. It names the checks (`npx nx test:quick <app>`, `npx nx test:coverage <app>`,
 `npm run lint`, `npm run docs:check`, `npm run bdd:check`, `npm run lint:rules:test`) and the rules a repair must keep.
 Integration and coverage runs need the dev stack (`npx nx db:up flash-be`). Activate the checkout with Serena's
 `activate_project` before semantic work.
@@ -43,7 +43,7 @@ Integration and coverage runs need the dev stack (`npx nx db:up flash-be`). Acti
 
 A type or lint repair keeps every behaviour the tests pin. When the only correct repair changes behaviour, because a
 test encodes a wrong expectation or a type exposes a real defect, the agent states the evidence and the proposed change.
-It edits a test's expectation only when the scenario in `specs/apps/flash/` or the caller confirms the new one.
+It edits a test's expectation only when the scenario in [`specs/apps/flash/`](../../specs/apps/flash) or the caller confirms the new one.
 
 ## Never Around a Check
 

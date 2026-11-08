@@ -4,7 +4,7 @@
 
 Accepted. The API is split into domain, application and adapters. The web app is a plain React app.
 
-Amended 2026-11-07: the copies guarded by `same_as_be_tests.ts` include the proxy's `not_found` reply.
+Amended 2026-11-07: the copies guarded by [`same_as_be_tests.ts`](../../../apps/flash-web/src/same_as_be_tests.ts) include the proxy's `not_found` reply.
 
 ## Context
 
@@ -14,8 +14,8 @@ stores and many rules. `flash-web` has no store and no sale rules. It shows the 
 ## Decision
 
 - `flash-be` has `domain` (no I/O), `application` (use cases and `ports/`), and `adapters` (inbound HTTP and CLI,
-  outbound Postgres, Redis, payment, clock). Only `composition.ts` and the entry points pick an adapter for a port.
-- `architecture_tests.ts` reads every import and fails on a wrong one, so the pre-push hook keeps the split.
+  outbound Postgres, Redis, payment, clock). Only [`composition.ts`](../../../apps/flash-be/src/composition.ts) and the entry points pick an adapter for a port.
+- [`architecture_tests.ts`](../../../apps/flash-be/src/architecture_tests.ts) reads every import and fails on a wrong one, so the pre-push hook keeps the split.
 - `flash-web` keeps routes, components and hooks, with one client for the API. It has no ports layer.
 
 ## Alternatives considered
@@ -24,7 +24,7 @@ stores and many rules. `flash-web` has no store and no sale rules. It shows the 
 - **A hexagon in `flash-web` too.** It would add ports for one API with one implementation, with nothing to isolate.
 - **Microservices (queue, reservation, payment).** They add network hops to the hot path and a distributed step between hold
   and purchase. The API instances are already identical and stateless, so there is no load reason to split them.
-- **A dependency-injection container.** `composition.ts` wires by hand in one short file, which a reader can follow.
+- **A dependency-injection container.** [`composition.ts`](../../../apps/flash-be/src/composition.ts) wires by hand in one short file, which a reader can follow.
 
 ## Consequences
 
@@ -32,7 +32,7 @@ stores and many rules. `flash-web` has no store and no sale rules. It shows the 
   Most ports have one real implementation, on purpose: they keep a service from naming Redis or Postgres.
 - It buys rules that are unit-tested without stores, and scenarios that run the production services against memory ports.
 - `flash-web` copies a few small rules of the API that only the two of them use (the user name rule, the password limits, the
-  ticket header and the proxy's `not_found` reply). `same_as_be_tests.ts` fails if a copy drifts. Time units, HTTP status numbers and the id rule
+  ticket header and the proxy's `not_found` reply). [`same_as_be_tests.ts`](../../../apps/flash-web/src/same_as_be_tests.ts) fails if a copy drifts. Time units, HTTP status numbers and the id rule
   (`isUuid`) are not copied:
   they come from `@flash/flash-commons` (see [016](016-dry-rule-of-three.md)).
 

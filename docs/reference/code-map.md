@@ -17,20 +17,20 @@ the folder tree and a table that answers "I want to add X, where does it go?".
 
 ## Outside the apps
 
-| Path                                                             | What it holds                                                                                              |
-| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| [`specs/apps/flash/be`](../../specs/apps/flash/be/README.md)     | the API's behaviour scenarios (Gherkin), the contract                                                      |
-| [`specs/apps/flash/web`](../../specs/apps/flash/web/README.md)   | the page's behaviour scenarios                                                                             |
-| [`specs/apps/flash/c4`](../../specs/apps/flash/c4/README.md)     | the C4 model: context, containers, components, the data model and the sequences                            |
-| [`specs/apps/flash/load`](../../specs/apps/flash/load/README.md) | the load test's profiles, limits and checks                                                                |
-| [`docs/`](../README.md)                                          | these docs, by Diátaxis mode; [decisions](../explanation/decisions/README.md) holds the why of each choice |
-| `scripts/bdd/`                                                   | `npm run bdd:check`, the check that every scenario is bound at each level                                  |
-| `scripts/lint/`                                                  | `npm run lint:rules:test`, the tests of the lint rules in `.biome/` and `biome.json`                       |
-| `scripts/smoke/`                                                 | the smoke test of the production stack                                                                     |
-| `api-flash-*.http`                                               | one request per route, and the demo in order (kulala.nvim format)                                          |
-| `compose.dev.yaml`, `compose.prod.yaml`                          | the local Postgres and Redis; the production-like stack                                                    |
-| `biome.json`, `.biome/`                                          | format and lint, with the limits on complexity and size                                                    |
-| `repo-config.yml`                                                | the docs policy RHINO checks                                                                               |
+| Path                                                                                         | What it holds                                                                                                            |
+| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| [`specs/apps/flash/be`](../../specs/apps/flash/be/README.md)                                 | the API's behaviour scenarios (Gherkin), the contract                                                                    |
+| [`specs/apps/flash/web`](../../specs/apps/flash/web/README.md)                               | the page's behaviour scenarios                                                                                           |
+| [`specs/apps/flash/c4`](../../specs/apps/flash/c4/README.md)                                 | the C4 model: context, containers, components, the data model and the sequences                                          |
+| [`specs/apps/flash/load`](../../specs/apps/flash/load/README.md)                             | the load test's profiles, limits and checks                                                                              |
+| [`docs/`](../README.md)                                                                      | these docs, by Diátaxis mode; [decisions](../explanation/decisions/README.md) holds the why of each choice               |
+| [`scripts/bdd/`](../../scripts/bdd)                                                          | `npm run bdd:check`, the check that every scenario is bound at each level                                                |
+| [`scripts/lint/`](../../scripts/lint)                                                        | `npm run lint:rules:test`, the tests of the lint rules in [`.biome/`](../../.biome) and [`biome.json`](../../biome.json) |
+| [`scripts/smoke/`](../../scripts/smoke)                                                      | the smoke test of the production stack                                                                                   |
+| `api-flash-*.http`                                                                           | one request per route, and the demo in order (kulala.nvim format)                                                        |
+| [`compose.dev.yaml`](../../compose.dev.yaml), [`compose.prod.yaml`](../../compose.prod.yaml) | the local Postgres and Redis; the production-like stack                                                                  |
+| [`biome.json`](../../biome.json), [`.biome/`](../../.biome)                                  | format and lint, with the limits on complexity and size                                                                  |
+| [`repo-config.yml`](../../repo-config.yml)                                                   | the docs policy RHINO checks                                                                                             |
 
 ## Rules for where code goes
 

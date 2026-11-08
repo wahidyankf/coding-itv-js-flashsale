@@ -22,10 +22,10 @@ expensive to detect and to undo, so both modes take the same care.
 
 ## Standards
 
-Read `AGENTS.md` in full first. The structure it already fixes is not reopened without a reason: the hexagon of
-`flash-be` (`docs/explanation/hexagonal-architecture.md`), Postgres as the last word with Redis as a gate it can
+Read [`AGENTS.md`](../../AGENTS.md) in full first. The structure it already fixes is not reopened without a reason: the hexagon of
+`flash-be` ([`docs/explanation/hexagonal-architecture.md`](../../docs/explanation/hexagonal-architecture.md)), Postgres as the last word with Redis as a gate it can
 rebuild, failures as values, soft delete with audit columns, cookie sessions, the `flash-web` proxy allow-list, and Nx
-as a command runner only. The explanations under `docs/explanation/` and the C4 model in `specs/apps/flash/c4/` record
+as a command runner only. The explanations under [`docs/explanation/`](../../docs/explanation) and the C4 model in [`specs/apps/flash/c4/`](../../specs/apps/flash/c4) record
 earlier choices. Activate the checkout with Serena's `activate_project` before semantic work.
 
 ## Modes
@@ -44,7 +44,7 @@ settles.
 3. Where the design changes a table or a migration, state the expand, migrate, verify, and contract steps. Migrations
    are hand-written Kysely files, and a new table gets the six audit columns and a `Database` type entry.
 4. Return the decisions, the boundaries, and the deterministic tests the work must add: each a failing test, a lint or
-   type rule (for example in `architecture_tests.ts`), an e2e assertion, or a threshold a command checks. A design whose
+   type rule (for example in [`architecture_tests.ts`](../../apps/flash-be/src/architecture_tests.ts)), an e2e assertion, or a threshold a command checks. A design whose
    success no command can check is not finished. Work on the sale path also names its concurrency scenario and the
    `flash-load` run that must still pass.
 5. Write one decision record when the choice is hard to reverse or would surprise the next reader. Each record states
@@ -61,10 +61,10 @@ completion.
 ## Where Decision Records Live
 
 `docs/explanation/decisions/NNN-<slug>.md`, numbered after the last record there. Each new record gets a line in
-`docs/explanation/decisions/README.md`, because `npm run docs:check` requires every folder under `docs/` to have a
+[`docs/explanation/decisions/README.md`](../../docs/explanation/decisions/README.md), because `npm run docs:check` requires every folder under [`docs/`](../../docs) to have a
 README that links its children. Records follow the
-docs rules of `AGENTS.md`: Diátaxis explanation mode, plain English, and Mermaid diagrams with `accTitle`, `accDescr`,
-and the palette in `repo-config.yml`.
+docs rules of [`AGENTS.md`](../../AGENTS.md): Diátaxis explanation mode, plain English, and Mermaid diagrams with `accTitle`, `accDescr`,
+and the palette in [`repo-config.yml`](../../repo-config.yml).
 
 ## Shell and Network
 

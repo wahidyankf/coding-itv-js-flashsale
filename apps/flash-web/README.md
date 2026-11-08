@@ -37,19 +37,19 @@ src/
   same_as_be_tests.ts  fails when a rule copied from flash-be drifts (user name, password, ticket header, two replies)
 ```
 
-`sale/` and `auth/` never import each other. What both need lives directly in `src/`.
+`sale/` and `auth/` never import each other. What both need lives directly in [`src/`](src).
 
 ## To add something
 
-| To add …                                    | Put it in …                                                         | Also update …                                                                                                                     |
-| ------------------------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| a rule of the buying card                   | `sale/shopper-state.ts`, with a test in `shopper_state_tests.ts`    | the scenario in `specs/apps/flash/web/behaviours/` if a shopper can see it                                                        |
-| a sentence or a button label                | `TEXT` in `sale/messages.ts` (or `AUTH_TEXT` in `auth/messages.ts`) | the locators of `flash-web-e2e` if they read it                                                                                   |
-| the text of a new error code                | `error-text.ts`, or the area's `messages.ts`                        | `flash-be`'s `errors.ts` already names the code                                                                                   |
-| a call to a new API route                   | `sale/client.ts` or `auth/client.ts`                                | `ALLOWED` in `proxy.ts`, `api-flash-web.http`, [HTTP endpoints](../../docs/reference/http-endpoints.md)                           |
-| a part of the page                          | a component in `sale/` or `auth/`; a shared one in `components/`    | classes in `components/ui.ts` when two parts share a look                                                                         |
-| a value used by 3 or more places in the app | one named constant or function in the folder that owns it           | when other apps use it in 3+ places too, `libs/flash-commons` ([rule](../../docs/explanation/decisions/016-dry-rule-of-three.md)) |
-| a behaviour                                 | a scenario first, then bindings in `src/bdd/`                       | `npm run bdd:check` ([how](../../docs/how-to/add-a-behaviour.md))                                                                 |
+| To add …                                    | Put it in …                                                                                                                      | Also update …                                                                                                                                       |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| a rule of the buying card                   | [`sale/shopper-state.ts`](src/sale/shopper-state.ts), with a test in [`shopper_state_tests.ts`](src/sale/shopper_state_tests.ts) | the scenario in [`specs/apps/flash/web/behaviours/`](../../specs/apps/flash/web/behaviours) if a shopper can see it                                 |
+| a sentence or a button label                | `TEXT` in [`sale/messages.ts`](src/sale/messages.ts) (or `AUTH_TEXT` in [`auth/messages.ts`](src/auth/messages.ts))              | the locators of `flash-web-e2e` if they read it                                                                                                     |
+| the text of a new error code                | [`error-text.ts`](src/error-text.ts), or the area's `messages.ts`                                                                | `flash-be`'s [`errors.ts`](../flash-be/src/adapters/inbound/http/errors.ts) already names the code                                                  |
+| a call to a new API route                   | [`sale/client.ts`](src/sale/client.ts) or [`auth/client.ts`](src/auth/client.ts)                                                 | `ALLOWED` in [`proxy.ts`](src/proxy.ts), [`api-flash-web.http`](../../api-flash-web.http), [HTTP endpoints](../../docs/reference/http-endpoints.md) |
+| a part of the page                          | a component in `sale/` or `auth/`; a shared one in `components/`                                                                 | classes in [`components/ui.ts`](src/components/ui.ts) when two parts share a look                                                                   |
+| a value used by 3 or more places in the app | one named constant or function in the folder that owns it                                                                        | when other apps use it in 3+ places too, `libs/flash-commons` ([rule](../../docs/explanation/decisions/016-dry-rule-of-three.md))                   |
+| a behaviour                                 | a scenario first, then bindings in [`src/bdd/`](src/bdd)                                                                         | `npm run bdd:check` ([how](../../docs/how-to/add-a-behaviour.md))                                                                                   |
 
 ## Commands
 

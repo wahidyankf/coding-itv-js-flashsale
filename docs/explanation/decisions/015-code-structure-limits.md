@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Size and nesting limits are set in `biome.json` with built-in rules. File headers and doc comments are kept by a rule in AGENTS.md and by review.
+Accepted. Size and nesting limits are set in [`biome.json`](../../../biome.json) with built-in rules. File headers and doc comments are kept by a rule in AGENTS.md and by review.
 
 Amended 2026-11-07: migrations are exempt from the function line limit only; the routes file has been split.
 
@@ -28,7 +28,7 @@ split into a folder.
 ## Alternatives considered
 
 - **ESLint with a JSDoc plugin.** It could require doc comments. But AGENTS.md allows Biome only, and a second linter means a second config, a second run and two places for a rule.
-- **A custom Biome (GritQL) plugin for doc comments.** Ruled out, to keep the limits to built-in rules. The one plugin in the repo, `no-catch.grit`, guards a correctness rule.
+- **A custom Biome (GritQL) plugin for doc comments.** Ruled out, to keep the limits to built-in rules. The one plugin in the repo, [`no-catch.grit`](../../../.biome/no-catch.grit), guards a correctness rule.
 - **No limits, review only.** Review sees one change at a time, and a file grows by many small changes.
 - **Lower numbers (for example 40 lines a function).** They would split code to meet a number, not to read better. The limits are meant to catch outliers.
 

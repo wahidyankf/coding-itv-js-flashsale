@@ -20,14 +20,14 @@ three levels and a load test that checks the data after each run. Everything run
 
 If you have five minutes, read these files in this order:
 
-| File                                                                                                                                           | What you learn                                                                                                                                         |
-| ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [`apps/flash-be/src/domain/sale.ts`](apps/flash-be/src/domain/sale.ts)                                                                         | the sale rules: upcoming, active, sold out or ended, from window and stock                                                                             |
-| [`apps/flash-be/src/adapters/outbound/redis/redis-hold-gate.ts`](apps/flash-be/src/adapters/outbound/redis/redis-hold-gate.ts)                 | the Redis script that takes one item for one shopper, atomically                                                                                       |
-| [`apps/flash-be/src/adapters/outbound/postgres/purchase-repository.ts`](apps/flash-be/src/adapters/outbound/postgres/purchase-repository.ts)   | the transaction that has the last word: `sold < stock`, one purchase per shopper                                                                       |
-| [`apps/flash-be/src/adapters/inbound/http/routes/`](apps/flash-be/src/adapters/inbound/http/routes/)                                           | every endpoint, one file per area, and what it does                                                                                                    |
-| [`apps/flash-web/src/sale-page.tsx`](apps/flash-web/src/sale-page.tsx)                                                                         | the page: it puts together the sale card (status, items left), the login and the Buy Now card, from `src/sale/` and `src/auth/`, with Tailwind classes |
-| [`apps/flash-load/k6/profiles.ts`](apps/flash-load/k6/profiles.ts), [`apps/flash-load/scripts/verdict.ts`](apps/flash-load/scripts/verdict.ts) | the stress profiles, and the verdict that is read from the data                                                                                        |
+| File                                                                                                                                           | What you learn                                                                                                                                                                                               |
+| ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [`apps/flash-be/src/domain/sale.ts`](apps/flash-be/src/domain/sale.ts)                                                                         | the sale rules: upcoming, active, sold out or ended, from window and stock                                                                                                                                   |
+| [`apps/flash-be/src/adapters/outbound/redis/redis-hold-gate.ts`](apps/flash-be/src/adapters/outbound/redis/redis-hold-gate.ts)                 | the Redis script that takes one item for one shopper, atomically                                                                                                                                             |
+| [`apps/flash-be/src/adapters/outbound/postgres/purchase-repository.ts`](apps/flash-be/src/adapters/outbound/postgres/purchase-repository.ts)   | the transaction that has the last word: `sold < stock`, one purchase per shopper                                                                                                                             |
+| [`apps/flash-be/src/adapters/inbound/http/routes/`](apps/flash-be/src/adapters/inbound/http/routes/)                                           | every endpoint, one file per area, and what it does                                                                                                                                                          |
+| [`apps/flash-web/src/sale-page.tsx`](apps/flash-web/src/sale-page.tsx)                                                                         | the page: it puts together the sale card (status, items left), the login and the Buy Now card, from [`src/sale/`](apps/flash-web/src/sale) and [`src/auth/`](apps/flash-web/src/auth), with Tailwind classes |
+| [`apps/flash-load/k6/profiles.ts`](apps/flash-load/k6/profiles.ts), [`apps/flash-load/scripts/verdict.ts`](apps/flash-load/scripts/verdict.ts) | the stress profiles, and the verdict that is read from the data                                                                                                                                              |
 
 ## Words used here
 
@@ -48,7 +48,7 @@ These words have a fixed meaning in the code, the docs and the API.
 
 Each line of the interview task, and the code or scenario that answers it.
 
-| The task asks for                 | Where it is                                                                                                                                                                                                                                                                                                                                                                 |
+| The task asks for                  | Where it is                                                                                                                                                                                                                                                                                                                                                                 |
 | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | A configurable start and end time  | `sales.starts_at` and `ends_at`. Set them with `POST /admin/sales` (absolute times, needs an operator login) or with the seed command (minutes from now). `PATCH` and `DELETE /admin/sales/:saleId` change and remove a sale                                                                                                                                                |
 | One product, limited stock         | `sales.stock`, with `UPDATE ... WHERE sold < stock` and `CHECK (sold <= stock)` in Postgres                                                                                                                                                                                                                                                                                 |
@@ -133,7 +133,7 @@ can drift.
 
 ### Under load
 
-This is the production stack (`compose.prod.yaml`) and the shape the load test runs against.
+This is the production stack ([`compose.prod.yaml`](compose.prod.yaml)) and the shape the load test runs against.
 
 ```mermaid
 flowchart LR
@@ -168,7 +168,7 @@ any request, so adding capacity is adding instances.
 
 ## What is in the repository
 
-It is an npm workspace with five apps in `apps/` and two libraries in `libs/`. Each tool links to a crash course that
+It is an npm workspace with five apps in [`apps/`](apps) and two libraries in [`libs/`](libs). Each tool links to a crash course that
 shows how this repository uses it.
 
 | App                                             | What it is                                                                                                                                                                                                                                                                                                      |
@@ -192,7 +192,7 @@ and a `sleep` (on its own entry, `/timers`, so the main entry stays pure). Every
 ([decision 017](docs/explanation/decisions/017-retry-backoff-jitter.md), [policies](docs/reference/retry-policies.md)).
 A value repeated a third time gets one name ([decision 016](docs/explanation/decisions/016-dry-rule-of-three.md)).
 
-The HTTP API is plain code: `flash-be` registers its routes in `adapters/inbound/http/routes/`, one file per area, and
+The HTTP API is plain code: `flash-be` registers its routes in [`adapters/inbound/http/routes/`](apps/flash-be/src/adapters/inbound/http/routes), one file per area, and
 every route, request and reply is listed in [docs/reference/http-endpoints.md](docs/reference/http-endpoints.md). The
 callers (`flash-web`, the e2e tests and the k6 script) write the paths they use.
 
@@ -232,20 +232,20 @@ the other options that were weighed and when to look at it again. Longer explana
 
 ### What was left out, and why
 
-| Left out                                 | Why                                                                                                                                                        | What would make it worth adding                                     |
-| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| A message broker                         | The Redis queue and one admitter per second smooth the rush already, and a purchase needs an answer now, not later                                         | Work that may finish after the reply, such as e-mail or fulfilment  |
-| Microservices                            | One API holds every rule of one sale; a split would add network calls and a distributed transaction on the hot path                                        | Teams that ship separately, or parts that scale very differently    |
-| An ORM                                   | The guards are a few exact SQL statements (`WHERE sold < stock`, the unique indexes); Kysely keeps them visible and typed                                  | Many more tables with plain CRUD                                    |
-| An admin page                            | An operator needs only a few calls, and they are in the API with tests and in `api-flash-be.http`                                                          | Operators who are not developers                                    |
+| Left out                                 | Why                                                                                                                                                       | What would make it worth adding                                     |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| A message broker                         | The Redis queue and one admitter per second smooth the rush already, and a purchase needs an answer now, not later                                        | Work that may finish after the reply, such as e-mail or fulfilment  |
+| Microservices                            | One API holds every rule of one sale; a split would add network calls and a distributed transaction on the hot path                                       | Teams that ship separately, or parts that scale very differently    |
+| An ORM                                   | The guards are a few exact SQL statements (`WHERE sold < stock`, the unique indexes); Kysely keeps them visible and typed                                 | Many more tables with plain CRUD                                    |
+| An admin page                            | An operator needs only a few calls, and they are in the API with tests and in [`api-flash-be.http`](api-flash-be.http)                                    | Operators who are not developers                                    |
 | A real payment                           | The task does not ask for one; the mock keeps the hard parts real: charge once, refund on a lost race, retry on a decline                                 | Real money; then the provider's idempotency keys replace the mock's |
 | Password reset, e-mail check, two-factor | The task asks only for a user identifier; the password is there so one shopper cannot buy as another                                                      | Real shoppers' accounts                                             |
 | Several sales at once                    | The task has one product and one sale; one current sale keeps the queue and the page simple ([010](docs/explanation/decisions/010-one-sale-at-a-time.md)) | A shop with many products on sale at the same time                  |
 
 ## How it scales, and where it stops
 
-**What scales.** The API tier, by adding instances (see [Under load](#under-load)). In `compose.prod.yaml` that means
-one more service next to `flash-be-1..3`, one more `server` line in `nginx.prod.conf`, and a higher Postgres
+**What scales.** The API tier, by adding instances (see [Under load](#under-load)). In [`compose.prod.yaml`](compose.prod.yaml) that means
+one more service next to `flash-be-1..3`, one more `server` line in [`nginx.prod.conf`](nginx.prod.conf), and a higher Postgres
 `max_connections`, since each instance opens a pool of ten. The hot path is one Redis script per hold, so a rush reaches
 Postgres only for the hold's write-through and the payment step. Reads of the sale are cached for a second, and watchers
 share one read through the event stream.
@@ -267,14 +267,14 @@ front of that.
 
 ## Run it
 
-You need [Volta](https://volta.sh/) (it installs the Node.js and npm versions pinned in `package.json`), Docker and Git.
+You need [Volta](https://volta.sh/) (it installs the Node.js and npm versions pinned in [`package.json`](package.json)), Docker and Git.
 
 ```bash
 npm install                    # also installs the Git hooks
 [ -f .env ] || cp .env.example .env
 ```
 
-The values in `.env.example` are for local use only. Do not use the example passwords or the ticket secret anywhere else.
+The values in [`.env.example`](.env.example) are for local use only. Do not use the example passwords or the ticket secret anywhere else.
 
 The short version of each way to run it is below. The full guides are
 [run in development](docs/how-to/run-in-development.md) (the daily loop: reload, tests in watch mode, the data) and
@@ -333,7 +333,7 @@ and 3000; Postgres, Redis and the instances are not. The stack reads `POSTGRES_*
 `.env`, and it does not start when a `POSTGRES_*` value or `TICKET_SECRET` is missing.
 
 `COOKIE_SECURE` is `true` by default, so the login cookies are `Secure` and need a TLS terminator in front.
-`.env.example` sets it to `false`, so a stack started from a copy of that file sends the cookies over plain HTTP. Set
+[`.env.example`](.env.example) sets it to `false`, so a stack started from a copy of that file sends the cookies over plain HTTP. Set
 it to `true` behind TLS. `npm run smoke:prod` builds the stack under its own name and walks one shopper through it (see
 [the smoke test](docs/how-to/smoke-test-the-production-stack.md)).
 

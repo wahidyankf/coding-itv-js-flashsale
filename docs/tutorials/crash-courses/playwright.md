@@ -60,7 +60,7 @@ Tests start only when the servers answer.
 ### Step files and their support
 
 Each app has `steps/<area>.steps.ts` for the steps and `steps/support/` for the helpers. `flash-web-e2e` imports the
-shared helpers (time, logins, the database) from `flash-be-e2e/steps/support/`; it does not copy them. A hook in
+shared helpers (time, logins, the database) from [`flash-be-e2e/steps/support/`](../../../apps/flash-be-e2e/steps/support); it does not copy them. A hook in
 [`world.steps.ts`](../../../apps/flash-be-e2e/steps/world.steps.ts) cleans up after every scenario:
 
 ```ts

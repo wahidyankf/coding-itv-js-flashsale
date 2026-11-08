@@ -21,10 +21,10 @@ computation, and rates what differs. Judging what a difference means takes judge
 
 ## The Sources
 
-- `specs/apps/flash/web/`: the behaviour scenarios of the page.
-- `AGENTS.md`: the page stays readable from a phone to a desktop and in light and dark mode, and colour is never the
+- [`specs/apps/flash/web/`](../../specs/apps/flash/web): the behaviour scenarios of the page.
+- [`AGENTS.md`](../../AGENTS.md): the page stays readable from a phone to a desktop and in light and dark mode, and colour is never the
   only signal (the words stay on screen).
-- `docs/reference/http-endpoints.md` and `docs/explanation/web-server-proxy.md`: what the page may reach through
+- [`docs/reference/http-endpoints.md`](../../docs/reference/http-endpoints.md) and [`docs/explanation/web-server-proxy.md`](../../docs/explanation/web-server-proxy.md): what the page may reach through
   `/api`, and what the proxy refuses.
 
 ## Charter
@@ -37,7 +37,7 @@ The caller names one charter per pass. With none named, it asks rather than gues
 ## Before the First Action
 
 Confirm the exact origin (the dev page is `http://localhost:3000`, with the API on `http://localhost:8080`, started as
-`README.md` says), the routes, the viewport classes (phone, tablet, desktop), both themes, and a sale to shop in. Use
+[`README.md`](../../README.md) says), the routes, the viewport classes (phone, tablet, desktop), both themes, and a sale to shop in. Use
 synthetic identities only: shoppers signed up through the page, and an operator made with
 `npx nx db:create-operator flash-be --username=<name> --password=<pw>` when a sale must be created. Confirm whether
 state-changing actions are authorized, and that the browser tools respond. An unreachable origin, an unresolved
@@ -52,7 +52,7 @@ scenario, or no browser ends the pass as not run, never as clean.
    click on Buy, a lost login mid-hold, a refresh while waiting, a second tab), and recomputes any count or countdown
    shown. Each route is seen at every viewport class (`browser_resize`) and in both themes (`browser_emulate_media`).
 3. **Tell a defect from a gap.** Behaviour contradicting a cited source is a defect that quotes it. Correct behaviour no
-   scenario protects becomes a scenario proposal in Gherkin, written in the findings record, never into `specs/`.
+   scenario protects becomes a scenario proposal in Gherkin, written in the findings record, never into [`specs/`](../../specs).
 4. **Check completeness.** Before closing, name each category of state, input, or viewport never enumerated, and record
    it as an open gap.
 5. **Rate and record** each finding with its route, viewport class, theme, state, the source it departs from,

@@ -46,7 +46,7 @@ sales: Audit & {
 };
 ```
 
-The migrations change the tables; this type must follow them by hand. `schema_integration_tests.ts` checks both.
+The migrations change the tables; this type must follow them by hand. [`schema_integration_tests.ts`](../../../apps/flash-be/src/adapters/outbound/postgres/schema_integration_tests.ts) checks both.
 
 ### The query builder, and `sql` for the rest
 
@@ -181,7 +181,7 @@ npx vitest run --config vitest.integration.config.ts src/adapters/outbound/postg
   `.columns(["sale_id", "user_id"]).where("deleted_at", "is", null)` for this reason.
 - **Counts and row counts are not plain numbers.** `numUpdatedRows` is a `bigint`, so the code compares with `0n`. A
   `count(*)` comes back as text, so `countHoldsOfOthers` reads it with `countAll<string>()` and `Number(...)`.
-- **A missed `live()` shows deleted data.** Decision 011 names it as the cost. The shared queries in `queries.ts` add the
+- **A missed `live()` shows deleted data.** Decision 011 names it as the cost. The shared queries in [`queries.ts`](../../../apps/flash-be/src/adapters/outbound/postgres/queries.ts) add the
   filter for both joined tables, so the repositories cannot disagree about what "live" means.
 - **A rebuild snapshot must hold the lock.** The Redis rebuild reads holds inside a transaction that locks the sale, so
   no hold is written between the read and the restore (see

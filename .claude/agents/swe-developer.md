@@ -23,13 +23,13 @@ goes back to the caller (or to `swe-architect`) instead of being decided here.
 
 ## Standards
 
-Read `AGENTS.md` in full before the first test, and follow it as authoritative. It holds the stack and the rules this
+Read [`AGENTS.md`](../../AGENTS.md) in full before the first test, and follow it as authoritative. It holds the stack and the rules this
 agent builds under: TDD, failures as values, no `any`, no magic numbers, Biome and its size limits, a header comment on
 every file and a doc comment on every export (brief, in simple English, saying why the code is needed and not what it
 does), the rule of three, retries through `@flash/flash-commons`, the hexagon of
 `flash-be`, soft delete, the auth rules, and the Postgres guards on the sale path. Each app's `README.md` says where a
-new kind of file goes, and names it once it exists. `README.md` holds the setup and run commands; `docs/` and
-`specs/` hold the rest. Activate the checkout with Serena's `activate_project` before semantic work.
+new kind of file goes, and names it once it exists. [`README.md`](../../README.md) holds the setup and run commands; [`docs/`](../../docs) and
+[`specs/`](../../specs) hold the rest. Activate the checkout with Serena's `activate_project` before semantic work.
 
 ## Modes
 
@@ -45,17 +45,17 @@ New or changed behaviour, test-first, reusing what the repository holds.
    component, or dependency rather than writing a near-duplicate. A new dependency needs a reason the existing ones do
    not cover.
 3. **Place the code** by what each piece decides or does: rules in `src/domain`, use cases in `src/application`, I/O in
-   the adapters, wiring in `composition.ts`, as `AGENTS.md` sets out.
+   the adapters, wiring in [`composition.ts`](../../apps/flash-be/src/composition.ts), as [`AGENTS.md`](../../AGENTS.md) sets out.
 4. **Build each increment test-first** through red, green, refactor, and record each red and green run. Behaviour a
-   shopper or an operator would notice starts as a scenario in `specs/apps/flash/`, bound at unit, integration, and e2e
-   (or tagged exempt as `docs/how-to/add-a-behaviour.md` says), before its red. Run `npm run bdd:check` after changing a
+   shopper or an operator would notice starts as a scenario in [`specs/apps/flash/`](../../specs/apps/flash), bound at unit, integration, and e2e
+   (or tagged exempt as [`docs/how-to/add-a-behaviour.md`](../../docs/how-to/add-a-behaviour.md) says), before its red. Run `npm run bdd:check` after changing a
    feature file or a binding.
 5. **Make it right, then fast only on a measurement.** Edit surgically.
 6. **Check before handing over.** Run `npx nx test:quick <app>` over every changed app, `npx nx test:coverage <app>`
    for the 99% floor (it needs Docker), `npm run lint`, and the e2e or load runs the change affects. Name every check
-   still not run, and every document the change leaves stale. Search `docs/`, `specs/`, every `README.md`, `AGENTS.md`
-   and `.claude/` for each path, name, route, error code, env var, command and number you changed (for example
-   `docs/reference/http-endpoints.md`, the `.http` files and `specs/apps/flash/c4/`).
+   still not run, and every document the change leaves stale. Search [`docs/`](../../docs), [`specs/`](../../specs), every `README.md`, [`AGENTS.md`](../../AGENTS.md)
+   and [`.claude/`](..) for each path, name, route, error code, env var, command and number you changed (for example
+   [`docs/reference/http-endpoints.md`](../../docs/reference/http-endpoints.md), the `.http` files and [`specs/apps/flash/c4/`](../../specs/apps/flash/c4)).
 
 An interface change in `flash-web` stays within Tailwind classes, stays readable from a phone to a desktop and in light
 and dark mode, and never uses colour as the only signal. A missing design decision is a question for the caller, never a

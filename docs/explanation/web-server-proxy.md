@@ -10,7 +10,7 @@ server passes it on, with the login cookies. This page gives the reasons and wha
   address.
 - **One origin.** The browser makes same-origin requests, so no CORS rules are needed and none can be got wrong.
 - **One place to narrow the surface.** The server passes on a short list of method and path pairs (the `ALLOWED` list in
-  `apps/flash-web/src/proxy.ts`) and nothing else, so a path such as `../ready` cannot be used to reach other routes. The
+  [`apps/flash-web/src/proxy.ts`](../../apps/flash-web/src/proxy.ts)) and nothing else, so a path such as `../ready` cannot be used to reach other routes. The
   operator routes (`/admin/sales` with POST, GET, PATCH and DELETE) are not on the list. A sale id must be a UUID, or the answer is `404 not_found`. The
   server also sends on only the headers the API needs (the `cookie` header among them), and moves the refresh cookie from
   `/auth` to `/api/auth`. A POST from another origin is refused with `403 cross_site`.
@@ -53,7 +53,7 @@ step, is in its [behaviour scenarios](../../specs/apps/flash/web/behaviours/READ
 ## What the page checks itself
 
 Names are checked in the page with the same pattern the API uses, so a bad name never leaves the browser. The web app
-keeps its own copy of that rule and of the `not_found` reply; `same_as_be_tests.ts` fails if a copy drifts from
+keeps its own copy of that rule and of the `not_found` reply; [`same_as_be_tests.ts`](../../apps/flash-web/src/same_as_be_tests.ts) fails if a copy drifts from
 `flash-be`. The sale id rule is not copied: both apps take `isUuid` from `@flash/flash-commons`.
 
 ## Related

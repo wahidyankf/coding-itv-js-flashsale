@@ -22,12 +22,12 @@ judgement.
 
 ## The Contract
 
-- `docs/reference/http-endpoints.md`: the paths, what each takes, and the replies.
-- `apps/flash-be/src/adapters/inbound/http/errors.ts`: every error code with its status and sentence. An error reply is
+- [`docs/reference/http-endpoints.md`](../../docs/reference/http-endpoints.md): the paths, what each takes, and the replies.
+- [`apps/flash-be/src/adapters/inbound/http/errors.ts`](../../apps/flash-be/src/adapters/inbound/http/errors.ts): every error code with its status and sentence. An error reply is
   `{ errorCode, errorMessage }`, plus `retryAfterSeconds` and a `Retry-After` header for `429`.
-- `specs/apps/flash/be/`: the behaviour scenarios.
-- `docs/explanation/authentication.md`: the two cookies, their paths, lifetimes, flags, and the refresh rotation.
-- `AGENTS.md`: the rules every reply keeps, such as no token in a body, a URL, or a log.
+- [`specs/apps/flash/be/`](../../specs/apps/flash/be): the behaviour scenarios.
+- [`docs/explanation/authentication.md`](../../docs/explanation/authentication.md): the two cookies, their paths, lifetimes, flags, and the refresh rotation.
+- [`AGENTS.md`](../../AGENTS.md): the rules every reply keeps, such as no token in a body, a URL, or a log.
 
 ## Charter
 
@@ -38,8 +38,8 @@ The caller names one charter per pass. With none named, it asks rather than gues
 
 ## Before the First Request
 
-Confirm the exact origin (the dev API is `http://localhost:8080`, started as `README.md` says, or a run of
-`compose.prod.yaml`), the routes in scope, and the charter. Use synthetic identities only: shoppers made through
+Confirm the exact origin (the dev API is `http://localhost:8080`, started as [`README.md`](../../README.md) says, or a run of
+[`compose.prod.yaml`](../../compose.prod.yaml)), the routes in scope, and the charter. Use synthetic identities only: shoppers made through
 `POST /auth/register`, and an operator made with `npx nx db:create-operator flash-be --username=<name> --password=<pw>`
 (no spaces in the password). Confirm whether state-changing requests are authorized; they run only against a local
 stack, never a shared one. An origin that does not answer `/ready`, or a reference that does not resolve, ends the pass
@@ -57,7 +57,7 @@ as not run, never as clean.
    a derived value such as `remaining` rather than accepting that a field is present, and judge whether each error tells
    a caller what to change.
 4. **Tell a defect from a gap.** Behaviour contradicting a cited source is a defect that quotes it. Correct behaviour no
-   scenario protects becomes a scenario proposal in Gherkin, written in the findings record, never into `specs/`.
+   scenario protects becomes a scenario proposal in Gherkin, written in the findings record, never into [`specs/`](../../specs).
 5. **Rate and record** each finding with the route, a `curl` command that reproduces it with placeholder credentials,
    the clause it breaks, the response observed, and a criticality: `CRITICAL`, `HIGH`, `MEDIUM`, or `LOW`. Never record
    a real token, cookie value, or password.

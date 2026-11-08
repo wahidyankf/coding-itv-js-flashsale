@@ -4,7 +4,7 @@
 
 Accepted. Logic or a value used in three or more places becomes one named piece. Two copies are fine.
 
-Amended 2026-11-07: the count of `sleep` users is dropped, and the copies guarded by `same_as_be_tests.ts` include the
+Amended 2026-11-07: the count of `sleep` users is dropped, and the copies guarded by [`same_as_be_tests.ts`](../../../apps/flash-web/src/same_as_be_tests.ts) include the
 proxy's `not_found` reply.
 
 ## Context
@@ -17,7 +17,7 @@ more places before this rule.
 
 - **Three places make one piece.** The same logic or value in 3 or more places gets one name. Two copies stay as they are.
 - **Start inside the app,** in the layer or folder that owns it. Count again afterwards: if it is still used in 3 or more
-  places across apps (places, not apps), it moves to `libs/`.
+  places across apps (places, not apps), it moves to [`libs/`](../../../libs).
 - **`libs/flash-commons`** (`@flash/flash-commons`) is the shared behaviour library. Its main entry is pure: no timers,
   randomness or I/O of its own. `sleep`, used across four apps, is the one timer helper, on its own
   entry `@flash/flash-commons/timers`, so the pure entry stays pure. `libs/typekit` stays a kit of `Result` and the `attempt` wrappers. They are
@@ -26,7 +26,7 @@ more places before this rule.
   names, error codes and expected statuses themselves. Values that are not our contract (time units, the standard HTTP
   status numbers) are shared from `flash-commons`.
 - **Two places stay copied.** The password limits, the user name rule, the ticket header and the proxy's `not_found`
-  reply are used by `flash-be` and `flash-web` only. `apps/flash-web/src/same_as_be_tests.ts` fails if a copy drifts. The sale id rule (`isUuid`) has a
+  reply are used by `flash-be` and `flash-web` only. [`apps/flash-web/src/same_as_be_tests.ts`](../../../apps/flash-web/src/same_as_be_tests.ts) fails if a copy drifts. The sale id rule (`isUuid`) has a
   third user, the uuid decoder, so it lives in `flash-commons`.
 
 ## Alternatives considered
@@ -38,7 +38,7 @@ more places before this rule.
 
 ## Consequences
 
-- It costs a count that people must do by hand, a second step (app first, then `libs/`), and some copies that stay on
+- It costs a count that people must do by hand, a second step (app first, then [`libs/`](../../../libs)), and some copies that stay on
   purpose. A copy of a contract value in a test is not a smell here.
 - It buys small shared code with a clear owner, tests that still fail when the contract changes, and a drift check
   for the two-place copies.
@@ -46,7 +46,7 @@ more places before this rule.
 ## Revisit when
 
 - A third product app needs the contract values: a shared contract package then costs less than the copies.
-- A drift bug gets past `same_as_be_tests.ts`.
+- A drift bug gets past [`same_as_be_tests.ts`](../../../apps/flash-web/src/same_as_be_tests.ts).
 
 ## Related
 

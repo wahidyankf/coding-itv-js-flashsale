@@ -3,7 +3,7 @@
 The REST API of the flash sale (Fastify, Postgres through Kysely, Redis). It holds every rule of the sale: the window,
 the stock, one item per shopper, the queue, the hold and the payment. It is a hexagon: the rules know nothing of HTTP,
 Postgres or Redis ([how](../../docs/explanation/hexagonal-architecture.md),
-[why](../../docs/explanation/decisions/004-hexagon-in-the-api-only.md)). `architecture_tests.ts` fails on an import that
+[why](../../docs/explanation/decisions/004-hexagon-in-the-api-only.md)). [`architecture_tests.ts`](src/architecture_tests.ts) fails on an import that
 crosses a layer it must not know.
 
 ## Where things are
@@ -47,18 +47,18 @@ already names the reads. Each port file starts with a `Kind:` line that says whi
 
 ## To add something
 
-| To add …                     | Put it in …                                                                        | Also update …                                                                                                                              |
-| ---------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| a rule                       | `domain/<topic>.ts`, with a test in `<topic>_tests.ts`, first                      | the service that asks it; the scenario if a shopper or an operator can see it                                                              |
-| a use case                   | `application/<name>-service.ts`; it orders steps and asks the domain               | `application/dependencies.ts` and `composition.ts`                                                                                         |
-| a store or outside service   | a port in `application/ports/`, an adapter in `adapters/outbound/`                 | a memory copy in `bdd/support/memory-*.ts`, the wiring in `composition.ts`                                                                 |
-| a route                      | `adapters/inbound/http/routes/<area>.ts`                                           | [HTTP endpoints](../../docs/reference/http-endpoints.md), the `.http` files, every caller ([how](../../docs/how-to/change-an-endpoint.md)) |
-| an error code                | `ERROR_STATUS` and `ERROR_MESSAGE` in `adapters/inbound/http/errors.ts`            | the error type of the service that answers it; its text in `flash-web`                                                                     |
-| a table or a column          | a new file in `adapters/outbound/postgres/migrations/`                             | the `Database` type in `database.ts`; the six audit columns on a new table                                                                 |
-| a setting                    | `config.ts`                                                                        | `.env.example`                                                                                                                             |
-| a retry                      | `retryAsync` from `@flash/flash-commons`, with a max attempt count                 | [decision 017](../../docs/explanation/decisions/017-retry-backoff-jitter.md)                                                               |
-| a value used 3 or more times | one named constant or function in the layer that owns it                           | `libs/flash-commons` when other apps use it in 3+ places too ([rule](../../docs/explanation/decisions/016-dry-rule-of-three.md))           |
-| a behaviour                  | a scenario in `specs/apps/flash/be/behaviours/` first, then bindings in `src/bdd/` | `npm run bdd:check` ([how](../../docs/how-to/add-a-behaviour.md))                                                                          |
+| To add …                     | Put it in …                                                                                                                           | Also update …                                                                                                                              |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| a rule                       | `domain/<topic>.ts`, with a test in `<topic>_tests.ts`, first                                                                         | the service that asks it; the scenario if a shopper or an operator can see it                                                              |
+| a use case                   | `application/<name>-service.ts`; it orders steps and asks the domain                                                                  | [`application/dependencies.ts`](src/application/dependencies.ts) and [`composition.ts`](src/composition.ts)                                |
+| a store or outside service   | a port in [`application/ports/`](src/application/ports), an adapter in [`adapters/outbound/`](src/adapters/outbound)                  | a memory copy in `bdd/support/memory-*.ts`, the wiring in [`composition.ts`](src/composition.ts)                                           |
+| a route                      | `adapters/inbound/http/routes/<area>.ts`                                                                                              | [HTTP endpoints](../../docs/reference/http-endpoints.md), the `.http` files, every caller ([how](../../docs/how-to/change-an-endpoint.md)) |
+| an error code                | `ERROR_STATUS` and `ERROR_MESSAGE` in [`adapters/inbound/http/errors.ts`](src/adapters/inbound/http/errors.ts)                        | the error type of the service that answers it; its text in `flash-web`                                                                     |
+| a table or a column          | a new file in [`adapters/outbound/postgres/migrations/`](src/adapters/outbound/postgres/migrations)                                   | the `Database` type in [`database.ts`](src/adapters/outbound/postgres/database.ts); the six audit columns on a new table                   |
+| a setting                    | [`config.ts`](src/config.ts)                                                                                                          | [`.env.example`](../../.env.example)                                                                                                       |
+| a retry                      | `retryAsync` from `@flash/flash-commons`, with a max attempt count                                                                    | [decision 017](../../docs/explanation/decisions/017-retry-backoff-jitter.md)                                                               |
+| a value used 3 or more times | one named constant or function in the layer that owns it                                                                              | `libs/flash-commons` when other apps use it in 3+ places too ([rule](../../docs/explanation/decisions/016-dry-rule-of-three.md))           |
+| a behaviour                  | a scenario in [`specs/apps/flash/be/behaviours/`](../../specs/apps/flash/be/behaviours) first, then bindings in [`src/bdd/`](src/bdd) | `npm run bdd:check` ([how](../../docs/how-to/add-a-behaviour.md))                                                                          |
 
 Postgres has the last word on the stock and on one item per shopper (`WHERE sold < stock`, the partial unique index on
 `(sale_id, user_id)`, `CHECK (sold <= stock)`). Those stay whatever Redis says.

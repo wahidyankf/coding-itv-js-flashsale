@@ -33,7 +33,7 @@ like `type(scope): subject`, for example `docs: name the new flash-commons modul
 
 ### pre-commit: lint-staged formats the staged files
 
-[`.husky/pre-commit`](../../../.husky/pre-commit) runs `npx --no -- lint-staged`. The config is in `package.json`:
+[`.husky/pre-commit`](../../../.husky/pre-commit) runs `npx --no -- lint-staged`. The config is in [`package.json`](../../../package.json):
 
 ```json
 "lint-staged": {

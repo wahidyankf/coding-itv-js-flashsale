@@ -27,12 +27,12 @@ nginx.conf         the load balancer in front of the API
 
 ## To add something
 
-| To add …               | Put it in …                                                                                 | Also update …                                                            |
-| ---------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| a profile              | `k6/profiles.ts`, and a `load:<name>` target                                                | `specs/apps/flash/load/profiles.md` and `limits.md`                      |
-| a check                | `scripts/collect.ts` (the data) and `scripts/verdict.ts`, with a case in `verdict_tests.ts` | `specs/apps/flash/load/checks.md`                                        |
-| a step of a shopper    | a named step in `k6/shop.ts`                                                                | the paths it calls stay written here, as an independent check of the API |
-| a command on the stack | `scripts/compose.ts`                                                                        | nothing else should call `docker compose` itself                         |
+| To add …               | Put it in …                                                                                                                                                         | Also update …                                                                                                                           |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| a profile              | [`k6/profiles.ts`](k6/profiles.ts), and a `load:<name>` target                                                                                                      | [`specs/apps/flash/load/profiles.md`](../../specs/apps/flash/load/profiles.md) and [`limits.md`](../../specs/apps/flash/load/limits.md) |
+| a check                | [`scripts/collect.ts`](scripts/collect.ts) (the data) and [`scripts/verdict.ts`](scripts/verdict.ts), with a case in [`verdict_tests.ts`](scripts/verdict_tests.ts) | [`specs/apps/flash/load/checks.md`](../../specs/apps/flash/load/checks.md)                                                              |
+| a step of a shopper    | a named step in [`k6/shop.ts`](k6/shop.ts)                                                                                                                          | the paths it calls stay written here, as an independent check of the API                                                                |
+| a command on the stack | [`scripts/compose.ts`](scripts/compose.ts)                                                                                                                          | nothing else should call `docker compose` itself                                                                                        |
 
 A failed run is a finding. A limit is never changed to make a run pass.
 

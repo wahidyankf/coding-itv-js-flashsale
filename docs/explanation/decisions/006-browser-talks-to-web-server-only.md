@@ -12,10 +12,10 @@ and the health checks. A browser that calls the API directly needs its address, 
 ## Decision
 
 - The page calls its own server under `/api/sales` and `/api/auth`. The server passes on a list of method and path pairs
-  (`ALLOWED` in `proxy.ts`) and answers `404 not_found` to the rest. A sale id must be a UUID.
+  (`ALLOWED` in [`proxy.ts`](../../../apps/flash-web/src/proxy.ts)) and answers `404 not_found` to the rest. A sale id must be a UUID.
 - `FLASH_BE_URL` is read on the server only. Only the headers the API needs go on, and the refresh cookie moves from
   `/auth` to `/api/auth`. A POST from another origin gets `403 cross_site`. If the API cannot be reached the answer is `502 backend_unavailable`.
-- The operator routes are not on the list, and a test in `proxy_tests.ts` fails if one is.
+- The operator routes are not on the list, and a test in [`proxy_tests.ts`](../../../apps/flash-web/src/proxy_tests.ts) fails if one is.
 
 ## Alternatives considered
 

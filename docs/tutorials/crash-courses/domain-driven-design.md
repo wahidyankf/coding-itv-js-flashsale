@@ -8,7 +8,7 @@ grouped behind one boundary. This repository takes a few of its ideas, not the w
 
 The hard part of a flash sale is not the HTTP. It is a handful of rules that must hold at every moment: a sale never
 sells more than its stock, a shopper buys at most one item, a hold ends on time, and only an admitted shopper may hold.
-DDD gives those rules a home (`apps/flash-be/src/domain/`) and a vocabulary that is the same in the scenarios, the code,
+DDD gives those rules a home ([`apps/flash-be/src/domain/`](../../../apps/flash-be/src/domain)) and a vocabulary that is the same in the scenarios, the code,
 the Redis keys and the docs. A reader who knows the word "hold" from a scenario finds `holdRequest`, `HoldGate` and
 `sale:<saleId>:holds`.
 
@@ -19,7 +19,7 @@ consistency boundary. We did not adopt the rest, on purpose:
   their source on a timer and send only changes ([live updates](../../explanation/live-updates.md)). Each use case
   runs its steps in one call, which is easier to follow and to test than handlers that react to events.
 - **No CQRS.** Reads and writes use the same tables. The only read model is a short in-process cache in front of the
-  sale reads for shoppers' pages (`sale-cache.ts`); a rule that decides a write always reads the sale fresh.
+  sale reads for shoppers' pages ([`sale-cache.ts`](../../../apps/flash-be/src/application/sale-cache.ts)); a rule that decides a write always reads the sale fresh.
 - **No generic repository per entity.** Each port has the methods its use case needs. `PurchaseRepository` has one
   write, `commit`, that does the whole purchase step under the lock, not a `save(entity)`.
 - **No rich entity objects.** The sale rules are functions over plain types, not methods on a `Sale` class. A class

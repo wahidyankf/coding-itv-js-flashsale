@@ -113,7 +113,7 @@ Every app has `typecheck`, `lint`, `test:quick` and `test:quick:watch`, and the 
 
 ### `run-many` and `affected`
 
-- `run-many` runs one or more targets on a list of projects. The `demo:dev` script in the root `package.json` starts
+- `run-many` runs one or more targets on a list of projects. The `demo:dev` script in the root [`package.json`](../../../package.json) starts
   both servers with `npx nx run-many -t dev -p flash-be flash-web --output-style=stream`.
 - `affected` runs a target only on the projects that a change touches. The pre-push hook
   ([`.husky/pre-push`](../../../.husky/pre-push)) uses it against `origin/main`:
@@ -125,7 +125,7 @@ npx --no -- nx affected -t test:coverage --base=origin/main
 
 ### No cache is relied on
 
-No target sets `"cache": true` and `nx.json` has no `targetDefaults`, so Nx runs every task each time and the summary
+No target sets `"cache": true` and [`nx.json`](../../../nx.json) has no `targetDefaults`, so Nx runs every task each time and the summary
 says `Cache: 0/2 hit (0%)`. Decision 013 says to look at caching only when `affected` runs become slow.
 
 ## Try it here

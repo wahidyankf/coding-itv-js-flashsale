@@ -27,7 +27,7 @@ await attemptAsync(() => gate.confirm(saleId, user), Error);
 
 Return `new Ok(value)` or `new Err(error)`, and type the function as `Result<Value, ErrorCode>`. Keep the error a union of
 string literals so a caller can match it. A shorter form of the one in
-`apps/flash-be/src/application/reservation-service.ts`:
+[`apps/flash-be/src/application/reservation-service.ts`](../../apps/flash-be/src/application/reservation-service.ts):
 
 ```ts
 type ReserveError = "sale_not_found" | "not_admitted" | "sold_out";
@@ -46,7 +46,7 @@ if (reserved.isErr()) {
 const { reservationId } = reserved.value;
 ```
 
-`ERROR_STATUS` and `errorPayload` are in `apps/flash-be/src/adapters/inbound/http/errors.ts`. Indexing `ERROR_STATUS` with
+`ERROR_STATUS` and `errorPayload` are in [`apps/flash-be/src/adapters/inbound/http/errors.ts`](../../apps/flash-be/src/adapters/inbound/http/errors.ts). Indexing `ERROR_STATUS` with
 `reserved.error` compiles only when every `ReserveError` has a status, so a new error without one fails the build. The
 routes do not write these lines themselves: `sendResult` and `sendError` in `http/routes/reply.ts` do it for them.
 

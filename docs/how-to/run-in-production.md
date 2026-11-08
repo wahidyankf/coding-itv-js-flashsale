@@ -1,12 +1,12 @@
 # Run in production
 
 Run the whole system in containers, the way it is meant to be deployed: three API instances behind nginx, the web
-server, Postgres and Redis, from `compose.prod.yaml`. To work on the code, see [run in development](run-in-development.md)
+server, Postgres and Redis, from [`compose.prod.yaml`](../../compose.prod.yaml). To work on the code, see [run in development](run-in-development.md)
 instead.
 
 You need Docker and a clone of the repository. The images build the apps, so the host needs Node.js only for the `npm run`
 shortcuts below; each one is a plain `docker compose -f compose.prod.yaml ...` command you can run instead (see the
-`docker:prod:*` scripts in `package.json`).
+`docker:prod:*` scripts in [`package.json`](../../package.json)).
 
 ## What runs
 
@@ -39,8 +39,8 @@ Optional:
 | `COOKIE_SECURE`                   | `true`         | the login cookies are `Secure`, so they need HTTPS. Set `false` only to try the stack over plain HTTP on one machine |
 | `FLASH_BE_PORT`, `FLASH_WEB_PORT` | `8080`, `3000` | the host ports of nginx and of the web server                                                                        |
 
-Never use the values of `.env.example` outside your machine. The other settings (rate limits, payment mock, cache) keep
-the defaults written in `apps/flash-be/src/config.ts`.
+Never use the values of [`.env.example`](../../.env.example) outside your machine. The other settings (rate limits, payment mock, cache) keep
+the defaults written in [`apps/flash-be/src/config.ts`](../../apps/flash-be/src/config.ts).
 
 ## 2. Start the stack
 
@@ -115,7 +115,7 @@ To delete the data as well, run `docker compose -f compose.prod.yaml down -v`. I
 
 `npm run smoke:prod` builds this stack under another name with random secrets, walks one shopper through it, and removes
 it (see [the smoke test](smoke-test-the-production-stack.md)). Run it after a change to a Dockerfile,
-`compose.prod.yaml` or `nginx.prod.conf`.
+[`compose.prod.yaml`](../../compose.prod.yaml) or [`nginx.prod.conf`](../../nginx.prod.conf).
 
 This stack runs on one machine, with one Postgres and one Redis and no backups. What it takes to go further is in
 [how it scales, and where it stops](../../README.md#how-it-scales-and-where-it-stops).

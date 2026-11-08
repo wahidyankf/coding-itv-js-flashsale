@@ -12,7 +12,7 @@ utility classes, the size and both colour schemes of an element sit on that elem
 place, and there is no stylesheet that can drift away from the components.
 
 **What we did not pick.** No decision record compares styling tools. The repository rules forbid inline style blocks and
-a second CSS library, and keep `src/styles.css` to the Tailwind import and one `color-scheme` rule.
+a second CSS library, and keep [`src/styles.css`](../../../apps/flash-web/src/styles.css) to the Tailwind import and one `color-scheme` rule.
 
 **What it costs.** Class lists get long, and every colour is written twice (`dark:`).
 
@@ -68,7 +68,7 @@ puts its two cards side by side from `md:` ([`sale-page.tsx`](../../../apps/flas
 ### Dark mode
 
 A `dark:` class applies when the system asks for a dark theme (`prefers-color-scheme`). The page has no theme switch,
-and `styles.css` does not change the `dark` variant. The colour pairs in `TONE` give each tone a light and a dark form.
+and [`styles.css`](../../../apps/flash-web/src/styles.css) does not change the `dark` variant. The colour pairs in `TONE` give each tone a light and a dark form.
 
 ### Colour is never the only signal
 
@@ -127,13 +127,13 @@ The output starts with the version, and each prefix becomes a media query (trimm
 ## Traps to avoid
 
 - **Class names built from pieces.** Tailwind reads the files as text, so `` `bg-${tone}-100` `` never becomes a class.
-  `ui.ts` writes every class out in full, and `sale-status-card.tsx` maps each status to a full class list (`BADGE`).
+  [`ui.ts`](../../../apps/flash-web/src/components/ui.ts) writes every class out in full, and [`sale-status-card.tsx`](../../../apps/flash-web/src/sale/sale-status-card.tsx) maps each status to a full class list (`BADGE`).
 - **A width from data.** A class is fixed when the build runs, so the stock bar sets one value inline,
   ``style={{ transform: `scaleX(${left})` }}`` in [`stock-meter.tsx`](../../../apps/flash-web/src/sale/stock-meter.tsx).
   It is the only `style=` in the app's source.
 - **Native controls that stay light.** `dark:` classes do not reach form controls and scrollbars. `color-scheme: light dark`
-  in `styles.css` lets the browser draw those in the system theme.
-- **A disabled button that only turns grey.** The `PRIMARY` button in `ui.ts` greys out when disabled, and its words
+  in [`styles.css`](../../../apps/flash-web/src/styles.css) lets the browser draw those in the system theme.
+- **A disabled button that only turns grey.** The `PRIMARY` button in [`ui.ts`](../../../apps/flash-web/src/components/ui.ts) greys out when disabled, and its words
   still say what it is, so the state is not told by colour alone.
 
 ## Read next

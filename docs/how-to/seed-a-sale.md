@@ -78,10 +78,10 @@ The access cookie lasts 15 minutes. To renew it, send the refresh cookie and sav
 curl -s -b cookies.txt -c cookies.txt -X POST http://localhost:8080/auth/refresh
 ```
 
-The local `.env.example` sets `COOKIE_SECURE=false`, because a `Secure` cookie is not sent over plain HTTP.
+The local [`.env.example`](../../.env.example) sets `COOKIE_SECURE=false`, because a `Secure` cookie is not sent over plain HTTP.
 
 The reply is `201` with the sale. A window that overlaps another sale is refused with `409` `sale_overlaps`. If a sale
-already uses that hour (you ran this before, or the request in the root `README.md`), pick another day in `startsAt` and
+already uses that hour (you ran this before, or the request in the root [`README.md`](../../README.md)), pick another day in `startsAt` and
 `endsAt`. The seed command above does not check overlaps, so it can still create overlapping sales; the API is the safe
 way to set up a real sale. See [admin and sale windows](../explanation/admin-and-sale-windows.md).
 

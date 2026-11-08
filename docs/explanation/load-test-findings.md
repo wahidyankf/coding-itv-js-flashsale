@@ -14,7 +14,7 @@ takes a row lock and the database constraints refuse a second sale.
 
 `smoke`, `full` and `chaos` send shoppers over many seconds, so the queue smooths the load before it reaches the sale.
 Two profiles, `burst` and `contention`, were added to send everyone inside one second. Their size and the reason for it
-are in `profiles.ts` and were written before they ran. The limits are the same as for every other run.
+are in [`profiles.ts`](../../apps/flash-load/k6/profiles.ts) and were written before they ran. The limits are the same as for every other run.
 
 **The first try never began.** With 2,000 shoppers k6 stopped starting virtual users at 1,186 of 2,070 on a Docker VM with
 7.7 GiB, about 6 MiB for each user with a schema library bundled into the script (the script has since been made plain code). That is a limit of the machine
@@ -67,7 +67,7 @@ A `MULTI`/`EXEC` is different. It waits for the connection first, and the wait g
 (about 0.9 s, then 1.8 to 2 s). The hold gate used `MULTI` to record a purchase and to release a hold, so each payment
 waited for it, even though the answer was thrown away.
 
-Fix: `confirm` and `release` in `redis-hold-gate.ts` are single Lua scripts. A script fails at once when Redis is down,
+Fix: `confirm` and `release` in [`redis-hold-gate.ts`](../../apps/flash-be/src/adapters/outbound/redis/redis-hold-gate.ts) are single Lua scripts. A script fails at once when Redis is down,
 like the other gate calls. The scenario "Paying while Redis is down is not slowed down" holds the outage for four
 seconds and requires every confirmation to answer in under 500 ms. It failed before the fix (2,148 ms) and passes after.
 
@@ -118,7 +118,7 @@ the current code ran `full` in turn on the same machine:
 | new 2 | current | 40.8 ms     | 673.2 ms     | 563     | failed |
 
 **The likely cause is the sign-up.** Since `64bfa17`, every shopper has an account, and each load shopper signs up
-during the run (`POST /auth/register` in `shop.ts`). A sign-up hashes the password with scrypt at the cost Node uses by
+during the run (`POST /auth/register` in [`shop.ts`](../../apps/flash-load/k6/shop.ts)). A sign-up hashes the password with scrypt at the cost Node uses by
 default, which takes about 32 ms of CPU. `full` sends 250 shoppers a second, so the sign-ups alone need about 8
 CPU-seconds every second, on a Docker VM with 6 CPUs. In `new 2`, all requests together had a p95 of 3.7 s and the
 slowest took 24.6 s, while reserve stayed at 41 ms. A purchase waits behind the hashing, and k6 runs out of virtual

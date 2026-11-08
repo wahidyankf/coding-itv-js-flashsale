@@ -1,8 +1,8 @@
 # HTTP endpoints
 
 The routes of the two services, the shape of their replies, and the rules that a shape cannot say. The API routes are
-registered in `apps/flash-be/src/adapters/inbound/http/routes/`, one file per area, and the error codes with their
-statuses and sentences are in `adapters/inbound/http/errors.ts`. The web routes are in `apps/flash-web/src/routes/`.
+registered in [`apps/flash-be/src/adapters/inbound/http/routes/`](../../apps/flash-be/src/adapters/inbound/http/routes), one file per area, and the error codes with their
+statuses and sentences are in [`adapters/inbound/http/errors.ts`](../../apps/flash-be/src/adapters/inbound/http/errors.ts). The web routes are in [`apps/flash-web/src/routes/`](../../apps/flash-web/src/routes).
 
 Every error is `{"errorCode": "<code>", "errorMessage": "<sentence>"}`, whether the route refused the request, the route
 does not exist (`404` `not_found`), the body is not JSON (`400` `invalid_request`) or the server failed (`500` `internal`).
@@ -81,10 +81,10 @@ A shopper signs up with a user name and a password, and an operator logs in the 
 two cookies. Both are `HttpOnly` (a script on the page cannot read them) and `SameSite=Lax`, and both are `Secure` when
 `COOKIE_SECURE` is `true` (the default in production). The tokens are never in a body.
 
-| Cookie          | Lives for  | Sent to | What it does                                                            |
-| --------------- | ---------- | ------- | ----------------------------------------------------------------------- |
-| `access_token`  | 15 minutes | `/`     | goes with every request and says who you are                            |
-| `refresh_token` | 7 days     | `/auth` | only trades itself for a new pair; each use replaces it (it is rotated) |
+| Cookie          | Lives for  | Sent to  | What it does                                                            |
+| --------------- | ---------- | -------- | ----------------------------------------------------------------------- |
+| `access_token`  | 15 minutes | [`/`](.) | goes with every request and says who you are                            |
+| `refresh_token` | 7 days     | `/auth`  | only trades itself for a new pair; each use replaces it (it is rotated) |
 
 `POST /auth/register` and `POST /auth/login` take `{ "username", "password" }`, set both cookies and answer with
 `{ "username", "role" }` (`201` for a new account, `200` for a login). A user name is trimmed and lowercased, then must
@@ -364,7 +364,7 @@ The scenarios are in [`specs/apps/flash/be/behaviours/degraded/`](../../specs/ap
 
 | Method    | Path           | Response                                                                                                                                       |
 | --------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| GET       | `/`            | HTML page. It shows the current sale, a login form or Buy Now, and `Backend: ok` when `flash-be` answers `GET /health` with `{"status":"ok"}`. |
+| GET       | [`/`](.)       | HTML page. It shows the current sale, a login form or Buy Now, and `Backend: ok` when `flash-be` answers `GET /health` with `{"status":"ok"}`. |
 | GET       | `/api/health`  | `200` `{"status":"ok"}`                                                                                                                        |
 | GET, POST | `/api/sales/*` | The routes below, passed on to `flash-be`. Any other `GET` or `POST` under this path answers `404` with `errorCode` `not_found`.               |
 | GET, POST | `/api/auth/*`  | The login routes below, passed on to `flash-be`, with the cookies.                                                                             |
@@ -428,7 +428,7 @@ The scenarios are in [`specs/apps/flash/web/behaviours/proxy/`](../../specs/apps
 ## Configuration
 
 Environment variables are listed in [`.env.example`](../../.env.example), with a comment for each one. The defaults for
-local development are there too. `apps/flash-be/src/config.ts` builds the API configuration from them. In production,
+local development are there too. [`apps/flash-be/src/config.ts`](../../apps/flash-be/src/config.ts) builds the API configuration from them. In production,
 the API stops at start-up when `DATABASE_URL`, `REDIS_URL` or `TICKET_SECRET` is missing. `PAYMENT_LATENCY_MS` (150) and
 `PAYMENT_FAILURE_RATE` (0.02) tune the mock payment provider. The `RATE_LIMIT_*` and `TRUST_PROXY` variables tune the
 rate limits. `SALE_CACHE_MS` (1000) sets the sale read cache. `EVENTS_INTERVAL_MS` (1000) sets how often an event stream reads. `AUTH_RATE_LIMIT_PER_IP` (20) limits the `/auth`

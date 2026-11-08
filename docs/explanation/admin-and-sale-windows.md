@@ -15,7 +15,7 @@ The task sells one type of product in limited quantity, and each user may buy on
 - One user gets one unit and holds one item at a time in a sale. The tables keep it with `UNIQUE(sale_id, user_id)` on
   reservations and on purchases, and Redis keeps a set of buyers in front of them.
 - A user is a row of the `users` table with a user name and a password hash. The name is trimmed and lowercased
-  (`domain/user.ts`), so `Ana ` and `ana` are one person. A shopper signs up and logs in with a cookie session; see
+  ([`domain/user.ts`](../../apps/flash-be/src/domain/user.ts)), so `Ana ` and `ana` are one person. A shopper signs up and logs in with a cookie session; see
   [authentication](authentication.md). A name belongs to the one who signed up first.
 
 ## Changing and removing a sale

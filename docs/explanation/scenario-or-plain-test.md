@@ -3,14 +3,14 @@
 A test is written as a Gherkin scenario when it describes behaviour that somebody outside the code can see. It is a plain
 Vitest test when it guards how the code does its work. This page gives the reasons and a question to ask.
 
-Only the apps use Gherkin. The libraries in `libs/` and the repository's tools in `scripts/` always use plain tests, so
+Only the apps use Gherkin. The libraries in [`libs/`](../../libs) and the repository's tools in [`scripts/`](../../scripts) always use plain tests, so
 the question below applies to the apps only.
 
 ## The question
 
 > If this breaks, does a shopper or an operator see the difference?
 
-- **Yes**: write a scenario in `specs/`.
+- **Yes**: write a scenario in [`specs/`](../../specs).
 - **No**, and only a developer cares: write a plain test next to the code.
 
 ## Write a scenario when
@@ -25,8 +25,8 @@ the question below applies to the apps only.
 ## Write a plain test when
 
 - It checks a branch or an edge case inside one function or module: the validation of a name, the rounding of a time, the
-  order of arguments. As scenarios, these would crowd `specs/` and make it hard to read.
-- It checks a rule of structure, such as `architecture_tests.ts`, which keeps the layers from importing each other. That is
+  order of arguments. As scenarios, these would crowd [`specs/`](../../specs) and make it hard to read.
+- It checks a rule of structure, such as [`architecture_tests.ts`](../../apps/flash-be/src/architecture_tests.ts), which keeps the layers from importing each other. That is
   not behaviour of the system.
 - It checks how config and environment variables are mapped: the defaults, the values read, and the values refused. It
   can also check a type (`expectTypeOf`, `@ts-expect-error`) or an internal helper.

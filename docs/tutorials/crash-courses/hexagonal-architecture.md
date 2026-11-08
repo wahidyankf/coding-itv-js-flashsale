@@ -58,7 +58,7 @@ async reserve(saleId, user, ticket) {
 The clock, the id maker and the wait all come in as arguments. The application reads no time and no randomness of its
 own, so a test can fix them.
 
-**3. The port is a small type in the words of the sale.** Ports live in `src/application/ports/`. The suffix says what
+**3. The port is a small type in the words of the sale.** Ports live in [`src/application/ports/`](../../../apps/flash-be/src/application/ports). The suffix says what
 kind a port is: a **Repository** is the Postgres record of a thing, a **Store** holds keyed state, and a **Gate** is
 the fast check in front of Postgres ([`ports/hold-gate.ts`](../../../apps/flash-be/src/application/ports/hold-gate.ts)):
 
@@ -155,11 +155,11 @@ Trimmed output:
       Tests  14 passed (14)
 ```
 
-Now break a rule in your head. Say `domain/sale.ts` imports `../application/sale-service.js` to read a sale. The test
+Now break a rule in your head. Say [`domain/sale.ts`](../../../apps/flash-be/src/domain/sale.ts) imports `../application/sale-service.js` to read a sale. The test
 "keeps the domain free of the application, adapters and packages" would fail and list the import as
 `domain/sale.ts -> application/sale-service.ts`, the form `violations` prints. The same happens if
-`reservation-service.ts` imports the Redis client, or a route imports a Postgres adapter. The fix is never to move the
-check: pass what the inner layer needs through a port or an argument, and wire it in `composition.ts`.
+[`reservation-service.ts`](../../../apps/flash-be/src/application/reservation-service.ts) imports the Redis client, or a route imports a Postgres adapter. The fix is never to move the
+check: pass what the inner layer needs through a port or an argument, and wire it in [`composition.ts`](../../../apps/flash-be/src/composition.ts).
 
 ## Read next
 

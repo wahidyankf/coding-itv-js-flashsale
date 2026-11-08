@@ -1,6 +1,6 @@
 # Apps
 
-The specifications of the apps in `apps/`. Their behaviour is written as Gherkin scenarios, and their architecture is
+The specifications of the apps in [`apps/`](../../apps). Their behaviour is written as Gherkin scenarios, and their architecture is
 written as a C4 model.
 
 ## Directory Map

@@ -98,7 +98,7 @@ export function sendResult<T, E extends ErrorCode>(
 ### Cookies without a plugin
 
 The login sets two `Set-Cookie` headers with `reply.header("set-cookie", [...])`
-([`auth.ts`](../../../apps/flash-be/src/adapters/inbound/http/routes/auth.ts)). `setCookie` in `cookies.ts` always adds
+([`auth.ts`](../../../apps/flash-be/src/adapters/inbound/http/routes/auth.ts)). `setCookie` in [`cookies.ts`](../../../apps/flash-be/src/adapters/inbound/http/cookies.ts) always adds
 `HttpOnly` and `SameSite=Lax`, and `Secure` when the config asks. `cookieValue` reads one cookie from the `Cookie`
 header. Why the session uses cookies is in [authentication](../../explanation/authentication.md).
 
@@ -138,7 +138,7 @@ expect(reply.json()).toEqual(errorPayload("internal"));
 ### An inbound adapter of the hexagon
 
 Only `adapters/inbound/http` imports `fastify`. A route reads the request, calls one service from `Dependencies`, and
-shapes the reply; the rules are in `src/domain`. `architecture_tests.ts` fails if the application imports `fastify`. See
+shapes the reply; the rules are in `src/domain`. [`architecture_tests.ts`](../../../apps/flash-be/src/architecture_tests.ts) fails if the application imports `fastify`. See
 [hexagonal architecture](../../explanation/hexagonal-architecture.md).
 
 ## Try it here
@@ -164,13 +164,13 @@ Each of these tests sends a login with `app.inject` and reads the `set-cookie` h
 ## Traps to avoid
 
 - **Open streams keep the server open.** By default `app.close()` closes only idle connections, and an event stream is
-  never idle. `forceCloseConnections: true` in `app.ts` closes them too.
+  never idle. `forceCloseConnections: true` in [`app.ts`](../../../apps/flash-be/src/adapters/inbound/http/app.ts) closes them too.
 - **`preValidation` runs after the body is parsed.** A guard that must run before the body is read goes in `onRequest`,
   as the admin and auth routes do.
 - **After `reply.hijack()`, Fastify sends nothing.** An error after that point cannot be a JSON reply. So a stream route
-  checks the request first and calls `sendError` before it calls `serveEvents`, as the place stream in `queue.ts` does.
+  checks the request first and calls `sendError` before it calls `serveEvents`, as the place stream in [`queue.ts`](../../../apps/flash-be/src/adapters/inbound/http/routes/queue.ts) does.
 - **`request.ip` behind a proxy.** Without `trustProxy` every shopper behind nginx has the address of nginx, and the rate
-  limit counts them as one. `TRUST_PROXY` turns it on, only behind a proxy you control (`config.ts`).
+  limit counts them as one. `TRUST_PROXY` turns it on, only behind a proxy you control ([`config.ts`](../../../apps/flash-be/src/config.ts)).
 
 ## Read next
 

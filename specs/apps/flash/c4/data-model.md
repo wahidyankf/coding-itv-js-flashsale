@@ -2,8 +2,8 @@
 
 The tables of the Postgres database, as the migrations build them. It sits beside the C4 views because Postgres
 is the data store that has the last word on stock and on who bought (see [containers.md](containers.md)). The
-sources are `apps/flash-be/src/adapters/outbound/postgres/migrations/`: `0002_create_sales.ts` makes the sale tables,
-`0003_users_products_audit.ts` adds users, products, the audit columns and soft delete, and `0004_auth_sessions.ts` adds
+sources are [`apps/flash-be/src/adapters/outbound/postgres/migrations/`](../../../../apps/flash-be/src/adapters/outbound/postgres/migrations): [`0002_create_sales.ts`](../../../../apps/flash-be/src/adapters/outbound/postgres/migrations/0002_create_sales.ts) makes the sale tables,
+[`0003_users_products_audit.ts`](../../../../apps/flash-be/src/adapters/outbound/postgres/migrations/0003_users_products_audit.ts) adds users, products, the audit columns and soft delete, and [`0004_auth_sessions.ts`](../../../../apps/flash-be/src/adapters/outbound/postgres/migrations/0004_auth_sessions.ts) adds
 passwords, roles and sessions.
 
 ```mermaid
@@ -190,7 +190,7 @@ author. A deleted `$operator` row is also there: migration `0004` marked it dele
 - `sales.product_id`, `purchases.sale_id`, `reservations.sale_id` and `sessions.user_id` are foreign keys with
   `ON DELETE RESTRICT`. Since nothing is hard-deleted, a row is never removed from under the rows that point at it.
   The operator route marks a sale and its holds deleted, and refuses when the sale has a purchase (`sale_has_purchases`).
-- Product code never calls `deleteFrom`: `architecture_tests.ts` fails if it does, and `schema_integration_tests.ts` checks
+- Product code never calls `deleteFrom`: [`architecture_tests.ts`](../../../../apps/flash-be/src/architecture_tests.ts) fails if it does, and [`schema_integration_tests.ts`](../../../../apps/flash-be/src/adapters/outbound/postgres/schema_integration_tests.ts) checks
   that every table has the six audit columns and that the `Database` type matches the migrations.
 
 ## Not in the database

@@ -23,7 +23,7 @@ is costly to find later.
 
 ## Standards
 
-Read `AGENTS.md` in full before reading any code; it is the standard every check below cites. Activate the checkout with
+Read [`AGENTS.md`](../../AGENTS.md) in full before reading any code; it is the standard every check below cites. Activate the checkout with
 Serena's `activate_project` before semantic work.
 
 ## Scope
@@ -35,9 +35,9 @@ It reads those and nothing else. It judges source, never a running render or a l
 
 Six checks.
 
-1. **Placement and failure handling.** The hexagon of `flash-be` (`docs/explanation/hexagonal-architecture.md`): rules
+1. **Placement and failure handling.** The hexagon of `flash-be` ([`docs/explanation/hexagonal-architecture.md`](../../docs/explanation/hexagonal-architecture.md)): rules
    in `src/domain` with no I/O, use cases in `src/application` reaching stores only through ports, adapters picked only
-   in `composition.ts`. Failures as values (`docs/explanation/failures-as-values.md`): no `catch` and no `.catch(` in
+   in [`composition.ts`](../../apps/flash-be/src/composition.ts). Failures as values ([`docs/explanation/failures-as-values.md`](../../docs/explanation/failures-as-values.md)): no `catch` and no `.catch(` in
    product code, `attempt` or `attemptAsync` naming the expected failure, `Result` for a function that can fail,
    `T | undefined` for a lookup, every `switch` over a union closed. Input from a body, a header, or the environment is
    checked at the edge; no `any`, no cast that hides an unchecked value.
@@ -46,18 +46,18 @@ Six checks.
    dead code, no magic number, no new dependency without a reason, and no ORM, Nx plugin, Prettier, or ESLint. Every
    source file has a header comment (a test file's header only says what it tests) and every export a doc comment that
    says why; Biome cannot check this, so this
-   review does. The rule of three from `AGENTS.md`: a third copy is a finding, and a value 3 or more places across the
+   review does. The rule of three from [`AGENTS.md`](../../AGENTS.md): a third copy is a finding, and a value 3 or more places across the
    apps share belongs in `libs/flash-commons`, except what the e2e and load oracles write themselves. A retry that does
    not go through `@flash/flash-commons` with backoff, a max attempt count and jitter is a finding. A new kind of file
-   that its app's `README.md` does not name is a finding. A page in `docs/`, `specs/`, a `README.md`, `AGENTS.md` or
-   `.claude/` that still names a path, name, route, error code, env var, command or number the change altered is a
+   that its app's `README.md` does not name is a finding. A page in [`docs/`](../../docs), [`specs/`](../../specs), a `README.md`, [`AGENTS.md`](../../AGENTS.md) or
+   [`.claude/`](..) that still names a path, name, route, error code, env var, command or number the change altered is a
    finding.
-3. **Stack and domain rules** from `AGENTS.md`: the oversell and one-per-shopper guards in Postgres stay
+3. **Stack and domain rules** from [`AGENTS.md`](../../AGENTS.md): the oversell and one-per-shopper guards in Postgres stay
    (`sold < stock`, the partial unique indexes, the `CHECK`); Redis commands on the sale path fail at once; nothing is
    hard-deleted and every read adds `deleted_at IS NULL`; tokens never reach a body, URL, or log; no route takes a user
    id; the operator routes stay off the `flash-web` proxy allow-list; a changed route updates every caller,
-   `docs/reference/http-endpoints.md`, and the `.http` files.
-4. **Test design.** Each test sits at its layer, as `docs/explanation/scenario-or-plain-test.md` decides: a scenario for
+   [`docs/reference/http-endpoints.md`](../../docs/reference/http-endpoints.md), and the `.http` files.
+4. **Test design.** Each test sits at its layer, as [`docs/explanation/scenario-or-plain-test.md`](../../docs/explanation/scenario-or-plain-test.md) decides: a scenario for
    what a shopper or an operator would notice, a plain Vitest test next to the code for a detail. Unit tests are
    `*_tests.ts(x)`, integration tests `*_integration_tests.ts(x)`. A double behaves like the adapter it replaces; test data
    does not leak between tests; coverage is never bought with a test that asserts nothing.
@@ -73,11 +73,11 @@ control has an accessible name, a visible focus, and a keyboard path.
 
 ## Scenario Trace
 
-One row per expanded scenario in `specs/apps/flash/` and per layer (unit, integration, e2e). For each row it follows
+One row per expanded scenario in [`specs/apps/flash/`](../../specs/apps/flash) and per layer (unit, integration, e2e). For each row it follows
 Given, When, and Then to the binding and the code behind them, and names the change that ought to turn the row red. A row
 is `untested` when Then reads what Given wrote, the asserted value was copied from the expected one, or the assertion
 reads state the subject never touched. A step that names a function, type, or file path describes implementation, not
-behaviour. An `@integration-exempt` or `@e2e-exempt` tag needs the comment format of `docs/how-to/add-a-behaviour.md`
+behaviour. An `@integration-exempt` or `@e2e-exempt` tag needs the comment format of [`docs/how-to/add-a-behaviour.md`](../../docs/how-to/add-a-behaviour.md)
 and a unit binding as its proof. It runs no test; a green run never settles a row.
 
 ## Specification Completeness

@@ -18,5 +18,5 @@ k6 still reports its numbers, but the verdict of a chaos run comes only from the
 
 ## When a limit fails
 
-Record the real numbers in `docs/explanation/load-test-findings.md` and find the cause. A slow reserve is a finding about
+Record the real numbers in [`docs/explanation/load-test-findings.md`](../../../../docs/explanation/load-test-findings.md) and find the cause. A slow reserve is a finding about
 the system.

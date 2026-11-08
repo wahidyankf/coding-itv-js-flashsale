@@ -27,7 +27,7 @@ flowchart LR
 
 ## The stack
 
-`apps/flash-load/compose.yaml` starts Postgres 18, Redis 8 (no snapshots), a migration job, three `flash-be` instances
+[`apps/flash-load/compose.yaml`](../../apps/flash-load/compose.yaml) starts Postgres 18, Redis 8 (no snapshots), a migration job, three `flash-be` instances
 and nginx with `least_conn`. k6 runs as a container on the same network and reaches nginx by name. nginx publishes one
 port on the loopback address only. Each instance runs with the product defaults for payment (150 ms, 2 percent
 declined), rate limits (30 per user and 600 per address in 10 seconds) and the sale cache (1 second). `TRUST_PROXY` is

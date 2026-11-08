@@ -24,7 +24,7 @@ HTTP (end-to-end). The three proofs must not drift apart.
 
 - **Plain tests only.** There would be no shared readable contract, and each layer would test something a little different.
 - **A scenario at end-to-end level only.** It is the most real, but it needs servers and a browser, so it cannot run in the pre-push hook.
-- **A scenario for every detail.** It would crowd `specs/` until nobody could read it. The question to ask is whether a shopper or an operator would see the difference.
+- **A scenario for every detail.** It would crowd [`specs/`](../../../specs) until nobody could read it. The question to ask is whether a shopper or an operator would see the difference.
 - **A separate Cucumber runner.** It would run outside Vitest, so the unit and integration runs would need a second setup for coverage and watch mode.
 
 ## Consequences

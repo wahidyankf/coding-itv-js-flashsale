@@ -20,11 +20,11 @@ Helpers that the API tests also need (time, logins, the database, the reply hold
 
 ## To add something
 
-| To add …                     | Put it in …                               | Also update …        |
-| ---------------------------- | ----------------------------------------- | -------------------- |
-| a step                       | the `<area>.steps.ts` of its feature file | `npm run bdd:check`  |
-| a helper only the page needs | `steps/support/`                          | its doc comment      |
-| a helper the API tests share | `apps/flash-be-e2e/steps/support/`        | import it from there |
+| To add …                     | Put it in …                                                         | Also update …        |
+| ---------------------------- | ------------------------------------------------------------------- | -------------------- |
+| a step                       | the `<area>.steps.ts` of its feature file                           | `npm run bdd:check`  |
+| a helper only the page needs | [`steps/support/`](steps/support)                                   | its doc comment      |
+| a helper the API tests share | [`apps/flash-be-e2e/steps/support/`](../flash-be-e2e/steps/support) | import it from there |
 
 The steps find elements by the words a shopper reads, so a change of a label in `flash-web`'s text tables changes the
 locator here too.

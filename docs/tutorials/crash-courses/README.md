@@ -69,7 +69,7 @@ Front end:
 Tests:
 
 - [vitest.md](vitest.md) - unit and integration tests next to the code, and the coverage floor.
-- [gherkin-scenarios.md](gherkin-scenarios.md) - the behaviour scenarios in `specs/` and how one scenario is bound at
+- [gherkin-scenarios.md](gherkin-scenarios.md) - the behaviour scenarios in [`specs/`](../../../specs) and how one scenario is bound at
   three layers.
 - [playwright.md](playwright.md) - the end-to-end tests of the API and of the page in a browser.
 - [k6.md](k6.md) - the load test: the shopper's visit, the profiles, and the verdict read from the data.

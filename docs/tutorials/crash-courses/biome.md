@@ -71,14 +71,14 @@ Biome has no built-in rule for `catch`, so [`.biome/no-catch.grit`](../../../.bi
 ```
 
 The last override applies it to `apps/*/src/**` and `libs/*/src/**`, minus tests, `src/bdd` and
-`libs/typekit/src/boundary.ts`, the one file that catches so that no other file has to.
+[`libs/typekit/src/boundary.ts`](../../../libs/typekit/src/boundary.ts), the one file that catches so that no other file has to.
 [`scripts/lint/lint-rules_tests.mjs`](../../../scripts/lint/lint-rules_tests.mjs) lints small samples with the real
 config and checks that the plugin and the exhaustive switch rule still fire.
 
 ### Markdown is formatted too
 
 `biome check .` checks the format of the Markdown files as well, and `biome format --write` fixes it.
-`files.includes` skips `.claude/`, because the Markdown formatter would break the YAML frontmatter of the agent files.
+`files.includes` skips [`.claude/`](../../../.claude), because the Markdown formatter would break the YAML frontmatter of the agent files.
 
 ## Try it here
 

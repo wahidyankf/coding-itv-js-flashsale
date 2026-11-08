@@ -22,7 +22,7 @@ integration tests. Globals are off, so every file imports what it uses and clean
 ### A test file sits next to its code
 
 A unit test is `<name>_tests.ts` (or `.tsx`) beside the module it tests. This one is
-[`queue_tests.ts`](../../../apps/flash-be/src/domain/queue_tests.ts), next to `queue.ts`:
+[`queue_tests.ts`](../../../apps/flash-be/src/domain/queue_tests.ts), next to [`queue.ts`](../../../apps/flash-be/src/domain/queue.ts):
 
 ```ts
 import { describe, expect, it } from "vitest";

@@ -4,7 +4,7 @@ First check that it is a behaviour: a shopper or an operator would see the diffe
 cares, write a plain test next to the code instead (see [scenario or plain test](../explanation/scenario-or-plain-test.md)).
 
 Write the scenario first. Then bind it to the tests, so each layer proves what it can. Only the apps use scenarios, so this
-guide applies to `apps/` only. It uses `flash-be`.
+guide applies to [`apps/`](../../apps) only. It uses `flash-be`.
 The steps are the same for `flash-web`, with its own folders.
 
 ```mermaid
@@ -32,7 +32,7 @@ flowchart LR
 
 ## 1. Write the scenario
 
-Add it to a feature file under `specs/apps/flash/be/behaviours/`. Put it in the folder for its area, for example
+Add it to a feature file under [`specs/apps/flash/be/behaviours/`](../../specs/apps/flash/be/behaviours). Put it in the folder for its area, for example
 `health/` or `queue/`. If the folder has no feature file for this behaviour yet, create one and link it from the
 folder's `README.md`:
 
@@ -44,8 +44,8 @@ Every `.feature` file must be linked from the `README.md` next to it. The check 
 
 ## 2. Bind the unit layer
 
-Every scenario needs a unit binding. Add it to a test file in `apps/flash-be/src/bdd/` named for the area and the
-feature file, such as `health_tests.ts` or `queue_joining_tests.ts`. The title must match the scenario title exactly:
+Every scenario needs a unit binding. Add it to a test file in [`apps/flash-be/src/bdd/`](../../apps/flash-be/src/bdd) named for the area and the
+feature file, such as [`health_tests.ts`](../../apps/flash-be/src/bdd/health_tests.ts) or [`queue_joining_tests.ts`](../../apps/flash-be/src/bdd/queue_joining_tests.ts). The title must match the scenario title exactly:
 
 ```ts
 describeFeature(
@@ -59,10 +59,10 @@ describeFeature(
 ```
 
 When the unit and integration layers run the same steps, write the steps once in
-`apps/flash-be/src/bdd/support/bind-<area>-<feature>.ts`, such as `bind-queue-joining.ts`. A binder takes what the
+`apps/flash-be/src/bdd/support/bind-<area>-<feature>.ts`, such as [`bind-queue-joining.ts`](../../apps/flash-be/src/bdd/support/bind-queue-joining.ts). A binder takes what the
 layer gives it (a function that builds the layer's world, or a `ShopLayer` for the queue features) and returns one step
 function per scenario. Each test file then names the scenarios and passes the steps in, as
-`queue_joining_tests.ts` does:
+[`queue_joining_tests.ts`](../../apps/flash-be/src/bdd/queue_joining_tests.ts) does:
 
 ```ts
 const steps = bindQueueJoining(unitShopLayer());
@@ -78,8 +78,8 @@ describeFeature(
 );
 ```
 
-The shared checks (`statusIs`, `errorIs`) are in `support/steps.ts`, and the shared Given steps of a sale and a
-shopper are in `support/shop-steps.ts`, `auth-steps.ts` and `operator-steps.ts`. Keep a step in the test file when
+The shared checks (`statusIs`, `errorIs`) are in [`support/steps.ts`](../../apps/flash-be/src/bdd/support/steps.ts), and the shared Given steps of a sale and a
+shopper are in [`support/shop-steps.ts`](../../apps/flash-be/src/bdd/support/shop-steps.ts), [`auth-steps.ts`](../../apps/flash-be/src/bdd/support/auth-steps.ts) and [`operator-steps.ts`](../../apps/flash-be/src/bdd/support/operator-steps.ts). Keep a step in the test file when
 the two layers check different things, as the `db` and `seeding` bindings do.
 
 Run the unit tests:
@@ -91,7 +91,7 @@ npx nx test:unit flash-be
 ## 3. Bind the integration layer
 
 Unless the scenario is tagged `@integration-exempt`, bind it in the matching `*_integration_tests.ts` file, such as
-`apps/flash-be/src/bdd/queue_joining_integration_tests.ts`.
+[`apps/flash-be/src/bdd/queue_joining_integration_tests.ts`](../../apps/flash-be/src/bdd/queue_joining_integration_tests.ts).
 Integration tests use the real Postgres and Redis from the dev stack. Start the stack first:
 
 ```bash
@@ -101,7 +101,7 @@ npx nx test:integration flash-be
 
 ## 4. Bind the end-to-end layer
 
-Unless the scenario is tagged `@e2e-exempt`, its steps must match a step definition in `apps/flash-be-e2e/steps/`.
+Unless the scenario is tagged `@e2e-exempt`, its steps must match a step definition in [`apps/flash-be-e2e/steps/`](../../apps/flash-be-e2e/steps).
 Each step is a regex or exact text. Run the browser-less API tests:
 
 ```bash

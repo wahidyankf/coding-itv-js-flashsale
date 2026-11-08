@@ -45,7 +45,7 @@ It answers with `new Ok(value)` or `new Err("sold_out")`.
 
 `value` and `error` are reachable only after a check narrows the union. The route replies go through one helper in
 [`routes/reply.ts`](../../../apps/flash-be/src/adapters/inbound/http/routes/reply.ts). Its error type must extend
-`ErrorCode`, so a service error that has no status in `errors.ts` does not compile:
+`ErrorCode`, so a service error that has no status in [`errors.ts`](../../../apps/flash-be/src/adapters/inbound/http/errors.ts) does not compile:
 
 ```ts
 return result.isErr() ? sendError(reply, result.error) : onOk(result.value);
