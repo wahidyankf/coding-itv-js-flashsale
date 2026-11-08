@@ -45,7 +45,7 @@ export type ErrorCode = keyof typeof ERROR_STATUS;
 
 // The `errorMessage` sent for each code. `internal` never names the cause, so a server fault does not leak detail.
 const ERROR_MESSAGE = {
-	invalid_user: "The user id is missing or not valid.",
+	invalid_user: "The user name is missing or not valid.",
 	invalid_reservation: "The reservation id is missing or not valid.",
 	invalid_request: "The request could not be read.",
 	invalid_sale: "The sale is not valid.",
