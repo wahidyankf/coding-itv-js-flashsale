@@ -80,9 +80,13 @@ export function eventRequests(app: FastifyInstance, scenario: ShopScenario) {
 	return {
 		watchSale: (saleId = scenario.saleId) =>
 			watch(salePath("saleEvents", saleId)),
-		watchPlace: async (user: string, ticket?: string) => {
+		watchPlace: async (
+			user: string,
+			ticket?: string,
+			saleId = scenario.saleId,
+		) => {
 			const given = ticket ?? scenario.tickets.get(shopperKey(user));
-			return watch(salePath("queueMeEvents", scenario.saleId), {
+			return watch(salePath("queueMeEvents", saleId), {
 				cookie: await scenario.login(user),
 				...ticketHeader(given),
 			});

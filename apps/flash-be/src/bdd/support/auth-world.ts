@@ -28,6 +28,10 @@ export type AuthLayer = {
 	app: () => FastifyInstance;
 	// Makes the access token end, as the passing of its 15 minutes does.
 	expireAccess: (accessToken: string) => Promise<void>;
+	// Makes the refresh token end, as the passing of its 7 days does.
+	expireRefresh: (refreshToken: string) => Promise<void>;
+	// Whether the login of this access token is still open: its row is not marked deleted.
+	liveSession: (accessToken: string) => Promise<boolean>;
 	// What is stored: the password hashes, and the hashes of the tokens.
 	stored: () => Promise<{ passwordHashes: string[]; tokenHashes: string[] }>;
 	// The row of the live user with this name, if there is one.
@@ -120,6 +124,10 @@ export function authWorld(layer: AuthLayer) {
 		refreshWithCopy: (on?: Instance) =>
 			send("POST", API_PATHS.authRefresh, { from: copy, record: false, on }),
 		expireAccess: () => layer.expireAccess(cookieValueOf(jar, "access_token")),
+		expireRefresh: () =>
+			layer.expireRefresh(cookieValueOf(jar, "refresh_token")),
+		// The copy's login, which a refused refresh must leave open.
+		copyIsLive: () => layer.liveSession(cookieValueOf(copy, "access_token")),
 		stored: layer.stored,
 		userRow: layer.userRow,
 		// The jar after the last reply, to see which tokens are still held.

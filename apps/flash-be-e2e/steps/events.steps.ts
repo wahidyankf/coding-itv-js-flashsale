@@ -91,6 +91,22 @@ When(
 	},
 );
 
+// A watch in a sale that is not there. The API refuses it before it opens a stream, so the reply is a plain JSON one.
+When(
+	/^"([^"]+)" watches her place in the sale with id "([^"]+)"$/,
+	async ({ request }, user: string, saleId: string) => {
+		setResponse(
+			await send(request, routes.placeEvents, {
+				params: { saleId },
+				headers: {
+					cookie: await shopperCookie(request, user),
+					[TICKET_HEADER]: ticketOf(user),
+				},
+			}),
+		);
+	},
+);
+
 // The operator moves the start of a sale that has not opened. The private API admits on its own timer, so the shopper is
 // admitted within one admission tick.
 When("the sale opens", async ({ request }) => {

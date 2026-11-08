@@ -12,7 +12,7 @@ describeFeature(
 	await loadFeature(
 		specFile("flash/be/behaviours/purchase/confirming.feature"),
 	),
-	({ Scenario }) => {
+	({ Scenario, ScenarioOutline }) => {
 		Scenario("A shopper pays for the held item", steps.paysForHeld);
 
 		Scenario("Confirming again returns the same purchase", steps.confirmsAgain);
@@ -27,6 +27,11 @@ describeFeature(
 		Scenario(
 			"A reservation id that is not an id is refused",
 			steps.refusesNonId,
+		);
+
+		ScenarioOutline(
+			"Confirming in an unknown sale is refused",
+			steps.refusesUnknownSale,
 		);
 
 		Scenario(

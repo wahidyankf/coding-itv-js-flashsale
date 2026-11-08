@@ -23,5 +23,10 @@ describeFeature(
 			"A buyer cannot hold again after Redis lost its state",
 			steps.buyerRefusedAfterLoss,
 		);
+
+		Scenario(
+			"A reserve that waits too long for another instance's rebuild is refused",
+			steps.refusesWhileOtherRebuilds,
+		);
 	},
 );

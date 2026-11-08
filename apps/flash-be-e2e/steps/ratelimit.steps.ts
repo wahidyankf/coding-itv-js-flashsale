@@ -6,6 +6,7 @@ import type { APIRequestContext } from "@playwright/test";
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { routes, send } from "./support/api.js";
+import { E2E_PASSWORD } from "./support/auth.js";
 import { ensureDatabase } from "./support/database.js";
 import { E2E_REDIS_URL, withRedis } from "./support/processes.js";
 import { currentResponse, setResponse } from "./support/response.js";
@@ -24,6 +25,17 @@ async function sendKind(
 	else if (kind === "reserve an item") await reserve(request, user);
 	else if (kind === "confirm a purchase") {
 		await confirm(request, user, { reservationId: "not-an-id" });
+	} else if (kind === "sign up") {
+		await ensureDatabase();
+		setResponse(
+			await send(request, routes.register, {
+				body: { username: user, password: E2E_PASSWORD },
+			}),
+		);
+	} else if (kind === "list the sales") {
+		setResponse(
+			await send(request, routes.listSales, { headers: { cookie: "" } }),
+		);
 	} else if (kind === "log in") {
 		await ensureDatabase();
 		setResponse(
@@ -98,6 +110,20 @@ When(
 	async ({ request }, count: string) => {
 		for (let index = 0; index < Number(count); index++) {
 			await sendKind(request, "join the queue", `visitor${index}`);
+		}
+	},
+);
+
+// The operator routes count by address alone, so counts an earlier scenario left for this address are dropped first.
+When(
+	/^someone who is not logged in tries to (.+) (\d+) times$/,
+	async ({ request }, kind: string, times: string) => {
+		await withRedis(E2E_REDIS_URL, async (redis) => {
+			const counts = await redis.keys("ratelimit:address:admin:*");
+			if (counts.length > 0) await redis.del(counts);
+		});
+		for (let attempt = 0; attempt < Number(times); attempt++) {
+			await sendKind(request, kind, "visitor");
 		}
 	},
 );

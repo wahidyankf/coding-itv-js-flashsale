@@ -42,6 +42,11 @@ describeFeature(
 		Scenario("A wrong ticket is refused", steps.refusesWrongTicket);
 
 		Scenario(
+			"Checking the place in an unknown sale is refused",
+			steps.refusesUnknownSale,
+		);
+
+		Scenario(
 			"A shopper whose place was lost is told to join again",
 			steps.placeLost,
 		);

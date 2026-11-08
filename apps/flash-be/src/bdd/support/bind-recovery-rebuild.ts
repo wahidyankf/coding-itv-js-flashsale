@@ -136,6 +136,35 @@ function buyerRefusedAfterLoss(layer: ShopLayer): ScenarioBinder {
 	};
 }
 
+// Another instance holds the rebuild lock, so this request waits for a rebuild that does not come, and then gives up.
+function refusesWhileOtherRebuilds(layer: ShopLayer): ScenarioBinder {
+	return ({ Given, And, When, Then }) => {
+		const world = layer.newWorld();
+
+		Given(SALE_OF_1, async () =>
+			openSale(world, layer.now, { stock: 1, sold: 0 }),
+		);
+
+		And('"ana" has been admitted', async () => {
+			await world.admitted("ana");
+		});
+
+		And("the reservation state of the sale is lost from Redis", async () => {
+			await world.loseReservationState();
+		});
+
+		And("another instance holds the rebuild lock of the sale", async () => {
+			await world.holdRebuildLock();
+		});
+
+		When("{string} reserves an item", reserveUser(world));
+
+		Then("the response status is {int}", statusIs(world));
+
+		And("the error is {string}", errorIs(world));
+	};
+}
+
 // The steps of each scenario in the rebuild feature, by the scenario's name in the feature's own words.
 export function bindRecoveryRebuild(layer: ShopLayer) {
 	return {
@@ -143,5 +172,6 @@ export function bindRecoveryRebuild(layer: ShopLayer) {
 		sameHoldAfterLoss: sameHoldAfterLoss(layer),
 		expiredNotRebuilt: expiredNotRebuilt(layer),
 		buyerRefusedAfterLoss: buyerRefusedAfterLoss(layer),
+		refusesWhileOtherRebuilds: refusesWhileOtherRebuilds(layer),
 	};
 }

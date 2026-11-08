@@ -15,3 +15,15 @@ Feature: Seeding a sale
     When the sale is seeded with stock 0, opening in 10 minutes for 60 minutes
     Then seeding fails with "stock must be a positive integer"
     And the sales table holds 0 sales
+
+  Scenario: Seeding refuses a window that lasts no minutes
+    Given a database migrated to the latest version
+    When the sale is seeded with stock 100, opening in 10 minutes for 0 minutes
+    Then seeding fails with "duration-minutes must be a positive integer"
+    And the sales table holds 0 sales
+
+  Scenario: Seeding refuses a window that starts past the range of a date
+    Given a database migrated to the latest version
+    When the sale is seeded with stock 100, opening in 9000000000000000 minutes for 60 minutes
+    Then seeding fails with "the sale is not usable: its name, window or holds are out of range"
+    And the sales table holds 0 sales

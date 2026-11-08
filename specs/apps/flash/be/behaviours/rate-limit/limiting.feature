@@ -48,3 +48,19 @@ Feature: Rate limiting
     And the response status is 429
     And the error is "rate_limited"
     And a Retry-After header of at least 1 second is given
+
+  Scenario: Sign-ups from one address share the login limit
+    Given the limit is 3 logins per address in each 60 seconds
+    When "ana" tries to sign up 4 times
+    Then the first 3 requests are not limited
+    And the response status is 429
+    And the error is "rate_limited"
+    And a Retry-After header of at least 1 second is given
+
+  Scenario: The operator routes are limited per address, even for a client that is not logged in
+    Given the limit is 3 requests per address in each 60 seconds
+    When someone who is not logged in tries to list the sales 4 times
+    Then the first 3 requests are not limited
+    And the response status is 429
+    And the error is "rate_limited"
+    And a Retry-After header of at least 1 second is given

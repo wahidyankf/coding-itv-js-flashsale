@@ -110,6 +110,13 @@ When(
 	},
 );
 
+When(
+	/^"([^"]+)" confirms the purchase with the reservation id "([^"]*)" in the sale with id "([^"]+)"$/,
+	async ({ request }, user: string, reservationId: string, saleId: string) => {
+		await confirm(request, user, { reservationId, saleId });
+	},
+);
+
 // A body that names no reservation at all, which a client with nothing held might send.
 When(
 	/^"([^"]+)" confirms the purchase with an empty body$/,

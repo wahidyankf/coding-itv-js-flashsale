@@ -54,6 +54,11 @@ describeFeature(
 			steps.paysWithoutSlowdown,
 		);
 
+		Scenario(
+			"A buyer who has bought cannot reserve again while Redis is down",
+			steps.refusesAgainWithoutRedis,
+		);
+
 		Scenario("Requests are still limited", steps.stillLimited);
 
 		Scenario(

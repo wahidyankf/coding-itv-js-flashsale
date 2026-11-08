@@ -6,4 +6,4 @@ lets shoppers in.
 ## Directory Map
 
 - [joining.feature](joining.feature) - `POST /api/v1/sales/:saleId/queue` gives a ticket and a place, and refuses what it cannot take.
-- [admission.feature](admission.feature) - the queue admits shoppers in order at the sale's rate, the running sale is served while a later sale is scheduled, a ticket proves whose place it is, and an admission not used in time ends.
+- [admission.feature](admission.feature) - the queue admits shoppers in order at the sale's rate, the running sale is served while a later sale is scheduled, a ticket proves whose place it is, an admission not used in time ends, and an unknown sale is refused.

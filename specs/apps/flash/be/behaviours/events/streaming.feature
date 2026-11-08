@@ -41,6 +41,12 @@ Feature: Live updates
     Then the response status is 401
     And the error is "invalid_ticket"
 
+  Scenario: Watching a place in an unknown sale is refused
+    Given no sale exists
+    When "ana" watches her place in the sale with id "00000000-0000-4000-8000-000000000000"
+    Then the response status is 404
+    And the error is "sale_not_found"
+
   Scenario: A shopper whose place was lost before watching is told it is gone
     Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
     And "ana" has joined the queue

@@ -1,22 +1,29 @@
 // The auth steps' unit layer: the accounts and logins live in memory, two app instances are built on them (each with its
 // own auth service, as two servers over one Postgres), and the clock is one the scenario moves. Only the auth steps use it; the app is closed by the test file that made it.
-import { MS_PER_HOUR, MS_PER_MINUTE } from "@flash/flash-commons";
+import {
+	MS_PER_HOUR,
+	MS_PER_MINUTE,
+	MS_PER_SECOND,
+} from "@flash/flash-commons";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../../adapters/inbound/http/app.js";
 import { createScryptHasher } from "../../adapters/outbound/crypto/scrypt-hasher.js";
 import type { AuthService } from "../../application/auth-service.js";
 import { createQueueService } from "../../application/queue-service.js";
 import { createSaleService } from "../../application/sale-service.js";
+import { REFRESH_TTL_SECONDS } from "../../domain/auth.js";
 import type { Sale } from "../../domain/sale.js";
 import { authWorld } from "./auth-world.js";
 import { healthyDeps } from "./deps.js";
 import { fakeRepository, fakeSale } from "./fake-sales.js";
 import { memoryAuth } from "./memory-auth.js";
 import { memoryQueueStore } from "./memory-queue-store.js";
-import { QUEUE_OPTIONS } from "./queue-world.js";
+import { QUEUE_OPTIONS } from "./unit-parts.js";
 
 // Past the 15 minutes of an access token.
 const PAST_ACCESS_MS = 16 * MS_PER_MINUTE;
+// Past the 7 days of a refresh token, with a minute to spare.
+const PAST_REFRESH_MS = REFRESH_TTL_SECONDS * MS_PER_SECOND + MS_PER_MINUTE;
 
 // One scenario in memory: its accounts, logins and clock. The app goes into `apps`, so the test file can close it.
 export function unitAuthWorld(apps: FastifyInstance[]) {
@@ -53,6 +60,10 @@ export function unitAuthWorld(apps: FastifyInstance[]) {
 			sales.push(sale);
 			return sale.id;
 		},
+		expireRefresh: async () => {
+			now = new Date(now.getTime() + PAST_REFRESH_MS);
+		},
+		liveSession: async (accessToken) => auth.liveSession(accessToken),
 		expireAccess: async () => {
 			now = new Date(now.getTime() + PAST_ACCESS_MS);
 		},

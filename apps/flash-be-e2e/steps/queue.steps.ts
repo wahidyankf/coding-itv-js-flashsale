@@ -115,6 +115,14 @@ When(
 	},
 );
 
+// A check in a sale that is not there. No ticket is sent, so the sale is the only thing the API can refuse.
+When(
+	/^"([^"]+)" checks the queue of the sale with id "([^"]+)"$/,
+	async ({ request }, user: string, saleId: string) => {
+		await checkPlace(request, user, undefined, saleId);
+	},
+);
+
 Then(/^the user is "([^"]+)"$/, async ({ request: _request }, user: string) => {
 	expect((await currentResponse().json()).userId).toBe(user);
 });

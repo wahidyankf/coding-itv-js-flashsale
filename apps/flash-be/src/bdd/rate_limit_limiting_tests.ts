@@ -27,5 +27,15 @@ describeFeature(
 		);
 
 		Scenario("Logins from one address are limited", steps.loginsLimited);
+
+		Scenario(
+			"Sign-ups from one address share the login limit",
+			steps.signUpsShareLimit,
+		);
+
+		Scenario(
+			"The operator routes are limited per address, even for a client that is not logged in",
+			steps.operatorRoutesLimited,
+		);
 	},
 );

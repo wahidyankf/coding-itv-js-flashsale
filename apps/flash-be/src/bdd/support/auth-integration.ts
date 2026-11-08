@@ -50,6 +50,21 @@ export async function openAuthIntegration() {
 					);
 					await redis.del(`session:${hash}`);
 				},
+				expireRefresh: async (refreshToken) => {
+					const hash = hashToken(refreshToken);
+					await sql`update sessions set refresh_expires_at = now() - interval '1 minute' where refresh_hash = ${hash}`.execute(
+						db,
+					);
+				},
+				liveSession: async (accessToken) => {
+					const rows = await db
+						.selectFrom("sessions")
+						.select("id")
+						.where("access_hash", "=", hashToken(accessToken))
+						.where("deleted_at", "is", null)
+						.execute();
+					return rows.length > 0;
+				},
 				stored: () => storedHashes(db),
 				userRow: (username) => userRowOf(db, username),
 				secondApp: () => second,

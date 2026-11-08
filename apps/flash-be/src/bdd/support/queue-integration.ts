@@ -256,12 +256,6 @@ function saleRowActions(
 		async loseQueue() {
 			await parts.redis.flushDb();
 		},
-		async loseReservationState() {
-			const names = ["ready", "buyers", "holds", "ids", "rebuild-lock"];
-			await parts.redis.del(
-				names.map((name) => `sale:${current().saleId}:${name}`),
-			);
-		},
 		async openSale() {
 			await db
 				.updateTable("sales")
@@ -308,7 +302,7 @@ function timeAndPaymentActions(
 }
 
 // Faults and the cache: Redis stops answering, the writes break, and the cache time moves. The limits are in limit-actions.ts.
-function faultActions(parts: IntegrationParts) {
+function faultActions(parts: IntegrationParts, current: () => ShopScenario) {
 	return {
 		async breakWrites() {
 			parts.writes.broken = true;
@@ -321,6 +315,20 @@ function faultActions(parts: IntegrationParts) {
 		},
 		async fixRedis() {
 			parts.redisState.down = false;
+		},
+		// The lock a rebuild on another instance would hold, with the owner's token, for an hour: longer than any wait.
+		async holdRebuildLock() {
+			await parts.redis.set(
+				`sale:${current().saleId}:rebuild-lock`,
+				"another-instance",
+				{ expiration: { type: "PX", value: MS_PER_HOUR } },
+			);
+		},
+		async loseReservationState() {
+			const names = ["ready", "buyers", "holds", "ids", "rebuild-lock"];
+			await parts.redis.del(
+				names.map((name) => `sale:${current().saleId}:${name}`),
+			);
 		},
 		async setSaleCache(ms: number) {
 			parts.cache.ttlMs = ms;
@@ -353,7 +361,7 @@ function integrationScenario(
 		...placeholders(),
 		...saleRowActions(db, parts, () => scenario),
 		...timeAndPaymentActions(parts, () => scenario),
-		...faultActions(parts),
+		...faultActions(parts, () => scenario),
 		...limitActions(parts.limits),
 		holdRows: () => holdRowsOf(db, scenario.saleId),
 		confirmOnTwoInstances: (user) =>

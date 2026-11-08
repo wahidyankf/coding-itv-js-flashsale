@@ -43,3 +43,12 @@ Feature: Rebuilding the reservation state
     When "ana" reserves an item
     Then the response status is 409
     And the error is "already_purchased"
+
+  Scenario: A reserve that waits too long for another instance's rebuild is refused
+    Given a sale with stock 1 and 0 sold that opens 1 hour ago and closes in 1 hour
+    And "ana" has been admitted
+    And the reservation state of the sale is lost from Redis
+    And another instance holds the rebuild lock of the sale
+    When "ana" reserves an item
+    Then the response status is 503
+    And the error is "unavailable"

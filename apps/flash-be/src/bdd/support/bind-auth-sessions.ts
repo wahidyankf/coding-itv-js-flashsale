@@ -312,6 +312,28 @@ function refreshAcrossInstances(newWorld: () => AuthWorld): ScenarioBinder {
 	};
 }
 
+// The refresh token runs out, as its 7 days do. The refresh is refused, and the session row is left open: nothing ends it.
+function refusesExpiredRefresh(newWorld: () => AuthWorld): ScenarioBinder {
+	return ({ Given, And, When, Then }) => {
+		const world = newWorld();
+
+		Given(SIGNED_UP, signedUp(world));
+		And(COPY, keepsCopy(world));
+		When("the refresh token runs out", async () => {
+			await world.expireRefresh();
+		});
+		And("the shopper refreshes the login", async () => {
+			await world.refresh();
+		});
+		Then("the response status is {int}", statusIs(world));
+		And("the error is {string}", errorIs(world));
+		And(CLEARS_COOKIES, clearsCookies(world));
+		And("the session of the copied tokens is not ended", async () => {
+			expect(await world.copyIsLive()).toBe(true);
+		});
+	};
+}
+
 // The steps of each scenario in the sessions feature, by the scenario's name in the feature's own words.
 export function bindAuthSessions(newWorld: () => AuthWorld) {
 	return {
@@ -322,6 +344,7 @@ export function bindAuthSessions(newWorld: () => AuthWorld) {
 		refreshTrades: refreshTrades(newWorld),
 		refreshTwiceEnds: refreshTwiceEnds(newWorld),
 		refreshWithoutToken: refreshWithoutToken(newWorld),
+		refusesExpiredRefresh: refusesExpiredRefresh(newWorld),
 		cookieLimitedToAuth: cookieLimitedToAuth(newWorld),
 		routesNeedLogin: routesNeedLogin(newWorld),
 		loginAcrossInstances: loginAcrossInstances(newWorld),

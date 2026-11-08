@@ -36,6 +36,11 @@ describeFeature(
 		Scenario("Watching an unknown sale is refused", steps.refusesUnknownSale);
 
 		Scenario(
+			"Watching a place in an unknown sale is refused",
+			steps.refusesUnknownPlace,
+		);
+
+		Scenario(
 			"A waiting shopper hears when they are admitted",
 			steps.hearsAdmitted,
 		);

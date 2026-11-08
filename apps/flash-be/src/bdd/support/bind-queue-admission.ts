@@ -195,6 +195,26 @@ function placeLost(layer: ShopLayer): ScenarioBinder {
 	};
 }
 
+// A place asked for in a sale that does not exist is refused as that sale, before any ticket is read.
+function refusesUnknownSale(layer: ShopLayer): ScenarioBinder {
+	return ({ Given, When, Then, And }) => {
+		const world = layer.newWorld();
+
+		Given("no sale exists", () => {});
+
+		When(
+			'"ana" checks the queue of the sale with id {string}',
+			async (_ctx, saleId: string) => {
+				await world.check("ana", undefined, saleId);
+			},
+		);
+
+		Then("the response status is {int}", statusIs(world));
+
+		And("the error is {string}", errorIs(world));
+	};
+}
+
 // "an admission lasts {int} second": admissions given from now on end that long after they are given.
 function admissionLasts(world: ShopScenario) {
 	return async (_ctx: unknown, seconds: number) => {
@@ -266,5 +286,6 @@ export function bindQueueAdmission(layer: ShopLayer) {
 		placeLost: placeLost(layer),
 		admissionEnds: admissionEnds(layer),
 		joinsAgainAfterAdmission: joinsAgainAfterAdmission(layer),
+		refusesUnknownSale: refusesUnknownSale(layer),
 	};
 }

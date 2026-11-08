@@ -61,15 +61,17 @@ export async function join(
 	}
 }
 
-// Asks for a place in the queue, with the ticket given or the one the shopper was issued. Returns the place when the API
+// Asks for a place in the queue, with the ticket given or the one the shopper was issued, in the running sale or in
+// `saleId`. Returns the place when the API
 // gave one, and nothing when it refused.
 export async function checkPlace(
 	request: APIRequestContext,
 	user: string,
 	ticket?: string,
+	saleId = currentSaleId(),
 ) {
 	const reply = await send(request, routes.checkPlace, {
-		params: { saleId: currentSaleId() },
+		params: { saleId },
 		headers: {
 			cookie: await shopperCookie(request, user),
 			[TICKET_HEADER]: ticket,
@@ -139,16 +141,16 @@ export async function waitUntilAdmitted(
 }
 
 // Sends the request that confirms the purchase. The hold is the shopper's own, unless `owner` names another shopper or
-// `reservationId` gives one directly. A shopper with no hold sends an empty id, which the API refuses.
+// `reservationId` gives one directly. The sale is the running one unless `saleId` names another. A shopper with no hold sends an empty id, which the API refuses.
 export async function postConfirm(
 	request: APIRequestContext,
 	user: string,
-	options: { reservationId?: string; owner?: string } = {},
+	options: { reservationId?: string; owner?: string; saleId?: string } = {},
 ) {
 	const reservationId =
 		options.reservationId ?? holdOf(options.owner ?? user)?.reservationId;
 	return send(request, routes.confirm, {
-		params: { saleId: currentSaleId() },
+		params: { saleId: options.saleId ?? currentSaleId() },
 		headers: { cookie: await shopperCookie(request, user) },
 		body: { reservationId: reservationId ?? "" },
 	});
@@ -158,7 +160,7 @@ export async function postConfirm(
 export async function confirm(
 	request: APIRequestContext,
 	user: string,
-	options: { reservationId?: string; owner?: string } = {},
+	options: { reservationId?: string; owner?: string; saleId?: string } = {},
 ) {
 	const started = performance.now();
 	const reply = await postConfirm(request, user, options);

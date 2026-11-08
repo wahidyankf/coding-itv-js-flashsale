@@ -2,50 +2,25 @@
 // and payment timers that fire only as that clock moves. The integration layer runs the same steps over Postgres and
 // Redis (queue-integration.ts). The steps themselves are the request helpers in queue-requests.ts.
 
-import { randomUUID } from "node:crypto";
 import { MS_PER_HOUR, MS_PER_SECOND } from "@flash/flash-commons";
 import type { FastifyInstance } from "fastify";
 import { expect } from "vitest";
 import { buildApp } from "../../adapters/inbound/http/app.js";
 import { DEFAULT_STREAM_OPTIONS } from "../../adapters/inbound/http/event-stream.js";
-import { createMemoryRateLimitStore } from "../../adapters/outbound/memory/memory-rate-limit-store.js";
 import type { MockPayment } from "../../adapters/outbound/payment/mock-payment.js";
 import { admitCurrentSale } from "../../application/admission.js";
-import { createGuardedGate } from "../../application/guarded-gate.js";
-import type { Clock } from "../../application/ports/clock.js";
-import type { PurchaseService } from "../../application/purchase-service.js";
-import { createPurchaseService } from "../../application/purchase-service.js";
 import type { QueueService } from "../../application/queue-service.js";
-import { createQueueService } from "../../application/queue-service.js";
-import type {
-	RateLimiter,
-	RateLimits,
-} from "../../application/rate-limiter.js";
-import { createRateLimiter } from "../../application/rate-limiter.js";
 import type { ReservationService } from "../../application/reservation-service.js";
-import { createReservationService } from "../../application/reservation-service.js";
 import type { SaleService } from "../../application/sale-service.js";
-import { createSaleService } from "../../application/sale-service.js";
-import { buildConfig } from "../../config.js";
 import type { Sale } from "../../domain/sale.js";
 import { normalizeUser } from "../../domain/user.js";
 import { healthyDeps } from "./deps.js";
-import { fakeRepository, fakeSale } from "./fake-sales.js";
+import { fakeSale } from "./fake-sales.js";
 import { limitActions } from "./limit-actions.js";
-import { type MemoryAuth, memoryAuth } from "./memory-auth.js";
-import { type MemoryHoldGate, memoryHoldGate } from "./memory-hold-gate.js";
-import {
-	type MemoryPurchaseRepository,
-	memoryPurchaseRepository,
-} from "./memory-purchase-repository.js";
-import {
-	type MemoryQueueStore,
-	memoryQueueStore,
-} from "./memory-queue-store.js";
-import {
-	type MemoryReservationRepository,
-	memoryReservationRepository,
-} from "./memory-reservation-repository.js";
+import type { MemoryHoldGate } from "./memory-hold-gate.js";
+import type { MemoryPurchaseRepository } from "./memory-purchase-repository.js";
+import type { MemoryQueueStore } from "./memory-queue-store.js";
+import type { MemoryReservationRepository } from "./memory-reservation-repository.js";
 import { eventRequests } from "./queue-events.js";
 import {
 	limitRequests,
@@ -56,21 +31,18 @@ import {
 } from "./queue-requests.js";
 import {
 	ADMIT_EVERYONE_WAITING,
-	LIMITS_OUT_OF_REACH,
 	placeholders,
 	type SaleOverrides,
 	type ShopScenario,
 } from "./queue-scenario.js";
-import { sharedCounter } from "./shared-counter.js";
 import type { ShopLayer } from "./shop-steps.js";
-import { switchable } from "./switchable.js";
 import {
 	confirmOnBoth,
 	giveBackNextCharge,
 	setProvider,
-	unitPayments,
 } from "./two-instances.js";
 import { byClock } from "./unit-clock.js";
+import { type UnitParts, unitParts } from "./unit-parts.js";
 import { usernameOf } from "./users.js";
 
 // The types a queue scenario is built from, re-exported so the unit layer's test file imports them from one place.
@@ -80,16 +52,6 @@ export type {
 	Response,
 	ShopScenario,
 } from "./queue-scenario.js";
-
-// The queue settings the unit layer runs with. The tick and the admission take the configuration defaults, so the unit
-// layer and a server agree on them; only the ticket secret is set here.
-const queueDefaults = buildConfig({});
-// The queue settings of the unit layer: a fixed ticket secret, and the server's own tick and admission lifetime.
-export const QUEUE_OPTIONS = {
-	ticketSecret: "unit-secret",
-	admissionTickMs: queueDefaults.admissionTickMs,
-	admissionTtlSeconds: queueDefaults.admissionTtlSeconds,
-};
 
 // One queue scenario at the unit layer: the app and each in-memory store, so a step can set or read any of them.
 export type UnitQueueScenario = ShopScenario & {
@@ -106,110 +68,8 @@ export type UnitQueueScenario = ShopScenario & {
 	sales: Sale[];
 };
 
-// Everything one unit scenario is built from. The actions below read and change these, and the app is built over them.
-type UnitParts = {
-	time: { now: Date };
-	clock: Clock;
-	sales: Sale[];
-	redis: { down: boolean };
-	timers: Array<{ at: number; resolve: () => void }>;
-	store: MemoryQueueStore;
-	memoryGate: MemoryHoldGate;
-	repository: MemoryReservationRepository;
-	purchased: MemoryPurchaseRepository;
-	payment: MockPayment;
-	cache: { ttlMs: number };
-	limits: RateLimits;
-	// This scenario's copy of the queue settings, so a scenario that shortens the admission changes only its own.
-	queueOptions: typeof QUEUE_OPTIONS;
-	saleService: SaleService;
-	queue: QueueService;
-	reservations: ReservationService;
-	purchases: PurchaseService;
-	secondPurchases: PurchaseService;
-	// The payments of both instances, which a provider setting changes together.
-	payments: MockPayment[];
-	rateLimiter: RateLimiter;
-	auth: MemoryAuth;
-};
-
 // Lets the pending promises run once, so an answer that is already due is seen.
 const settle = () => new Promise((resolve) => setImmediate(resolve));
-
-// The stores, services and switches of one unit scenario, wired as the production app wires them.
-function unitParts(start: Date): UnitParts {
-	const time = { now: start };
-	const clock: Clock = () => time.now;
-	const sales: Sale[] = [];
-	const redis = { down: false };
-	const isDown = () => redis.down;
-	const store = memoryQueueStore(clock);
-	const memoryGate = memoryHoldGate(clock);
-	const gate = createGuardedGate(switchable(memoryGate, isDown));
-	let purchaseRepository: MemoryPurchaseRepository | undefined;
-	const repository = memoryReservationRepository(
-		(saleId) => purchaseRepository?.buyersOf(saleId) ?? [],
-	);
-	const purchased = memoryPurchaseRepository(sales, repository.rows);
-	purchaseRepository = purchased;
-	// Time in memory: a payment that "takes 3 seconds" waits on a timer that only the clock can fire.
-	const timers: UnitParts["timers"] = [];
-	const [payment, secondPayment] = unitPayments(clock, timers, purchased);
-	const cache = { ttlMs: 0 };
-	const saleService = createSaleService(fakeRepository(sales), clock, cache);
-	const queueOptions = { ...QUEUE_OPTIONS };
-	const queue = createQueueService(
-		switchable(store, isDown),
-		saleService,
-		clock,
-		queueOptions,
-	);
-	const reservations = createReservationService({
-		gate,
-		repository,
-		sales: saleService,
-		queue,
-		clock,
-		newId: randomUUID,
-		options: { rebuildWaitMs: 100, wait: async () => {}, random: () => 0.5 },
-	});
-	// A second instance of the API has its own payment, over the same ledger and the same stores.
-	const purchasesOver = (pay: MockPayment) =>
-		createPurchaseService(purchased, pay, gate, saleService, clock);
-	// Limits start far out of reach, so only the rate limit scenarios ever meet them.
-	const limits: RateLimits = { ...LIMITS_OUT_OF_REACH };
-	const rateLimiter = createRateLimiter(
-		sharedCounter(switchable(createMemoryRateLimitStore(), isDown)),
-		createMemoryRateLimitStore(),
-		clock,
-		limits,
-	);
-	// Logins keep their own clock, so a scenario that moves time does not end them.
-	const auth = memoryAuth(() => start);
-	return {
-		time,
-		clock,
-		sales,
-		redis,
-		timers,
-		store,
-		memoryGate,
-		repository,
-		purchased,
-		payment,
-		cache,
-		limits,
-		queueOptions,
-		saleService,
-		queue,
-		reservations,
-		purchases: purchasesOver(payment),
-		secondPurchases: purchasesOver(secondPayment),
-		payments: [payment, secondPayment],
-		rateLimiter,
-		auth,
-	};
-}
 
 // The app over the unit parts. Streams read often in tests, so a change shows within a few milliseconds.
 function unitApp(parts: UnitParts): FastifyInstance {
@@ -297,6 +157,13 @@ function saleActions(parts: UnitParts, current: () => UnitQueueScenario) {
 		},
 		async loseReservationState() {
 			parts.memoryGate.forget(current().saleId);
+		},
+		async holdRebuildLock() {
+			await parts.memoryGate.lockRebuild(
+				current().saleId,
+				MS_PER_HOUR,
+				"another-instance",
+			);
 		},
 		async openSale() {
 			for (const sale of parts.sales) {

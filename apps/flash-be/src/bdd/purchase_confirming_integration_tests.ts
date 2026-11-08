@@ -19,7 +19,7 @@ describeFeature(
 	await loadFeature(
 		specFile("flash/be/behaviours/purchase/confirming.feature"),
 	),
-	({ Scenario, BeforeEachScenario }) => {
+	({ Scenario, ScenarioOutline, BeforeEachScenario }) => {
 		BeforeEachScenario(() => {
 			real.resetSettings();
 		});
@@ -38,6 +38,11 @@ describeFeature(
 		Scenario(
 			"A reservation id that is not an id is refused",
 			steps.refusesNonId,
+		);
+
+		ScenarioOutline(
+			"Confirming in an unknown sale is refused",
+			steps.refusesUnknownSale,
 		);
 
 		Scenario(

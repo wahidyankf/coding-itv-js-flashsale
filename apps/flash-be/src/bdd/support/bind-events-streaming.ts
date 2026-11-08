@@ -228,6 +228,30 @@ function toldPlaceIsGone(layer: ShopLayer): ScenarioBinder {
 	};
 }
 
+// A place watched in a sale that does not exist is refused as that sale. The refusal is a plain reply, read as the watcher's.
+function refusesUnknownPlace(layer: ShopLayer): ScenarioBinder {
+	return ({ Given, When, Then, And }) => {
+		const world = layer.newWorld();
+
+		Given("no sale exists", () => {});
+
+		When(
+			'"ana" watches her place in the sale with id {string}',
+			async (_ctx, saleId: string) => {
+				await world.watchPlace("ana", undefined, saleId);
+			},
+		);
+
+		Then("the response status is {int}", (_ctx, status: number) => {
+			expect(watcherOf(world).status).toBe(status);
+		});
+
+		And("the error is {string}", (_ctx, error: string) => {
+			expect(watcherOf(world).body.errorCode).toBe(error);
+		});
+	};
+}
+
 // The steps of each scenario in the streaming feature, by the scenario's name in the feature's own words.
 export function bindEventsStreaming(layer: ShopLayer) {
 	return {
@@ -238,5 +262,6 @@ export function bindEventsStreaming(layer: ShopLayer) {
 		watchesPlaceFirst: watchesPlaceFirst(layer),
 		refusesWrongPlaceTicket: refusesWrongPlaceTicket(layer),
 		toldPlaceIsGone: toldPlaceIsGone(layer),
+		refusesUnknownPlace: refusesUnknownPlace(layer),
 	};
 }

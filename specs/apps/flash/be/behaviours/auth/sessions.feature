@@ -50,6 +50,16 @@ Feature: Logins of shoppers
     And the reply clears both cookies
     And the shopper is no longer logged in
 
+  Scenario: A refresh token that has run out is refused, and the session stays open
+    Given "ana" has signed up with the password "a long password"
+    And the shopper keeps a copy of the tokens
+    When the refresh token runs out
+    And the shopper refreshes the login
+    Then the response status is 401
+    And the error is "invalid_refresh_token"
+    And the reply clears both cookies
+    And the session of the copied tokens is not ended
+
   Scenario: A refresh without a refresh token is refused
     When someone who is not logged in refreshes the login
     Then the response status is 401

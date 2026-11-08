@@ -1,6 +1,8 @@
 // The steps of specs/apps/flash/be/behaviours/rate-limit/limiting.feature, as both layers bind them. Each scenario gets the
 // world its layer makes; the titles stay in the layer's test file, where the behaviour checker reads them.
+import type { StepTest } from "@amiceli/vitest-cucumber";
 import { expect } from "vitest";
+import type { ShopScenario } from "./queue-scenario.js";
 import { responseOf } from "./response.js";
 import {
 	joinUser,
@@ -16,6 +18,31 @@ import {
 	type ScenarioBinder,
 	statusIs,
 } from "./steps.js";
+
+// The checks of a burst past its limit: the first requests are not limited, and the one that is limited says so, with how
+// long to wait.
+function burstChecks(
+	{ Then, And }: Pick<StepTest, "Then" | "And">,
+	world: ShopScenario,
+): void {
+	Then("the first {int} requests are not limited", (_ctx, count: number) => {
+		const first = world.replies.slice(0, count);
+		expect(first.map((reply) => reply.statusCode)).not.toContain(429);
+	});
+
+	And("the response status is {int}", statusIs(world));
+
+	And("the error is {string}", errorIs(world));
+
+	And(
+		"a Retry-After header of at least {int} second is given",
+		(_ctx, seconds: number) => {
+			expect(
+				Number(responseOf(world).headers["retry-after"]),
+			).toBeGreaterThanOrEqual(seconds);
+		},
+	);
+}
 
 function limitsEveryRoute(layer: ShopLayer): OutlineBinder {
 	return ({ Given, And, When, Then }, examples) => {
@@ -34,23 +61,7 @@ function limitsEveryRoute(layer: ShopLayer): OutlineBinder {
 			await world.repeat(String(examples.request), "ana", 4);
 		});
 
-		Then("the first {int} requests are not limited", (_ctx, count: number) => {
-			const first = world.replies.slice(0, count);
-			expect(first.map((reply) => reply.statusCode)).not.toContain(429);
-		});
-
-		And("the response status is {int}", statusIs(world));
-
-		And("the error is {string}", errorIs(world));
-
-		And(
-			"a Retry-After header of at least {int} second is given",
-			(_ctx, seconds: number) => {
-				expect(
-					Number(responseOf(world).headers["retry-after"]),
-				).toBeGreaterThanOrEqual(seconds);
-			},
-		);
+		burstChecks({ Then, And }, world);
 	};
 }
 
@@ -144,7 +155,11 @@ function countStartsAgain(layer: ShopLayer): ScenarioBinder {
 	};
 }
 
-function loginsLimited(layer: ShopLayer): ScenarioBinder {
+// The auth routes count the sign-ups and the logins of one address together, so a burst of either past the limit is refused.
+function authBurstLimited(
+	layer: ShopLayer,
+	verb: "log in" | "sign up",
+): ScenarioBinder {
 	return ({ Given, And, When, Then }) => {
 		const world = layer.newWorld();
 
@@ -156,29 +171,37 @@ function loginsLimited(layer: ShopLayer): ScenarioBinder {
 		);
 
 		When(
-			"{string} tries to log in {int} times",
+			`{string} tries to ${verb} {int} times`,
 			async (_ctx, user: string, times: number) => {
-				await world.repeat("log in", user, times);
+				await world.repeat(verb, user, times);
 			},
 		);
 
-		Then("the first {int} requests are not limited", (_ctx, count: number) => {
-			const first = world.replies.slice(0, count);
-			expect(first.map((reply) => reply.statusCode)).not.toContain(429);
-		});
+		burstChecks({ Then, And }, world);
+	};
+}
 
-		And("the response status is {int}", statusIs(world));
+// The operator routes count by address before the login is read, so a client with no login is limited as well.
+function operatorRoutesLimited(layer: ShopLayer): ScenarioBinder {
+	return ({ Given, And, When, Then }) => {
+		const world = layer.newWorld();
 
-		And("the error is {string}", errorIs(world));
-
-		And(
-			"a Retry-After header of at least {int} second is given",
-			(_ctx, seconds: number) => {
-				expect(
-					Number(responseOf(world).headers["retry-after"]),
-				).toBeGreaterThanOrEqual(seconds);
+		Given(
+			"the limit is {int} requests per address in each {int} seconds",
+			async (_ctx, requests: number, seconds: number) => {
+				await world.setAddressLimit(requests, seconds);
 			},
 		);
+
+		// The operator routes take no login, so the name sent is only a label for the request.
+		When(
+			"someone who is not logged in tries to list the sales {int} times",
+			async (_ctx, times: number) => {
+				await world.repeat("list the sales", "visitor", times);
+			},
+		);
+
+		burstChecks({ Then, And }, world);
 	};
 }
 
@@ -189,6 +212,8 @@ export function bindRateLimitLimiting(layer: ShopLayer) {
 		otherUserUnaffected: otherUserUnaffected(layer),
 		addressLimited: addressLimited(layer),
 		countStartsAgain: countStartsAgain(layer),
-		loginsLimited: loginsLimited(layer),
+		loginsLimited: authBurstLimited(layer, "log in"),
+		signUpsShareLimit: authBurstLimited(layer, "sign up"),
+		operatorRoutesLimited: operatorRoutesLimited(layer),
 	};
 }

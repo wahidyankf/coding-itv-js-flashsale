@@ -11,6 +11,9 @@ import type {
 } from "./queue-scenario.js";
 import { salePath } from "./sale-path.js";
 
+// The password a scenario signs up with. A sign-up is only counted by the limit, so any password the rule takes will do.
+const SIGN_UP_PASSWORD = "a long password";
+
 // The key a shopper has in the scenario's maps: the name as the server normalizes it.
 export const shopperKey = (user: string): string => user.trim().toLowerCase();
 
@@ -38,6 +41,25 @@ export function queueRequests(app: FastifyInstance, scenario: QueueScenario) {
 			});
 			return scenario.response;
 		},
+		// A sign-up from the scenario's address, which the auth limit counts with the logins.
+		async trySignUp(user: string): Promise<Response> {
+			scenario.response = await app.inject({
+				method: "POST",
+				url: API_PATHS.authRegister,
+				remoteAddress: address,
+				payload: { username: user, password: SIGN_UP_PASSWORD },
+			});
+			return scenario.response;
+		},
+		// The operator's list of sales, with no login: the operator routes count by address before the login is read.
+		async tryListSales(): Promise<Response> {
+			scenario.response = await app.inject({
+				method: "GET",
+				url: API_PATHS.adminSales,
+				remoteAddress: address,
+			});
+			return scenario.response;
+		},
 		async join(user: string, saleId = scenario.saleId): Promise<Response> {
 			const reply = await app.inject({
 				method: "POST",
@@ -52,10 +74,14 @@ export function queueRequests(app: FastifyInstance, scenario: QueueScenario) {
 			}
 			return reply;
 		},
-		async check(user: string, ticket?: string): Promise<Response> {
+		async check(
+			user: string,
+			ticket?: string,
+			saleId = scenario.saleId,
+		): Promise<Response> {
 			scenario.response = await app.inject({
 				method: "GET",
-				url: salePath("queueMe", scenario.saleId),
+				url: salePath("queueMe", saleId),
 				headers: {
 					cookie: await scenario.login(user),
 					...ticketHeader(ticket),
@@ -186,6 +212,8 @@ export function limitRequests(scenario: ShopScenario) {
 			return scenario.confirm(user, { reservationId: "not-an-id" });
 		}
 		if (kind === "log in") return scenario.tryLogin(user);
+		if (kind === "sign up") return scenario.trySignUp(user);
+		if (kind === "list the sales") return scenario.tryListSales();
 		throw new Error(`unknown request "${kind}"`);
 	};
 	return {

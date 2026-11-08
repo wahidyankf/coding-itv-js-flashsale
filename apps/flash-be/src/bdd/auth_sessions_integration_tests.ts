@@ -21,6 +21,11 @@ describeFeature(
 
 		Scenario("A shopper asks who is logged in", steps.asksLoggedIn);
 
+		Scenario(
+			"A refresh token that has run out is refused, and the session stays open",
+			steps.refusesExpiredRefresh,
+		);
+
 		Scenario("Logging out ends the login", steps.logsOutEnds);
 
 		Scenario("Logging out twice is harmless", steps.logsOutTwice);

@@ -417,6 +417,41 @@ function survivesNoData(layer: ShopLayer): ScenarioBinder {
 	};
 }
 
+// A buyer who has paid is refused a second item by the purchase record in Postgres, so Redis being down lets nobody in twice.
+function refusesAgainWithoutRedis(layer: ShopLayer): ScenarioBinder {
+	return ({ Given, And, When, Then }) => {
+		const world = layer.newWorld();
+
+		Given(OPEN_SALE, async () =>
+			openSale(world, layer.now, { stock: 10, sold: 0 }),
+		);
+
+		And('"ana" has been admitted', async () => {
+			await world.admitted("ana");
+		});
+
+		And('"ana" has reserved an item', async () => {
+			await world.reserve("ana");
+		});
+
+		And('"ana" has confirmed the purchase', async () => {
+			await world.confirm("ana");
+		});
+
+		And("Redis is down", async () => {
+			await world.breakRedis();
+		});
+
+		When('"ana" reserves an item', async () => {
+			await world.reserve("ana");
+		});
+
+		Then("the response status is {int}", statusIs(world));
+
+		And("the error is {string}", errorIs(world));
+	};
+}
+
 // The steps of each scenario in the degraded serving feature, by the scenario's name in the feature's own words.
 export function bindDegradedServing(layer: ShopLayer) {
 	return {
@@ -431,5 +466,6 @@ export function bindDegradedServing(layer: ShopLayer) {
 		stillLimited: stillLimited(layer),
 		countedWithOldData: countedWithOldData(layer),
 		survivesNoData: survivesNoData(layer),
+		refusesAgainWithoutRedis: refusesAgainWithoutRedis(layer),
 	};
 }

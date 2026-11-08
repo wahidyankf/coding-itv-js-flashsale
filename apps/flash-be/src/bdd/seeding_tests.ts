@@ -1,7 +1,11 @@
 // Binds specs/apps/flash/be/behaviours/sale/seeding.feature at the unit layer: the seed writes into a recording database, so each
 // Then checks the one insert the seed sends and its values. The integration layer checks the same scenarios against a real
 // database (seeding_integration_tests.ts). The two differ on purpose, so the steps stay in each file.
-import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
+import {
+	describeFeature,
+	loadFeature,
+	type StepTest,
+} from "@amiceli/vitest-cucumber";
 import type { Kysely } from "kysely";
 import { expect } from "vitest";
 import { parseSeedArgs } from "../adapters/inbound/cli/seed-args.js";
@@ -47,6 +51,36 @@ async function seedFrom(
 	await seedSale(db.db as unknown as Kysely<Database>, parsed.value, ACTOR);
 }
 
+// A seed the command refuses: nothing is stored, and the message the command gives is the one the scenario names.
+function refusesSeed({ Given, When, Then, And }: StepTest) {
+	let db: Recording;
+	let failure: unknown;
+
+	Given("a database migrated to the latest version", () => {
+		db = recordingDb();
+	});
+
+	When(
+		"the sale is seeded with stock {int}, opening in {int} minutes for {int} minutes",
+		async (_ctx, stock: number, startsIn: number, duration: number) => {
+			try {
+				await seedFrom(db, stock, startsIn, duration);
+			} catch (error) {
+				failure = error;
+			}
+		},
+	);
+
+	Then("seeding fails with {string}", (_ctx, message: string) => {
+		expect(failure).toBeInstanceOf(Error);
+		expect((failure as Error).message).toBe(message);
+	});
+
+	And("the sales table holds {int} sales", (_ctx, count: number) => {
+		expect(statementsInto(db, "sales")).toHaveLength(count);
+	});
+}
+
 describeFeature(
 	await loadFeature(specFile("flash/be/behaviours/sale/seeding.feature")),
 	({ Scenario }) => {
@@ -89,34 +123,14 @@ describeFeature(
 
 		Scenario(
 			"Seeding refuses a stock that is not a positive integer",
-			({ Given, When, Then, And }) => {
-				let db: Recording;
-				let failure: unknown;
+			refusesSeed,
+		);
 
-				Given("a database migrated to the latest version", () => {
-					db = recordingDb();
-				});
+		Scenario("Seeding refuses a window that lasts no minutes", refusesSeed);
 
-				When(
-					"the sale is seeded with stock {int}, opening in {int} minutes for {int} minutes",
-					async (_ctx, stock: number, startsIn: number, duration: number) => {
-						try {
-							await seedFrom(db, stock, startsIn, duration);
-						} catch (error) {
-							failure = error;
-						}
-					},
-				);
-
-				Then("seeding fails with {string}", (_ctx, message: string) => {
-					expect(failure).toBeInstanceOf(Error);
-					expect((failure as Error).message).toBe(message);
-				});
-
-				And("the sales table holds {int} sales", (_ctx, count: number) => {
-					expect(statementsInto(db, "sales")).toHaveLength(count);
-				});
-			},
+		Scenario(
+			"Seeding refuses a window that starts past the range of a date",
+			refusesSeed,
 		);
 	},
 );

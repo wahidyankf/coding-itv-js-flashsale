@@ -76,6 +76,16 @@ Feature: Serving while Redis is down
     And "cai" confirms the purchase
     Then every confirmation answered in less than 500 milliseconds
 
+  Scenario: A buyer who has bought cannot reserve again while Redis is down
+    Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
+    And "ana" has been admitted
+    And "ana" has reserved an item
+    And "ana" has confirmed the purchase
+    And Redis is down
+    When "ana" reserves an item
+    Then the response status is 409
+    And the error is "already_purchased"
+
   Scenario: Requests are still limited
     Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
     And the limit is 3 requests per user in each 60 seconds

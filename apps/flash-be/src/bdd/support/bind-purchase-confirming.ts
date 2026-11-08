@@ -14,7 +14,12 @@ import {
 	type ShopLayer,
 	secondsPass,
 } from "./shop-steps.js";
-import { errorIs, type ScenarioBinder, statusIs } from "./steps.js";
+import {
+	errorIs,
+	type OutlineBinder,
+	type ScenarioBinder,
+	statusIs,
+} from "./steps.js";
 import { shopperNames } from "./users.js";
 
 // The sale of the given stock, open from an hour ago until an hour from now, with nothing sold yet.
@@ -476,6 +481,30 @@ function refusesSecondPurchase(layer: ShopLayer): ScenarioBinder {
 	};
 }
 
+// A well-formed reservation id that no sale holds, so the sale is the only reason the confirmation is refused. The sale id
+// is the outline's: an id no sale has, or a value that is not an id at all.
+function refusesUnknownSale(layer: ShopLayer): OutlineBinder {
+	return ({ Given, When, Then, And }, examples) => {
+		const world = layer.newWorld();
+
+		Given("no sale exists", () => {});
+
+		When(
+			'"ana" confirms the purchase with the reservation id "00000000-0000-4000-8000-000000000000" in the sale with id "<id>"',
+			async () => {
+				await world.confirm("ana", {
+					reservationId: "00000000-0000-4000-8000-000000000000",
+					saleId: String(examples.id),
+				});
+			},
+		);
+
+		Then("the response status is {int}", statusIs(world));
+
+		And("the error is {string}", errorIs(world));
+	};
+}
+
 // The steps of each scenario in the confirming feature, by the scenario's name in the feature's own words.
 export function bindPurchaseConfirming(layer: ShopLayer) {
 	return {
@@ -484,6 +513,7 @@ export function bindPurchaseConfirming(layer: ShopLayer) {
 		noSecondItem: noSecondItem(layer),
 		refusesUnknownId: refusesReservationId(layer),
 		refusesNonId: refusesReservationId(layer),
+		refusesUnknownSale: refusesUnknownSale(layer),
 		refusesOthersHold: refusesOthersHold(layer),
 		refusesExpiredHold: refusesExpiredHold(layer),
 		keepsHoldOnDecline: keepsHoldOnDecline(layer),

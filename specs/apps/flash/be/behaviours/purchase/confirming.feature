@@ -45,6 +45,17 @@ Feature: Confirming a purchase
     Then the response status is 400
     And the error is "invalid_reservation"
 
+  Scenario Outline: Confirming in an unknown sale is refused
+    Given no sale exists
+    When "ana" confirms the purchase with the reservation id "00000000-0000-4000-8000-000000000000" in the sale with id "<id>"
+    Then the response status is 404
+    And the error is "sale_not_found"
+
+    Examples:
+      | id                                   |
+      | 00000000-0000-4000-8000-000000000000 |
+      | not-a-uuid                           |
+
   Scenario: Somebody else's reservation cannot be confirmed
     Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
     And "ana" has been admitted

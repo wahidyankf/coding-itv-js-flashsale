@@ -206,6 +206,15 @@ When("the access token expires", async ({ request: _request }) => {
 	);
 });
 
+// The refresh token runs out: its row's expiry is set in the past, so the next refresh is refused.
+When("the refresh token runs out", async ({ request: _request }) => {
+	const token = jar().get("refresh_token")?.value ?? "";
+	await query(
+		"update sessions set refresh_expires_at = now() - interval '1 minute' where refresh_hash = $1",
+		[hash(token)],
+	);
+});
+
 When("the shopper refreshes the login", async ({ request }) => {
 	await go(request, routes.refresh);
 });
@@ -216,6 +225,19 @@ When("the copy of the refresh token is used", async ({ request }) => {
 		record: false,
 	});
 });
+
+// The copy's access row is still open: the refused refresh did not end the session the copy belongs to.
+Then(
+	"the session of the copied tokens is not ended",
+	async ({ request: _request }) => {
+		const token = world.jarCopy?.get("access_token")?.value ?? "";
+		const rows = await query<{ id: string }>(
+			"select id from sessions where access_hash = $1 and deleted_at is null",
+			[hash(token)],
+		);
+		expect(rows).toHaveLength(1);
+	},
+);
 
 Then("the shopper is no longer logged in", async ({ request }) => {
 	await go(request, routes.me);

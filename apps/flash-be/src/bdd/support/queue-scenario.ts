@@ -36,7 +36,7 @@ export type QueueScenario = {
 	// How long an admission lasts from now on. A server reads it from ADMISSION_TTL_SECONDS; a scenario shortens it.
 	setAdmissionSeconds: (seconds: number) => Promise<void>;
 	join: (user: string, saleId?: string) => Promise<Response>;
-	check: (user: string, ticket?: string) => Promise<Response>;
+	check: (user: string, ticket?: string, saleId?: string) => Promise<Response>;
 	admit: (saleId?: string) => Promise<void>;
 	loseQueue: () => Promise<void>;
 };
@@ -70,6 +70,8 @@ export type ShopScenario = QueueScenario & {
 	// Time passes: the unit clock moves; other layers really wait.
 	advance: (seconds: number) => Promise<void>;
 	loseReservationState: () => Promise<void>;
+	// Another instance holds the rebuild lock of the sale, so a request that finds no state waits for it and gives up.
+	holdRebuildLock: () => Promise<void>;
 	breakWrites: () => Promise<void>;
 	fixWrites: () => Promise<void>;
 	purchases: Map<string, { purchaseId: string }>;
@@ -104,7 +106,11 @@ export type ShopScenario = QueueScenario & {
 	// Live updates: a watcher per stream, and the sale opening while a shopper is already waiting.
 	watcher: EventWatcher | undefined;
 	watchSale: (saleId?: string) => Promise<EventWatcher>;
-	watchPlace: (user: string, ticket?: string) => Promise<EventWatcher>;
+	watchPlace: (
+		user: string,
+		ticket?: string,
+		saleId?: string,
+	) => Promise<EventWatcher>;
 	openSale: () => Promise<void>;
 	// Redis stops answering, and answers again. What it held is untouched; `loseQueue` and
 	// `loseReservationState` take the data away.
@@ -116,6 +122,9 @@ export type ShopScenario = QueueScenario & {
 	setLoginLimit: (requests: number, seconds: number) => Promise<void>;
 	// One login with a wrong password, from the scenario's own address, so its count meets no other scenario's.
 	tryLogin: (user: string) => Promise<Response>;
+	trySignUp: (user: string) => Promise<Response>;
+	// The operator's list of sales, sent with no login, as a client that is not logged in sends it.
+	tryListSales: () => Promise<Response>;
 	// Sends the same kind of write request several times, one after the other.
 	repeat: (kind: string, user: string, times: number) => Promise<Response[]>;
 	joinMany: (count: number) => Promise<Response[]>;
@@ -134,6 +143,8 @@ export function placeholders() {
 		join: notWired,
 		check: notWired,
 		tryLogin: notWired,
+		trySignUp: notWired,
+		tryListSales: notWired,
 		reserve: notWired,
 		reserveAll: notWired,
 		repeat: notWired,

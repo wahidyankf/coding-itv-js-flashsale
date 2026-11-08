@@ -12,7 +12,7 @@ import type { AccountRepository } from "../../application/ports/account-reposito
 import type { Clock } from "../../application/ports/clock.js";
 import type { PasswordHasher } from "../../application/ports/password-hasher.js";
 import type { SessionRepository } from "../../application/ports/session-repository.js";
-import type { Principal, Role } from "../../domain/auth.js";
+import { hashToken, type Principal, type Role } from "../../domain/auth.js";
 import { type UserId, type Username, userIdOf } from "../../domain/user.js";
 import type { UserRow } from "./auth-world.js";
 import { usernameOf } from "./users.js";
@@ -61,6 +61,8 @@ export type MemoryAuth = {
 	// The auth service of another instance: its own service object over the same accounts and logins, as a second server
 	// over the same Postgres is.
 	anotherInstance: () => AuthService;
+	// Whether the login of this access token is still open: its row is not marked deleted.
+	liveSession: (accessToken: string) => boolean;
 };
 
 // Accounts by name: a name is taken once, and a principal is found by name.
@@ -200,6 +202,10 @@ export function memoryAuth(
 	return {
 		service,
 		anotherInstance: instance,
+		liveSession: (accessToken) =>
+			rows.some(
+				(row) => !row.deleted && row.accessHash === hashToken(accessToken),
+			),
 		stored: () => ({
 			passwordHashes: [...users.values()].map((user) => user.passwordHash),
 			tokenHashes: rows.flatMap((row) => [row.accessHash, row.refreshHash]),

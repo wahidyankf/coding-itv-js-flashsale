@@ -3,7 +3,7 @@
 // hold is taken again. Binds reservation/reserving.feature and recovery/rebuild.feature, and the hold rows of
 // degraded/serving.feature. The reserve and waitUntilAdmitted calls are in support/shoppers.ts.
 
-import { MS_PER_SECOND } from "@flash/flash-commons";
+import { MS_PER_HOUR, MS_PER_SECOND } from "@flash/flash-commons";
 import { sleep } from "@flash/flash-commons/timers";
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
@@ -95,6 +95,18 @@ Given(
 		const names = ["ready", "buyers", "holds", "ids", "rebuild-lock"];
 		await withRedis(E2E_REDIS_URL, (redis) =>
 			redis.del(names.map((name) => `sale:${currentSaleId()}:${name}`)),
+		);
+	},
+);
+
+// The lock a rebuild on another instance holds, for an hour: longer than any wait, so this reserve gives up waiting.
+Given(
+	"another instance holds the rebuild lock of the sale",
+	async ({ request: _request }) => {
+		await withRedis(E2E_REDIS_URL, (redis) =>
+			redis.set(`sale:${currentSaleId()}:rebuild-lock`, "another-instance", {
+				expiration: { type: "PX", value: MS_PER_HOUR },
+			}),
 		);
 	},
 );
