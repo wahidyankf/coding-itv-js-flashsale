@@ -53,7 +53,7 @@ password get the same answer, and the check for an unknown name still hashes, so
 | `HttpOnly`     | always                                 | a script on the page, including an injected one, cannot read the tokens                |
 | `SameSite=Lax` | always                                 | another site cannot make the browser send the cookie with a POST                       |
 | `Secure`       | `COOKIE_SECURE` (`true` in production) | the browser sends the cookie over HTTPS only; `false` is for plain HTTP on one machine |
-| `Path`         | [`/`](.) and `/auth`                   | the refresh token reaches only the auth routes                                         |
+| `Path`         | `/` and `/auth`                        | the refresh token reaches only the auth routes                                         |
 
 `flash-web` is the browser's only server. It passes `/api/auth` and `/api/sales` on with the cookies, moves the refresh
 cookie's path to `/api/auth`, and refuses a POST whose `Origin` is another host (`403 cross_site`) as a second lock beside

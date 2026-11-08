@@ -12,7 +12,7 @@ the place, the hold or the purchase of another shopper, and the operator routes 
 ## Decision
 
 - A user has a user name and a password (8 to 128 characters), hashed with scrypt. Sign-up makes a shopper. An operator is made on the server with `create-operator`.
-- A session is two cookies: `access_token` (15 minutes, path [`/`](.)) and `refresh_token` (7 days, path `/auth`, used once).
+- A session is two cookies: `access_token` (15 minutes, path `/`) and `refresh_token` (7 days, path `/auth`, used once).
   Replaying an old refresh token ends the session. Only SHA-256 hashes of tokens are stored, in Postgres, with Redis as a cache.
 - No route takes a user id. The shopper is the session (`/queue/me`, `/purchases/me`). Cookies are `SameSite=Lax`, and `Secure` when `COOKIE_SECURE` is true.
 - The identifier of the task is still there: it is the user name.
@@ -21,6 +21,11 @@ the place, the hold or the purchase of another shopper, and the operator routes 
 
 - **A plain user name, no password.** It matches the task, but it lets anyone act as anyone, and it gives the audit columns nothing real to point at.
 - **One shared token for operators.** It cannot say who changed a sale.
+- **Make the first operator from environment variables at startup.** The password would sit in the deploy config, and
+  the server would gain a bootstrap step on its start path.
+- **A setup script outside the API for the first operator.** It would copy the user name and password rules and the
+  hash format, and the copies would drift. `create-operator` is an inbound adapter of the API instead
+  ([why the two commands live in the API](../admin-and-sale-windows.md#why-the-two-commands-live-in-the-api)).
 - **A signed JWT as the access token.** A replayed refresh token must end the session, which needs server state anyway,
   and a copied JWT cannot be revoked before it ends.
 - **One long cookie.** A copy would be worth a week of access on every request.

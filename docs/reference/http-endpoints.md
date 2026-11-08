@@ -81,10 +81,10 @@ A shopper signs up with a user name and a password, and an operator logs in the 
 two cookies. Both are `HttpOnly` (a script on the page cannot read them) and `SameSite=Lax`, and both are `Secure` when
 `COOKIE_SECURE` is `true` (the default in production). The tokens are never in a body.
 
-| Cookie          | Lives for  | Sent to  | What it does                                                            |
-| --------------- | ---------- | -------- | ----------------------------------------------------------------------- |
-| `access_token`  | 15 minutes | [`/`](.) | goes with every request and says who you are                            |
-| `refresh_token` | 7 days     | `/auth`  | only trades itself for a new pair; each use replaces it (it is rotated) |
+| Cookie          | Lives for  | Sent to | What it does                                                            |
+| --------------- | ---------- | ------- | ----------------------------------------------------------------------- |
+| `access_token`  | 15 minutes | `/`     | goes with every request and says who you are                            |
+| `refresh_token` | 7 days     | `/auth` | only trades itself for a new pair; each use replaces it (it is rotated) |
 
 `POST /auth/register` and `POST /auth/login` take `{ "username", "password" }`, set both cookies and answer with
 `{ "username", "role" }` (`201` for a new account, `200` for a login). A user name is trimmed and lowercased, then must
@@ -364,7 +364,7 @@ The scenarios are in [`specs/apps/flash/be/behaviours/degraded/`](../../specs/ap
 
 | Method    | Path           | Response                                                                                                                                       |
 | --------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| GET       | [`/`](.)       | HTML page. It shows the current sale, a login form or Buy Now, and `Backend: ok` when `flash-be` answers `GET /health` with `{"status":"ok"}`. |
+| GET       | `/`            | HTML page. It shows the current sale, a login form or Buy Now, and `Backend: ok` when `flash-be` answers `GET /health` with `{"status":"ok"}`. |
 | GET       | `/api/health`  | `200` `{"status":"ok"}`                                                                                                                        |
 | GET, POST | `/api/sales/*` | The routes below, passed on to `flash-be`. Any other `GET` or `POST` under this path answers `404` with `errorCode` `not_found`.               |
 | GET, POST | `/api/auth/*`  | The login routes below, passed on to `flash-be`, with the cookies.                                                                             |

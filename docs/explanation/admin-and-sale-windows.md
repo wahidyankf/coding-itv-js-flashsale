@@ -77,6 +77,25 @@ The routes need a session whose account has the role `operator`. A request witho
 - The web server does not pass `/api/admin` on. Its proxy has an allow-list of method and path pairs, no `/admin` route
   is on it, and a test fails if one ever is.
 
+## Why the two commands live in the API
+
+`create-operator` and `seed-sale` are a second inbound adapter of `flash-be`, next to HTTP
+([`src/adapters/inbound/cli/`](../../apps/flash-be/src/adapters/inbound/cli)). They have their own entry points
+([`src/create-operator.ts`](../../apps/flash-be/src/create-operator.ts),
+[`src/seed-sale.ts`](../../apps/flash-be/src/seed-sale.ts)). The server's entry point,
+[`src/main.ts`](../../apps/flash-be/src/main.ts), does not load them, so they add no route and no code to a request.
+
+They live in the app, not in a separate setup script, because an account must follow the same rules as a sign-up: the
+user name and password rules of the domain, the scrypt format of the stored hash, and the audit columns. A script
+outside the app would copy those rules, and the copies would drift. Importing them from outside would break the
+module boundary that `architecture_tests.ts` guards. Running a command needs a shell on the server, so nothing is open
+to the network.
+
+`seed-sale` is in the production image too. It skips the overlap check and writes `$system` as the author, so day-to-day
+sales go through `POST /admin/sales`. It stays in the image because the load test builds its
+image from the same [`Dockerfile`](../../apps/flash-be/Dockerfile) and seeds each run's sale with it, so what it tests
+is what ships.
+
 ## Windows may not overlap
 
 The task sells one product at a time, and "the current sale" is the one that is running, or the next one to open. Two

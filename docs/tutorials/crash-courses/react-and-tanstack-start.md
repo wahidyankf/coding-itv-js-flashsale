@@ -26,7 +26,7 @@ plugins matters.
 
 ### File routes and the generated tree
 
-Each file in [`src/routes/`](../../../apps/flash-web/src/routes/) is a route: [`index.tsx`](../../../apps/flash-web/src/routes/index.tsx) is [`/`](.), [`api/health.ts`](../../../apps/flash-web/src/routes/api/health.ts) is
+Each file in [`src/routes/`](../../../apps/flash-web/src/routes/) is a route: [`index.tsx`](../../../apps/flash-web/src/routes/index.tsx) is `/`, [`api/health.ts`](../../../apps/flash-web/src/routes/api/health.ts) is
 `/api/health`, and `$` in [`api/sales.$.ts`](../../../apps/flash-web/src/routes/api/sales.$.ts) matches the rest of the path. The Vite plugin writes
 [`routeTree.gen.ts`](../../../apps/flash-web/src/routeTree.gen.ts) from them, and
 [`router.tsx`](../../../apps/flash-web/src/router.tsx) builds a new router per request from that tree. Do not edit the
