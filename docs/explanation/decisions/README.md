@@ -29,3 +29,4 @@ the other options, and link to those pages.
 - [016-dry-rule-of-three.md](016-dry-rule-of-three.md) - logic used in three places becomes one piece; shared behaviour lives in `libs/flash-commons`; test oracles keep their own copies.
 - [017-retry-backoff-jitter.md](017-retry-backoff-jitter.md) - every retry uses exponential backoff, full jitter and a max attempt count, except the Redis reconnect.
 - [018-decode-payloads-at-the-edge.md](018-decode-payloads-at-the-edge.md) - every request body, reply and stream event is decoded at the edge with a small kit in flash-commons.
+- [019-api-version-prefix.md](019-api-version-prefix.md) - every API route is under `/api/v1`, and each app keeps its route paths in one module.
