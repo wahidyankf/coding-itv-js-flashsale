@@ -6,24 +6,29 @@ import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import net from "node:net";
 import path from "node:path";
-// The API's paths come from the table in flash-commons, the same one flash-be and flash-web use. `npm run smoke:prod` builds
-// flash-commons before this script runs, so the import resolves to its dist.
-import { API_PATHS, PROBE_PATHS } from "@flash/flash-commons";
+// The API's paths, the status numbers and the retry come from flash-commons, the same ones flash-be and flash-web use.
+// `npm run smoke:prod` builds flash-commons and typekit before this script runs, so the imports resolve to their dist.
+import {
+	API_PATHS,
+	FIRST_ERROR_STATUS,
+	HTTP_STATUS,
+	PROBE_PATHS,
+	retryAsync,
+} from "@flash/flash-commons";
+import { sleep } from "@flash/flash-commons/timers";
+import { Err, Ok } from "@flash/typekit";
 
 const root = path.resolve(import.meta.dirname, "../..");
 const PROJECT = "flash-smoke";
 // The API instances in compose.prod.yaml. The run waits for all of them to be healthy.
 const API_INSTANCES = ["flash-be-1", "flash-be-2", "flash-be-3"];
-// The shopper checks the queue this often, this many times, before the run gives up.
-const ADMISSION_CHECK_MS = 500;
-const MAX_ADMISSION_CHECKS = 30;
-// A declined payment is tried up to this many times in total.
-const MAX_PAYMENT_ATTEMPTS = 5;
+// The shopper checks the queue up to this many times before the run gives up. The wait between checks starts at the
+// base and doubles up to the cap, with full jitter, so a slow queue is not hammered.
+const ADMISSION_POLICY = { baseMs: 250, capMs: 1000, maxAttempts: 30 };
+// A declined payment is tried up to this many times in total, with a short backoff between the tries.
+const PAYMENT_POLICY = { baseMs: 100, capMs: 800, maxAttempts: 5 };
 const MINUTE_MS = 60_000;
 const TICKET_HEADER = "x-queue-ticket";
-const STATUS = { ok: 200, created: 201, firstError: 400, notFound: 404 };
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function freePort() {
 	return new Promise((resolve, reject) => {
@@ -92,7 +97,7 @@ async function call(base, method, path, { headers = {}, body } = {}) {
 
 // A reply that is not the one expected stops the walk, with what came back.
 function expectOk(label, reply, status) {
-	if (reply.status >= STATUS.firstError) {
+	if (reply.status >= FIRST_ERROR_STATUS) {
 		throw new Error(`${label}: refused with ${JSON.stringify(reply.body)}`);
 	}
 	if (status !== undefined && reply.status !== status) {
@@ -130,7 +135,7 @@ async function startStack() {
 async function checkReady(apiUrl) {
 	step("the API is ready");
 	const ready = await fetch(`${apiUrl}${PROBE_PATHS.ready}`);
-	if (ready.status !== STATUS.ok)
+	if (ready.status !== HTTP_STATUS.ok)
 		throw new Error(`/ready answered ${ready.status}`);
 }
 
@@ -142,7 +147,7 @@ async function signUpShopper(web) {
 	const account = await web("POST", API_PATHS.authRegister, {
 		body: { username: SHOPPER, password },
 	});
-	expectOk("sign up", account, STATUS.created);
+	expectOk("sign up", account, HTTP_STATUS.created);
 	return account.cookie;
 }
 
@@ -205,14 +210,14 @@ async function createSaleAsOperator(api, body) {
 	const operator = await api("POST", API_PATHS.authLogin, {
 		body: { username: OPERATOR, password },
 	});
-	expectOk("operator login", operator, STATUS.ok);
+	expectOk("operator login", operator, HTTP_STATUS.ok);
 	const sale = expectOk(
 		"create sale",
 		await api("POST", API_PATHS.adminSales, {
 			headers: { cookie: operator.cookie },
 			body,
 		}),
-		STATUS.created,
+		HTTP_STATUS.created,
 	);
 	return { sale, cookie: operator.cookie };
 }
@@ -229,7 +234,7 @@ async function checkWebBlocksAdmin(operatorCookie) {
 		},
 		body: "{}",
 	});
-	if (blocked.status !== STATUS.notFound) {
+	if (blocked.status !== HTTP_STATUS.notFound) {
 		throw new Error(
 			`the web server answered ${blocked.status} to ${API_PATHS.adminSales}`,
 		);
@@ -241,7 +246,7 @@ async function checkShopperSeesSale(web, sale) {
 	const current = expectOk(
 		"current sale",
 		await web("GET", API_PATHS.saleCurrent),
-		STATUS.ok,
+		HTTP_STATUS.ok,
 	);
 	if (current.id !== sale.id)
 		throw new Error("the current sale is not the new one");
@@ -256,21 +261,19 @@ async function joinAndWaitForAdmission(web, routes, shopperCookie) {
 		await web("POST", routes.queue, { headers: logged }),
 	);
 	const headers = { ...logged, [TICKET_HEADER]: joined.ticket };
-	let state = joined.state;
-	for (
-		let tries = 0;
-		state !== "admitted" && tries < MAX_ADMISSION_CHECKS;
-		tries++
-	) {
-		await sleep(ADMISSION_CHECK_MS);
-		const place = expectOk(
-			"place",
-			await web("GET", routes.queueMe, { headers }),
-			STATUS.ok,
-		);
-		state = place.state;
-	}
-	if (state !== "admitted") throw new Error("the shopper was never admitted");
+	if (joined.state === "admitted") return headers;
+	const admitted = await retryAsync(
+		async () => {
+			const place = expectOk(
+				"place",
+				await web("GET", routes.queueMe, { headers }),
+				HTTP_STATUS.ok,
+			);
+			return place.state === "admitted" ? new Ok(place) : new Err(place.state);
+		},
+		{ ...ADMISSION_POLICY, sleep, random: Math.random },
+	);
+	if (admitted.isErr()) throw new Error("the shopper was never admitted");
 	return headers;
 }
 
@@ -282,27 +285,26 @@ async function holdItem(web, routes, headers) {
 	);
 }
 
-// Pays for the hold. A declined charge is tried again, up to MAX_PAYMENT_ATTEMPTS, and the purchase is returned.
+// Pays for the hold. A declined charge is tried again, up to PAYMENT_POLICY.maxAttempts, and the purchase is returned.
 async function payForItem(web, routes, shopperCookie, held) {
 	step("the shopper pays (a declined charge is tried again)");
-	let purchase;
-	for (
-		let attempt = 0;
-		purchase === undefined && attempt < MAX_PAYMENT_ATTEMPTS;
-		attempt++
-	) {
-		const paid = await web("POST", routes.purchases, {
-			headers: { cookie: shopperCookie },
-			body: { reservationId: held.reservationId },
-		});
-		if (paid.status < STATUS.firstError) purchase = paid.body;
-		else if (paid.body.errorCode !== "payment_failed") {
-			throw new Error(`confirm: ${JSON.stringify(paid.body)}`);
-		}
-	}
-	if (purchase === undefined)
-		throw new Error("the payment was declined every time");
-	return purchase;
+	const declined = "payment_failed";
+	const paid = await retryAsync(
+		async () => {
+			const reply = await web("POST", routes.purchases, {
+				headers: { cookie: shopperCookie },
+				body: { reservationId: held.reservationId },
+			});
+			if (reply.status < FIRST_ERROR_STATUS) return new Ok(reply.body);
+			if (reply.body.errorCode !== declined) {
+				throw new Error(`confirm: ${JSON.stringify(reply.body)}`);
+			}
+			return new Err(declined);
+		},
+		{ ...PAYMENT_POLICY, sleep, random: Math.random },
+	);
+	if (paid.isErr()) throw new Error("the payment was declined every time");
+	return paid.value;
 }
 
 // The shopper learns they bought the item, and a second hold is refused.
@@ -313,7 +315,7 @@ async function checkOutcome(web, routes, shopperCookie, headers) {
 		await web("GET", routes.purchaseMe, {
 			headers: { cookie: shopperCookie },
 		}),
-		STATUS.ok,
+		HTTP_STATUS.ok,
 	);
 	if (outcome.state !== "purchased") {
 		throw new Error(`the outcome is ${outcome.state}, wanted purchased`);
