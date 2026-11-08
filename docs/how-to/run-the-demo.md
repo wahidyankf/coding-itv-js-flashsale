@@ -6,7 +6,8 @@ keeps selling while Redis is down, and a load run proves that nothing was sold t
 (`cp .env.example .env`).
 
 The requests are in [`api-flash-demo.http`](../../api-flash-demo.http), in the
-[kulala.nvim](https://github.com/wahidyankf/kulala.nvim) format. Send them one at a time from top to bottom.
+[kulala.nvim](https://github.com/wahidyankf/kulala.nvim) format, so you also need Neovim with kulala.nvim. Send them
+one at a time from top to bottom.
 
 ## Before the audience arrives
 
@@ -17,7 +18,9 @@ npm run demo:dev     # starts the API on :8080 and the web page on :3000; leave 
 ```
 
 `demo:reset` deletes every local account and sale. Skip it to keep them, but then an older sale that is still running
-can be the current one, because one sale runs at a time and the seed command does not check for overlaps.
+can be the current one, because one sale runs at a time and the seed command does not check for overlaps. The names
+`ana` and `ben` can also be taken, because the e2e tests use the same database and the same names with another
+password. Then sign up with new names.
 `demo:setup` goes on when the operator `ops` already exists.
 
 Open <http://localhost:3000> in two browser windows, one of them private, so that two shoppers have their own cookies.
@@ -50,6 +53,14 @@ Open `api-flash-demo.http` and send requests 1 to 25. The ones to stop at:
 | 21      | `409 already_purchased`                                                                    |
 | 23, 25  | `403 forbidden` for a shopper on an operator route, `401 not_authenticated` with no login  |
 
+The reply to request 8 has only the id. To show the row that stayed:
+
+```bash
+docker compose -f compose.dev.yaml exec postgres psql -U flash -d flash -c "SELECT s.name, s.deleted_at, u.username AS deleted_by FROM sales s JOIN users u ON u.id = s.deleted_by ORDER BY s.deleted_at DESC LIMIT 1"
+```
+
+It prints `Demo sale for later`, the time and `ops`.
+
 This buys the second item, so one is left. Requests 26 to 30 go through the web server: the browser reaches only a
 fixed list of routes, the operator routes answer `404`, and a `POST` from another site answers `403 cross_site`.
 
@@ -61,8 +72,9 @@ curl -s localhost:8080/ready
 ```
 
 The answer is `{"status":"unavailable","checks":{"database":"ok","redis":"error"}}` with status `503`. In the second
-window, sign up as `ben`, press **Buy Now** and **Confirm purchase**: the purchase goes through on Postgres alone,
-under a row lock. It is the last item, so both windows change to **Sold out** by themselves.
+window, sign up as `ben` with the password `a long password`, press **Buy Now** and **Confirm purchase**: the purchase
+goes through on Postgres alone, under a row lock. It is the last item, so within a few seconds both windows change to
+**Sold out** by themselves.
 
 ```bash
 npm run demo:redis:start   # returns when Redis is healthy; /ready answers ok again
@@ -92,6 +104,7 @@ the [README](../../README.md#start-here).
 
 | What you see                             | Why, and what to do                                                                                 |
 | ---------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| sign up says "That name is taken"        | the name exists from an earlier run or the e2e tests: pick another name                             |
 | request 4 answers `409 sale_overlaps`    | an earlier run stopped before request 8: delete that sale (its id is in request 6) and send 4 again |
 | request 10 answers `409 username_taken`  | the shopper exists from an earlier run: send request 11 to log in                                   |
 | request 14 says `waiting`                | the queue lets shoppers in each second: send 14 again                                               |

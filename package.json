@@ -25,7 +25,7 @@
 		"demo:dev": "npx nx run-many -t dev -p flash-be flash-web --output-style=stream",
 		"demo:redis:stop": "docker compose -f compose.dev.yaml stop redis",
 		"demo:redis:start": "docker compose -f compose.dev.yaml up -d --wait redis",
-		"demo:load": "npx nx load:smoke flash-load"
+		"demo:load": "npx nx load:smoke flash-load --output-style=stream"
 	},
 	"repository": {
 		"type": "git",
