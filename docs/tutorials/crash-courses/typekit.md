@@ -88,7 +88,12 @@ The same rule for a call that returns a promise. The proxy turns any failed call
 
 ```ts
 const answered = await attemptAsync(async (): Promise<Response> => { /* fetch and copy headers */ }, Error);
-return answered.isOk() ? answered.value : refuse("backend_unavailable");
+if (answered.isOk()) return answered.value;
+// A browser that left aborts the call; only a real failure is logged.
+if (!request.signal.aborted) {
+	logUnreachable(requestId, request, answered.error);
+}
+return refuse("backend_unavailable", requestId);
 ```
 
 `/ready` in [`routes/health.ts`](../../../apps/flash-be/src/adapters/inbound/http/routes/health.ts) wraps each store check

@@ -110,15 +110,14 @@ and a shopper waits only behind shoppers of the same sale. The lock is `lockLive
 
 **6. Use cases ask the domain, then call ports.** The purchase service decides nothing a domain function can decide.
 It asks `confirmBlock` whether the sale is over and `holdRefusalOf` whether the hold is still good, and only then
-charges ([`purchase-service.ts`](../../../apps/flash-be/src/application/purchase-service.ts)):
+charges ([`purchase-service.ts`](../../../apps/flash-be/src/application/purchase-service.ts), `refusalOf`):
 
 ```ts
-const ended = confirmBlock(request.value.sale, clock());
-if (ended !== undefined) return new Err(ended);
-const hold = await repository.findReservation(saleId, user);
-const refused = holdRefusalOf(hold, held, clock());
-if (refused !== undefined) return new Err(refused);
-return chargeAndCommit(saleId, user, held);
+if (await repository.findByUser(sale.id, user)) return "already_purchased";
+const ended = confirmBlock(sale, clock());
+if (ended !== undefined) return ended;
+const hold = await repository.findReservation(sale.id, user);
+return holdRefusalOf(hold, reservationId, clock());
 ```
 
 ## Try it here

@@ -18,8 +18,8 @@ out of the hooks. No decision record compares Playwright with another browser to
 
 **What it costs.** Each run builds the apps it tests (the configs allow 120 and 240 seconds for start-up), needs the
 dev stack, and needs Chromium once (`npx playwright install chromium`). Tests run one at a time, with one worker.
-The steps also write the API's paths and statuses themselves, so a renamed route means editing the tests (see the
-last idea below).
+The steps write the API's error codes and statuses themselves, so a changed reply means editing the tests; the paths
+come from `API_PATHS` (see the last idea below).
 
 ## The ideas this repo uses
 

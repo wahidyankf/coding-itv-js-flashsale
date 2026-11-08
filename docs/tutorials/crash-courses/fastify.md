@@ -135,8 +135,8 @@ raw.writeHead(HTTP_STATUS.ok, {
 });
 // ... the read loop ...
 request.raw.on("close", () => {
-	closed = true;
-	clearTimeout(timer);
+	stop(); // closed = true, and the next read is not scheduled
+	forget(); // the stream leaves the set that a shutdown ends
 });
 ```
 

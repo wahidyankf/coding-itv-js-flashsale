@@ -113,7 +113,7 @@ const gate = createGuardedGate(createRedisHoldGate(redis));
 // ...
 reservations: createReservationService({
 	gate,
-	repository: createReservationRepository(db),
+	repository: withRebuildLog(createReservationRepository(db), log),
 	sales,
 	queue,
 	clock,
@@ -164,7 +164,7 @@ Trimmed output:
  ✓ |unit| src/architecture_tests.ts > hexagonal architecture > lets outbound adapters implement ports, not use services or inbound adapters
  ✓ |unit| src/architecture_tests.ts > the route files > writes no path of its own: each one takes its path from the table
  Test Files  1 passed (1)
-      Tests  17 passed (17)
+      Tests  18 passed (18)
 ```
 
 Now break a rule in your head. Say [`domain/sale.ts`](../../../apps/flash-be/src/domain/sale.ts) imports `../application/sale-service.js` to read a sale. The test

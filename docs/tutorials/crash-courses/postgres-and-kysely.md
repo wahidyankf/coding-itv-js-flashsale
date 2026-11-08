@@ -104,8 +104,10 @@ and then runs its steps in a fixed order. The order is the rule:
 1. Lock the sale row.
 2. A purchase for this reservation already exists: return it again (a retried payment).
 3. The shopper already bought: answer `already_purchased`.
-4. The guarded update below finds no item left: answer `sold_out`.
-5. Insert the purchase and mark the hold spent. The transaction commits.
+4. The charge is no longer live in the payments ledger (another confirm refunded it first, read `FOR SHARE`): answer
+   `charge_refunded` and write nothing.
+5. The guarded update below finds no item left: answer `sold_out`.
+6. Insert the purchase and mark the hold spent. The transaction commits.
 
 ### The guarded update
 
@@ -171,8 +173,10 @@ npx vitest run --config vitest.integration.config.ts src/adapters/outbound/postg
 ```text
  ✓ |integration| ... > committing a purchase > returns the same purchase for the same reservation, without selling twice 47ms
  ✓ |integration| ... > committing a purchase > refuses a second purchase by the same user 7ms
- ✓ |integration| ... > committing a purchase > refuses a purchase when no item is left 7ms
-      Tests  3 passed (3)
+ ✓ |integration| ... > committing a purchase > refuses a purchase when no item is left 9ms
+ ✓ |integration| ... > committing a purchase > refuses a purchase whose charge was refunded first, and leaves the hold and the stock as they were 9ms
+ ✓ |integration| ... > committing a purchase > waits for a refund that holds the charge, and then refuses the purchase 313ms
+      Tests  5 passed (5)
 ```
 
 ## Traps to avoid

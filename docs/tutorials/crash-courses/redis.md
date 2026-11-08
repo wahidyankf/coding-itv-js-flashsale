@@ -40,6 +40,7 @@ const client = createClient({
 // Without a listener, a dropped socket emits an unhandled 'error' and exits the process.
 // The client reconnects on its own, and watchConnection logs the change, once.
 client.on("error", () => {});
+if (log !== undefined) watchConnection(client, log);
 await client.connect();
 ```
 

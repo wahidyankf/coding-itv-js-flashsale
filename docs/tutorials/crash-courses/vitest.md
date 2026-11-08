@@ -92,7 +92,8 @@ export function memoryHoldGate(clock: Clock): MemoryHoldGate {
 ```
 
 Do not confuse them with [`adapters/outbound/memory/`](../../../apps/flash-be/src/adapters/outbound/memory/). That
-folder is product code: the rate-limit counter that the API uses when Redis is down. A test reaches a store only
+folder holds the rate-limit counter that the API uses when Redis is down, which is product code, and the memory
+payment ledger, which only the unit tests use. A test reaches a store only
 through a port, so the
 [hexagon](../../explanation/hexagonal-architecture.md) lets a test pick the store without mocking a module.
 
