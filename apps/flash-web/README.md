@@ -10,11 +10,12 @@ server, which passes a fixed list of routes on to `flash-be`
 ```text
 src/
   routes/            TanStack routes: the page (index.tsx), the document (__root.tsx), and the server routes under
-                     /api: health.ts answers by itself, v1/auth.$.ts and v1/sales.$.ts hand every request to the proxy,
+                     /api: health.ts answers by itself, v1/auth.$.ts and v1/sales.$.ts hand every GET and POST to the proxy,
                      and $.ts sends every other /api path to the proxy, which refuses it with not_found
   api-paths.ts       BROWSER_ROUTES: the method and path pairs the browser may reach, in order, from API_PATHS in
                      @flash/flash-commons (no operator route)
-  proxy.ts           checks a request against BROWSER_ROUTES, passes it on to flash-be unchanged, and keeps only some headers
+  proxy.ts           checks a request against BROWSER_ROUTES, refuses a POST from another site, passes it on to flash-be
+                     unchanged, and keeps only some headers
   api.ts             what the app knows about the API: header names, the error shape, and callApi, which decodes
                      every reply with the decoder its caller names (the decoders sit next to the view types)
   web-api.ts         the one set of clients the page uses, sharing a fetch that renews the login

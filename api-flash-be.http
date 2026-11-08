@@ -57,7 +57,7 @@ Content-Type: application/json
 
 { "stock": 100, "startsAt": "2036-01-01T12:00:00Z", "endsAt": "2036-01-01T13:00:00Z" }
 
-### List every sale (the one that opens last first, with sold, holdSeconds and admitPerSecond)
+### List every sale (latest start first, with sold, holdSeconds and admitPerSecond)
 GET {{backend}}/api/v1/admin/sales
 
 ### Change a sale (only the fields sent: name, stock, startsAt, endsAt, holdSeconds, admitPerSecond; 409 sale_locked)
@@ -92,14 +92,15 @@ GET {{backend}}/api/v1/auth/me
 POST {{backend}}/api/v1/auth/refresh
 
 ###############################################################################
-# The waiting queue (log in as a shopper first; the three POST routes can answer 429 with Retry-After)
+# The waiting queue (log in as a shopper first; POST queue, reservations and purchases can answer 429 with
+# Retry-After, as can the auth and operator routes)
 ###############################################################################
 
 ### Join the queue (201 on a new place, 200 when you have one; the reply holds the ticket)
 # @name join
 POST {{backend}}/api/v1/sales/{{current.response.body.$.id}}/queue
 
-### Check your place (waiting with place, admitted, or absent; the delay lets one admission tick pass)
+### Check your place (waiting with a place, or admitted; 404 not_in_queue when the place was lost; the delay lets one admission tick pass)
 # @delay 1500
 GET {{backend}}/api/v1/sales/{{current.response.body.$.id}}/queue/me
 x-queue-ticket: {{join.response.body.$.ticket}}

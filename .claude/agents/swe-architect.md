@@ -17,8 +17,8 @@ source; the only files it writes are architecture decision records.
 ## Normal Workload
 
 It reads the goal, the code around the change, and the decisions already recorded, then chooses boundaries,
-dependencies, and tradeoffs whose consequences cascade through every later task. A wrong structural verdict is
-expensive to detect and to undo, so both modes take the same care.
+dependencies, and tradeoffs that every later task builds on. A wrong choice about structure is hard to find and costly
+to undo, so both modes take the same care.
 
 ## Standards
 

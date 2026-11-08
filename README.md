@@ -4,8 +4,7 @@ A flash sale sells a small stock of one product to a large crowd in a short time
 thousands of shoppers press **Buy Now** in the same second. This project sells through that rush and keeps two promises
 whatever happens: it never sells more than the stock, and it never sells one shopper more than one item.
 
-It was written in a coding interview setting. It answers the interview task with a REST API, a React page, tests at
-three levels and a load test that checks the data after each run. Everything runs on one laptop with Node.js and Docker.
+It answers a coding interview task with a REST API, a React page, tests at three levels and a load test that checks the data after each run. Everything runs on one laptop with Node.js and Docker.
 
 ## Start here
 
@@ -71,7 +70,7 @@ flowchart LR
   be["flash-be<br/>Fastify API"]
   pg[("Postgres 18<br/>source of truth")]
   redis[("Redis 8<br/>fast gate")]
-  browser -->|page, /api/v1/sales| web
+  browser -->|page, /api/v1 routes| web
   web -->|sale routes| be
   be -->|SQL, final guard| pg
   be -->|queue, gate, counters| redis
@@ -193,7 +192,7 @@ route is served under `/api/v1`, and every path is named once in
 the e2e tests and the k6 script call it ([decision 019](docs/explanation/decisions/019-api-version-prefix.md)).
 
 `flash-be` is a hexagon (hexagonal architecture, also called ports and adapters): the rules sit in `src/domain`, the use
-cases in `src/application`, and Postgres, Redis, the payment mock and HTTP are adapters behind ports. A unit test fails when a layer imports one it must not know. See
+cases in `src/application`, HTTP is an inbound adapter, and Postgres, Redis and the payment mock are outbound adapters behind ports. A unit test fails when a layer imports one it must not know. See
 [hexagonal architecture](docs/explanation/hexagonal-architecture.md).
 
 [Nx](docs/tutorials/crash-courses/nx.md) (a monorepo task runner) only runs commands here. It has no plugins, and every
@@ -204,22 +203,22 @@ the libraries first.
 
 Each row is a choice a reviewer may question, with what it buys and what it costs.
 
-| Choice                                                                                                               | Why                                                                                                                                                                    | What it costs                                                      |
-| -------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| Redis Lua script as the hot path ([002](docs/explanation/decisions/002-redis-gate-postgres-last-word.md))            | One script counts and takes an item atomically, so thousands of requests per second do not touch the database row                                                      | A second store to run, and a rebuild when it is lost               |
-| Postgres as the source of truth ([002](docs/explanation/decisions/002-redis-gate-postgres-last-word.md))             | `UPDATE ... WHERE sold < stock`, `UNIQUE(sale_id, user_id)` and `CHECK (sold <= stock)` still refuse an oversell if Redis is wrong or empty                            | Every purchase pays one short transaction                          |
-| Reserve, then confirm ([001](docs/explanation/decisions/001-queue-hold-pay.md))                                      | A shopper is not charged for an item that is gone, and an abandoned hold frees the item                                                                                | A hold takes stock from others until it ends                       |
-| Waiting queue with a ticket ([001](docs/explanation/decisions/001-queue-hold-pay.md))                                | Smooths a rush and cannot be skipped by posting to the reserve route                                                                                                   | Shoppers wait; the queue needs an admitter that runs once per sale |
-| Serving without Redis ([003](docs/explanation/decisions/003-keep-selling-without-redis.md))                          | Redis down means the queue fails open, reserve runs on Postgres under a row lock, and `/ready` reports 503. Redis is rebuilt from Postgres when it returns             | The Postgres path is slower under load                             |
-| Sale read cache of one second, with Server-Sent Events ([008](docs/explanation/decisions/008-server-sent-events.md)) | Many readers cost one database read a second, and the page gets each change over one open HTTP stream. Writes never use the cache                                      | The page can be a second old                                       |
-| Rate limit per user and per address ([how](docs/explanation/rate-limiting.md))                                       | A flood gets `429` with `Retry-After`, not a slow server                                                                                                               | Shoppers behind one address share a limit                          |
-| In-process mock payment ([009](docs/explanation/decisions/009-in-process-mock-payment.md))                           | The flow, the refund and the retry rules are real; no provider is needed                                                                                               | It proves nothing about a real provider                            |
-| Accounts and cookie sessions ([007](docs/explanation/decisions/007-accounts-and-cookie-sessions.md))                 | Sign-up with a password (scrypt), an access and a refresh cookie, only token hashes stored, roles `shopper` and `operator` ([how](docs/explanation/authentication.md)) | No password reset, e-mail check or two-factor step                 |
-| The browser talks to the web server only ([006](docs/explanation/decisions/006-browser-talks-to-web-server-only.md)) | The API needs no CORS and no public address, and an allow-list keeps the operator routes away from the browser                                                         | One more hop for every sale call                                   |
-| A hexagon in the API only ([004](docs/explanation/decisions/004-hexagon-in-the-api-only.md))                         | The sale rules are tested without Postgres or Redis, and a unit test fails on a wrong import                                                                           | More files than a flat API; the page stays plain React             |
-| Failures as values ([005](docs/explanation/decisions/005-failures-as-values.md))                                     | A failure is in the type, so a caller cannot forget it; no `catch` in product code                                                                                     | Every call that may throw is wrapped in `attempt`                  |
-| Soft delete ([011](docs/explanation/decisions/011-soft-delete-everywhere.md))                                        | Nothing is lost, and a removal says who did it                                                                                                                         | Every read and every unique index filters `deleted_at`             |
-| Retry with backoff and jitter ([017](docs/explanation/decisions/017-retry-backoff-jitter.md))                        | A retry storm cannot hit a server that is coming back, and every retry ends                                                                                            | A shopper may wait a little longer before a retry                  |
+| Choice                                                                                                               | Why                                                                                                                                                                           | What it costs                                                                             |
+| -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Redis Lua script as the hot path ([002](docs/explanation/decisions/002-redis-gate-postgres-last-word.md))            | One script counts and takes an item atomically, so thousands of requests per second do not touch the database row                                                             | A second store to run, and a rebuild when it is lost                                      |
+| Postgres as the source of truth ([002](docs/explanation/decisions/002-redis-gate-postgres-last-word.md))             | `UPDATE ... WHERE sold < stock`, `UNIQUE(sale_id, user_id)` and `CHECK (sold <= stock)` still refuse an oversell if Redis is wrong or empty                                   | Every purchase pays one short transaction                                                 |
+| Reserve, then confirm ([001](docs/explanation/decisions/001-queue-hold-pay.md))                                      | A shopper is not charged for an item that is gone, and an abandoned hold frees the item                                                                                       | A hold takes stock from others until it ends                                              |
+| Waiting queue with a ticket ([001](docs/explanation/decisions/001-queue-hold-pay.md))                                | Smooths a rush and cannot be skipped by posting to the reserve route                                                                                                          | Shoppers wait; each second one instance must win a Redis lease to admit the next shoppers |
+| Serving without Redis ([003](docs/explanation/decisions/003-keep-selling-without-redis.md))                          | Redis down means the queue lets every shopper in at once, reserve runs on Postgres under a row lock, and `/ready` reports 503. Redis is rebuilt from Postgres when it returns | The Postgres path is slower under load                                                    |
+| Sale read cache of one second, with Server-Sent Events ([008](docs/explanation/decisions/008-server-sent-events.md)) | Many readers cost one database read a second, and the page gets each change over one open HTTP stream. Writes never use the cache                                             | The page can be a second old                                                              |
+| Rate limit per user and per address ([how](docs/explanation/rate-limiting.md))                                       | A flood gets `429` with `Retry-After`, not a slow server                                                                                                                      | Shoppers behind one address share a limit                                                 |
+| In-process mock payment ([009](docs/explanation/decisions/009-in-process-mock-payment.md))                           | The flow, the refund and the retry rules are real; no provider is needed                                                                                                      | It proves nothing about a real provider                                                   |
+| Accounts and cookie sessions ([007](docs/explanation/decisions/007-accounts-and-cookie-sessions.md))                 | Sign-up with a password (scrypt), an access and a refresh cookie, only token hashes stored, roles `shopper` and `operator` ([how](docs/explanation/authentication.md))        | No password reset, e-mail check or two-factor step                                        |
+| The browser talks to the web server only ([006](docs/explanation/decisions/006-browser-talks-to-web-server-only.md)) | The API needs no CORS and no public address, and an allow-list keeps the operator routes away from the browser                                                                | One more hop for every sale call                                                          |
+| A hexagon in the API only ([004](docs/explanation/decisions/004-hexagon-in-the-api-only.md))                         | The sale rules are tested without Postgres or Redis, and a unit test fails on a wrong import                                                                                  | More files than a flat API; the page stays plain React                                    |
+| Failures as values ([005](docs/explanation/decisions/005-failures-as-values.md))                                     | A failure is in the type, so a caller cannot forget it; no `catch` in product code                                                                                            | Every call that may throw is wrapped in `attempt`                                         |
+| Soft delete ([011](docs/explanation/decisions/011-soft-delete-everywhere.md))                                        | Nothing is lost, and a removal says who did it                                                                                                                                | Every read and every unique index filters `deleted_at`                                    |
+| Retry with backoff and jitter ([017](docs/explanation/decisions/017-retry-backoff-jitter.md))                        | A retry storm cannot hit a server that is coming back, and every retry but the Redis reconnect ends                                                                           | A shopper may wait a little longer before a retry                                         |
 
 The numbered choices have a decision record in [docs/explanation/decisions](docs/explanation/decisions/README.md), with
 the other options that were weighed and when to look at it again. Longer explanations are in
@@ -317,10 +316,10 @@ The requests of the demo are in [api-flash-demo.http](api-flash-demo.http). To s
 
 ```bash
 npm run docker:prod:up         # build the images, migrate, start the stack
-docker compose -f compose.prod.yaml exec flash-be-1 node dist/seed-sale.js --stock=5 --duration-minutes=60
-docker compose -f compose.prod.yaml exec flash-be-1 node dist/create-operator.js --username=ops --password='<a long password>'
+npm run prod:create-operator -- --username=ops --password='<a long password>'
+npm run prod:seed-sale -- --stock=5 --duration-minutes=60
 curl localhost:8080/ready      # Postgres and Redis ok
-open localhost:3000            # the sale page
+open localhost:3000            # the sale page (macOS; elsewhere open it in a browser)
 npm run docker:prod:down       # stop the stack (volumes are kept)
 ```
 
@@ -394,15 +393,15 @@ k6 had an account for every shopper and started every planned shopper, no overse
 floods the queue gets `429`, Redis and Postgres agree on the buyers, and there are no server errors.
 
 **What the runs show.** On a laptop where k6 and the servers share the same CPUs, every profile sells its whole stock
-and keeps every data check, with a reserve p95 of a few milliseconds and a purchase p95 of about 160 ms, most of it the
-mock payment. `burst` and `contention` put 700 shoppers into the system within one second; `chaos` stops Redis in the
+and keeps every data check. Except in `chaos`, the reserve p95 is a few milliseconds and the purchase p95 about 160 ms,
+most of it the mock payment. `burst` and `contention` put 700 shoppers into the system within one second; `chaos` stops Redis in the
 middle of the sale. One of five `burst` runs failed the purchase speed limit (519.8 ms against 500 ms) on a machine that other
 projects shared; that is an open finding, and the limit stays. The times are relative, because the
 load generator shares the machine; the data checks are exact.
 
-The runs also shaped the code: paying while Redis is down uses single Lua scripts so it answers at once, a buyer whose
-queue place was lost is told they already bought, the shoppers sign up before the sale, and the pool of virtual users
-is larger than the herd. Each of these, with its numbers, is in [what the load runs found](docs/explanation/load-test-findings.md). The profiles are in
+What the runs measured is in the code: paying while Redis is down uses single Lua scripts so it answers at once, a
+buyer whose queue place was lost is told they already bought, the shoppers sign up before the sale, and k6 has more
+virtual users ready than shoppers who arrive at once. Each of these, with its numbers, is in [what the load runs found](docs/explanation/load-test-findings.md). The profiles are in
 [docs/reference/load-test.md](docs/reference/load-test.md), the limits and checks in
 [specs/apps/flash/load](specs/apps/flash/load/README.md), and the steps in
 [how to run the load test](docs/how-to/run-the-load-test.md).

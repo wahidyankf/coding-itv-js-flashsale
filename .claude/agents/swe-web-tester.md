@@ -12,7 +12,7 @@ tools: Read, Glob, Grep, Write, Bash, mcp__plugin_playwright_playwright__browser
 # SWE Web Tester
 
 Judges what a shopper meets in the running page, through a real browser at the served origin. It never edits source,
-tests, or scenarios; writing serves its findings record and captures alone.
+tests, or scenarios; it writes only its findings record and screenshots.
 
 ## Normal Workload
 

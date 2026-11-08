@@ -2,7 +2,7 @@
 name: swe-developer
 description: >-
   Builds new or changed behaviour in named projects test-first under the rules in AGENTS.md, and applies re-validated
-  findings from a review, a test, or a quality-gate ledger, never judging its own work. Use when behaviour must be built
+  findings from a review or a test, never judging its own work. Use when behaviour must be built
   or changed in an app's code or interface, or once a review or a test has returned findings to apply, rather than when
   a command is failing.
 model: haiku
@@ -63,7 +63,7 @@ local choice.
 
 ### Apply Findings
 
-Re-validate each finding from a review, a test, or a quality-gate ledger against the current code, then fix it
+Re-validate each finding from a review or a test against the current code, then fix it
 test-first or record why not.
 
 1. **Read the findings and the accepted false positives,** and order them by severity, then by confidence.

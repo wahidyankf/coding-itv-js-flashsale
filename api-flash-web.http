@@ -41,7 +41,7 @@ GET {{web}}/api/v1/sales/{{current.response.body.$.id}}
 # @name join
 POST {{web}}/api/v1/sales/{{current.response.body.$.id}}/queue
 
-### Check your place (waiting, admitted or absent; the delay lets one admission tick pass)
+### Check your place (waiting or admitted; 404 not_in_queue when the place was lost; the delay lets one admission tick pass)
 # @delay 1500
 GET {{web}}/api/v1/sales/{{current.response.body.$.id}}/queue/me
 x-queue-ticket: {{join.response.body.$.ticket}}

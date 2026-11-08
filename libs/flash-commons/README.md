@@ -18,7 +18,7 @@ The library has nine modules, one per concern:
 | [`timers.ts`](src/timers.ts) (`/timers`)   | `sleep`, the one timer helper                                                                                                                                                               | flash-be (mock payment, rebuild wait), flash-web (live streams), flash-be-e2e, flash-load (runner)                               |
 | [`decode.ts`](src/decode.ts)               | the decoder kit: `Decoder`, `DecodeError`, `text`, `nonEmptyText`, `integer`, `nonNegativeInteger`, `isoDate`, `uuid`, `literal`, `oneOf`, `optional`, `object`, `tagged`, `both`, `refine` | flash-web (every reply and stream event); flash-be (request bodies)                                                              |
 | [`uuid.ts`](src/uuid.ts)                   | `isUuid`, the id rule (sales, holds, products)                                                                                                                                              | flash-be (domain), flash-web (proxy), [`decode.ts`](src/decode.ts) (`uuid`)                                                      |
-| [`cookies.ts`](src/cookies.ts)             | `parseSetCookie`, `applySetCookies`, `cookieHeader`, `cookieHeaderOf`: a cookie jar with RFC 6265 path matching                                                                             | the test worlds of flash-be and flash-web, flash-be-e2e, flash-web-e2e                                                           |
+| [`cookies.ts`](src/cookies.ts)             | `parseSetCookie`, `applySetCookies`, `cookieHeader`, `cookieHeaderOf`: a cookie jar with RFC 6265 path matching                                                                             | the test worlds of flash-be and flash-web, flash-be-e2e, flash-web-e2e, flash-load (sign-up runner)                              |
 | [`api-paths.ts`](src/api-paths.ts)         | `API_PREFIX` (`/api/v1`), `AUTH_BASE_PATH`, `PROBE_PATHS`, `API_PATHS`: every path of the API, named once                                                                                   | flash-be (routes, refresh cookie path), flash-web (clients, proxy list), flash-be-e2e, flash-web-e2e, flash-load                 |
 | [`relative-time.ts`](src/relative-time.ts) | `relativeTime`, the time phrases of the scenarios ("in 2 hours", "1 hour ago")                                                                                                              | the test support of flash-be, flash-web and flash-be-e2e (flash-web-e2e through it)                                              |
 
@@ -66,7 +66,8 @@ const unauthorized = reply.status === HTTP_STATUS.unauthorized;
 
 ## Retry
 
-Every retry in this repository uses exponential backoff, a max attempt count and full jitter. One tested
+Every retry in this repository uses exponential backoff, a max attempt count and full jitter, except the Redis
+reconnect, which keeps trying on purpose (its wait is still capped and jittered with `backoffDelayMs`). One tested
 implementation keeps that rule in one place, so the apps, the e2e tests and the k6 script do not each copy it and drift.
 
 The wait before try `n` is `random() * min(capMs, baseMs * 2 ** n)`, where `n` counts from 0 for the wait after the

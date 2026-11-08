@@ -33,7 +33,7 @@ locator here too.
 
 ```bash
 npx nx test:quick flash-web-e2e   # typecheck and lint
-npx nx test:e2e flash-web-e2e     # builds both apps; needs the dev stack up (npx nx db:up flash-be)
+npx nx test:e2e flash-web-e2e     # starts and migrates the dev stack, then builds and starts both apps
 ```
 
 Stop the dev servers on `:3000` and `:8080` first (for example `npm run demo:dev`). Playwright starts its own web server

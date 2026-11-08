@@ -43,8 +43,8 @@ src/
 ```
 
 Port names follow the suffix rule (Repository, Store, Gate) in
-[hexagonal architecture](../../docs/explanation/hexagonal-architecture.md#the-three-layers). `SaleAdmin` has no suffix: it writes sale rows, but `SaleRepository`
-already names the reads. Each port file starts with a `Kind:` line that says which one it is.
+[hexagonal architecture](../../docs/explanation/hexagonal-architecture.md#the-three-layers). Some ports have no suffix (Clock, Payment, PasswordHasher, TokenSource,
+SaleSeeder, SaleAdmin). `SaleAdmin` writes sale rows, but `SaleRepository` already names the reads. Each port file starts with a `Kind:` line that says which one it is.
 
 ## To add something
 

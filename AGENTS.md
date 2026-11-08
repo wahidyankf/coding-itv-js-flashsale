@@ -54,7 +54,7 @@ Flash sale monorepo with five apps in [`apps/`](apps) and two libraries in [`lib
 - Run targets with `npx nx <target> <app>`. Every app has `typecheck`, `lint`, `test:quick`, and `test:quick:watch`.
   - `flash-be` and `flash-web` also have `test:unit` and `test:integration`.
   - `flash-be-e2e` and `flash-web-e2e` have `test:e2e` instead.
-  - `flash-load` has `test:unit` (the pure parts: verdict, report, sampler, accounts, paths and the VU pools of the profiles) and `load:smoke`, `load:full`, `load:chaos`, `load:burst` and `load:contention`. The load targets need Docker and run the stack. Its numbers are in
+  - `flash-load` has `test:unit` (the pure parts: verdict, report, sampler, collect, accounts, paths and the VU pools of the profiles) and `load:smoke`, `load:full`, `load:chaos`, `load:burst` and `load:contention`. The load targets need Docker and run the stack. Its numbers are in
     [`apps/flash-load/k6/profiles.ts`](apps/flash-load/k6/profiles.ts), and its rules and limits are in [`specs/apps/flash/load/`](specs/apps/flash/load). A failed run is a finding; do not change a limit to make it pass.
   - `test:quick` runs `typecheck`, `lint`, and `test:unit` (flash-load included), or only `typecheck` and `lint` for the e2e apps. Change a
     check in its own target, not in `test:quick`. Keep `test:quick:watch` in sync with it.
@@ -62,8 +62,9 @@ Flash sale monorepo with five apps in [`apps/`](apps) and two libraries in [`lib
   their statuses and sentences are in [`errors.ts`](apps/flash-be/src/adapters/inbound/http/errors.ts) in `http/`. Every route is served under `/api/v1`
   (the probes `/health` and `/ready` stay at the root), and every path comes from `API_PATHS` in
   [`libs/flash-commons/src/api-paths.ts`](libs/flash-commons/src/api-paths.ts): `flash-be`, `flash-web`, the e2e apps and
-  `flash-load` import it, and only the `.http` files and the docs write a path out. A path change also edits the literal table in
-  [`api-paths_tests.ts`](libs/flash-commons/src/api-paths_tests.ts) on purpose
+  `flash-load` import it, and only the `.http` files and the docs write a path out. A path change also edits the literal tables in
+  [`api-paths_tests.ts`](libs/flash-commons/src/api-paths_tests.ts) and in flash-be's
+  [`routes/index_tests.ts`](apps/flash-be/src/adapters/inbound/http/routes/index_tests.ts) on purpose
   ([`docs/explanation/decisions/019-api-version-prefix.md`](docs/explanation/decisions/019-api-version-prefix.md)). A change to a route or a reply updates the handler, every caller, [`docs/reference/http-endpoints.md`](docs/reference/http-endpoints.md) and the
   scenario ([`docs/how-to/change-an-endpoint.md`](docs/how-to/change-an-endpoint.md)). An error reply is `{ errorCode, errorMessage }` (plus `retryAfterSeconds`
   for `429`); the status is not in the body.
@@ -155,7 +156,7 @@ Flash sale monorepo with five apps in [`apps/`](apps) and two libraries in [`lib
   [`compose.dev.yaml`](compose.dev.yaml). In production, a missing required URL must fail fast.
 - Accounts and sessions ([`docs/explanation/authentication.md`](docs/explanation/authentication.md)): shoppers and operators log in with a user name and a password.
   Two cookies carry the session: `access_token` (15 minutes, path `/`) and `refresh_token` (7 days, path `/api/v1/auth`, used once,
-  replaying an old one ends the session). Both are `HttpOnly` and `SameSite=Lax`, and `Secure` when `COOKIE_SECURE` is true.
+  replaying the one it replaced ends the session). Both are `HttpOnly` and `SameSite=Lax`, and `Secure` when `COOKIE_SECURE` is true.
   Never put a token in a body, a URL or a log, and store only SHA-256 hashes of tokens and scrypt hashes of passwords. No
   route takes a user id: the shopper is `/queue/me`, `/purchases/me` and the session. The first operator is made with
   `create-operator`; sign-up can only make a shopper. The `/api/v1/auth` routes have their own rate limit (`AUTH_RATE_LIMIT_PER_IP`).

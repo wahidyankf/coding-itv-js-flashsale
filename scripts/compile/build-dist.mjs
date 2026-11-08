@@ -1,4 +1,4 @@
-// The `build` script of flash-be, typekit and flash-commons: `node ../../scripts/build/build-dist.mjs`, run in the
+// The `build` script of flash-be, typekit and flash-commons: `node ../../scripts/compile/build-dist.mjs`, run in the
 // package folder. It runs `tsc -p tsconfig.build.json`, then deletes what that build did not write (see prune-dist.mjs).
 // It never empties `dist` first, because other builds and type checks read these folders while this one runs.
 import { spawnSync } from "node:child_process";
