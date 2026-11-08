@@ -37,10 +37,11 @@ flowchart LR
   It also turns a sale or a shopper's place into Server-Sent Events, sets and clears the two login cookies, and guards the
   routes: a route that needs a login reads the access cookie, and the operator routes (create, change, remove and list a
   sale) need the role operator, checked before the body. It holds no rules.
-- **CLI adapter** reads the options of the two commands: [`seed-sale.ts`](../../../../apps/flash-be/src/seed-sale.ts) (a sale) and [`create-operator.ts`](../../../../apps/flash-be/src/create-operator.ts) (the first
-  operator account). Each wires itself to the database and calls a use case (the seed service, `createOperator`).
+- **CLI adapter** ([`adapters/inbound/cli/`](../../../../apps/flash-be/src/adapters/inbound/cli)) reads the options of the two commands and words their failures. The commands are
+  [`seed-sale.ts`](../../../../apps/flash-be/src/seed-sale.ts) (a sale) and [`create-operator.ts`](../../../../apps/flash-be/src/create-operator.ts) (the first operator account). Each entry point wires itself to the
+  database and calls a use case (the seed service, `createOperator`).
 - **Application** (`application/`) has one service per use case: the sale status with its read cache, the waiting queue,
-  reserving, paying, the rate limiter, the operator's sale service (create, change, remove, list), the auth service (sign up, log in, refresh, log out, and who a cookie is) and the admission step that serves the current sale. Its ports are in
+  reserving, paying, the rate limiter, the operator's sale service (create, change, remove, list), the seed service that the seed command calls, the auth service (sign up, log in, refresh, log out, and who a cookie is) and the admission step that serves the current sale. Its ports are in
   [`application/ports/`](../../../../apps/flash-be/src/application/ports): `SaleRepository`, `QueueStore`, `HoldGate`, `ReservationRepository`, `PurchaseRepository`,
   `RateLimitStore`, `Payment`, `Clock`, `SaleSeeder`, `SaleAdmin`, `AccountRepository`, `SessionRepository`, `PasswordHasher` and `TokenSource`.
 - **Domain** (`domain/`) holds the rules and does no I/O: when a sale is upcoming, active, sold out or

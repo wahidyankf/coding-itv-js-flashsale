@@ -80,13 +80,13 @@ listed here as name, type and note. The six audit columns of every table are in 
 
 ### users
 
-| column_name     | data_type     | note                                                                                             |
-| --------------- | ------------- | ------------------------------------------------------------------------------------------------ |
-| `id`            | `uuid`        | Primary key. Default `gen_random_uuid()`.                                                        |
-| `username`      | `text`        | Not null. Unique among live rows. Trimmed and lowercased; a person's name never starts with `$`. |
-| `password_hash` | `text`        | A scrypt hash with its salt. Empty for the `$system` user, which cannot log in.                  |
-| `role`          | `text`        | Not null. Default `shopper`. One of `shopper` and `operator` (`users_role_known`).               |
-| `last_login_at` | `timestamptz` | The last successful login or sign-up. Empty until the first.                                     |
+| column_name     | data_type     | note                                                                                                  |
+| --------------- | ------------- | ----------------------------------------------------------------------------------------------------- |
+| `id`            | `uuid`        | Primary key. Default `gen_random_uuid()`.                                                             |
+| `username`      | `text`        | Not null. Unique among live rows. Trimmed and lowercased; a person's name never starts with `$`.      |
+| `password_hash` | `text`        | A scrypt hash with its salt. Empty for `$system` and for a row `ensureUser` made; neither can log in. |
+| `role`          | `text`        | Not null. Default `shopper`. One of `shopper` and `operator` (`users_role_known`).                    |
+| `last_login_at` | `timestamptz` | The last successful login or sign-up. Empty until the first.                                          |
 
 ### products
 
@@ -164,7 +164,8 @@ author, and it cannot log in.
 ## Tables in Prose
 
 - `users` has one row per account: a shopper who signed up, an operator made with `create-operator`, and `$system`.
-  Everything else points to it to say who did something.
+  A hold or a purchase for a name with no row makes one with no password (`ensureUser`); no request reaches that today,
+  because the name always comes from a login. Everything else points to it to say who did something.
 - `products` has one row per thing for sale. A sale that is made without a product gets the live product with
   the sale's name, which is made when there is none.
 - `sales` has one row per sale of one product: its stock, its window, how many are sold, the hold time and the
