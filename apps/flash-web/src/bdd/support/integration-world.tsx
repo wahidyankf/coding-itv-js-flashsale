@@ -266,7 +266,7 @@ function setupOf(h: Harness, browserFetch: typeof fetch) {
 		},
 		async loggedIn(user: string) {
 			await browserFetch(
-				`${h.webUrl}/api/auth/register`,
+				`${h.webUrl}/api/v1/auth/register`,
 				jsonPost(JSON.stringify({ username: user, password: PASSWORD })),
 			);
 		},

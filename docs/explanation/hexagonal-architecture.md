@@ -21,7 +21,7 @@ The folder tree, file by file, is in the [flash-be README](../../apps/flash-be/R
 
 ## One request through the layers
 
-A shopper asks for an item: `POST /sales/:saleId/reservations`. The diagram follows that request. Solid arrows are calls.
+A shopper asks for an item: `POST /api/v1/sales/:saleId/reservations`. The diagram follows that request. Solid arrows are calls.
 Dotted arrows say which port an adapter implements, so the code dependency always points inward.
 
 ```mermaid

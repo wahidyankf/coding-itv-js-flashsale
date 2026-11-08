@@ -2,6 +2,7 @@
 // reply, and the Redis connection the API keeps (cut and restored). Binds health/liveness.feature, health/readiness.feature,
 // routing/unknown-routes.feature and readiness' Redis steps. The other features use the request and reply steps.
 
+import { PROBE_PATHS } from "@flash/flash-commons";
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { DEV_REDIS_URL, withRedis } from "./support/processes.js";
@@ -12,12 +13,18 @@ import { world } from "./support/world.js";
 // createBdd exposes Given, When and Then only. Matching is by step text, so an And line binds to When or Then.
 const { Given, When, Then } = createBdd();
 
-// Any path, so each feature can name the route it calls.
+// Any path, so each feature can name the route it calls, sent with GET or with POST and no body.
 // A scenario that started its own API (for example one whose Postgres does not answer) is asked there; the others ask
 // the shared one.
-When(/^a client sends GET (\/\S*)$/, async ({ request }, path: string) => {
-	setResponse(await request.get(`${world.api?.url ?? ""}${path}`));
-});
+When(
+	/^a client sends (GET|POST) (\/\S*)$/,
+	async ({ request }, method: string, path: string) => {
+		const url = `${world.api?.url ?? ""}${path}`;
+		setResponse(
+			method === "GET" ? await request.get(url) : await request.post(url),
+		);
+	},
+);
 
 // A write whose body is sent as given, so a scenario can send what the API must refuse.
 When(
@@ -46,7 +53,7 @@ When(
 );
 
 Given("the API is running and Redis answers", async ({ request }) => {
-	expect((await request.get("/ready")).status()).toBe(200);
+	expect((await request.get(PROBE_PATHS.ready)).status()).toBe(200);
 });
 
 When("Redis drops the API's connection", async () => {
@@ -62,7 +69,7 @@ When("Redis reconnects", async ({ request }) => {
 	await pollUntil(
 		async () => {
 			try {
-				return (await request.get("/ready")).status() === 200;
+				return (await request.get(PROBE_PATHS.ready)).status() === 200;
 			} catch {
 				return false;
 			}

@@ -39,7 +39,7 @@ export type NewSaleInput = {
 	productId?: string;
 };
 
-// Sets a sale up the way an operator does, through `POST /admin/sales`, and returns its id. Windows in the past are fine for
+// Sets a sale up the way an operator does, through `POST /api/v1/admin/sales`, and returns its id. Windows in the past are fine for
 // the API, so a sale that is already running needs no shortcut.
 export async function createSale(
 	request: APIRequestContext,
@@ -59,7 +59,7 @@ export async function createSale(
 	return (await reply.json()).id;
 }
 
-// Changes some fields of a sale through `PATCH /admin/sales/:saleId`, as an operator does. The reply must be a success.
+// Changes some fields of a sale through `PATCH /api/v1/admin/sales/:saleId`, as an operator does. The reply must be a success.
 export async function patchSale(
 	request: APIRequestContext,
 	saleId: string,

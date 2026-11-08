@@ -111,12 +111,16 @@ The web server reaches `flash-be` through a forwarder on port 18082
 private `flash-be`, the shared one, nowhere, or a canned reply. So a scenario can break the API without touching
 another test ([how the web end-to-end tests control the API](../../reference/test-layers-and-coverage.md#how-the-web-end-to-end-tests-control-the-api)).
 
-### The tests write the API's paths themselves
+### The tests take the API's paths from one table
 
-[`support/api.ts`](../../../apps/flash-be-e2e/steps/support/api.ts) lists every route by hand, such as
-`joinQueue: route<JoinedView>("POST", "/sales/:saleId/queue")`. The e2e apps are test oracles: if they imported the
-paths from `flash-be`, a renamed route would pass every test while real clients break
-([decision 016](../../explanation/decisions/016-dry-rule-of-three.md)).
+[`support/api.ts`](../../../apps/flash-be-e2e/steps/support/api.ts) lists every route with its reply type, such as
+`joinQueue: route<JoinedView>("POST", API_PATHS.queue)`. The paths come from `API_PATHS` in
+[`@flash/flash-commons`](../../../libs/flash-commons/src/api-paths.ts), the same table the API serves. A renamed route
+still cannot slip through unseen:
+[`api-paths_tests.ts`](../../../libs/flash-commons/src/api-paths_tests.ts) writes every path out as a literal, so a
+rename fails it and shows up in review
+([decision 019](../../explanation/decisions/019-api-version-prefix.md)). The error codes and statuses the tests expect
+are still written in the tests.
 
 ## Try it here
 

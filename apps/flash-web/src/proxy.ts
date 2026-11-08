@@ -4,24 +4,14 @@
 import { HTTP_STATUS, isUuid } from "@flash/flash-commons";
 import { attempt, attemptAsync } from "@flash/typekit";
 import { RETRY_AFTER_HEADER, TICKET_HEADER } from "./api";
+import { BROWSER_ROUTES, routePattern } from "./api-paths";
 import { buildConfig } from "./config";
 
-// The routes the browser may reach, each with its one method. Operator routes are left out on purpose.
-// `/sales/current` comes before the sale pattern, which would otherwise match it. A shopper's own routes end in `/me`:
-// who they are comes from the login cookie, not the address.
-const ALLOWED: Array<[method: string, path: RegExp]> = [
-	["POST", /^\/auth\/(?:register|login|refresh|logout)$/],
-	["GET", /^\/auth\/me$/],
-	["GET", /^\/sales\/current$/],
-	["GET", /^\/sales\/(?<saleId>[^/]+)$/],
-	["GET", /^\/sales\/(?<saleId>[^/]+)\/events$/],
-	["POST", /^\/sales\/(?<saleId>[^/]+)\/queue$/],
-	["GET", /^\/sales\/(?<saleId>[^/]+)\/queue\/me$/],
-	["GET", /^\/sales\/(?<saleId>[^/]+)\/queue\/me\/events$/],
-	["POST", /^\/sales\/(?<saleId>[^/]+)\/reservations$/],
-	["POST", /^\/sales\/(?<saleId>[^/]+)\/purchases$/],
-	["GET", /^\/sales\/(?<saleId>[^/]+)\/purchases\/me$/],
-];
+// The routes the browser may reach, each with its one method, built from the table in api-paths.ts. Operator routes are
+// not in the table.
+const ALLOWED: Array<[method: string, path: RegExp]> = BROWSER_ROUTES.map(
+	([method, template]) => [method, routePattern(template)],
+);
 
 // Headers that carry something the API needs, or something the browser needs back. The API limits by address, so it
 // needs the browser's address (`x-forwarded-for`) and not this server's.
@@ -61,7 +51,7 @@ const decode = (value: string | undefined) =>
 			});
 
 // Says whether the browser may reach a route. A route not in `ALLOWED` is refused, so a new route stays closed until it
-// is listed. `path` is what follows `/api`, such as `/sales/current`.
+// is listed. `path` is the whole path of the address, such as `/api/v1/sales/current`.
 export function isAllowed(method: string, path: string): boolean {
 	for (const [allowed, pattern] of ALLOWED) {
 		if (allowed !== method) continue;
@@ -72,12 +62,6 @@ export function isAllowed(method: string, path: string): boolean {
 	}
 	return false;
 }
-
-// flash-be sets the refresh cookie for `/auth`, but the browser calls `/api/auth` and would never send that cookie back.
-// So the cookie path moves under `/api`.
-const BACKEND_AUTH_PATH = /;\s*Path=\/auth(?=;|$)/i;
-const rewritePath = (cookie: string) =>
-	cookie.replace(BACKEND_AUTH_PATH, "; Path=/api/auth");
 
 // Stops a POST from another site that would use the shopper's cookies. `SameSite=Lax` is the first lock; this is the
 // second. A browser sends `Origin` on every POST, or else `Sec-Fetch-Site`. A caller with neither is not a browser, and
@@ -121,7 +105,7 @@ export async function proxyToBackend(
 	fetcher: typeof fetch = fetch,
 ): Promise<Response> {
 	const url = new URL(request.url);
-	const path = url.pathname.replace(/^\/api/, "");
+	const path = url.pathname;
 	if (!isAllowed(request.method, path)) return refuse("not_found");
 	if (request.method === "POST" && isCrossSite(request)) {
 		return refuse("cross_site");
@@ -137,9 +121,10 @@ export async function proxyToBackend(
 			signal: request.signal,
 		});
 		const returned = pick(upstream.headers, RETURNED);
-		// Every cookie, one header each: they cannot be joined into one value.
+		// Every cookie, one header each: they cannot be joined into one value. The browser and the API use the same paths,
+		// so a cookie passes unchanged.
 		for (const cookie of upstream.headers.getSetCookie()) {
-			returned.append("set-cookie", rewritePath(cookie));
+			returned.append("set-cookie", cookie);
 		}
 		return new Response(upstream.body, {
 			status: upstream.status,

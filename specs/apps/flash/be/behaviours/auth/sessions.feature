@@ -56,7 +56,8 @@ Feature: Logins of shoppers
 
   Scenario: The refresh cookie is sent only to the auth paths
     Given "ana" has signed up with the password "a long password"
-    Then the "refresh_token" cookie is limited to the path "/auth"
+    Then the "refresh_token" cookie is limited to the path "/api/v1/auth"
+    And the "access_token" cookie is limited to the path "/"
 
   Scenario Outline: The routes of a shopper need a login
     When someone who is not logged in sends <method> <path>
@@ -64,11 +65,11 @@ Feature: Logins of shoppers
     And the error is "not_authenticated"
 
     Examples:
-      | method | path                                                       |
-      | POST   | /sales/00000000-0000-4000-8000-000000000000/queue          |
-      | GET    | /sales/00000000-0000-4000-8000-000000000000/queue/me       |
-      | GET    | /sales/00000000-0000-4000-8000-000000000000/queue/me/events |
-      | POST   | /sales/00000000-0000-4000-8000-000000000000/reservations  |
-      | POST   | /sales/00000000-0000-4000-8000-000000000000/purchases     |
-      | GET    | /sales/00000000-0000-4000-8000-000000000000/purchases/me  |
-      | GET    | /auth/me                                                   |
+      | method | path                                                                       |
+      | POST   | /api/v1/sales/00000000-0000-4000-8000-000000000000/queue                   |
+      | GET    | /api/v1/sales/00000000-0000-4000-8000-000000000000/queue/me                |
+      | GET    | /api/v1/sales/00000000-0000-4000-8000-000000000000/queue/me/events         |
+      | POST   | /api/v1/sales/00000000-0000-4000-8000-000000000000/reservations            |
+      | POST   | /api/v1/sales/00000000-0000-4000-8000-000000000000/purchases              |
+      | GET    | /api/v1/sales/00000000-0000-4000-8000-000000000000/purchases/me           |
+      | GET    | /api/v1/auth/me                                                            |

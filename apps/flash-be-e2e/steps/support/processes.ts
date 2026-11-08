@@ -5,6 +5,7 @@
 import { type SpawnSyncReturns, spawn, spawnSync } from "node:child_process";
 import net from "node:net";
 import path from "node:path";
+import { PROBE_PATHS } from "@flash/flash-commons";
 import { createClient } from "redis";
 import { pipeSockets } from "./relay.js";
 import { pollUntil } from "./time.js";
@@ -153,7 +154,7 @@ export async function startApi(): Promise<string> {
 		async () => {
 			if (child.exitCode !== null) throw new Error("flash-be exited at start");
 			try {
-				return (await fetch(`${url}/health`)).ok;
+				return (await fetch(`${url}${PROBE_PATHS.health}`)).ok;
 			} catch {
 				// not listening yet
 				return false;

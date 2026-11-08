@@ -18,7 +18,7 @@ A rejected request gets status `429`, the body `{"errorCode":"rate_limited","err
 - **Auth routes** (20 requests per address in 10 seconds by default, `AUTH_RATE_LIMIT_PER_IP`). Sign-up, login, refresh and
   logout have a count of their own, so a crowd that arrives for a sale cannot lock itself out of the login, and a password
   cannot be guessed at speed. It is by address only, because a request that is not logged in has no user yet. The
-  `/admin` routes are counted by address too, under their own key (`admin`) and with the per-address limit of the sale
+  `/api/v1/admin` routes are counted by address too, under their own key (`admin`) and with the per-address limit of the sale
   routes (`RATE_LIMIT_PER_IP`).
 
 A request is refused when either counter is over its limit. A refused request still counts, so a client that keeps

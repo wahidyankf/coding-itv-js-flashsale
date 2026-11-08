@@ -22,7 +22,7 @@ export function queueRequests(app: FastifyInstance, scenario: QueueScenario) {
 		async join(user: string, saleId = scenario.saleId): Promise<Response> {
 			const reply = await app.inject({
 				method: "POST",
-				url: `/sales/${saleId}/queue`,
+				url: `/api/v1/sales/${saleId}/queue`,
 				headers: { cookie: await scenario.login(user) },
 			});
 			scenario.response = reply;
@@ -36,7 +36,7 @@ export function queueRequests(app: FastifyInstance, scenario: QueueScenario) {
 		async check(user: string, ticket?: string): Promise<Response> {
 			scenario.response = await app.inject({
 				method: "GET",
-				url: `/sales/${scenario.saleId}/queue/me`,
+				url: `/api/v1/sales/${scenario.saleId}/queue/me`,
 				headers: {
 					cookie: await scenario.login(user),
 					...ticketHeader(ticket),
@@ -57,7 +57,7 @@ export function reserveRequests(app: FastifyInstance, scenario: ShopScenario) {
 		const ticket = options.ticket ?? scenario.tickets.get(key);
 		const reply = await app.inject({
 			method: "POST",
-			url: `/sales/${options.saleId ?? scenario.saleId}/reservations`,
+			url: `/api/v1/sales/${options.saleId ?? scenario.saleId}/reservations`,
 			headers: {
 				cookie: await scenario.login(user),
 				...ticketHeader(ticket),
@@ -92,7 +92,7 @@ export function purchaseRequests(app: FastifyInstance, scenario: ShopScenario) {
 			options.reservationId ?? scenario.holds.get(owner)?.reservationId;
 		const reply = await app.inject({
 			method: "POST",
-			url: `/sales/${options.saleId ?? scenario.saleId}/purchases`,
+			url: `/api/v1/sales/${options.saleId ?? scenario.saleId}/purchases`,
 			headers: { cookie: await scenario.login(user) },
 			payload: { reservationId },
 		});
@@ -123,7 +123,7 @@ export function purchaseRequests(app: FastifyInstance, scenario: ShopScenario) {
 		async outcome(user: string, saleId = scenario.saleId) {
 			scenario.response = await app.inject({
 				method: "GET",
-				url: `/sales/${saleId}/purchases/me`,
+				url: `/api/v1/sales/${saleId}/purchases/me`,
 				headers: { cookie: await scenario.login(user) },
 			});
 			return scenario.response;
@@ -131,7 +131,7 @@ export function purchaseRequests(app: FastifyInstance, scenario: ShopScenario) {
 		async saleView() {
 			const reply = await app.inject({
 				method: "GET",
-				url: `/sales/${scenario.saleId}`,
+				url: `/api/v1/sales/${scenario.saleId}`,
 			});
 			return reply.json();
 		},
@@ -144,14 +144,14 @@ export function saleRequests(app: FastifyInstance, scenario: ShopScenario) {
 		async readSale() {
 			scenario.response = await app.inject({
 				method: "GET",
-				url: `/sales/${scenario.saleId}`,
+				url: `/api/v1/sales/${scenario.saleId}`,
 			});
 			return scenario.response;
 		},
 		async readCurrentSale() {
 			scenario.response = await app.inject({
 				method: "GET",
-				url: "/sales/current",
+				url: "/api/v1/sales/current",
 			});
 			return scenario.response;
 		},

@@ -37,9 +37,11 @@ steps/
 | a wait for something to be ready | `pollUntil` in [`support/time.ts`](steps/support/time.ts)                 | nothing: it already backs off with jitter and a max attempt count                                    |
 | a wait for a shopper's admission | `pollUntilAdmitted` in [`support/shoppers.ts`](steps/support/shoppers.ts) | name its wait (`ADMISSION_WAIT_MS` in web-e2e's [`shop.ts`](../flash-web-e2e/steps/support/shop.ts)) |
 
-The steps write the API's paths, headers, error codes and expected statuses themselves. They do not import them from
-`flash-be`, so a renamed route or header fails here before a real client sees it
-([decision 016](../../docs/explanation/decisions/016-dry-rule-of-three.md)).
+The steps write the API's headers, error codes and expected statuses themselves. They do not import them from
+`flash-be`, so a renamed header or code fails here before a real client sees it
+([decision 016](../../docs/explanation/decisions/016-dry-rule-of-three.md)). The paths are the one exception: they come
+from `API_PATHS` in `@flash/flash-commons`, whose literal test makes a rename a change a reviewer sees
+([decision 019](../../docs/explanation/decisions/019-api-version-prefix.md)).
 
 ## Commands
 

@@ -1,7 +1,7 @@
 // The sale routes: the sale a shopper sees now, one sale by its id, and the live stream of one sale. The public reads may
 // be kept for the cache time, by this server and by the client. Inbound HTTP adapter.
 
-import { HTTP_STATUS, MS_PER_SECOND } from "@flash/flash-commons";
+import { API_PATHS, HTTP_STATUS, MS_PER_SECOND } from "@flash/flash-commons";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import type { Dependencies } from "../../../../application/dependencies.js";
 import type { SaleWithStatus } from "../../../../application/sale-service.js";
@@ -42,14 +42,14 @@ export function registerSaleRoutes(
 	// The sale a shopper sees. "current" is the running sale, else the one that opens next, else none.
 	app.route({
 		method: "GET",
-		url: "/sales/current",
+		url: API_PATHS.saleCurrent,
 		handler: async (_request, reply) =>
 			sendSale(reply, await deps.sales.current()),
 	});
 
 	app.route<{ Params: SaleParams }>({
 		method: "GET",
-		url: "/sales/:saleId",
+		url: API_PATHS.sale,
 		handler: async (request, reply) =>
 			sendSale(reply, await deps.sales.byId(request.params.saleId)),
 	});
@@ -58,7 +58,7 @@ export function registerSaleRoutes(
 	// database read per cache time.
 	app.route<{ Params: SaleParams }>({
 		method: "GET",
-		url: "/sales/:saleId/events",
+		url: API_PATHS.saleEvents,
 		handler: async (request, reply) => {
 			const { saleId } = request.params;
 			if ((await deps.sales.byId(saleId)) === undefined) {

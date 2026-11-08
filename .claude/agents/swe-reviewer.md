@@ -47,7 +47,7 @@ Six checks.
    source file has a header comment (a test file's header only says what it tests) and every export a doc comment that
    says why; Biome cannot check this, so this
    review does. The rule of three from [`AGENTS.md`](../../AGENTS.md): a third copy is a finding, and a value 3 or more places across the
-   apps share belongs in `libs/flash-commons`, except what the e2e and load oracles write themselves. A retry that does
+   apps share belongs in `libs/flash-commons`, except the headers, error codes and statuses that the e2e and load oracles write themselves (the API paths come from `API_PATHS`, the recorded exception of decision 019). A retry that does
    not go through `@flash/flash-commons` with backoff, a max attempt count and jitter is a finding. A new kind of file
    that its app's `README.md` does not name is a finding. A page in [`docs/`](../../docs), [`specs/`](../../specs), a `README.md`, [`AGENTS.md`](../../AGENTS.md) or
    [`.claude/`](..) that still names a path, name, route, error code, env var, command or number the change altered is a

@@ -260,3 +260,38 @@ describe("hexagonal architecture", () => {
 		expect(allowed("inbound", "application/dependencies.ts")).toBe(true);
 	});
 });
+
+// The folder of the route files, which take every path from the table in @flash/flash-commons.
+const ROUTES = path.join(SRC, "adapters/inbound/http/routes");
+// A quote or a backtick followed by a slash and a letter opens a path. Whole-line and trailing comments are cut first, so a
+// path named in prose does not count.
+const PATH_LITERAL = /["'`]\/[a-z]/;
+const LINE_COMMENT = /(^|\s)\/\/.*$/gm;
+
+// True when `text` writes a path as a string or a template, outside its comments. Exported so the rule is tested on samples.
+export function pathLiteralsIn(text: string): boolean {
+	return PATH_LITERAL.test(text.replace(LINE_COMMENT, ""));
+}
+
+// The route files take every path from the table in @flash/flash-commons, so the routes read one list. A string that starts
+// with a slash in the code (not in a comment) is a path written by hand, and is refused.
+describe("the route files", () => {
+	it("sees a path written as a string or a template", () => {
+		expect(pathLiteralsIn('url: "/sales/current"')).toBe(true);
+		expect(pathLiteralsIn("url: `/sales/current`")).toBe(true);
+	});
+
+	it("does not count a path named in a comment, or a path taken from the table", () => {
+		expect(pathLiteralsIn("// The `/health` probe.\nconst x = 1;")).toBe(false);
+		expect(pathLiteralsIn("url: API_PATHS.sale")).toBe(false);
+	});
+
+	it("writes no path of its own: each one takes its path from the table", () => {
+		// A test writes the paths it expects, as the route-table test does, so only product files are checked.
+		const writers = walk(ROUTES)
+			.filter((file) => file.endsWith(".ts") && !file.endsWith("_tests.ts"))
+			.filter((file) => pathLiteralsIn(readFileSync(file, "utf8")))
+			.map((file) => path.relative(SRC, file));
+		expect(writers).toEqual([]);
+	});
+});

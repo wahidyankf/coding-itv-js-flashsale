@@ -1,7 +1,7 @@
 // The queue routes: a shopper joins the line of a sale, reads the place they hold with their ticket, and may follow that
 // place on a live stream. The ticket is the proof of the join. Inbound HTTP adapter.
 
-import { HTTP_STATUS } from "@flash/flash-commons";
+import { API_PATHS, HTTP_STATUS } from "@flash/flash-commons";
 import type { FastifyInstance } from "fastify";
 import type { Dependencies } from "../../../../application/dependencies.js";
 import type { QueuePlace } from "../../../../domain/queue.js";
@@ -24,7 +24,7 @@ const placeBody = (user: Username, place: QueuePlace) => ({
 // One event of a shopper's place: whose it is, and the place it now has.
 type PlaceEvent = { event: "place"; data: ReturnType<typeof placeBody> };
 
-// Registers the queue routes. The shopper is the one who is logged in (`.../queue/me`), and `stream` paces the place stream.
+// Registers the queue routes. The shopper is the one who is logged in (the `queueMe` paths), and `stream` paces the place stream.
 export function registerQueueRoutes(
 	app: FastifyInstance,
 	deps: Dependencies,
@@ -35,7 +35,7 @@ export function registerQueueRoutes(
 	// Joins the shopper to the queue. The ticket in the reply proves the join, and later reads check it.
 	app.route<{ Params: SaleParams }>({
 		method: "POST",
-		url: "/sales/:saleId/queue",
+		url: API_PATHS.queue,
 		preValidation: limit,
 		handler: async (request, reply) =>
 			sendResult(
@@ -50,7 +50,7 @@ export function registerQueueRoutes(
 	// The place of the shopper who is logged in, with the ticket that proves the join.
 	app.route<{ Params: SaleParams }>({
 		method: "GET",
-		url: "/sales/:saleId/queue/me",
+		url: API_PATHS.queueMe,
 		preValidation: needSession,
 		handler: async (request, reply) =>
 			sendResult(
@@ -68,7 +68,7 @@ export function registerQueueRoutes(
 	// Pushes the shopper's place when it changes. The first check runs before the stream opens, so a bad ticket gets a normal reply.
 	app.route<{ Params: SaleParams }>({
 		method: "GET",
-		url: "/sales/:saleId/queue/me/events",
+		url: API_PATHS.queueMeEvents,
 		preValidation: needSession,
 		handler: async (request, reply) => {
 			const { saleId } = request.params;

@@ -1,6 +1,11 @@
 // Unit tests for the cookie helpers of the HTTP edge: reading one cookie, setting the login cookies, and cutting a user agent.
 import { describe, expect, it } from "vitest";
-import { cookieValue, cutUserAgent, setCookie } from "./cookies.js";
+import {
+	cookieValue,
+	cutUserAgent,
+	REFRESH_COOKIE_PATH,
+	setCookie,
+} from "./cookies.js";
 
 describe("cookieValue", () => {
 	it("finds one cookie among several, with or without spaces", () => {
@@ -26,14 +31,26 @@ describe("cookieValue", () => {
 describe("setCookie", () => {
 	it("is HttpOnly and SameSite=Lax, with its path and its age", () => {
 		expect(
-			setCookie("a", "b", { maxAgeSeconds: 60, path: "/auth", secure: false }),
-		).toBe("a=b; Path=/auth; Max-Age=60; HttpOnly; SameSite=Lax");
+			setCookie("a", "b", {
+				maxAgeSeconds: 60,
+				path: "/api/v1/auth",
+				secure: false,
+			}),
+		).toBe("a=b; Path=/api/v1/auth; Max-Age=60; HttpOnly; SameSite=Lax");
 	});
 
 	it("adds Secure on request", () => {
 		expect(
 			setCookie("a", "b", { maxAgeSeconds: 0, path: "/", secure: true }),
 		).toBe("a=b; Path=/; Max-Age=0; HttpOnly; SameSite=Lax; Secure");
+	});
+});
+
+// The refresh cookie is sent to the auth routes alone, so its path is the auth base path. The access cookie is `/`, set
+// where the login is made (see routes/auth.ts).
+describe("REFRESH_COOKIE_PATH", () => {
+	it("is the auth base path of the API, /api/v1/auth", () => {
+		expect(REFRESH_COOKIE_PATH).toBe("/api/v1/auth");
 	});
 });
 

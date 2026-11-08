@@ -1,7 +1,7 @@
-// How the e2e steps call the private API: the routes, the request builder and the reply reader. The paths are written by hand, so a renamed route fails a test.
-// A route change also updates the list in docs/how-to/change-an-endpoint.md. Decision: docs/explanation/decisions/016-dry-rule-of-three.md (why the e2e apps write the paths themselves).
+// How the e2e steps call the private API: the routes, the request builder and the reply reader. The paths come from the
+// table in @flash/flash-commons, so a renamed route changes here and in the table. Decision: docs/explanation/decisions/019-api-version-prefix.md.
 
-import { FIRST_ERROR_STATUS } from "@flash/flash-commons";
+import { API_PATHS, FIRST_ERROR_STATUS } from "@flash/flash-commons";
 import type { APIRequestContext, APIResponse } from "@playwright/test";
 import { startApi } from "./processes.js";
 import type {
@@ -32,24 +32,24 @@ const route = <B>(method: Route["method"], path: string): Route<B> => ({
 
 // Every route the steps call, by a name that says what it does.
 export const routes = {
-	currentSale: route<SaleView>("GET", "/sales/current"),
-	sale: route<SaleView>("GET", "/sales/:saleId"),
-	saleEvents: route("GET", "/sales/:saleId/events"),
-	placeEvents: route("GET", "/sales/:saleId/queue/me/events"),
-	joinQueue: route<JoinedView>("POST", "/sales/:saleId/queue"),
-	checkPlace: route<PlaceView>("GET", "/sales/:saleId/queue/me"),
-	reserve: route<ReservedView>("POST", "/sales/:saleId/reservations"),
-	confirm: route<PurchaseView>("POST", "/sales/:saleId/purchases"),
-	outcome: route<OutcomeView>("GET", "/sales/:saleId/purchases/me"),
-	register: route<AccountView>("POST", "/auth/register"),
-	login: route<AccountView>("POST", "/auth/login"),
-	refresh: route<AccountView>("POST", "/auth/refresh"),
-	logout: route("POST", "/auth/logout"),
-	me: route<AccountView>("GET", "/auth/me"),
-	createSale: route<SaleView>("POST", "/admin/sales"),
-	updateSale: route<SaleView>("PATCH", "/admin/sales/:saleId"),
-	removeSale: route<{ id: string }>("DELETE", "/admin/sales/:saleId"),
-	listSales: route<{ sales: AdminSaleView[] }>("GET", "/admin/sales"),
+	currentSale: route<SaleView>("GET", API_PATHS.saleCurrent),
+	sale: route<SaleView>("GET", API_PATHS.sale),
+	saleEvents: route("GET", API_PATHS.saleEvents),
+	placeEvents: route("GET", API_PATHS.queueMeEvents),
+	joinQueue: route<JoinedView>("POST", API_PATHS.queue),
+	checkPlace: route<PlaceView>("GET", API_PATHS.queueMe),
+	reserve: route<ReservedView>("POST", API_PATHS.reservations),
+	confirm: route<PurchaseView>("POST", API_PATHS.purchases),
+	outcome: route<OutcomeView>("GET", API_PATHS.purchaseMe),
+	register: route<AccountView>("POST", API_PATHS.authRegister),
+	login: route<AccountView>("POST", API_PATHS.authLogin),
+	refresh: route<AccountView>("POST", API_PATHS.authRefresh),
+	logout: route("POST", API_PATHS.authLogout),
+	me: route<AccountView>("GET", API_PATHS.authMe),
+	createSale: route<SaleView>("POST", API_PATHS.adminSales),
+	updateSale: route<SaleView>("PATCH", API_PATHS.adminSale),
+	removeSale: route<{ id: string }>("DELETE", API_PATHS.adminSale),
+	listSales: route<{ sales: AdminSaleView[] }>("GET", API_PATHS.adminSales),
 };
 
 // What a request carries: values for the path placeholders, headers (an undefined one is left out), and a JSON body.

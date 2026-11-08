@@ -32,7 +32,7 @@ and nginx with `least_conn`. k6 runs as a container on the same network and reac
 port on the loopback address only. Each instance runs with the product defaults for payment (150 ms, 2 percent
 declined), rate limits (30 per user and 600 per address in 10 seconds) and the sale cache (1 second). `TRUST_PROXY` is
 on, so each virtual shopper gets an address of their own through `X-Forwarded-For`. Before k6 starts, the
-runner signs every shopper, latecomer and flooder up (`POST /auth/register`, with a real scrypt hash), 16 at a time, and
+runner signs every shopper, latecomer and flooder up (`POST /api/v1/auth/register`, with a real scrypt hash), 16 at a time, and
 writes their `access_token` cookies to `generated-reports/load/<profile>-accounts.json`
 ([`scripts/accounts.ts`](../../apps/flash-load/scripts/accounts.ts)). A real shopper is signed up before a sale opens, and
 the hashing would otherwise take the CPU that purchases need. k6 reads that file once, shared by every virtual user, and

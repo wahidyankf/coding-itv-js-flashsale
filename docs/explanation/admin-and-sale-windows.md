@@ -1,6 +1,6 @@
 # Admin and sale windows
 
-An operator can create a sale in two ways: the seed command, which needs a shell on the server, and `POST /admin/sales`,
+An operator can create a sale in two ways: the seed command, which needs a shell on the server, and `POST /api/v1/admin/sales`,
 which needs the login of an operator. The same login also changes, removes and lists sales. This page explains the product rule behind
 the sales, why a started sale is limited, and where the rules stop.
 
@@ -9,7 +9,7 @@ the sales, why a started sale is limited, and where the rules stop.
 The task sells one type of product in limited quantity, and each user may buy one unit. In the code:
 
 - A sale sells one product, a row of the `products` table, with `stock` units. A product can have many sales over time
-  (`sales.product_id`). `POST /admin/sales` takes an optional `productId`; without it, the sale gets the product of that
+  (`sales.product_id`). `POST /api/v1/admin/sales` takes an optional `productId`; without it, the sale gets the product of that
   `name`, which is made when there is none.
   There is no product CRUD and no price: the task needs neither.
 - One user gets one unit and holds one item at a time in a sale. The tables keep it with `UNIQUE(sale_id, user_id)` on
@@ -20,7 +20,7 @@ The task sells one type of product in limited quantity, and each user may buy on
 
 ## Changing and removing a sale
 
-The routes are `PATCH /admin/sales/:saleId` and `DELETE /admin/sales/:saleId`. A sale that has queues, holds or purchases
+The routes are `PATCH /api/v1/admin/sales/:saleId` and `DELETE /api/v1/admin/sales/:saleId`. A sale that has queues, holds or purchases
 is data that other rules depend on, so what may change follows how far the sale has gone: every field before it starts,
 less once it runs, nothing once it is over. The exact fields and errors are in
 [HTTP endpoints](../reference/http-endpoints.md#changing-a-sale-operator).
@@ -74,7 +74,7 @@ The routes need a session whose account has the role `operator`. A request witho
   broken body. The address is counted by the rate limiter first, so guesses are counted too.
 - The author of each change is kept: `created_by`, `updated_by` and `deleted_by` of the sale hold the operator's user id.
   The seed command writes the `$system` user instead.
-- The web server does not pass `/api/admin` on. Its proxy has an allow-list of method and path pairs, no `/admin` route
+- The web server does not pass `/api/v1/admin` on. Its proxy has an allow-list of method and path pairs, no `/api/v1/admin` route
   is on it, and a test fails if one ever is.
 
 ## Why the two commands live in the API
@@ -92,7 +92,7 @@ module boundary that `architecture_tests.ts` guards. Running a command needs a s
 to the network.
 
 `seed-sale` is in the production image too. It skips the overlap check and writes `$system` as the author, so day-to-day
-sales go through `POST /admin/sales`. It stays in the image because the load test builds its
+sales go through `POST /api/v1/admin/sales`. It stays in the image because the load test builds its
 image from the same [`Dockerfile`](../../apps/flash-be/Dockerfile) and seeds each run's sale with it, so what it tests
 is what ships.
 

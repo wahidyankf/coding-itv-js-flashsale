@@ -1,5 +1,5 @@
 // Server only, used by the home route. Asks flash-be whether it is up; the page shows "ok" or "down".
-import { literal, object } from "@flash/flash-commons";
+import { literal, object, PROBE_PATHS } from "@flash/flash-commons";
 import { callApi } from "./api";
 import { buildConfig } from "./config";
 
@@ -16,7 +16,7 @@ export async function fetchBackendHealth(
 ): Promise<BackendStatus> {
 	const asked = await callApi(
 		fetcher,
-		`${backendUrl}/health`,
+		`${backendUrl}${PROBE_PATHS.health}`,
 		decodeBackendHealth,
 	);
 	return asked.isOk() ? "ok" : "down";

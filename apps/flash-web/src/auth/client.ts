@@ -1,6 +1,6 @@
 // Browser only, part of the account feature. The browser's calls for the account: who am I, sign up, log in, and log out. Each one goes to the web server, which
 // passes it on to flash-be and carries the cookies. The page gets this client, so a test can give it a fake.
-import { object } from "@flash/flash-commons";
+import { API_PATHS, object } from "@flash/flash-commons";
 import { type ApiResult, callApi, jsonPost } from "../api";
 import { type Account, decodeAccount } from "./types";
 
@@ -15,30 +15,35 @@ export type AuthClient = {
 	logout: () => Promise<ApiResult<unknown>>;
 };
 
-// The routes are under /api/auth on the web server. The tokens are only ever in the cookies, so the page never sees them.
+// The routes come from the path table. The tokens are only ever in the cookies, so the page never sees them.
 export function createAuthClient(
 	base = "",
 	fetcher: typeof fetch = fetch,
 ): AuthClient {
-	const auth = `${base}/api/auth`;
 	const post = (body?: object) =>
 		jsonPost(body === undefined ? "{}" : JSON.stringify(body));
 	return {
-		me: () => callApi(fetcher, `${auth}/me`, decodeAccount),
+		me: () => callApi(fetcher, `${base}${API_PATHS.authMe}`, decodeAccount),
 		register: (username, password) =>
 			callApi(
 				fetcher,
-				`${auth}/register`,
+				`${base}${API_PATHS.authRegister}`,
 				decodeAccount,
 				post({ username, password }),
 			),
 		login: (username, password) =>
 			callApi(
 				fetcher,
-				`${auth}/login`,
+				`${base}${API_PATHS.authLogin}`,
 				decodeAccount,
 				post({ username, password }),
 			),
-		logout: () => callApi(fetcher, `${auth}/logout`, decodeLoggedOut, post()),
+		logout: () =>
+			callApi(
+				fetcher,
+				`${base}${API_PATHS.authLogout}`,
+				decodeLoggedOut,
+				post(),
+			),
 	};
 }

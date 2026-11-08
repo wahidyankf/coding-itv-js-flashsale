@@ -6,6 +6,9 @@ import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import net from "node:net";
 import path from "node:path";
+// The API's paths come from the table in flash-commons, the same one flash-be and flash-web use. `npm run smoke:prod` builds
+// flash-commons before this script runs, so the import resolves to its dist.
+import { API_PATHS, PROBE_PATHS } from "@flash/flash-commons";
 
 const root = path.resolve(import.meta.dirname, "../..");
 const PROJECT = "flash-smoke";
@@ -126,7 +129,7 @@ async function startStack() {
 
 async function checkReady(apiUrl) {
 	step("the API is ready");
-	const ready = await fetch(`${apiUrl}/ready`);
+	const ready = await fetch(`${apiUrl}${PROBE_PATHS.ready}`);
 	if (ready.status !== STATUS.ok)
 		throw new Error(`/ready answered ${ready.status}`);
 }
@@ -136,11 +139,23 @@ async function signUpShopper(web) {
 	step(
 		"a shopper signs up through the web server and is refused on the admin route",
 	);
-	const account = await web("POST", "/auth/register", {
+	const account = await web("POST", API_PATHS.authRegister, {
 		body: { username: SHOPPER, password },
 	});
 	expectOk("sign up", account, STATUS.created);
 	return account.cookie;
+}
+
+// The API paths of one sale, with its id filled into the `:saleId` placeholder.
+function routesOf(saleId) {
+	const fill = (template) => template.replace(":saleId", saleId);
+	return {
+		queue: fill(API_PATHS.queue),
+		queueMe: fill(API_PATHS.queueMe),
+		reservations: fill(API_PATHS.reservations),
+		purchases: fill(API_PATHS.purchases),
+		purchaseMe: fill(API_PATHS.purchaseMe),
+	};
 }
 
 // The sale the walk creates: it started a minute ago and runs for an hour.
@@ -157,12 +172,12 @@ function saleRequest() {
 async function refusedOnAdmin(api, shopperCookie, body) {
 	expectRefusal(
 		"no login",
-		await api("POST", "/admin/sales", { body }),
+		await api("POST", API_PATHS.adminSales, { body }),
 		"not_authenticated",
 	);
 	expectRefusal(
 		"shopper",
-		await api("POST", "/admin/sales", {
+		await api("POST", API_PATHS.adminSales, {
 			headers: { cookie: shopperCookie },
 			body,
 		}),
@@ -187,13 +202,13 @@ async function createSaleAsOperator(api, body) {
 		"--password",
 		password,
 	);
-	const operator = await api("POST", "/auth/login", {
+	const operator = await api("POST", API_PATHS.authLogin, {
 		body: { username: OPERATOR, password },
 	});
 	expectOk("operator login", operator, STATUS.ok);
 	const sale = expectOk(
 		"create sale",
-		await api("POST", "/admin/sales", {
+		await api("POST", API_PATHS.adminSales, {
 			headers: { cookie: operator.cookie },
 			body,
 		}),
@@ -205,7 +220,7 @@ async function createSaleAsOperator(api, body) {
 // The web server must not pass the admin route on, even to an operator.
 async function checkWebBlocksAdmin(operatorCookie) {
 	step("the web server does not pass the admin route on");
-	const blocked = await fetch(`http://127.0.0.1:${webPort}/api/admin/sales`, {
+	const blocked = await fetch(`${origin}${API_PATHS.adminSales}`, {
 		method: "POST",
 		headers: {
 			"content-type": "application/json",
@@ -215,7 +230,9 @@ async function checkWebBlocksAdmin(operatorCookie) {
 		body: "{}",
 	});
 	if (blocked.status !== STATUS.notFound) {
-		throw new Error(`the web server answered ${blocked.status} to /api/admin`);
+		throw new Error(
+			`the web server answered ${blocked.status} to ${API_PATHS.adminSales}`,
+		);
 	}
 }
 
@@ -223,7 +240,7 @@ async function checkShopperSeesSale(web, sale) {
 	step("the shopper sees the sale through the web server");
 	const current = expectOk(
 		"current sale",
-		await web("GET", "/sales/current"),
+		await web("GET", API_PATHS.saleCurrent),
 		STATUS.ok,
 	);
 	if (current.id !== sale.id)
@@ -231,12 +248,12 @@ async function checkShopperSeesSale(web, sale) {
 }
 
 // The shopper joins the queue and waits to be admitted. Returns the headers that carry the queue ticket.
-async function joinAndWaitForAdmission(web, salePath, shopperCookie) {
+async function joinAndWaitForAdmission(web, routes, shopperCookie) {
 	step("the shopper joins the queue and is admitted");
 	const logged = { cookie: shopperCookie };
 	const joined = expectOk(
 		"join",
-		await web("POST", `${salePath}/queue`, { headers: logged }),
+		await web("POST", routes.queue, { headers: logged }),
 	);
 	const headers = { ...logged, [TICKET_HEADER]: joined.ticket };
 	let state = joined.state;
@@ -248,7 +265,7 @@ async function joinAndWaitForAdmission(web, salePath, shopperCookie) {
 		await sleep(ADMISSION_CHECK_MS);
 		const place = expectOk(
 			"place",
-			await web("GET", `${salePath}/queue/me`, { headers }),
+			await web("GET", routes.queueMe, { headers }),
 			STATUS.ok,
 		);
 		state = place.state;
@@ -257,16 +274,16 @@ async function joinAndWaitForAdmission(web, salePath, shopperCookie) {
 	return headers;
 }
 
-async function holdItem(web, salePath, headers) {
+async function holdItem(web, routes, headers) {
 	step("the shopper holds one item");
 	return expectOk(
 		"reserve",
-		await web("POST", `${salePath}/reservations`, { headers }),
+		await web("POST", routes.reservations, { headers }),
 	);
 }
 
 // Pays for the hold. A declined charge is tried again, up to MAX_PAYMENT_ATTEMPTS, and the purchase is returned.
-async function payForItem(web, salePath, shopperCookie, held) {
+async function payForItem(web, routes, shopperCookie, held) {
 	step("the shopper pays (a declined charge is tried again)");
 	let purchase;
 	for (
@@ -274,7 +291,7 @@ async function payForItem(web, salePath, shopperCookie, held) {
 		purchase === undefined && attempt < MAX_PAYMENT_ATTEMPTS;
 		attempt++
 	) {
-		const paid = await web("POST", `${salePath}/purchases`, {
+		const paid = await web("POST", routes.purchases, {
 			headers: { cookie: shopperCookie },
 			body: { reservationId: held.reservationId },
 		});
@@ -289,11 +306,11 @@ async function payForItem(web, salePath, shopperCookie, held) {
 }
 
 // The shopper learns they bought the item, and a second hold is refused.
-async function checkOutcome(web, salePath, shopperCookie, headers) {
+async function checkOutcome(web, routes, shopperCookie, headers) {
 	step("the shopper asks if they got it, and cannot buy twice");
 	const outcome = expectOk(
 		"outcome",
-		await web("GET", `${salePath}/purchases/me`, {
+		await web("GET", routes.purchaseMe, {
 			headers: { cookie: shopperCookie },
 		}),
 		STATUS.ok,
@@ -303,7 +320,7 @@ async function checkOutcome(web, salePath, shopperCookie, headers) {
 	}
 	expectRefusal(
 		"second reserve",
-		await web("POST", `${salePath}/reservations`, { headers }),
+		await web("POST", routes.reservations, { headers }),
 		"already_purchased",
 	);
 }
@@ -313,8 +330,7 @@ async function walk() {
 	await startStack();
 	const apiUrl = `http://127.0.0.1:${bePort}`;
 	const api = (method, path, options) => call(apiUrl, method, path, options);
-	const web = (method, path, options) =>
-		call(`http://127.0.0.1:${webPort}/api`, method, path, options);
+	const web = (method, path, options) => call(origin, method, path, options);
 
 	await checkReady(apiUrl);
 	const shopperCookie = await signUpShopper(web);
@@ -327,11 +343,11 @@ async function walk() {
 	await checkWebBlocksAdmin(operatorCookie);
 	await checkShopperSeesSale(web, sale);
 
-	const salePath = `/sales/${sale.id}`;
-	const headers = await joinAndWaitForAdmission(web, salePath, shopperCookie);
-	const held = await holdItem(web, salePath, headers);
-	await payForItem(web, salePath, shopperCookie, held);
-	await checkOutcome(web, salePath, shopperCookie, headers);
+	const routes = routesOf(sale.id);
+	const headers = await joinAndWaitForAdmission(web, routes, shopperCookie);
+	const held = await holdItem(web, routes, headers);
+	await payForItem(web, routes, shopperCookie, held);
+	await checkOutcome(web, routes, shopperCookie, headers);
 }
 
 try {

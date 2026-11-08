@@ -30,7 +30,7 @@ GET {{backend}}/ready
 ###############################################################################
 
 ### 3. Log in as the operator (the tokens are in two HttpOnly cookies, never in the body)
-POST {{backend}}/auth/login
+POST {{backend}}/api/v1/auth/login
 Content-Type: application/json
 
 { "username": "ops", "password": "correct-horse-battery" }
@@ -38,123 +38,123 @@ Content-Type: application/json
 ### 4. Create a sale for later (201)
 # 409 sale_overlaps here means an earlier run stopped before 8: delete that sale (its id is in 6) and send 4 again.
 # @name created
-POST {{backend}}/admin/sales
+POST {{backend}}/api/v1/admin/sales
 Content-Type: application/json
 
 { "name": "Demo sale for later", "stock": 100, "startsAt": "2035-01-01T12:00:00Z", "endsAt": "2035-01-01T13:00:00Z" }
 
 ### 5. A second sale in the same hour: 409 sale_overlaps, one sale runs at a time
-POST {{backend}}/admin/sales
+POST {{backend}}/api/v1/admin/sales
 Content-Type: application/json
 
 { "stock": 100, "startsAt": "2035-01-01T12:30:00Z", "endsAt": "2035-01-01T13:30:00Z" }
 
 ### 6. List every sale, with what only an operator sees (sold, holdSeconds, admitPerSecond)
-GET {{backend}}/admin/sales
+GET {{backend}}/api/v1/admin/sales
 
 ### 7. Give the new sale more stock (send only the fields that change)
-PATCH {{backend}}/admin/sales/{{created.response.body.$.id}}
+PATCH {{backend}}/api/v1/admin/sales/{{created.response.body.$.id}}
 Content-Type: application/json
 
 { "stock": 150 }
 
 ### 8. Remove the new sale (a soft delete: the row stays with deleted_at and deleted_by)
-DELETE {{backend}}/admin/sales/{{created.response.body.$.id}}
+DELETE {{backend}}/api/v1/admin/sales/{{created.response.body.$.id}}
 
 ### 9. Log out the operator
-POST {{backend}}/auth/logout
+POST {{backend}}/api/v1/auth/logout
 
 ###############################################################################
 # Act 3. A shopper buys one item: queue, hold, pay. No route takes a user id: the shopper is the cookie's account.
 ###############################################################################
 
 ### 10. Sign up as a shopper (201; on a second run it answers 409 username_taken, so send 11)
-POST {{backend}}/auth/register
+POST {{backend}}/api/v1/auth/register
 Content-Type: application/json
 
 { "username": "shopper-demo", "password": "a long password" }
 
 ### 11. Log in as the shopper (only needed when 10 answered 409)
-POST {{backend}}/auth/login
+POST {{backend}}/api/v1/auth/login
 Content-Type: application/json
 
 { "username": "shopper-demo", "password": "a long password" }
 
 ### 12. The current sale: the running one, else the next to open
 # @name current
-GET {{backend}}/sales/current
+GET {{backend}}/api/v1/sales/current
 
 ### 13. Join the queue (201 with a signed ticket; "waiting" with a place, or "admitted")
 # @name join
-POST {{backend}}/sales/{{current.response.body.$.id}}/queue
+POST {{backend}}/api/v1/sales/{{current.response.body.$.id}}/queue
 
 ### 14. Check the place (the queue admits shoppers each second; send again until "admitted")
 # @delay 1500
-GET {{backend}}/sales/{{current.response.body.$.id}}/queue/me
+GET {{backend}}/api/v1/sales/{{current.response.body.$.id}}/queue/me
 x-queue-ticket: {{join.response.body.$.ticket}}
 
 ### 15. Hold one item (201 with reservationId and expiresAt; the hold time comes from the sale)
 # @name reserve
-POST {{backend}}/sales/{{current.response.body.$.id}}/reservations
+POST {{backend}}/api/v1/sales/{{current.response.body.$.id}}/reservations
 x-queue-ticket: {{join.response.body.$.ticket}}
 
 ### 16. Hold again: 200 with the same hold, never a second item
-POST {{backend}}/sales/{{current.response.body.$.id}}/reservations
+POST {{backend}}/api/v1/sales/{{current.response.body.$.id}}/reservations
 x-queue-ticket: {{join.response.body.$.ticket}}
 
 ### 17. Did I get it? "holding"
-GET {{backend}}/sales/{{current.response.body.$.id}}/purchases/me
+GET {{backend}}/api/v1/sales/{{current.response.body.$.id}}/purchases/me
 
 ### 18. Pay (201; the mock payment takes about 150 ms and declines about 2% of the time with 402, then send again)
-POST {{backend}}/sales/{{current.response.body.$.id}}/purchases
+POST {{backend}}/api/v1/sales/{{current.response.body.$.id}}/purchases
 Content-Type: application/json
 
 { "reservationId": "{{reserve.response.body.$.reservationId}}" }
 
 ### 19. Pay again: 200 with the same purchase; the reservation id is the idempotency key, so one charge
-POST {{backend}}/sales/{{current.response.body.$.id}}/purchases
+POST {{backend}}/api/v1/sales/{{current.response.body.$.id}}/purchases
 Content-Type: application/json
 
 { "reservationId": "{{reserve.response.body.$.reservationId}}" }
 
 ### 20. Did I get it? "purchased"
-GET {{backend}}/sales/{{current.response.body.$.id}}/purchases/me
+GET {{backend}}/api/v1/sales/{{current.response.body.$.id}}/purchases/me
 
 ### 21. A second item for the same shopper: 409 already_purchased (or sold_out, when 18 took the last item)
-POST {{backend}}/sales/{{current.response.body.$.id}}/reservations
+POST {{backend}}/api/v1/sales/{{current.response.body.$.id}}/reservations
 x-queue-ticket: {{join.response.body.$.ticket}}
 
 ### 22. The sale: remaining is one lower (reads are cached for up to a second)
-GET {{backend}}/sales/{{current.response.body.$.id}}
+GET {{backend}}/api/v1/sales/{{current.response.body.$.id}}
 
 ###############################################################################
 # Act 4. What a shopper may not do.
 ###############################################################################
 
 ### 23. A shopper on an operator route: 403 forbidden
-GET {{backend}}/admin/sales
+GET {{backend}}/api/v1/admin/sales
 
 ### 24. Log out
-POST {{backend}}/auth/logout
+POST {{backend}}/api/v1/auth/logout
 
 ### 25. Join with no login: 401 not_authenticated
-POST {{backend}}/sales/{{current.response.body.$.id}}/queue
+POST {{backend}}/api/v1/sales/{{current.response.body.$.id}}/queue
 
 ###############################################################################
 # Act 5. The browser talks only to flash-web, which passes on a fixed list of routes.
 ###############################################################################
 
 ### 26. The current sale through the web server (what the page reads)
-GET {{web}}/api/sales/current
+GET {{web}}/api/v1/sales/current
 
-### 27. The operator routes are not passed on: 404 (the page's Not Found, flash-be is not asked)
-GET {{web}}/api/admin/sales
+### 27. The operator routes are not passed on: 404 not_found, and flash-be is not asked
+GET {{web}}/api/v1/admin/sales
 
 ### 28. A path that is not on the list: 404 not_found, and flash-be is not asked
-GET {{web}}/api/sales/current/secret
+GET {{web}}/api/v1/sales/current/secret
 
 ### 29. A POST from another site: 403 cross_site
-POST {{web}}/api/auth/login
+POST {{web}}/api/v1/auth/login
 Origin: http://evil.example
 Content-Type: application/json
 
@@ -167,4 +167,4 @@ Content-Type: application/json
 ### 30. Live sale status through the web server (event: sale)
 # @accept chunked
 # @curl-max-time 5
-GET {{web}}/api/sales/{{current.response.body.$.id}}/events
+GET {{web}}/api/v1/sales/{{current.response.body.$.id}}/events

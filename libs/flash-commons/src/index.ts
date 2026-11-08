@@ -1,6 +1,14 @@
 // The public surface of @flash/flash-commons. Each module is re-exported here, so a caller imports from one place.
 // Only the names below are public; a module's helpers stay private to it.
 
+// The API's route paths and its prefix, so flash-be serves and flash-web calls the same path. The e2e apps and flash-load
+// import them too, so a rename reaches every caller at once.
+export {
+	API_PATHS,
+	API_PREFIX,
+	AUTH_BASE_PATH,
+	PROBE_PATHS,
+} from "./api-paths.js";
 // The cookie jar the apps' tests use, so a test sends the cookies a browser would. A jar is a value; each function returns a new one.
 export {
 	applySetCookies,

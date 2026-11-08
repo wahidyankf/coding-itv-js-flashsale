@@ -64,7 +64,7 @@ Nobody can sign up as an operator, so make the first one inside an API container
 docker compose -f compose.prod.yaml exec flash-be-1 node dist/create-operator.js --username=ops --password='<a long password>'
 ```
 
-Then create sales through the API with that login (`POST /admin/sales`, see [seed a sale](seed-a-sale.md)), or seed one
+Then create sales through the API with that login (`POST /api/v1/admin/sales`, see [seed a sale](seed-a-sale.md)), or seed one
 that starts now:
 
 ```bash

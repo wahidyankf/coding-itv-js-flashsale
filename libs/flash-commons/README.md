@@ -8,7 +8,7 @@ in Node, the browser and k6, and flash-be's domain may import it. The one timer 
 It is a workspace package. Build it with `npx nx build flash-commons`. Its Nx targets build `typekit` first. The apps
 that import it (all five) build it first too, as they do for typekit.
 
-The library has eight modules, one per concern:
+The library has nine modules, one per concern:
 
 | Module                                     | What it holds                                                                                                                                                                               | Used by                                                                                                                          |
 | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
@@ -19,7 +19,24 @@ The library has eight modules, one per concern:
 | [`decode.ts`](src/decode.ts)               | the decoder kit: `Decoder`, `DecodeError`, `text`, `nonEmptyText`, `integer`, `nonNegativeInteger`, `isoDate`, `uuid`, `literal`, `oneOf`, `optional`, `object`, `tagged`, `both`, `refine` | flash-web (every reply and stream event); flash-be (request bodies)                                                              |
 | [`uuid.ts`](src/uuid.ts)                   | `isUuid`, the id rule (sales, holds, products)                                                                                                                                              | flash-be (domain), flash-web (proxy), [`decode.ts`](src/decode.ts) (`uuid`)                                                      |
 | [`cookies.ts`](src/cookies.ts)             | `parseSetCookie`, `applySetCookies`, `cookieHeader`, `cookieHeaderOf`: a cookie jar with RFC 6265 path matching                                                                             | the test worlds of flash-be and flash-web, flash-be-e2e, flash-web-e2e                                                           |
+| [`api-paths.ts`](src/api-paths.ts)         | `API_PREFIX` (`/api/v1`), `AUTH_BASE_PATH`, `PROBE_PATHS`, `API_PATHS`: every path of the API, named once                                                                                   | flash-be (routes, refresh cookie path), flash-web (clients, proxy list), flash-be-e2e, flash-web-e2e, flash-load                 |
 | [`relative-time.ts`](src/relative-time.ts) | `relativeTime`, the time phrases of the scenarios ("in 2 hours", "1 hour ago")                                                                                                              | the test support of flash-be, flash-web and flash-be-e2e (flash-web-e2e through it)                                              |
+
+## API paths
+
+[`api-paths.ts`](src/api-paths.ts) names every route of the API once, so the server, the page, the proxy list and the
+tests cannot call one route by two names. Every route sits under `API_PREFIX` (`/api/v1`); the probes in `PROBE_PATHS`
+stay at the root. A `:saleId` part is a placeholder the caller fills in. The table holds paths only, no methods.
+
+```ts
+import { API_PATHS } from "@flash/flash-commons";
+
+const url = API_PATHS.reservations.replace(":saleId", saleId); // "/api/v1/sales/<id>/reservations"
+```
+
+[`api-paths_tests.ts`](src/api-paths_tests.ts) writes the whole table out as literals. A renamed path must change that
+test too, so the rename is a deliberate change that a reviewer sees
+([decision 019](../../docs/explanation/decisions/019-api-version-prefix.md)).
 
 ## Time units
 
@@ -129,7 +146,7 @@ decodeSale(JSON.parse(text)).match({
 ## Test helpers
 
 [`cookies.ts`](src/cookies.ts) and [`relative-time.ts`](src/relative-time.ts) serve the tests of several apps. The cookie jar keeps the cookies a reply sets and
-sends each one only to the paths RFC 6265 allows, so `/auth` reaches `/auth/refresh` but not `/authx`, the way a browser does, and every test
+sends each one only to the paths RFC 6265 allows, so a cookie for `/auth` reaches `/auth/refresh` but not `/authx`, the way a browser does, and every test
 layer sends the same cookies. `relativeTime` reads a scenario's "in 2 hours" against the moment the layer picks, and
 throws on a phrase it does not know, because that is a mistake in the scenario, not a failure to handle. The cookie
 names and paths a test expects stay written in the test: they are the API's contract.
@@ -144,7 +161,7 @@ refuses it in the domain and the application, which take their waits as argument
 ## Commands
 
 ```bash
-npx nx build flash-commons           # tsc to dist/
+npx nx build flash-commons           # empties dist/, then tsc into it
 npx nx test:quick flash-commons      # typecheck + lint + unit tests
 npx nx test:coverage flash-commons   # unit tests with the 99% floor
 ```

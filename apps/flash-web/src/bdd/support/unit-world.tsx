@@ -113,7 +113,7 @@ function streamOf(
 	onEvent: (event: string, data: unknown) => void,
 	headers: Record<string, string>,
 ): () => void {
-	const match = matchRoute("GET", url.replace(/^.*?\/api/, ""));
+	const match = matchRoute("GET", url.replace(/^.*?(?=\/api)/, ""));
 	let last = "";
 	const send = (event: string, data: unknown) => {
 		const key = JSON.stringify([event, data]);
@@ -206,7 +206,7 @@ function setupOf(h: Harness, webFetch: typeof fetch) {
 		},
 		async loggedIn(user: string) {
 			await webFetch(
-				"/api/auth/register",
+				"/api/v1/auth/register",
 				jsonPost(JSON.stringify({ username: user, password: PASSWORD })),
 			);
 		},

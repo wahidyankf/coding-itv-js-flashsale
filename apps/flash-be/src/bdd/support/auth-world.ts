@@ -67,12 +67,14 @@ export function authWorld(layer: AuthLayer) {
 		},
 		pathOf: (name: string) => jar.get(name)?.path,
 		signUp: (username: unknown, password: unknown) =>
-			send("POST", "/auth/register", { payload: { username, password } }),
+			send("POST", "/api/v1/auth/register", {
+				payload: { username, password },
+			}),
 		logIn: (username: unknown, password: unknown) =>
-			send("POST", "/auth/login", { payload: { username, password } }),
-		me: () => send("GET", "/auth/me"),
-		logOut: () => send("POST", "/auth/logout"),
-		refresh: () => send("POST", "/auth/refresh"),
+			send("POST", "/api/v1/auth/login", { payload: { username, password } }),
+		me: () => send("GET", "/api/v1/auth/me"),
+		logOut: () => send("POST", "/api/v1/auth/logout"),
+		refresh: () => send("POST", "/api/v1/auth/refresh"),
 		keepCopy: () => {
 			copy = new Map(jar);
 		},
@@ -80,9 +82,10 @@ export function authWorld(layer: AuthLayer) {
 		anonymous: (method: "GET" | "POST", url: string) =>
 			send(method, url, { from: new Map() }),
 		// The copy of the tokens from before, sent as a thief would send it. What the reply sets does not reach the jar.
-		meWithCopy: () => send("GET", "/auth/me", { from: copy, record: false }),
+		meWithCopy: () =>
+			send("GET", "/api/v1/auth/me", { from: copy, record: false }),
 		refreshWithCopy: () =>
-			send("POST", "/auth/refresh", { from: copy, record: false }),
+			send("POST", "/api/v1/auth/refresh", { from: copy, record: false }),
 		expireAccess: () => layer.expireAccess(cookieValueOf(jar, "access_token")),
 		stored: layer.stored,
 		// The jar after the last reply, to see which tokens are still held.

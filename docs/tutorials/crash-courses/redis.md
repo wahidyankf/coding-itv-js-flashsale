@@ -88,7 +88,7 @@ not write is a failure value, never a guess. The queue has `JOIN`, `PLACE` and `
 Even writes that need no decision, such as `CONFIRM` and `RELEASE`, are scripts. node-redis holds a `MULTI` until the
 connection is back, so a payment inside one would wait for Redis (about 1.8 s at the 95th percentile in a load run). A
 script fails at once, like every other gate call
-([what the load runs found](../../explanation/load-test-findings.md#paying-during-a-redis-outage-was-slow)).
+([what the load runs found](../../explanation/load-test-findings.md#paying-during-a-redis-outage-answers-at-once)).
 
 ### Sorted sets as time and order
 

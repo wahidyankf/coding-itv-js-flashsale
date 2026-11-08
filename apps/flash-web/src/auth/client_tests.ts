@@ -18,13 +18,13 @@ describe("createAuthClient", () => {
 		const { api, fetcher } = client(() => Response.json(ANA));
 		expect(await api.me()).toEqual(new Ok(ANA));
 		const [url, init] = fetcher.mock.calls[0] ?? [];
-		expect(url).toBe("http://web.test/api/auth/me");
+		expect(url).toBe("http://web.test/api/v1/auth/me");
 		expect(init?.body).toBeUndefined();
 	});
 
 	it.each([
-		["register", "/api/auth/register"],
-		["login", "/api/auth/login"],
+		["register", "/api/v1/auth/register"],
+		["login", "/api/v1/auth/login"],
 	] as const)("sends the name and the password to %s", async (call, path) => {
 		const { api, fetcher } = client(() => Response.json(ANA, { status: 201 }));
 		expect(await api[call]("ana", "a long password")).toEqual(new Ok(ANA));
@@ -38,7 +38,7 @@ describe("createAuthClient", () => {
 		const { api, fetcher } = client(() => Response.json({}));
 		expect(await api.logout()).toEqual(new Ok({}));
 		const [url, init] = fetcher.mock.calls[0] ?? [];
-		expect(url).toBe("http://web.test/api/auth/logout");
+		expect(url).toBe("http://web.test/api/v1/auth/logout");
 		expect(init?.method).toBe("POST");
 		expect(init?.body).toBe("{}");
 	});

@@ -120,7 +120,7 @@ describe("the event stream", () => {
 		apps.push(app);
 		const origin = await app.listen({ host: "127.0.0.1", port: 0 });
 		const seen = await readUntil(
-			`${origin}/sales/${sale.id}/events`,
+			`${origin}/api/v1/sales/${sale.id}/events`,
 			{},
 			": keep-alive",
 		);
@@ -149,7 +149,7 @@ describe("the event stream", () => {
 		apps.push(app);
 		const origin = await app.listen({ host: "127.0.0.1", port: 0 });
 		const seen = await readUntil(
-			`${origin}/sales/s/events`,
+			`${origin}/api/v1/sales/s/events`,
 			{},
 			'"remaining":4',
 		);
@@ -176,7 +176,7 @@ describe("the event stream", () => {
 		apps.push(app);
 		const origin = await app.listen({ host: "127.0.0.1", port: 0 });
 		const seen = await readUntil(
-			`${origin}/sales/s/events`,
+			`${origin}/api/v1/sales/s/events`,
 			{},
 			'"remaining":4',
 		);
@@ -207,7 +207,7 @@ describe("the event stream", () => {
 		apps.push(app);
 		const origin = await app.listen({ host: "127.0.0.1", port: 0 });
 		const seen = await readUntil(
-			`${origin}/sales/s/events`,
+			`${origin}/api/v1/sales/s/events`,
 			{},
 			'"remaining":5',
 		);
@@ -240,7 +240,7 @@ describe("the event stream", () => {
 		apps.push(app);
 		const origin = await app.listen({ host: "127.0.0.1", port: 0 });
 		const seen = await readUntil(
-			`${origin}/sales/s/queue/me/events`,
+			`${origin}/api/v1/sales/s/queue/me/events`,
 			{ "x-queue-ticket": "t", cookie: SHOPPER_COOKIE },
 			'"state":"absent"',
 		);
@@ -262,7 +262,7 @@ describe("the event stream", () => {
 		);
 		apps.push(app);
 		const origin = await app.listen({ host: "127.0.0.1", port: 0 });
-		const reply = await fetch(`${origin}/sales/s/queue/me/events`, {
+		const reply = await fetch(`${origin}/api/v1/sales/s/queue/me/events`, {
 			headers: { cookie: SHOPPER_COOKIE },
 		});
 		expect(reply.status).toBe(401);
@@ -291,7 +291,7 @@ describe("the event stream", () => {
 		apps.push(app);
 		const origin = await app.listen({ host: "127.0.0.1", port: 0 });
 		const seen = await readUntil(
-			`${origin}/sales/s/queue/me/events`,
+			`${origin}/api/v1/sales/s/queue/me/events`,
 			{ "x-queue-ticket": "t", cookie: SHOPPER_COOKIE },
 			'"state":"admitted"',
 		);
@@ -322,7 +322,7 @@ describe("the event stream", () => {
 		apps.push(app);
 		const origin = await app.listen({ host: "127.0.0.1", port: 0 });
 		const controller = new AbortController();
-		const reply = await fetch(`${origin}/sales/s/events`, {
+		const reply = await fetch(`${origin}/api/v1/sales/s/events`, {
 			signal: controller.signal,
 		});
 		const reader = reply.body?.getReader();

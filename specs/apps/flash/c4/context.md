@@ -24,6 +24,6 @@ flowchart LR
   TLS; a real deployment puts a TLS proxy in front, which the `Secure` login cookies need. The shopper signs up and logs
   in with a user name and a password; the login is two cookies (see [sequences.md](sequences.md)).
 - An operator calls the API directly over HTTP: the health endpoints, to check that the service is alive and ready, and
-  the `/admin/sales` routes, logged in as an operator, to create, list, change and remove sales.
+  the `/api/v1/admin/sales` routes, logged in as an operator, to create, list, change and remove sales.
 - The product has no runtime dependency outside itself: the sale data lives in its own Postgres database and cache.
   The system context therefore draws no external system.

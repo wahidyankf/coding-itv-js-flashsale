@@ -67,7 +67,7 @@ describe("createWatcher", () => {
 			);
 		});
 		const stop = createWatcher({ fetcher, sleep: tick, random: noJitter })(
-			"/api/sales/x/events",
+			"/api/v1/sales/x/events",
 			(event, data) => {
 				events.push([event, data]);
 				return true;

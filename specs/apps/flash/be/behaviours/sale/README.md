@@ -4,7 +4,7 @@ Scenarios for the sale itself: the status a shopper reads, how reads are cached,
 
 ## Directory Map
 
-- [status.feature](status.feature) - `GET /sales/:saleId` reports the sale and its status; `GET /sales/current` is the running sale, else the next one to open, else none.
+- [status.feature](status.feature) - `GET /api/v1/sales/:saleId` reports the sale and its status; `GET /api/v1/sales/current` is the running sale, else the next one to open, else none.
 - [caching.feature](caching.feature) - sale reads are answered from a short cache; writes never read it.
 - [seeding.feature](seeding.feature) - the seed command creates a sale with a stock and a window.
 - [admin.feature](admin.feature) - an operator, logged in, creates a sale through the API; windows that overlap are refused.

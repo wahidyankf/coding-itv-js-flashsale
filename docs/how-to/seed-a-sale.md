@@ -35,14 +35,14 @@ in the future to be a date, fails with `the sale is not usable: its name, window
 Start the API (`npx nx dev flash-be`), then:
 
 ```bash
-curl -s http://localhost:8080/sales/current
+curl -s http://localhost:8080/api/v1/sales/current
 ```
 
 The body is described in [HTTP endpoints](../reference/http-endpoints.md#the-sale). If another sale is running too,
-`/sales/current` shows the one that started first. Read the new sale by the id the command printed instead:
+`/api/v1/sales/current` shows the one that started first. Read the new sale by the id the command printed instead:
 
 ```bash
-curl -s http://localhost:8080/sales/<id>
+curl -s http://localhost:8080/api/v1/sales/<id>
 ```
 
 The scenarios for this command are in
@@ -64,9 +64,9 @@ log in with it as below. In the production image the same command is
 Then log in. `-c` saves the cookies in a file and `-b` sends them back:
 
 ```bash
-curl -s -c cookies.txt -X POST http://localhost:8080/auth/login \
+curl -s -c cookies.txt -X POST http://localhost:8080/api/v1/auth/login \
   -H "Content-Type: application/json" -d '{"username":"ops","password":"correct-horse-battery"}'
-curl -s -b cookies.txt -X POST http://localhost:8080/admin/sales \
+curl -s -b cookies.txt -X POST http://localhost:8080/api/v1/admin/sales \
   -H "Content-Type: application/json" \
   -d '{"stock":100,"startsAt":"2030-01-01T12:00:00Z","endsAt":"2030-01-01T13:00:00Z"}'
 ```
@@ -75,7 +75,7 @@ The access cookie lasts 15 minutes. To renew it, send the refresh cookie and sav
 (`-b` and `-c`), because a refresh token works only once:
 
 ```bash
-curl -s -b cookies.txt -c cookies.txt -X POST http://localhost:8080/auth/refresh
+curl -s -b cookies.txt -c cookies.txt -X POST http://localhost:8080/api/v1/auth/refresh
 ```
 
 The local [`.env.example`](../../.env.example) sets `COOKIE_SECURE=false`, because a `Secure` cookie is not sent over plain HTTP.
@@ -91,15 +91,15 @@ The same login works for three more routes. `<id>` is the `id` of the sale.
 
 ```bash
 # every sale, the one that opens last first
-curl -s -b cookies.txt http://localhost:8080/admin/sales
+curl -s -b cookies.txt http://localhost:8080/api/v1/admin/sales
 
 # change a sale: send only the fields that change
-curl -s -b cookies.txt -X PATCH http://localhost:8080/admin/sales/<id> \
+curl -s -b cookies.txt -X PATCH http://localhost:8080/api/v1/admin/sales/<id> \
   -H "Content-Type: application/json" \
   -d '{"stock":150}'
 
 # remove a sale
-curl -s -b cookies.txt -X DELETE http://localhost:8080/admin/sales/<id>
+curl -s -b cookies.txt -X DELETE http://localhost:8080/api/v1/admin/sales/<id>
 ```
 
 What each state of a sale lets you change, the bodies and every error are in

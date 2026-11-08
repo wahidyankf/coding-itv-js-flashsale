@@ -1,7 +1,7 @@
 // The health routes. `/health` says the process is up. `/ready` says that Postgres and Redis both answer, which a load
 // balancer checks before it sends traffic. Inbound HTTP adapter.
 
-import { HTTP_STATUS } from "@flash/flash-commons";
+import { HTTP_STATUS, PROBE_PATHS } from "@flash/flash-commons";
 import { attemptAsync, type Result } from "@flash/typekit";
 import type { FastifyInstance } from "fastify";
 import type { Dependencies } from "../../../../application/dependencies.js";
@@ -18,14 +18,14 @@ export function registerHealthRoutes(
 ): void {
 	app.route({
 		method: "GET",
-		url: "/health",
+		url: PROBE_PATHS.health,
 		handler: async () => ({ status: "ok" as const }),
 	});
 
 	// Readiness: Postgres and Redis both answer. Both checks run even when one fails, so the reply shows each store.
 	app.route({
 		method: "GET",
-		url: "/ready",
+		url: PROBE_PATHS.ready,
 		handler: async (_request, reply) => {
 			const database = await attemptAsync(() => deps.checkDatabase(), Error);
 			const redis = await attemptAsync(() => deps.checkGate(), Error);

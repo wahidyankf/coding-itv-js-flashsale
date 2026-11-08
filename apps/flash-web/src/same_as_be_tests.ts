@@ -48,7 +48,7 @@ describe("what flash-web copies from flash-be", () => {
 
 	it("answers an unknown path with the code, status and sentence of flash-be", async () => {
 		const reply = await proxyToBackend(
-			new Request("http://web.test/api/nope"),
+			new Request("http://web.test/api/v1/nope"),
 			{ FLASH_BE_URL: "http://be.test" },
 			vi.fn<typeof fetch>(),
 		);
@@ -65,7 +65,7 @@ describe("what flash-web copies from flash-be", () => {
 
 	it("answers a request from another site with 403, the status flash-be gives to a forbidden account", async () => {
 		const reply = await proxyToBackend(
-			new Request("http://web.test/api/auth/login", {
+			new Request("http://web.test/api/v1/auth/login", {
 				method: "POST",
 				body: "{}",
 				headers: { origin: "http://evil.test" },

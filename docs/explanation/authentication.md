@@ -24,16 +24,16 @@ sequenceDiagram
   A-->>B: access_token (15 min), refresh_token (7 days)
   B->>A: requests with access_token
   Note over B,A: the access token ends
-  B->>A: POST /auth/refresh with refresh_token
+  B->>A: POST /api/v1/auth/refresh with refresh_token
   A-->>B: a new pair; the old refresh token is now the previous one
   Note over B,A: someone replays the previous refresh token
-  B->>A: POST /auth/refresh with the old refresh_token
+  B->>A: POST /api/v1/auth/refresh with the old refresh_token
   A-->>B: 401, and the session ends
 ```
 
 - The **access token** is short (15 minutes) because it goes with every request and a copy of it is worth little for long.
   It is checked against a Redis cache first (`session:<hash>`, kept for at most one minute and never past the token's end) and against Postgres on a miss.
-- The **refresh token** is long (7 days) and only goes to `/auth`, so it travels in far fewer requests. Each use replaces
+- The **refresh token** is long (7 days) and only goes to `/api/v1/auth`, so it travels in far fewer requests. Each use replaces
   it. A token that was already replaced is a sign of a copy, so the whole session ends, and the real owner logs in again.
   A week without a visit also ends the login; every use starts a new week.
 - Both are random (32 bytes). Only the SHA-256 of a token is stored, in Postgres and in the Redis key. A copy of the
@@ -53,10 +53,10 @@ password get the same answer, and the check for an unknown name still hashes, so
 | `HttpOnly`     | always                                 | a script on the page, including an injected one, cannot read the tokens                |
 | `SameSite=Lax` | always                                 | another site cannot make the browser send the cookie with a POST                       |
 | `Secure`       | `COOKIE_SECURE` (`true` in production) | the browser sends the cookie over HTTPS only; `false` is for plain HTTP on one machine |
-| `Path`         | `/` and `/auth`                        | the refresh token reaches only the auth routes                                         |
+| `Path`         | `/` and `/api/v1/auth`                 | the refresh token reaches only the auth routes                                         |
 
-`flash-web` is the browser's only server. It passes `/api/auth` and `/api/sales` on with the cookies, moves the refresh
-cookie's path to `/api/auth`, and refuses a POST whose `Origin` is another host (`403 cross_site`) as a second lock beside
+`flash-web` is the browser's only server. It passes `/api/v1/auth` and `/api/v1/sales` on with the cookies, unchanged,
+because the browser and the API use the same paths. It refuses a POST whose `Origin` is another host (`403 cross_site`) as a second lock beside
 `SameSite`. The operator routes are not passed on at all.
 
 ## Roles

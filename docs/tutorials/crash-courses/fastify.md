@@ -60,7 +60,7 @@ takes the ones it needs ([`queue.ts`](../../../apps/flash-be/src/adapters/inboun
 ```ts
 app.route<{ Params: SaleParams }>({
 	method: "POST",
-	url: "/sales/:saleId/queue",
+	url: API_PATHS.queue,
 	preValidation: limit,
 	handler: async (request, reply) =>
 		sendResult(
@@ -130,7 +130,7 @@ What a stream sends and when is in [live updates](../../explanation/live-updates
 [`app_tests.ts`](../../../apps/flash-be/src/adapters/inbound/http/app_tests.ts) build the app over fake dependencies:
 
 ```ts
-const reply = await app.inject({ method: "GET", url: "/sales/current" });
+const reply = await app.inject({ method: "GET", url: "/api/v1/sales/current" });
 expect(reply.statusCode).toBe(500);
 expect(reply.json()).toEqual(errorPayload("internal"));
 ```

@@ -15,7 +15,7 @@ Feature: Requests the API cannot serve
     And the error message is "Nothing was found at this address."
 
   Scenario: A request body that is not JSON is refused
-    When a client sends POST /sales/00000000-0000-4000-8000-000000000000/queue with a body that is not JSON
+    When a client sends POST /api/v1/sales/00000000-0000-4000-8000-000000000000/queue with a body that is not JSON
     Then the response status is 400
     And the error is "invalid_request"
 
@@ -25,8 +25,20 @@ Feature: Requests the API cannot serve
     And the error is "<error>"
 
     Examples:
-      | path           | body                                          | error            |
-      | /auth/register | {}                                            | invalid_user     |
-      | /auth/register | {"username":5,"password":"a long password"}  | invalid_user     |
-      | /auth/register | {"username":"ana"}                            | invalid_password |
-      | /auth/register | {"username":"ana","password":7}              | invalid_password |
+      | path                  | body                                         | error            |
+      | /api/v1/auth/register | {}                                           | invalid_user     |
+      | /api/v1/auth/register | {"username":5,"password":"a long password"}  | invalid_user     |
+      | /api/v1/auth/register | {"username":"ana"}                           | invalid_password |
+      | /api/v1/auth/register | {"username":"ana","password":7}              | invalid_password |
+
+  Scenario Outline: An old unprefixed path answers 404 not_found
+    When a client sends <method> <path>
+    Then the response status is 404
+    And the error is "not_found"
+
+    Examples:
+      | method | path                                                       |
+      | GET    | /sales/current                                             |
+      | GET    | /sales/00000000-0000-4000-8000-000000000000/queue/me       |
+      | POST   | /auth/login                                                |
+      | GET    | /admin/sales                                               |

@@ -51,8 +51,8 @@ function readsSaleThroughWeb(world: WebWorld): ScenarioBinder {
 	return ({ Given, When, Then, And }) => {
 		const last: AnswerBox = { answer: undefined };
 		Given(SALE_WITH_3, openSaleWithThree(world));
-		When("a client sends GET /api/sales/current", async () => {
-			last.answer = await world.send("GET", "/api/sales/current");
+		When("a client sends GET /api/v1/sales/current", async () => {
+			last.answer = await world.send("GET", "/api/v1/sales/current");
 		});
 		Then("the response status is {int}", statusIs(last));
 		And("the body names the sale", () => {
@@ -86,12 +86,13 @@ function pathsOutsideRefused(world: WebWorld): OutlineBinder {
 
 // The operator routes are not reachable through the web server.
 function operatorRoutesUnreachable(world: WebWorld): ScenarioBinder {
-	return ({ When, Then }) => {
+	return ({ When, Then, And }) => {
 		const last: AnswerBox = { answer: undefined };
-		When("a client sends GET /api/admin/sales", async () => {
-			last.answer = await world.send("GET", "/api/admin/sales");
+		When("a client sends GET /api/v1/admin/sales", async () => {
+			last.answer = await world.send("GET", "/api/v1/admin/sales");
 		});
 		Then("the response status is {int}", statusIs(last));
+		And("the body has error {string}", errorIs(last));
 	};
 }
 
@@ -104,7 +105,7 @@ function writePassedOn(world: WebWorld): ScenarioBinder {
 		When("a client joins the queue through the web server", async () => {
 			last.answer = await world.send(
 				"POST",
-				`/api/sales/${world.saleId}/queue`,
+				`/api/v1/sales/${world.saleId}/queue`,
 				{},
 			);
 		});
@@ -126,7 +127,7 @@ function anonymousRefused(world: WebWorld): ScenarioBinder {
 		When("a client joins the queue through the web server", async () => {
 			last.answer = await world.send(
 				"POST",
-				`/api/sales/${world.saleId}/queue`,
+				`/api/v1/sales/${world.saleId}/queue`,
 				{},
 			);
 		});
@@ -142,7 +143,7 @@ function signUpSetsCookies(world: WebWorld): ScenarioBinder {
 		When(
 			"a client signs up through the web server as {string}",
 			async (_ctx, name: string) => {
-				last.answer = await world.send("POST", "/api/auth/register", {
+				last.answer = await world.send("POST", "/api/v1/auth/register", {
 					username: name,
 					password: "a long password",
 				});
@@ -156,9 +157,11 @@ function signUpSetsCookies(world: WebWorld): ScenarioBinder {
 			},
 		);
 		And(
-			'the response sets the cookie "refresh_token" for the path "/api/auth"',
+			'the response sets the cookie "refresh_token" for the path "/api/v1/auth"',
 			() => {
-				expect(attributesOf(last, "refresh_token")).toContain("Path=/api/auth");
+				expect(attributesOf(last, "refresh_token")).toContain(
+					"Path=/api/v1/auth",
+				);
 			},
 		);
 		And("both cookies are HttpOnly", () => {
@@ -188,14 +191,17 @@ function otherSiteRefused(world: WebWorld): ScenarioBinder {
 		const last: AnswerBox = { answer: undefined };
 		Given(SALE_10, openTenSale(world));
 		And("{string} is logged in", isLoggedIn(world));
-		When("a client on another site sends POST /api/auth/logout", async () => {
-			last.answer = await world.send(
-				"POST",
-				"/api/auth/logout",
-				{},
-				"http://evil.test",
-			);
-		});
+		When(
+			"a client on another site sends POST /api/v1/auth/logout",
+			async () => {
+				last.answer = await world.send(
+					"POST",
+					"/api/v1/auth/logout",
+					{},
+					"http://evil.test",
+				);
+			},
+		);
 		Then("the response status is {int}", statusIs(last));
 		And("the body has error {string}", errorIs(last));
 		And("the API was not asked", () => {
@@ -209,8 +215,8 @@ function apiUnreachable(world: WebWorld): ScenarioBinder {
 	return ({ Given, When, Then, And }) => {
 		const last: AnswerBox = { answer: undefined };
 		Given("the sale cannot be reached", () => world.cutOff());
-		When("a client sends GET /api/sales/current", async () => {
-			last.answer = await world.send("GET", "/api/sales/current");
+		When("a client sends GET /api/v1/sales/current", async () => {
+			last.answer = await world.send("GET", "/api/v1/sales/current");
 		});
 		Then("the response status is {int}", statusIs(last));
 		And("the body has error {string}", errorIs(last));

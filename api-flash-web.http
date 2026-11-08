@@ -15,84 +15,87 @@
 ### Health of the web server itself (no call to the API)
 GET {{web}}/api/health
 
-### Sign up as a shopper (201 and the two cookies; the refresh cookie comes back for /api/auth, the path the browser calls)
-POST {{web}}/api/auth/register
+### Sign up as a shopper (201 and the two cookies; the refresh cookie comes back for /api/v1/auth, the path the browser calls)
+POST {{web}}/api/v1/auth/register
 Content-Type: application/json
 
 { "username": "shopper-web", "password": "a long password" }
 
 ### Log in (when sign-up answers 409 username_taken)
-POST {{web}}/api/auth/login
+POST {{web}}/api/v1/auth/login
 Content-Type: application/json
 
 { "username": "shopper-web", "password": "a long password" }
 
 ### Who am I?
-GET {{web}}/api/auth/me
+GET {{web}}/api/v1/auth/me
 
 ### The current sale (what the page reads)
 # @name current
-GET {{web}}/api/sales/current
+GET {{web}}/api/v1/sales/current
 
 ### One sale by id
-GET {{web}}/api/sales/{{current.response.body.$.id}}
+GET {{web}}/api/v1/sales/{{current.response.body.$.id}}
 
 ### Join the queue
 # @name join
-POST {{web}}/api/sales/{{current.response.body.$.id}}/queue
+POST {{web}}/api/v1/sales/{{current.response.body.$.id}}/queue
 
 ### Check your place (waiting, admitted or absent; the delay lets one admission tick pass)
 # @delay 1500
-GET {{web}}/api/sales/{{current.response.body.$.id}}/queue/me
+GET {{web}}/api/v1/sales/{{current.response.body.$.id}}/queue/me
 x-queue-ticket: {{join.response.body.$.ticket}}
 
 ### Hold one item
 # @name reserve
-POST {{web}}/api/sales/{{current.response.body.$.id}}/reservations
+POST {{web}}/api/v1/sales/{{current.response.body.$.id}}/reservations
 x-queue-ticket: {{join.response.body.$.ticket}}
 
 ### Pay for the held item
-POST {{web}}/api/sales/{{current.response.body.$.id}}/purchases
+POST {{web}}/api/v1/sales/{{current.response.body.$.id}}/purchases
 Content-Type: application/json
 
 { "reservationId": "{{reserve.response.body.$.reservationId}}" }
 
 ### Did I get it?
-GET {{web}}/api/sales/{{current.response.body.$.id}}/purchases/me
+GET {{web}}/api/v1/sales/{{current.response.body.$.id}}/purchases/me
 
 ### Live sale status (Server-Sent Events, streamed through the web server; closes after 5 seconds here)
 # @accept chunked
 # @curl-max-time 5
-GET {{web}}/api/sales/{{current.response.body.$.id}}/events
+GET {{web}}/api/v1/sales/{{current.response.body.$.id}}/events
 
 ### Live place in the queue (closes after 5 seconds here)
 # @accept chunked
 # @curl-max-time 5
-GET {{web}}/api/sales/{{current.response.body.$.id}}/queue/me/events
+GET {{web}}/api/v1/sales/{{current.response.body.$.id}}/queue/me/events
 x-queue-ticket: {{join.response.body.$.ticket}}
 
 ### Renew the login
-POST {{web}}/api/auth/refresh
+POST {{web}}/api/v1/auth/refresh
 
 ### Log out
-POST {{web}}/api/auth/logout
+POST {{web}}/api/v1/auth/logout
 
 ###############################################################################
 # What the web server refuses before it asks the API.
 ###############################################################################
 
 ### A path that is not on the list: 404 not_found
-GET {{web}}/api/sales/current/secret
+GET {{web}}/api/v1/sales/current/secret
 
 ### A sale id that is not a UUID: 404 not_found
-GET {{web}}/api/sales/not-a-uuid
+GET {{web}}/api/v1/sales/not-a-uuid
 
 ### A POST from another site: 403 cross_site
-POST {{web}}/api/auth/login
+POST {{web}}/api/v1/auth/login
 Origin: http://evil.example
 Content-Type: application/json
 
 { "username": "shopper-web", "password": "a long password" }
 
-### The operator routes are never passed on: 404 (manage sales on the API, see api-flash-be.http)
-GET {{web}}/api/admin/sales
+### An old path without the version: 404 not_found (every API route is under /api/v1)
+GET {{web}}/api/sales/current
+
+### The operator routes are never passed on: 404 not_found (manage sales on the API, see api-flash-be.http)
+GET {{web}}/api/v1/admin/sales

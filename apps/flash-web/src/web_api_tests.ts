@@ -39,7 +39,7 @@ describe("withRefresh", () => {
 	it("trades the refresh token and asks again when the login is gone", async () => {
 		const fetcher = fetcherOf({
 			"/api/a": [unauthenticated, () => Response.json({ n: 2 })],
-			"/api/auth/refresh": [refreshed],
+			"/api/v1/auth/refresh": [refreshed],
 		});
 		const onExpired = vi.fn();
 		const wrapped = withRefresh(BASE, fetcher as typeof fetch, onExpired);
@@ -50,7 +50,7 @@ describe("withRefresh", () => {
 		expect(await reply.json()).toEqual({ n: 2 });
 		expect(fetcher.mock.calls.map(([url]) => String(url))).toEqual([
 			`${BASE}/api/a`,
-			`${BASE}/api/auth/refresh`,
+			`${BASE}/api/v1/auth/refresh`,
 			`${BASE}/api/a`,
 		]);
 		expect(fetcher.mock.calls[1]?.[1]?.method).toBe("POST");
@@ -62,7 +62,7 @@ describe("withRefresh", () => {
 	it("gives the first reply back, and says the login ended, when the refresh is refused", async () => {
 		const fetcher = fetcherOf({
 			"/api/a": [unauthenticated],
-			"/api/auth/refresh": [refused],
+			"/api/v1/auth/refresh": [refused],
 		});
 		const onExpired = vi.fn();
 		const wrapped = withRefresh(BASE, fetcher as typeof fetch, onExpired);
@@ -119,12 +119,12 @@ describe("withRefresh", () => {
 		const fetcher = fetcherOf({
 			"/api/a": [unauthenticated, () => Response.json({})],
 			"/api/b": [unauthenticated, () => Response.json({})],
-			"/api/auth/refresh": [refreshed],
+			"/api/v1/auth/refresh": [refreshed],
 		});
 		const wrapped = withRefresh(BASE, fetcher as typeof fetch, vi.fn());
 		await Promise.all([wrapped(`${BASE}/api/a`), wrapped(`${BASE}/api/b`)]);
 		const refreshes = fetcher.mock.calls.filter(([url]) =>
-			String(url).endsWith("/api/auth/refresh"),
+			String(url).endsWith("/api/v1/auth/refresh"),
 		);
 		expect(refreshes).toHaveLength(1);
 	});
@@ -137,13 +137,13 @@ describe("withRefresh", () => {
 				unauthenticated,
 				() => Response.json({}),
 			],
-			"/api/auth/refresh": [refreshed, refreshed],
+			"/api/v1/auth/refresh": [refreshed, refreshed],
 		});
 		const wrapped = withRefresh(BASE, fetcher as typeof fetch, vi.fn());
 		await wrapped(`${BASE}/api/a`);
 		await wrapped(`${BASE}/api/a`);
 		const refreshes = fetcher.mock.calls.filter(([url]) =>
-			String(url).endsWith("/api/auth/refresh"),
+			String(url).endsWith("/api/v1/auth/refresh"),
 		);
 		expect(refreshes).toHaveLength(2);
 	});
@@ -152,8 +152,8 @@ describe("withRefresh", () => {
 describe("createWebApi", () => {
 	it("tells every listener that the login ended, until it stops listening", async () => {
 		const fetcher = fetcherOf({
-			"/api/sales/s/purchases/me": [unauthenticated, unauthenticated],
-			"/api/auth/refresh": [refused, refused],
+			"/api/v1/sales/s/purchases/me": [unauthenticated, unauthenticated],
+			"/api/v1/auth/refresh": [refused, refused],
 		});
 		const api = createWebApi(BASE, fetcher as typeof fetch, {
 			watch: () => () => {},

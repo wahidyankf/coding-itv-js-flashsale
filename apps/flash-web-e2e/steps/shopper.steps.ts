@@ -2,6 +2,7 @@
 // would), the shopper who is logged in through the page, and the buttons and labels the page shows. Binds
 // sale/buying.feature, sale/checking.feature, sale/status.feature and account/login.feature.
 
+import { API_PATHS } from "@flash/flash-commons";
 import type { APIRequestContext } from "@playwright/test";
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
@@ -13,7 +14,7 @@ import {
 import { query } from "../../flash-be-e2e/steps/support/database.js";
 import { pollUntilAdmitted } from "../../flash-be-e2e/steps/support/shoppers.js";
 import { currentSaleId } from "../../flash-be-e2e/steps/support/world.js";
-import { getJson, postJson, salePath } from "./support/api.js";
+import { getJson, postJson, saleRoute } from "./support/api.js";
 import {
 	ADMISSION_POLL_MS,
 	ADMISSION_WAIT_MS,
@@ -33,12 +34,13 @@ async function joinAndWait(
 ): Promise<{ api: string; ticket: string; cookie: string }> {
 	const api = await privateApi();
 	const cookie = await loginOrSignUp(user);
-	const sale = `${api}${salePath(currentSaleId())}`;
-	const joined = await postJson(request, `${sale}/queue`, {}, { cookie });
+	const at = (template: string) =>
+		`${api}${saleRoute(template, currentSaleId())}`;
+	const joined = await postJson(request, at(API_PATHS.queue), {}, { cookie });
 	const ticket: string = (await joined.json()).ticket ?? "";
 	await pollUntilAdmitted(
 		async () => {
-			const place = await getJson(request, `${sale}/queue/me`, {
+			const place = await getJson(request, at(API_PATHS.queueMe), {
 				cookie,
 				[TICKET_HEADER]: ticket,
 			});
@@ -61,7 +63,7 @@ async function hold(
 	const { api, ticket, cookie } = await joinAndWait(request, user);
 	const reserved = await postJson(
 		request,
-		`${api}${salePath(currentSaleId())}/reservations`,
+		`${api}${saleRoute(API_PATHS.reservations, currentSaleId())}`,
 		{},
 		{ cookie, [TICKET_HEADER]: ticket },
 	);
@@ -85,7 +87,7 @@ Given(/^"([^"]+)" has bought an item$/, async ({ request }, user: string) => {
 	const { api, reservationId, cookie } = await hold(request, user);
 	const bought = await postJson(
 		request,
-		`${api}${salePath(currentSaleId())}/purchases`,
+		`${api}${saleRoute(API_PATHS.purchases, currentSaleId())}`,
 		{ reservationId },
 		{ cookie },
 	);
@@ -107,7 +109,7 @@ Given(
 		for (let index = 0; index < Number(count); index++) {
 			const joined = await postJson(
 				request,
-				`${api}${salePath(currentSaleId())}/queue`,
+				`${api}${saleRoute(API_PATHS.queue, currentSaleId())}`,
 				{},
 				{ cookie: await loginOrSignUp(`shopper${index}`) },
 			);
@@ -120,7 +122,7 @@ Given(
 Given(/^"([^"]+)" is logged in$/, async ({ page }, user: string) => {
 	await loginOrSignUp(user);
 	await connectWebServer();
-	const reply = await page.request.post("/api/auth/login", {
+	const reply = await page.request.post(API_PATHS.authLogin, {
 		data: { username: user, password: E2E_PASSWORD },
 	});
 	expect(reply.status(), await reply.text()).toBe(200);

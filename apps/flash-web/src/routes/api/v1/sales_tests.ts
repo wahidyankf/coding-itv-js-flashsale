@@ -1,4 +1,4 @@
-// Unit tests for the sale route: requests under /api/sales reach the proxy.
+// Unit tests for the sale route: requests under /api/v1/sales reach the proxy.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Route } from "./sales.$";
 
@@ -7,7 +7,7 @@ afterEach(() => {
 	vi.unstubAllEnvs();
 });
 
-describe("the /api/sales route", () => {
+describe("the /api/v1/sales route", () => {
 	it("passes GET and POST to flash-be, at the address in the environment", async () => {
 		vi.stubEnv("FLASH_BE_URL", "http://flash-be.test");
 		const urls: string[] = [];
@@ -20,19 +20,19 @@ describe("the /api/sales route", () => {
 			(context: { request: Request }) => Promise<Response>
 		>;
 		const get = await handlers.GET?.({
-			request: new Request("http://web.test/api/sales/current"),
+			request: new Request("http://web.test/api/v1/sales/current"),
 		});
 		const post = await handlers.POST?.({
 			request: new Request(
-				"http://web.test/api/sales/11111111-1111-4111-8111-111111111111/queue",
+				"http://web.test/api/v1/sales/11111111-1111-4111-8111-111111111111/queue",
 				{ method: "POST", body: "{}" },
 			),
 		});
 		expect(get?.status).toBe(200);
 		expect(post?.status).toBe(200);
-		expect(urls[0]).toBe("http://flash-be.test/sales/current");
+		expect(urls[0]).toBe("http://flash-be.test/api/v1/sales/current");
 		expect(urls[1]).toBe(
-			"http://flash-be.test/sales/11111111-1111-4111-8111-111111111111/queue",
+			"http://flash-be.test/api/v1/sales/11111111-1111-4111-8111-111111111111/queue",
 		);
 	});
 });

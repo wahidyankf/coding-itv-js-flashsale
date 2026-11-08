@@ -13,7 +13,7 @@ import type { FakeState, Session } from "./fake-state";
 
 // The names and the lives of the two cookies, as flash-be sets them.
 export const ACCESS_COOKIE = "access_token";
-// The name of the refresh cookie, which flash-be sets for /auth only.
+// The name of the refresh cookie, which flash-be sets for the auth path only.
 export const REFRESH_COOKIE = "refresh_token";
 // Fifteen minutes for the access cookie and seven days for the refresh cookie, as flash-be sets them.
 const ACCESS_TTL_MS = 15 * MS_PER_MINUTE;
@@ -23,11 +23,11 @@ const cookie = (name: string, value: string, path: string, maxAgeMs: number) =>
 	`${name}=${value}; Path=${path}; Max-Age=${Math.floor(maxAgeMs / MS_PER_SECOND)}; HttpOnly; SameSite=Lax`;
 const cookiesOf = (session: Session) => [
 	cookie(ACCESS_COOKIE, session.access, "/", ACCESS_TTL_MS),
-	cookie(REFRESH_COOKIE, session.refresh, "/auth", REFRESH_TTL_MS),
+	cookie(REFRESH_COOKIE, session.refresh, "/api/v1/auth", REFRESH_TTL_MS),
 ];
 const clearedCookies = () => [
 	cookie(ACCESS_COOKIE, "", "/", 0),
-	cookie(REFRESH_COOKIE, "", "/auth", 0),
+	cookie(REFRESH_COOKIE, "", "/api/v1/auth", 0),
 ];
 const cookieValue = (header: string | undefined, name: string) =>
 	(header ?? "")

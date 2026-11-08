@@ -1,4 +1,4 @@
-// Steps for creating a sale through the operator's route (`POST /admin/sales`): who may create one, the sale it makes, the
+// Steps for creating a sale through the operator's route (`POST /api/v1/admin/sales`): who may create one, the sale it makes, the
 // product it sells, the races between operators, and the rows the database keeps. Binds sale/admin.feature and
 // sale/operating.feature (its creating steps; the other operator steps are in operating.steps.ts).
 

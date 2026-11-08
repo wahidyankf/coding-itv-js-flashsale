@@ -63,6 +63,11 @@ describeFeature(
 			"A request body with a missing or mistyped field is refused with the code of that field",
 			steps.badField,
 		);
+
+		ScenarioOutline(
+			"An old unprefixed path answers 404 not_found",
+			steps.oldPath,
+		);
 	},
 	{ excludeTags: ["integration-exempt"] },
 );

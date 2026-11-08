@@ -15,7 +15,7 @@ flowchart LR
   migrate["flash-be-migrate<br/>container, one-off job"]
   pg[("Postgres 18<br/>data store")]
   redis[("Redis 8<br/>data store")]
-  operator -->|/admin/sales| lb
+  operator -->|/api/v1/admin/sales| lb
   web -->|sale, auth, /health| lb
   lb -->|least connections| be
   be -->|SQL queries over TCP| pg
@@ -32,12 +32,12 @@ flowchart LR
 
 ## Relationships in Prose
 
-- `flash-web` renders the sale page from `GET /sales/current` and shows the backend status from `GET /health`. It passes
-  the browser's requests under `/api/sales` and `/api/auth` on to the API, streams and cookies included. The address comes from `FLASH_BE_URL`,
+- `flash-web` renders the sale page from `GET /api/v1/sales/current` and shows the backend status from `GET /health`. It passes
+  the browser's requests under `/api/v1/sales` and `/api/v1/auth` on to the API, streams and cookies included. The address comes from `FLASH_BE_URL`,
   read only on the server. In production that address is nginx.
 - `nginx` is the one door to the API. It sends each request to the instance with the fewest open requests and sets
   `X-Forwarded-For` to the address it sees, so a caller cannot choose its own address for the rate limit. The operator
-  logs in and manages sales through it with the `/auth` and `/admin/sales` routes (create, list, change, remove); the web server never passes them on.
+  logs in and manages sales through it with the `/api/v1/auth` and `/api/v1/admin/sales` routes (create, list, change, remove); the web server never passes them on.
 - The three `flash-be` instances are identical. A queue ticket is signed with a shared secret, the state lives in
   Postgres and Redis, and one instance wins each admission tick, so any instance can serve any request.
 - `flash-be` runs SQL queries against Postgres over TCP through its Kysely query builder.

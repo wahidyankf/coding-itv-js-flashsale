@@ -1,7 +1,7 @@
 // The auth routes: sign-up, login, refresh, logout, and who the access cookie belongs to. A login sets the two cookies and
 // the refusal of a refresh clears them. How a cookie is written is in ../cookies.ts. Inbound HTTP adapter.
 
-import { HTTP_STATUS } from "@flash/flash-commons";
+import { API_PATHS, HTTP_STATUS } from "@flash/flash-commons";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { Login } from "../../../../application/auth-service.js";
 import type { Dependencies } from "../../../../application/dependencies.js";
@@ -62,7 +62,7 @@ function cookieJarOf(secure: boolean) {
 	};
 }
 
-// Registers the /auth routes, which have their own rate limit. `cookies.secure` says whether the cookies may only travel over
+// Registers the auth routes, which have their own rate limit. `cookies.secure` says whether the cookies may only travel over
 // HTTPS.
 export function registerAuthRoutes(
 	app: FastifyInstance,
@@ -75,7 +75,7 @@ export function registerAuthRoutes(
 	// Signing up makes a shopper account and logs it in. The cookies are the only place the tokens are sent.
 	app.route({
 		method: "POST",
-		url: "/auth/register",
+		url: API_PATHS.authRegister,
 		onRequest: limitAuth,
 		handler: async (request, reply) => {
 			const body = signUpBody(request.body);
@@ -101,7 +101,7 @@ export function registerAuthRoutes(
 	// A body that does not decode, or a name the rule refuses, is the same answer as a wrong login.
 	app.route({
 		method: "POST",
-		url: "/auth/login",
+		url: API_PATHS.authLogin,
 		onRequest: limitAuth,
 		handler: async (request, reply) => {
 			const body = loginBody(request.body);
@@ -122,10 +122,10 @@ export function registerAuthRoutes(
 		},
 	});
 
-	// Trades the refresh token (sent only to /auth) for a new pair. The old refresh token stops working.
+	// Trades the refresh token (sent only to the auth routes) for a new pair. The old refresh token stops working.
 	app.route({
 		method: "POST",
-		url: "/auth/refresh",
+		url: API_PATHS.authRefresh,
 		onRequest: limitAuth,
 		handler: async (request, reply) => {
 			const refreshed = await deps.auth.refresh(
@@ -148,7 +148,7 @@ export function registerAuthRoutes(
 	// Ends the login. It is safe to send twice, and with no login at all.
 	app.route({
 		method: "POST",
-		url: "/auth/logout",
+		url: API_PATHS.authLogout,
 		onRequest: limitAuth,
 		handler: async (request, reply) => {
 			await deps.auth.logout({
@@ -165,7 +165,7 @@ export function registerAuthRoutes(
 	// Who the cookie says you are.
 	app.route({
 		method: "GET",
-		url: "/auth/me",
+		url: API_PATHS.authMe,
 		preValidation: needSession,
 		handler: async (request, reply) =>
 			reply.code(HTTP_STATUS.ok).send(accountView(principalOf(request))),

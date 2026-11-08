@@ -4,4 +4,4 @@ Scenarios for holding an item: who may reserve, how long the hold lasts, and how
 
 ## Directory Map
 
-- [reserving.feature](reserving.feature) - `POST /sales/:saleId/reservations` gives an admitted shopper one held item, and refuses everyone else.
+- [reserving.feature](reserving.feature) - `POST /api/v1/sales/:saleId/reservations` gives an admitted shopper one held item, and refuses everyone else.

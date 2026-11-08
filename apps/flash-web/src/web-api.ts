@@ -1,6 +1,6 @@
 // The one set of clients the page uses: sale, account, and a way to hear that the login ended. They share one fetch that
 // renews an expired login. It sits in src/, so neither the sale nor the account folder imports the other.
-import { HTTP_STATUS } from "@flash/flash-commons";
+import { API_PATHS, HTTP_STATUS } from "@flash/flash-commons";
 import { attemptAsync } from "@flash/typekit";
 import { callApi, decodeRefusal, jsonPost, readBody } from "./api";
 import { type AuthClient, createAuthClient } from "./auth/client";
@@ -29,7 +29,7 @@ export function withRefresh(
 		refreshing ??= (async () => {
 			const traded = await callApi(
 				fetcher,
-				`${base}/api/auth/refresh`,
+				`${base}${API_PATHS.authRefresh}`,
 				decodeAccount,
 				jsonPost("{}"),
 			);

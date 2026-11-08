@@ -27,7 +27,7 @@ plugins matters.
 ### File routes and the generated tree
 
 Each file in [`src/routes/`](../../../apps/flash-web/src/routes/) is a route: [`index.tsx`](../../../apps/flash-web/src/routes/index.tsx) is `/`, [`api/health.ts`](../../../apps/flash-web/src/routes/api/health.ts) is
-`/api/health`, and `$` in [`api/sales.$.ts`](../../../apps/flash-web/src/routes/api/sales.$.ts) matches the rest of the path. The Vite plugin writes
+`/api/health`, and `$` in [`api/v1/sales.$.ts`](../../../apps/flash-web/src/routes/api/v1/sales.$.ts) matches the rest of the path. The Vite plugin writes
 [`routeTree.gen.ts`](../../../apps/flash-web/src/routeTree.gen.ts) from them, and
 [`router.tsx`](../../../apps/flash-web/src/router.tsx) builds a new router per request from that tree. Do not edit the
 generated file; Biome and the coverage skip it.
@@ -75,11 +75,11 @@ export const Route = createFileRoute("/")({
 ### Server routes that call the proxy
 
 A route with `server.handlers` answers HTTP itself and renders nothing.
-[`api/sales.$.ts`](../../../apps/flash-web/src/routes/api/sales.$.ts) hands every request to
+[`api/v1/sales.$.ts`](../../../apps/flash-web/src/routes/api/v1/sales.$.ts) hands every request to
 [`proxy.ts`](../../../apps/flash-web/src/proxy.ts), which checks it against the allow-list:
 
 ```ts
-export const Route = createFileRoute("/api/sales/$")({
+export const Route = createFileRoute("/api/v1/sales/$")({
 	server: {
 		handlers: {
 			GET: ({ request }) => proxyToBackend(request, process.env),
@@ -143,8 +143,8 @@ In a second terminal, ask its server routes:
 
 ```bash
 curl localhost:3000/api/health
-curl localhost:3000/api/sales/current
-curl localhost:3000/api/sales/not-a-uuid
+curl localhost:3000/api/v1/sales/current
+curl localhost:3000/api/v1/sales/not-a-uuid
 ```
 
 The first and the last answer come from the web server itself. The second goes through the proxy to `flash-be`. With
@@ -174,8 +174,10 @@ npx vitest run --config vitest.config.ts src/sale/shopper_state_tests.ts src/com
 
 ## Traps to avoid
 
-- **The refresh cookie path.** `flash-be` sets the refresh cookie for `/auth`, but the browser reaches it as `/api/auth`
-  and would never send it back. `rewritePath` in [`proxy.ts`](../../../apps/flash-web/src/proxy.ts) moves it.
+- **A path that differs between the browser and the API.** `flash-be` sets the refresh cookie for `/api/v1/auth`. If
+  the browser reached the auth routes under another path, it would never send the cookie back. So the browser routes
+  sit at the same paths as the API ([`routes/api/v1/`](../../../apps/flash-web/src/routes/api/v1/)), and
+  [`proxy.ts`](../../../apps/flash-web/src/proxy.ts) passes the path on unchanged.
 - **A callback that changes every render.** `stopLive`, which `useLiveSale` gets as `onStopped`, must be stable
   (`useCallback`), or the effect in [`sale-page.tsx`](../../../apps/flash-web/src/sale-page.tsx) opens the stream again
   on every render.

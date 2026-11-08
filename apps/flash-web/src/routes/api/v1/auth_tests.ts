@@ -1,4 +1,4 @@
-// Unit tests for the account route: requests under /api/auth reach the proxy.
+// Unit tests for the account route: requests under /api/v1/auth reach the proxy.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Route } from "./auth.$";
 
@@ -7,7 +7,7 @@ afterEach(() => {
 	vi.unstubAllEnvs();
 });
 
-describe("the /api/auth route", () => {
+describe("the /api/v1/auth route", () => {
 	it("passes GET and POST to flash-be, at the address in the environment", async () => {
 		vi.stubEnv("FLASH_BE_URL", "http://flash-be.test");
 		const urls: string[] = [];
@@ -20,10 +20,10 @@ describe("the /api/auth route", () => {
 			(context: { request: Request }) => Promise<Response>
 		>;
 		const get = await handlers.GET?.({
-			request: new Request("http://web.test/api/auth/me"),
+			request: new Request("http://web.test/api/v1/auth/me"),
 		});
 		const post = await handlers.POST?.({
-			request: new Request("http://web.test/api/auth/login", {
+			request: new Request("http://web.test/api/v1/auth/login", {
 				method: "POST",
 				body: "{}",
 			}),
@@ -31,8 +31,8 @@ describe("the /api/auth route", () => {
 		expect(get?.status).toBe(200);
 		expect(post?.status).toBe(200);
 		expect(urls).toEqual([
-			"http://flash-be.test/auth/me",
-			"http://flash-be.test/auth/login",
+			"http://flash-be.test/api/v1/auth/me",
+			"http://flash-be.test/api/v1/auth/login",
 		]);
 	});
 });

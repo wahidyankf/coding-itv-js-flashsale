@@ -65,7 +65,7 @@ describe("createSaleClient", () => {
 		const result = await api.join(SALE);
 		expect(result).toEqual(new Ok(JOINED));
 		const [url, init] = fetcher.mock.calls[0] ?? [];
-		expect(url).toBe(`http://web.test/api/sales/${SALE}/queue`);
+		expect(url).toBe(`http://web.test/api/v1/sales/${SALE}/queue`);
 		expect(init?.body).toBe("{}");
 	});
 
@@ -93,7 +93,7 @@ describe("createSaleClient", () => {
 		);
 		await api.outcome(SALE);
 		const [url, init] = fetcher.mock.calls[0] ?? [];
-		expect(url).toBe(`http://web.test/api/sales/${SALE}/purchases/me`);
+		expect(url).toBe(`http://web.test/api/v1/sales/${SALE}/purchases/me`);
 		expect(init?.body).toBeUndefined();
 	});
 
@@ -157,7 +157,7 @@ describe("createSaleClient", () => {
 		);
 		const onEvent = watch.mock.calls[0]?.[1];
 		expect(watch.mock.calls[0]?.[0]).toBe(
-			`http://web.test/api/sales/${SALE}/events`,
+			`http://web.test/api/v1/sales/${SALE}/events`,
 		);
 		onEvent?.("place", { userId: "ana", state: "admitted" });
 		onEvent?.("sale", SALE_VIEW);
@@ -174,7 +174,7 @@ describe("createSaleClient", () => {
 			() => {},
 		);
 		const [url, onEvent, subscription] = watch.mock.calls[0] ?? [];
-		expect(url).toBe(`http://web.test/api/sales/${SALE}/queue/me/events`);
+		expect(url).toBe(`http://web.test/api/v1/sales/${SALE}/queue/me/events`);
 		expect(subscription?.headers).toEqual({ "x-queue-ticket": "t1" });
 		onEvent?.("sale", SALE_VIEW);
 		onEvent?.("place", { userId: "ana", state: "admitted" });
@@ -253,7 +253,7 @@ describe("createSaleClient, what it reports", () => {
 		expect(report).toHaveBeenCalledOnce();
 		expect(report).toHaveBeenCalledWith(
 			expect.objectContaining({
-				source: `http://web.test/api/sales/${SALE}/queue`,
+				source: `http://web.test/api/v1/sales/${SALE}/queue`,
 				path: "state",
 			}),
 		);
@@ -270,7 +270,7 @@ describe("createSaleClient, what it reports", () => {
 		expect(onEvent?.("sale", { ...SALE_VIEW, stock: "10" })).toBe(false);
 		expect(report).toHaveBeenCalledOnce();
 		expect(report).toHaveBeenCalledWith({
-			source: `http://web.test/api/sales/${SALE}/events event sale`,
+			source: `http://web.test/api/v1/sales/${SALE}/events event sale`,
 			path: "stock",
 			expected: "a non-negative integer",
 		});
@@ -288,7 +288,7 @@ describe("createSaleClient, what it reports", () => {
 		expect(onEvent?.("place", { userId: "ana", state: "waiting" })).toBe(false);
 		expect(report).toHaveBeenCalledOnce();
 		expect(report).toHaveBeenCalledWith({
-			source: `http://web.test/api/sales/${SALE}/queue/me/events event place`,
+			source: `http://web.test/api/v1/sales/${SALE}/queue/me/events event place`,
 			path: "place",
 			expected: "an integer",
 		});

@@ -10,13 +10,13 @@ describe("reportDecodeFailure", () => {
 	it("warns once, naming the source, the field and what was expected", () => {
 		const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 		reportDecodeFailure({
-			source: "http://flash-be.test/api/sales/x",
+			source: "http://flash-be.test/api/v1/sales/x",
 			path: "sale.stock",
 			expected: "an integer",
 		});
 		expect(warn).toHaveBeenCalledOnce();
 		expect(warn).toHaveBeenCalledWith(
-			'flash-web: http://flash-be.test/api/sales/x sent a value that did not decode at field "sale.stock", expected an integer.',
+			'flash-web: http://flash-be.test/api/v1/sales/x sent a value that did not decode at field "sale.stock", expected an integer.',
 		);
 	});
 

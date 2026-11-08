@@ -1,5 +1,6 @@
 // The reservation route: an admitted shopper asks for one item, and the hold keeps it for the hold time. Inbound HTTP
 // adapter.
+import { API_PATHS } from "@flash/flash-commons";
 import type { FastifyInstance } from "fastify";
 import type { Dependencies } from "../../../../application/dependencies.js";
 import {
@@ -20,7 +21,7 @@ export function registerReservationRoutes(
 	// An admitted shopper holds one item for the sale's hold time. Asking again returns the same hold.
 	app.route<{ Params: SaleParams }>({
 		method: "POST",
-		url: "/sales/:saleId/reservations",
+		url: API_PATHS.reservations,
 		preValidation: limit,
 		handler: async (request, reply) =>
 			sendResult(

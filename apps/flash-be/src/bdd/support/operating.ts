@@ -84,7 +84,7 @@ function windowAt(now: Date, startsInMinutes: number, minutes: number) {
 
 // The operator creates a sale, and the scene remembers its id when the API made it.
 async function create(scene: Scene, sale: SaleInput, sender: Sender) {
-	const reply = await send(scene, "POST", "/admin/sales", sender, {
+	const reply = await send(scene, "POST", "/api/v1/admin/sales", sender, {
 		stock: sale.stock,
 		...windowAt(scene.layer.now(), sale.startsInMinutes, sale.minutes),
 		...(sale.productId === undefined ? {} : { productId: sale.productId }),
@@ -107,7 +107,7 @@ function operate(
 	phrase: string,
 	sender: Sender,
 ): Promise<Response> {
-	const url = `/admin/sales/${scene.memory.lastSaleId}`;
+	const url = `/api/v1/admin/sales/${scene.memory.lastSaleId}`;
 	const change = CHANGE_PHRASE.exec(phrase);
 	if (change) return send(scene, "PATCH", url, sender, changeBody(change));
 	const move = MOVE_PHRASE.exec(phrase);
@@ -123,7 +123,7 @@ function operate(
 	}
 	if (phrase === "removes that sale") return send(scene, "DELETE", url, sender);
 	if (phrase === "lists the sales") {
-		return send(scene, "GET", "/admin/sales", sender);
+		return send(scene, "GET", "/api/v1/admin/sales", sender);
 	}
 	throw new Error(`the operator cannot ${phrase}`);
 }
@@ -185,9 +185,10 @@ export function operatorWorld(layer: OperatingLayer) {
 		operate: (phrase: string, sender: Sender) => operate(scene, phrase, sender),
 		// The public read of that sale, as a shopper sees it.
 		readSale: () =>
-			send(scene, "GET", `/sales/${scene.memory.lastSaleId}`, undefined),
-		readCurrentSale: () => send(scene, "GET", "/sales/current", undefined),
-		listSales: () => send(scene, "GET", "/admin/sales", "operator"),
+			send(scene, "GET", `/api/v1/sales/${scene.memory.lastSaleId}`, undefined),
+		readCurrentSale: () =>
+			send(scene, "GET", "/api/v1/sales/current", undefined),
+		listSales: () => send(scene, "GET", "/api/v1/admin/sales", "operator"),
 		get saleId() {
 			return scene.memory.lastSaleId;
 		},

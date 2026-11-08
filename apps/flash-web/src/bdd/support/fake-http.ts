@@ -69,20 +69,24 @@ export type RouteName =
 	| "confirm"
 	| "outcome";
 const ROUTES: Array<[RouteName, string, RegExp]> = [
-	["register", "POST", /^\/auth\/register$/],
-	["login", "POST", /^\/auth\/login$/],
-	["refresh", "POST", /^\/auth\/refresh$/],
-	["logout", "POST", /^\/auth\/logout$/],
-	["account", "GET", /^\/auth\/me$/],
-	["currentSale", "GET", /^\/sales\/current$/],
-	["sale", "GET", /^\/sales\/(?<saleId>[^/]+)$/],
-	["saleEvents", "GET", /^\/sales\/(?<saleId>[^/]+)\/events$/],
-	["joinQueue", "POST", /^\/sales\/(?<saleId>[^/]+)\/queue$/],
-	["checkPlace", "GET", /^\/sales\/(?<saleId>[^/]+)\/queue\/me$/],
-	["placeEvents", "GET", /^\/sales\/(?<saleId>[^/]+)\/queue\/me\/events$/],
-	["reserve", "POST", /^\/sales\/(?<saleId>[^/]+)\/reservations$/],
-	["confirm", "POST", /^\/sales\/(?<saleId>[^/]+)\/purchases$/],
-	["outcome", "GET", /^\/sales\/(?<saleId>[^/]+)\/purchases\/me$/],
+	["register", "POST", /^\/api\/v1\/auth\/register$/],
+	["login", "POST", /^\/api\/v1\/auth\/login$/],
+	["refresh", "POST", /^\/api\/v1\/auth\/refresh$/],
+	["logout", "POST", /^\/api\/v1\/auth\/logout$/],
+	["account", "GET", /^\/api\/v1\/auth\/me$/],
+	["currentSale", "GET", /^\/api\/v1\/sales\/current$/],
+	["sale", "GET", /^\/api\/v1\/sales\/(?<saleId>[^/]+)$/],
+	["saleEvents", "GET", /^\/api\/v1\/sales\/(?<saleId>[^/]+)\/events$/],
+	["joinQueue", "POST", /^\/api\/v1\/sales\/(?<saleId>[^/]+)\/queue$/],
+	["checkPlace", "GET", /^\/api\/v1\/sales\/(?<saleId>[^/]+)\/queue\/me$/],
+	[
+		"placeEvents",
+		"GET",
+		/^\/api\/v1\/sales\/(?<saleId>[^/]+)\/queue\/me\/events$/,
+	],
+	["reserve", "POST", /^\/api\/v1\/sales\/(?<saleId>[^/]+)\/reservations$/],
+	["confirm", "POST", /^\/api\/v1\/sales\/(?<saleId>[^/]+)\/purchases$/],
+	["outcome", "GET", /^\/api\/v1\/sales\/(?<saleId>[^/]+)\/purchases\/me$/],
 ];
 
 // The route that matched, and the parts of its address (the sale id).

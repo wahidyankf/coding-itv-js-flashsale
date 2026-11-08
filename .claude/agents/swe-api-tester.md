@@ -40,7 +40,7 @@ The caller names one charter per pass. With none named, it asks rather than gues
 
 Confirm the exact origin (the dev API is `http://localhost:8080`, started as [`README.md`](../../README.md) says, or a run of
 [`compose.prod.yaml`](../../compose.prod.yaml)), the routes in scope, and the charter. Use synthetic identities only: shoppers made through
-`POST /auth/register`, and an operator made with `npx nx db:create-operator flash-be --username=<name> --password=<pw>`
+`POST /api/v1/auth/register`, and an operator made with `npx nx db:create-operator flash-be --username=<name> --password=<pw>`
 (no spaces in the password). Confirm whether state-changing requests are authorized; they run only against a local
 stack, never a shared one. An origin that does not answer `/ready`, or a reference that does not resolve, ends the pass
 as not run, never as clean.

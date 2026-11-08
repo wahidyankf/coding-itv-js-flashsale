@@ -17,7 +17,7 @@
 		"docker:dev:down": "docker compose -f compose.dev.yaml down",
 		"docker:prod:up": "docker compose -f compose.prod.yaml up -d --build --wait",
 		"docker:prod:down": "docker compose -f compose.prod.yaml down",
-		"smoke:prod": "npx nx build typekit && node scripts/smoke/prod.mjs",
+		"smoke:prod": "npx nx build typekit && npx nx build flash-commons && node scripts/smoke/prod.mjs",
 		"demo:reset": "npx nx db:reset flash-be",
 		"demo:operator": "npx nx db:create-operator flash-be --username=ops --password=correct-horse-battery --output-style=stream",
 		"demo:sale": "npx nx db:seed-sale flash-be --stock=3 --starts-in-minutes=0 --duration-minutes=60 --hold-seconds=60 --output-style=stream",

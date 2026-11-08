@@ -1,5 +1,6 @@
 // Server only, part of the sale feature. It loads the sale the server renders on the first visit. It runs on the web server only, asks flash-be for the current sale, and
 // tells "no sale" apart from "could not read it", so the page can say which.
+import { API_PATHS } from "@flash/flash-commons";
 import { callApi } from "../api";
 import { buildConfig } from "../config";
 import { decodeSaleView, type SaleView } from "./types";
@@ -17,7 +18,7 @@ export async function loadSale(
 ): Promise<SaleLoad> {
 	const found = await callApi(
 		fetcher,
-		`${buildConfig(env).backendUrl}/sales/current`,
+		`${buildConfig(env).backendUrl}${API_PATHS.saleCurrent}`,
 		decodeSaleView,
 	);
 	return found.match({

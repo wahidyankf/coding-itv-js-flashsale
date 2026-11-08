@@ -33,6 +33,11 @@ describeFeature(
 			steps.pathsOutsideRefused,
 		);
 
+		ScenarioOutline(
+			"An API path without the version is refused",
+			steps.pathsOutsideRefused,
+		);
+
 		Scenario(
 			"The operator routes are not reachable through the web server",
 			steps.operatorRoutesUnreachable,
@@ -49,7 +54,7 @@ describeFeature(
 		);
 
 		Scenario(
-			"Signing up sets both cookies, and the refresh cookie is moved under /api/auth",
+			"Signing up sets both cookies, and the refresh cookie is set for the auth path",
 			steps.signUpSetsCookies,
 		);
 

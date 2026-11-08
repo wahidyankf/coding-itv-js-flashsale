@@ -1,6 +1,6 @@
 # The web server in front of the API
 
-The page never calls `flash-be` itself. Every request goes to the web app's own server under `/api/sales` or `/api/auth`, and the
+The page never calls `flash-be` itself. Every request goes to the web app's own server under `/api/v1/sales` or `/api/v1/auth`, and the
 server passes it on, with the login cookies. This page gives the reasons and what it costs.
 
 ## Why not call the API from the browser
@@ -9,22 +9,24 @@ server passes it on, with the login cookies. This page gives the reasons and wha
   contain it, so the API can sit on a private network. A scenario checks that the rendered page does not hold the
   address.
 - **One origin.** The browser makes same-origin requests, so no CORS rules are needed and none can be got wrong.
-- **One place to narrow the surface.** The server passes on a short list of method and path pairs (the `ALLOWED` list in
-  [`apps/flash-web/src/proxy.ts`](../../apps/flash-web/src/proxy.ts)) and nothing else, so a path such as `../ready` cannot be used to reach other routes. The
-  operator routes (`/admin/sales` with POST, GET, PATCH and DELETE) are not on the list. A sale id must be a UUID, or the answer is `404 not_found`. The
-  server also sends on only the headers the API needs (the `cookie` header among them), and moves the refresh cookie from
-  `/auth` to `/api/auth`. A POST from another origin is refused with `403 cross_site`.
+- **One place to narrow the surface.** The server passes on a short list of method and path pairs (`BROWSER_ROUTES` in
+  [`apps/flash-web/src/api-paths.ts`](../../apps/flash-web/src/api-paths.ts), which
+  [`proxy.ts`](../../apps/flash-web/src/proxy.ts) turns into its allow-list) and nothing else, so a path such as
+  `../ready` cannot be used to reach other routes. The operator routes (`/api/v1/admin/sales` with POST, GET, PATCH and
+  DELETE) are not on the list. A sale id must be a UUID, or the answer is `404 not_found`. The server also sends on only
+  the headers the API needs (the `cookie` header among them). The browser and the API use the same paths, so the path
+  and the cookies pass unchanged. A POST from another origin is refused with `403 cross_site`.
 
 ```mermaid
 flowchart LR
   accTitle: A browser request through the web server
-  accDescr: The browser calls the web server under /api/sales. The proxy checks the method and path against its allow-list. A request that is not on the list gets 404 not_found from the proxy. An allowed request is passed to flash-be with only the needed headers, and the answer is streamed back. If flash-be cannot be reached, the proxy answers 502 backend_unavailable.
+  accDescr: The browser calls the web server under /api/v1/sales. The proxy checks the method and path against its allow-list. A request that is not on the list gets 404 not_found from the proxy. An allowed request is passed to flash-be with only the needed headers, and the answer is streamed back. If flash-be cannot be reached, the proxy answers 502 backend_unavailable.
   browser["Browser"]
   proxy["Web server<br/>proxy allow-list"]
   api["flash-be<br/>API"]
   refused["Reply<br/>404 not_found"]
   down["Reply<br/>502 backend_unavailable"]
-  browser -->|/api/sales| proxy
+  browser -->|/api/v1/sales| proxy
   proxy -->|allowed| api
   api -->|streamed back| browser
   proxy -->|not listed| refused

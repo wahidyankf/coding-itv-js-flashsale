@@ -158,24 +158,30 @@ function refreshWithoutToken(newWorld: () => AuthWorld): ScenarioBinder {
 		const world = newWorld();
 
 		When("someone who is not logged in refreshes the login", async () => {
-			await world.anonymous("POST", "/auth/refresh");
+			await world.anonymous("POST", "/api/v1/auth/refresh");
 		});
 		Then("the response status is {int}", statusIs(world));
 		And("the error is {string}", errorIs(world));
 	};
 }
 
+const LIMITED_TO_PATH = "the {string} cookie is limited to the path {string}";
+
+// The cookie of that name is sent only to that path, which is what the reply's Path attribute says.
+function limitedToPath(world: AuthWorld) {
+	return (_ctx: unknown, name: string, path: string) => {
+		expect(world.pathOf(name)).toBe(path);
+	};
+}
+
+// The refresh cookie reaches the auth routes alone, and the access cookie reaches every route.
 function cookieLimitedToAuth(newWorld: () => AuthWorld): ScenarioBinder {
-	return ({ Given, Then }) => {
+	return ({ Given, Then, And }) => {
 		const world = newWorld();
 
 		Given(SIGNED_UP, signedUp(world));
-		Then(
-			"the {string} cookie is limited to the path {string}",
-			(_ctx, name: string, path: string) => {
-				expect(world.pathOf(name)).toBe(path);
-			},
-		);
+		Then(LIMITED_TO_PATH, limitedToPath(world));
+		And(LIMITED_TO_PATH, limitedToPath(world));
 	};
 }
 

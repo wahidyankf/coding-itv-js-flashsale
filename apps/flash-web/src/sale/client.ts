@@ -1,7 +1,8 @@
 // Browser only, part of the sale feature. The browser's calls for the sale: the queue, the hold, the purchase and the outcome, plus the two live streams. The page
 // gets this client, so a test can give it a fake. The calls go to the web server, which passes the sale routes on.
-import type { Decoder } from "@flash/flash-commons";
+import { API_PATHS, type Decoder } from "@flash/flash-commons";
 import { type ApiResult, callApi, jsonPost, TICKET_HEADER } from "../api";
+import { fillSaleId } from "../api-paths";
 import { type Reporter, reportDecodeFailure } from "../decode-report";
 import { createWatcher, type Watcher } from "./sse";
 import {
@@ -76,8 +77,9 @@ export function createSaleClient(
 	watch: Watcher = createWatcher({ fetcher }),
 	report: Reporter = reportDecodeFailure,
 ): SaleClient {
-	const api = `${base}/api`;
-	const sale = (saleId: string) => `${api}/sales/${encodeURIComponent(saleId)}`;
+	// The address of a route for one sale, from the table in flash-commons.
+	const at = (template: string, saleId: string) =>
+		`${base}${fillSaleId(template, saleId)}`;
 	const post = (body: object, headers: Record<string, string> = {}) =>
 		jsonPost(JSON.stringify(body), headers);
 
@@ -85,7 +87,7 @@ export function createSaleClient(
 		join: (saleId) =>
 			callApi(
 				fetcher,
-				`${sale(saleId)}/queue`,
+				at(API_PATHS.queue, saleId),
 				decodeJoinedView,
 				post({}),
 				report,
@@ -93,7 +95,7 @@ export function createSaleClient(
 		reserve: (saleId, ticket) =>
 			callApi(
 				fetcher,
-				`${sale(saleId)}/reservations`,
+				at(API_PATHS.reservations, saleId),
 				decodeReservedView,
 				post({}, { [TICKET_HEADER]: ticket }),
 				report,
@@ -101,7 +103,7 @@ export function createSaleClient(
 		confirm: (saleId, reservationId) =>
 			callApi(
 				fetcher,
-				`${sale(saleId)}/purchases`,
+				at(API_PATHS.purchases, saleId),
 				decodePurchaseView,
 				post({ reservationId }),
 				report,
@@ -109,13 +111,13 @@ export function createSaleClient(
 		outcome: (saleId) =>
 			callApi(
 				fetcher,
-				`${sale(saleId)}/purchases/me`,
+				at(API_PATHS.purchaseMe, saleId),
 				decodeOutcomeView,
 				{},
 				report,
 			),
 		watchSale: (saleId, onSale, onGiveUp) => {
-			const url = `${sale(saleId)}/events`;
+			const url = at(API_PATHS.saleEvents, saleId);
 			return watch(
 				url,
 				(event, data) =>
@@ -131,7 +133,7 @@ export function createSaleClient(
 			);
 		},
 		watchPlace: (saleId, ticket, onPlace, onGiveUp) => {
-			const url = `${sale(saleId)}/queue/me/events`;
+			const url = at(API_PATHS.queueMeEvents, saleId);
 			return watch(
 				url,
 				(event, data) =>

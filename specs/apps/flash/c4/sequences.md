@@ -14,17 +14,17 @@ sequenceDiagram
   participant A as flash-be
   participant R as Redis
   participant P as Postgres
-  S->>A: POST /auth/login
+  S->>A: POST /api/v1/auth/login
   A->>P: read the user
   A->>A: check the password
   A->>P: save the session and the login time
   A-->>S: set access_token and refresh_token
-  S->>A: POST /sales/:id/queue (access_token)
+  S->>A: POST /api/v1/sales/:id/queue (access_token)
   A->>R: read the session
   R-->>A: miss
   A->>P: read the session by token hash
   A->>R: keep the session for up to 60 s
-  S->>A: POST /auth/refresh (refresh_token)
+  S->>A: POST /api/v1/auth/refresh (refresh_token)
   A->>P: lock the session, swap the pair, keep the old refresh hash
   A->>R: forget the old access token
   A-->>S: set a new access_token and refresh_token
@@ -36,7 +36,7 @@ sequenceDiagram
 - The refresh token is used once. When a token that was already replaced comes back, the session is marked deleted, because
   someone holds a copy. The Redis copy of the access token is forgotten on every rotation and on logout, so a revoked
   token stops working at once rather than at the end of its cache time.
-- The cookies are `HttpOnly` and `SameSite=Lax`, and `Secure` when `COOKIE_SECURE` is true (the default in production). The refresh cookie is sent to `/auth` only.
+- The cookies are `HttpOnly` and `SameSite=Lax`, and `Secure` when `COOKIE_SECURE` is true (the default in production). The refresh cookie is sent to `/api/v1/auth` only.
 
 ### The calls in full
 
@@ -86,16 +86,16 @@ sequenceDiagram
   participant A as flash-be
   participant R as Redis
   participant P as Postgres
-  S->>A: POST /sales/:id/queue (access_token)
+  S->>A: POST /api/v1/sales/:id/queue (access_token)
   A->>A: read the session
   A->>R: add to the line
   A-->>S: ticket and place
   A->>R: admit the next shoppers
-  S->>A: POST /sales/:id/reservations
+  S->>A: POST /api/v1/sales/:id/reservations
   A->>R: gate script
   A->>P: save the hold
   A-->>S: reservation id and end
-  S->>A: POST /sales/:id/purchases
+  S->>A: POST /api/v1/sales/:id/purchases
   A->>A: charge the mock payment
   A->>P: lock, count, insert
   A->>R: mark the buyer
@@ -205,7 +205,7 @@ sequenceDiagram
   participant A as flash-be
   participant Y as Payment
   participant P as Postgres
-  S->>A: POST /sales/:id/purchases
+  S->>A: POST /api/v1/sales/:id/purchases
   A->>P: check the hold
   A->>Y: charge
   Note over A,P: the hold ends, another shopper buys
@@ -241,7 +241,7 @@ sequenceDiagram
   participant A as flash-be
   participant R as Redis
   participant P as Postgres
-  S->>A: POST /sales/:id/reservations
+  S->>A: POST /api/v1/sales/:id/reservations
   A->>R: gate script
   R--xA: connection refused
   A->>P: lock the sale row
@@ -249,7 +249,7 @@ sequenceDiagram
   A->>P: save the hold
   A-->>S: reservation id and end
   Note over A,R: Redis returns
-  S->>A: POST /sales/:id/reservations
+  S->>A: POST /api/v1/sales/:id/reservations
   A->>R: mark not ready
   A->>P: rebuild buyers and holds
   A->>R: restore and mark ready

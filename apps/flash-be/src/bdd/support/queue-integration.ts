@@ -195,7 +195,7 @@ function saleRowActions(
 				.where("id", "=", current().saleId)
 				.execute();
 		},
-		// With no sale named, admit the sale the admission timer picks now, the same rule as GET /sales/current.
+		// With no sale named, admit the sale the admission timer picks now, the same rule as GET /api/v1/sales/current.
 		async admit(saleId?: string) {
 			if (saleId === undefined) {
 				await admitCurrentSale(parts.base.sales, parts.base.queue);

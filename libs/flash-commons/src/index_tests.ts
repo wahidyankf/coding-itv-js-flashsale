@@ -6,12 +6,16 @@ import * as commons from "./index.js";
 describe("public surface", () => {
 	it("exports exactly the documented names", () => {
 		expect(Object.keys(commons).sort()).toEqual([
+			"API_PATHS",
+			"API_PREFIX",
+			"AUTH_BASE_PATH",
 			"FIRST_ERROR_STATUS",
 			"FIRST_SERVER_ERROR_STATUS",
 			"HTTP_STATUS",
 			"MS_PER_HOUR",
 			"MS_PER_MINUTE",
 			"MS_PER_SECOND",
+			"PROBE_PATHS",
 			"applySetCookies",
 			"backoffDelayMs",
 			"both",

@@ -30,66 +30,66 @@ GET {{backend}}/ready
 
 ### The current sale (the running one, else the next to open, else 404 sale_not_found)
 # @name current
-GET {{backend}}/sales/current
+GET {{backend}}/api/v1/sales/current
 
 ### One sale by id (404 sale_not_found for an unknown or malformed id)
-GET {{backend}}/sales/{{current.response.body.$.id}}
+GET {{backend}}/api/v1/sales/{{current.response.body.$.id}}
 
 ### Live sale status (Server-Sent Events: event: sale; curl closes it after 5 seconds here)
 # @accept chunked
 # @curl-max-time 5
-GET {{backend}}/sales/{{current.response.body.$.id}}/events
+GET {{backend}}/api/v1/sales/{{current.response.body.$.id}}/events
 
 ###############################################################################
 # Operator routes (401 not_authenticated without a login, 403 forbidden for a shopper)
 ###############################################################################
 
 ### Log in as the operator (made with `npx nx db:create-operator flash-be --username=ops --password=correct-horse-battery`)
-POST {{backend}}/auth/login
+POST {{backend}}/api/v1/auth/login
 Content-Type: application/json
 
 { "username": "ops", "password": "correct-horse-battery" }
 
 ### Create a sale (201; optional: name, productId, holdSeconds, admitPerSecond; 409 sale_overlaps when the window overlaps)
 # @name created
-POST {{backend}}/admin/sales
+POST {{backend}}/api/v1/admin/sales
 Content-Type: application/json
 
 { "stock": 100, "startsAt": "2036-01-01T12:00:00Z", "endsAt": "2036-01-01T13:00:00Z" }
 
 ### List every sale (the one that opens last first, with sold, holdSeconds and admitPerSecond)
-GET {{backend}}/admin/sales
+GET {{backend}}/api/v1/admin/sales
 
 ### Change a sale (only the fields sent: name, stock, startsAt, endsAt, holdSeconds, admitPerSecond; 409 sale_locked)
-PATCH {{backend}}/admin/sales/{{created.response.body.$.id}}
+PATCH {{backend}}/api/v1/admin/sales/{{created.response.body.$.id}}
 Content-Type: application/json
 
 { "stock": 150 }
 
 ### Remove a sale (soft delete; 409 sale_has_purchases when someone bought)
-DELETE {{backend}}/admin/sales/{{created.response.body.$.id}}
+DELETE {{backend}}/api/v1/admin/sales/{{created.response.body.$.id}}
 
 ###############################################################################
 # Accounts and login (the shopper logged in here is the one the queue routes below use)
 ###############################################################################
 
 ### Sign up as a shopper (201 and the two cookies; 409 username_taken; a password has 8 to 128 characters)
-POST {{backend}}/auth/register
+POST {{backend}}/api/v1/auth/register
 Content-Type: application/json
 
 { "username": "shopper-api", "password": "a long password" }
 
 ### Log in (200 and the two cookies; the same 401 invalid_credentials for a wrong name and a wrong password)
-POST {{backend}}/auth/login
+POST {{backend}}/api/v1/auth/login
 Content-Type: application/json
 
 { "username": "shopper-api", "password": "a long password" }
 
 ### Who am I? (401 not_authenticated with no login)
-GET {{backend}}/auth/me
+GET {{backend}}/api/v1/auth/me
 
-### Renew the login (the refresh cookie is sent to /auth only; a new pair is set; replaying the old one ends the session)
-POST {{backend}}/auth/refresh
+### Renew the login (the refresh cookie is sent to /api/v1/auth only; a new pair is set; replaying the old one ends the session)
+POST {{backend}}/api/v1/auth/refresh
 
 ###############################################################################
 # The waiting queue (log in as a shopper first; the three POST routes can answer 429 with Retry-After)
@@ -97,17 +97,17 @@ POST {{backend}}/auth/refresh
 
 ### Join the queue (201 on a new place, 200 when you have one; the reply holds the ticket)
 # @name join
-POST {{backend}}/sales/{{current.response.body.$.id}}/queue
+POST {{backend}}/api/v1/sales/{{current.response.body.$.id}}/queue
 
 ### Check your place (waiting with place, admitted, or absent; the delay lets one admission tick pass)
 # @delay 1500
-GET {{backend}}/sales/{{current.response.body.$.id}}/queue/me
+GET {{backend}}/api/v1/sales/{{current.response.body.$.id}}/queue/me
 x-queue-ticket: {{join.response.body.$.ticket}}
 
 ### Live place in the queue (Server-Sent Events: event: place; curl closes it after 5 seconds here)
 # @accept chunked
 # @curl-max-time 5
-GET {{backend}}/sales/{{current.response.body.$.id}}/queue/me/events
+GET {{backend}}/api/v1/sales/{{current.response.body.$.id}}/queue/me/events
 x-queue-ticket: {{join.response.body.$.ticket}}
 
 ###############################################################################
@@ -116,21 +116,21 @@ x-queue-ticket: {{join.response.body.$.ticket}}
 
 ### Hold one item (201 on a new hold, 200 for the same hold; 403 not_admitted while waiting)
 # @name reserve
-POST {{backend}}/sales/{{current.response.body.$.id}}/reservations
+POST {{backend}}/api/v1/sales/{{current.response.body.$.id}}/reservations
 x-queue-ticket: {{join.response.body.$.ticket}}
 
 ### Pay for the held item (201, or 200 with the same purchase when sent again; 402 payment_failed keeps the hold)
-POST {{backend}}/sales/{{current.response.body.$.id}}/purchases
+POST {{backend}}/api/v1/sales/{{current.response.body.$.id}}/purchases
 Content-Type: application/json
 
 { "reservationId": "{{reserve.response.body.$.reservationId}}" }
 
 ### Did I get it? (purchased, holding or none)
-GET {{backend}}/sales/{{current.response.body.$.id}}/purchases/me
+GET {{backend}}/api/v1/sales/{{current.response.body.$.id}}/purchases/me
 
 ###############################################################################
 # The end of the session
 ###############################################################################
 
 ### Log out (ends the session and clears the cookies; safe to send twice)
-POST {{backend}}/auth/logout
+POST {{backend}}/api/v1/auth/logout

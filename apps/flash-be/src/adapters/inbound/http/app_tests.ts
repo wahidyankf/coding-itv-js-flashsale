@@ -25,7 +25,8 @@ function appWith(
 
 const json = { "content-type": "application/json" };
 const MISSING_SALE = "00000000-0000-4000-8000-000000000000";
-const PURCHASES = "/sales/00000000-0000-4000-8000-000000000000/purchases";
+const PURCHASES =
+	"/api/v1/sales/00000000-0000-4000-8000-000000000000/purchases";
 
 // Who is logged in, by the value of the access cookie.
 const SHOPPER_COOKIE = "access_token=shopper-token";
@@ -67,7 +68,10 @@ describe("the errors of the HTTP edge", () => {
 				},
 			},
 		});
-		const reply = await app.inject({ method: "GET", url: "/sales/current" });
+		const reply = await app.inject({
+			method: "GET",
+			url: "/api/v1/sales/current",
+		});
 		expect(reply.statusCode).toBe(500);
 		expect(reply.json()).toEqual(errorPayload("internal"));
 	});
@@ -84,7 +88,10 @@ describe("the errors of the HTTP edge", () => {
 				},
 			},
 		});
-		const reply = await app.inject({ method: "GET", url: "/sales/current" });
+		const reply = await app.inject({
+			method: "GET",
+			url: "/api/v1/sales/current",
+		});
 		expect(reply.statusCode).toBe(500);
 		expect(reply.json()).toEqual(errorPayload("internal"));
 	});
@@ -100,7 +107,10 @@ describe("the errors of the HTTP edge", () => {
 				},
 			},
 		});
-		const reply = await app.inject({ method: "GET", url: "/sales/current" });
+		const reply = await app.inject({
+			method: "GET",
+			url: "/api/v1/sales/current",
+		});
 		expect(reply.statusCode).toBe(500);
 		expect(reply.json()).toEqual(errorPayload("internal"));
 	});
@@ -262,7 +272,11 @@ describe("the auth routes at the edge", () => {
 				},
 			},
 		});
-		for (const url of ["/auth/register", "/auth/login", "/auth/refresh"]) {
+		for (const url of [
+			"/api/v1/auth/register",
+			"/api/v1/auth/login",
+			"/api/v1/auth/refresh",
+		]) {
 			const reply = await app.inject({
 				method: "POST",
 				url,
@@ -291,7 +305,7 @@ describe("the cookies of a login", () => {
 	const attempt = (app: ReturnType<typeof appWith>) =>
 		app.inject({
 			method: "POST",
-			url: "/auth/login",
+			url: "/api/v1/auth/login",
 			headers: json,
 			payload: JSON.stringify({ username: "ana", password: "a long password" }),
 		});
@@ -309,7 +323,8 @@ describe("the cookies of a login", () => {
 		}
 		expect(cookies[0]).toContain("access_token=a-token");
 		expect(cookies[1]).toContain("refresh_token=r-token");
-		expect(cookies[1]).toContain("Path=/auth");
+		expect(cookies[0]).toContain("Path=/;");
+		expect(cookies[1]).toContain("Path=/api/v1/auth;");
 	});
 
 	it("records the address and the cut user agent of the login, and none when the client sends none", async () => {
@@ -331,7 +346,7 @@ describe("the cookies of a login", () => {
 		const send = (userAgent: string | undefined) =>
 			app.inject({
 				method: "POST",
-				url: "/auth/login",
+				url: "/api/v1/auth/login",
 				headers: {
 					...json,
 					...(userAgent === undefined ? {} : { "user-agent": userAgent }),
@@ -374,7 +389,7 @@ describe("the login body at the edge", () => {
 		]) {
 			const reply = await app.inject({
 				method: "POST",
-				url: "/auth/login",
+				url: "/api/v1/auth/login",
 				headers: json,
 				payload: JSON.stringify(payload),
 			});
@@ -391,7 +406,7 @@ describe("the admin route at the edge", () => {
 	it("refuses a body of the wrong shape as `invalid_sale`, not as a bad user", async () => {
 		const reply = await appWith(loggedIn).inject({
 			method: "POST",
-			url: "/admin/sales",
+			url: "/api/v1/admin/sales",
 			headers: as(OPERATOR_COOKIE),
 			payload: JSON.stringify({ stock: "many" }),
 		});
@@ -402,7 +417,7 @@ describe("the admin route at the edge", () => {
 	it("refuses a change with a field of the wrong type as `invalid_sale`", async () => {
 		const reply = await appWith(loggedIn).inject({
 			method: "PATCH",
-			url: `/admin/sales/${MISSING_SALE}`,
+			url: `/api/v1/admin/sales/${MISSING_SALE}`,
 			headers: as(OPERATOR_COOKIE),
 			payload: JSON.stringify({ stock: "many" }),
 		});
@@ -413,7 +428,7 @@ describe("the admin route at the edge", () => {
 	it("refuses a body that is not JSON as `invalid_request`", async () => {
 		const reply = await appWith(loggedIn).inject({
 			method: "POST",
-			url: "/admin/sales",
+			url: "/api/v1/admin/sales",
 			headers: as(OPERATOR_COOKIE),
 			payload: "{oops",
 		});
@@ -424,7 +439,7 @@ describe("the admin route at the edge", () => {
 	it("checks the login before it reads the body", async () => {
 		const reply = await appWith(loggedIn).inject({
 			method: "POST",
-			url: "/admin/sales",
+			url: "/api/v1/admin/sales",
 			headers: json,
 			payload: "{oops",
 		});
@@ -435,7 +450,7 @@ describe("the admin route at the edge", () => {
 	it("refuses a shopper as `forbidden` before it reads the body", async () => {
 		const reply = await appWith(loggedIn).inject({
 			method: "POST",
-			url: "/admin/sales",
+			url: "/api/v1/admin/sales",
 			headers: as(SHOPPER_COOKIE),
 			payload: "{oops",
 		});
@@ -457,7 +472,7 @@ describe("the admin route at the edge", () => {
 		});
 		const reply = await app.inject({
 			method: "DELETE",
-			url: `/admin/sales/${MISSING_SALE}`,
+			url: `/api/v1/admin/sales/${MISSING_SALE}`,
 			headers: { cookie: OPERATOR_COOKIE },
 		});
 		expect(reply.statusCode).toBe(200);
@@ -478,7 +493,7 @@ describe("the admin route at the edge", () => {
 		});
 		const reply = await app.inject({
 			method: "POST",
-			url: "/admin/sales",
+			url: "/api/v1/admin/sales",
 			headers: json,
 			payload: "{}",
 		});

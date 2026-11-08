@@ -5,7 +5,7 @@ most frequent requests of the system, and they all ask for the same row. The cac
 
 ## What is cached
 
-`GET /sales/current` and `GET /sales/:saleId` read the sale row through a cache inside the API process. A row is kept for
+`GET /api/v1/sales/current` and `GET /api/v1/sales/:saleId` read the sale row through a cache inside the API process. A row is kept for
 `SALE_CACHE_MS` (one second by default). The first read after that goes to Postgres, and every other shopper in that
 second gets the same row. One API process therefore reads one sale at most once a second, whatever the number of
 shoppers. Callers that arrive while a read is running wait for it instead of starting their own.
@@ -17,7 +17,7 @@ that second.
 flowchart LR
   accTitle: Which reads use the sale cache
   accDescr: A display read of the sale uses the cache in the API process. The row lives for one second, then the next read goes to Postgres. A decision to join, reserve or pay skips the cache and always reads Postgres.
-  display["Display read<br/>GET /sales/..."]
+  display["Display read<br/>GET /api/v1/sales/..."]
   cache["Cache in the<br/>API process, 1 s"]
   decision["Join, reserve,<br/>confirm"]
   postgres[("Postgres<br/>sale row")]
@@ -36,7 +36,7 @@ flowchart LR
 ## What may be old
 
 A sale read may be up to `SALE_CACHE_MS` old (one second by default), and each process has its own cache, so two
-instances may differ for that long. This also applies to `GET /sales/current`, which is cached as its own entry.
+instances may differ for that long. This also applies to `GET /api/v1/sales/current`, which is cached as its own entry.
 After an operator changes a sale, or when a window opens or closes, readers may see the old sale for up to that time. In practice the field that moves is `remaining`: a shopper who sees `3 remaining` may find on the next
 step that the last item is gone. The `status` is not cached; it is computed on each request from the row and the clock,
 so a sale still opens and closes on time. That is acceptable for a display, and it is why the display never decides

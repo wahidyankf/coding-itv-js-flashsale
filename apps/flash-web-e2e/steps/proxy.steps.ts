@@ -2,7 +2,7 @@
 // HttpOnly on the right path, the body must not hold a token, and a request from another site must not reach the API.
 // Binds proxy/api.feature.
 
-import { parseSetCookie } from "@flash/flash-commons";
+import { API_PATHS, parseSetCookie } from "@flash/flash-commons";
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { E2E_PASSWORD } from "../../flash-be-e2e/steps/support/auth.js";
@@ -15,7 +15,7 @@ import {
 	currentSaleId,
 	world,
 } from "../../flash-be-e2e/steps/support/world.js";
-import { salePath } from "./support/api.js";
+import { saleRoute } from "./support/api.js";
 import { FORWARDER_URL } from "./support/forwarder.js";
 import { connectWebServer } from "./support/shop.js";
 
@@ -24,9 +24,9 @@ const { When, Then } = createBdd();
 // The client is the page's own browser context, so it sends the cookies the page holds, if there are any.
 When("a client joins the queue through the web server", async ({ page }) => {
 	await connectWebServer();
-	// The browser reaches the API through the web server, under /api.
+	// The browser reaches the API through the web server, under the API prefix.
 	setResponse(
-		await page.request.post(`/api${salePath(currentSaleId())}/queue`, {
+		await page.request.post(saleRoute(API_PATHS.queue, currentSaleId()), {
 			data: {},
 		}),
 	);
@@ -37,7 +37,7 @@ When(
 	async ({ request }, user: string) => {
 		await connectWebServer();
 		setResponse(
-			await request.post("/api/auth/register", {
+			await request.post(API_PATHS.authRegister, {
 				data: { username: user, password: E2E_PASSWORD },
 			}),
 		);
@@ -46,13 +46,13 @@ When(
 
 // The cookies of the shopper are sent along, so that only the check of the web server stands between them and the API.
 When(
-	/^a client on another site sends POST \/api\/auth\/logout$/,
+	/^a client on another site sends POST \/api\/v1\/auth\/logout$/,
 	async ({ page, context }) => {
 		const cookie = (await context.cookies())
 			.map(({ name, value }) => `${name}=${value}`)
 			.join("; ");
 		setResponse(
-			await page.request.post("/api/auth/logout", {
+			await page.request.post(API_PATHS.authLogout, {
 				data: {},
 				headers: { origin: "http://evil.test", cookie },
 			}),
@@ -90,7 +90,7 @@ Then("the body holds neither token", async ({ request: _request }) => {
 
 // A logout that reached the API would have ended the login of the shopper. It still works, so the request never got there.
 Then("the API was not asked", async ({ page }) => {
-	const me = await page.request.get("/api/auth/me");
+	const me = await page.request.get(API_PATHS.authMe);
 	expect(me.status()).toBe(200);
 });
 

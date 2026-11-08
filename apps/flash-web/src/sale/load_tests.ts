@@ -26,7 +26,7 @@ describe("loadSale", () => {
 			state: "ok",
 			sale: SALE,
 		});
-		expect(urls).toEqual(["http://flash-be.test/sales/current"]);
+		expect(urls).toEqual(["http://flash-be.test/api/v1/sales/current"]);
 	});
 
 	it("tells a missing sale from a failure", async () => {

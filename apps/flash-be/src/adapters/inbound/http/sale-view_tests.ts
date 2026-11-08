@@ -37,7 +37,10 @@ describe("the sale as the API sends it", () => {
 		});
 		const app = appWithSales([sale], () => NOW);
 		apps.push(app);
-		const reply = await app.inject({ method: "GET", url: "/sales/current" });
+		const reply = await app.inject({
+			method: "GET",
+			url: "/api/v1/sales/current",
+		});
 		expect(reply.statusCode).toBe(200);
 		expect(reply.body).toBe(
 			`{"id":"${SALE_ID}","productId":"${PRODUCT_ID}","name":"Mug drop","status":"active","startsAt":"2026-06-01T11:00:00.000Z","endsAt":"2026-06-01T13:00:00.000Z","stock":10,"remaining":7}`,
@@ -56,7 +59,10 @@ describe("the sale as the API sends it", () => {
 			{ cookieSecure: false },
 		);
 		apps.push(app);
-		const reply = await app.inject({ method: "GET", url: "/sales/current" });
+		const reply = await app.inject({
+			method: "GET",
+			url: "/api/v1/sales/current",
+		});
 		expect(reply.headers["cache-control"]).toBe("public, max-age=3");
 	});
 
@@ -91,7 +97,7 @@ describe("the sale as the API sends it", () => {
 		apps.push(app);
 		const reply = await app.inject({
 			method: "GET",
-			url: "/admin/sales",
+			url: "/api/v1/admin/sales",
 			headers: { cookie: "access_token=operator-token" },
 		});
 		expect(reply.statusCode).toBe(200);
@@ -113,7 +119,10 @@ describe("the sale as the API sends it", () => {
 			{ cookieSecure: false },
 		);
 		apps.push(app);
-		const reply = await app.inject({ method: "GET", url: "/sales/current" });
+		const reply = await app.inject({
+			method: "GET",
+			url: "/api/v1/sales/current",
+		});
 		expect(reply.headers["cache-control"]).toBeUndefined();
 	});
 });

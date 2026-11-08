@@ -38,10 +38,10 @@ function namedSale(world: SaleWorld, ids: Map<string, string>) {
 	};
 }
 
-// The reply to GET /sales/current, kept where the steps read it.
+// The reply to GET /api/v1/sales/current, kept where the steps read it.
 function askCurrent(world: SaleWorld, last: ReplyBox) {
 	return async () => {
-		last.response = await world.get("/sales/current");
+		last.response = await world.get("/api/v1/sales/current");
 	};
 }
 
@@ -63,7 +63,7 @@ function reportsStatus(newWorld: () => SaleWorld): OutlineBinder {
 			},
 		);
 		When("a client asks for that sale", async () => {
-			last.response = await world.get(`/sales/${saleId}`);
+			last.response = await world.get(`/api/v1/sales/${saleId}`);
 		});
 		Then("the response status is {int}", statusIs(last));
 		And('the sale status is "<status>"', () => {
@@ -108,7 +108,7 @@ function overKeepsId(newWorld: () => SaleWorld): ScenarioBinder {
 		And(
 			"the sale named {string} has the status {string} when read by its id",
 			async (_ctx, name: string, status: string) => {
-				const read = await world.get(`/sales/${ids.get(name)}`);
+				const read = await world.get(`/api/v1/sales/${ids.get(name)}`);
 				expect(read.json().status).toBe(status);
 			},
 		);
@@ -134,7 +134,7 @@ function unknownSale(newWorld: () => SaleWorld): OutlineBinder {
 
 		Given("no sale exists", () => world.noSales());
 		When('a client asks for the sale with id "<id>"', async () => {
-			last.response = await world.get(`/sales/${examples.id}`);
+			last.response = await world.get(`/api/v1/sales/${examples.id}`);
 		});
 		Then("the response status is {int}", statusIs(last));
 		And("the error is {string}", errorIs(last));

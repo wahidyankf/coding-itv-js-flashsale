@@ -1,7 +1,7 @@
 // The scenario's side of the web server: which flash-be it reaches, the sale the scenario plans, and the logins of its shoppers and operator.
 // The planned sale is made late, the first time the page needs the API, so steps after the plan can still change it. Shoppers log in directly, as other clients would.
 
-import { HTTP_STATUS, MS_PER_HOUR } from "@flash/flash-commons";
+import { API_PATHS, HTTP_STATUS, MS_PER_HOUR } from "@flash/flash-commons";
 import {
 	givenFields,
 	TICKET_HEADER,
@@ -25,7 +25,7 @@ import {
 	currentSaleId,
 	world,
 } from "../../../flash-be-e2e/steps/support/world.js";
-import { fetchJson, salePath } from "./api.js";
+import { fetchJson, saleRoute } from "./api.js";
 import { forwarder } from "./forwarder.js";
 
 // How long a shopper waits to be admitted: the page's waits and the shoppers' polls both use it, so one number says how long
@@ -58,7 +58,11 @@ type SaleChange = {
 // The cookie header of the operator on this API. The command makes the account once, and fetch logs it in.
 function operatorCookie(api: string): Promise<string> {
 	return operatorCookieVia(async (credentials) => {
-		const reply = await fetchJson("POST", `${api}/auth/login`, credentials);
+		const reply = await fetchJson(
+			"POST",
+			`${api}${API_PATHS.authLogin}`,
+			credentials,
+		);
 		return { status: reply.status, setCookies: reply.headers.getSetCookie() };
 	});
 }
@@ -100,9 +104,9 @@ export async function loginOrSignUp(
 	return cookieOnce(key, async () => {
 		const api = apiUrl ?? (await privateApi());
 		const body = { username: key, password };
-		let reply = await fetchJson("POST", `${api}/auth/login`, body);
+		let reply = await fetchJson("POST", `${api}${API_PATHS.authLogin}`, body);
 		if (reply.status === HTTP_STATUS.unauthorized) {
-			reply = await fetchJson("POST", `${api}/auth/register`, body);
+			reply = await fetchJson("POST", `${api}${API_PATHS.authRegister}`, body);
 		}
 		if (!reply.ok) {
 			throw new Error(
@@ -119,7 +123,7 @@ export async function createAccount(
 	password: string,
 ): Promise<void> {
 	const api = await privateApi();
-	const reply = await fetchJson("POST", `${api}/auth/register`, {
+	const reply = await fetchJson("POST", `${api}${API_PATHS.authRegister}`, {
 		username: usernameKey(username),
 		password,
 	});
@@ -151,13 +155,18 @@ export async function reviseSale(change: SaleChange): Promise<void> {
 		return;
 	}
 	const api = await privateApi();
-	await operator(api, "PATCH", `/admin/sales/${currentSaleId()}`, {
-		...givenFields({
-			holdSeconds: change.holdSeconds,
-			admitPerSecond: change.admitPerSecond,
-			endsAt: change.closes?.toISOString(),
-		}),
-	});
+	await operator(
+		api,
+		"PATCH",
+		saleRoute(API_PATHS.adminSale, currentSaleId()),
+		{
+			...givenFields({
+				holdSeconds: change.holdSeconds,
+				admitPerSecond: change.admitPerSecond,
+				endsAt: change.closes?.toISOString(),
+			}),
+		},
+	);
 }
 
 // Shoppers u1..uN each buy one item through the real routes. They all go at the same time.
@@ -175,31 +184,33 @@ async function buyItems(
 
 // One shopper's way to an item: queue, wait to be admitted, hold, and purchase. A step that does not answer as expected throws.
 async function buyItem(api: string, saleId: string, user: string) {
-	const sale = `${api}${salePath(saleId)}`;
+	const at = (template: string) => `${api}${saleRoute(template, saleId)}`;
 	const cookie = await loginOrSignUp(user, E2E_PASSWORD, api);
-	const joined = await postAs(cookie, `${sale}/queue`, {});
+	const joined = await postAs(cookie, at(API_PATHS.queue), {});
 	const { ticket } = (await joined.json()) as { ticket: string };
 	const headers = { [TICKET_HEADER]: ticket };
-	await waitForAdmission(sale, cookie, headers, user);
-	const held = await postAs(cookie, `${sale}/reservations`, {}, headers);
+	await waitForAdmission(at(API_PATHS.queueMe), cookie, headers, user);
+	const held = await postAs(cookie, at(API_PATHS.reservations), {}, headers);
 	if (held.status !== HTTP_STATUS.created)
 		throw new Error(`${user} got no hold: ${held.status}`);
 	const { reservationId } = (await held.json()) as { reservationId: string };
-	const bought = await postAs(cookie, `${sale}/purchases`, { reservationId });
+	const bought = await postAs(cookie, at(API_PATHS.purchases), {
+		reservationId,
+	});
 	if (bought.status !== HTTP_STATUS.created)
 		throw new Error(`${user} bought nothing: ${bought.status}`);
 }
 
 // Reads the shopper's place until the API admits them, or the wait runs out.
 async function waitForAdmission(
-	sale: string,
+	placeUrl: string,
 	cookie: string,
 	headers: Record<string, string>,
 	user: string,
 ): Promise<void> {
 	await pollUntilAdmitted(
 		async () => {
-			const place = await fetch(`${sale}/queue/me`, {
+			const place = await fetch(placeUrl, {
 				headers: { cookie, ...headers },
 			});
 			return ((await place.json()) as { state: string }).state;
@@ -222,7 +233,7 @@ async function makePlannedSale(api: string): Promise<void> {
 	const now = Date.now();
 	const over = plan.closes.getTime() <= now;
 	const opened = plan.opens.getTime() <= now;
-	const created = await operator(api, "POST", "/admin/sales", {
+	const created = await operator(api, "POST", API_PATHS.adminSales, {
 		stock: plan.stock,
 		startsAt: plan.opens.toISOString(),
 		endsAt: (over && plan.sold > 0
@@ -243,7 +254,7 @@ async function makePlannedSale(api: string): Promise<void> {
 	}
 	await buyItems(api, created.id, plan.sold);
 	if (over) {
-		await operator(api, "PATCH", `/admin/sales/${created.id}`, {
+		await operator(api, "PATCH", saleRoute(API_PATHS.adminSale, created.id), {
 			endsAt: plan.closes.toISOString(),
 		});
 	}

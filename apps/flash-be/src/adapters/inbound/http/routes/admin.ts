@@ -2,7 +2,7 @@
 // counts them by address before anything is read. What a write may do is a rule of the domain (sale-window), and these
 // routes only read the body and shape the reply. Inbound HTTP adapter.
 
-import { HTTP_STATUS } from "@flash/flash-commons";
+import { API_PATHS, HTTP_STATUS } from "@flash/flash-commons";
 import type { FastifyInstance } from "fastify";
 import type { Dependencies } from "../../../../application/dependencies.js";
 import { describeAdminSale, describeSale } from "../sale-view.js";
@@ -10,7 +10,7 @@ import { saleDraftBody, salePatchBody } from "./bodies.js";
 import { createGuards, operatorOf, type SaleParams } from "./guards.js";
 import { sendError, sendResult } from "./reply.js";
 
-// Registers the operator's sale routes under /admin/sales. Each needs an operator's login, and flash-web never passes them on.
+// Registers the operator's sale routes, the admin sales paths of the table. Each needs an operator's login, and flash-web never passes them on.
 export function registerAdminRoutes(
 	app: FastifyInstance,
 	deps: Dependencies,
@@ -21,7 +21,7 @@ export function registerAdminRoutes(
 	// The admin service refuses a window that overlaps another sale (`sale_overlaps`).
 	app.route({
 		method: "POST",
-		url: "/admin/sales",
+		url: API_PATHS.adminSales,
 		// onRequest runs before the body is read, so a client without an operator's login learns nothing from a broken body.
 		onRequest: guarded,
 		handler: async (request, reply) => {
@@ -41,7 +41,7 @@ export function registerAdminRoutes(
 	// An operator reads every sale, with the numbers that only an operator needs.
 	app.route({
 		method: "GET",
-		url: "/admin/sales",
+		url: API_PATHS.adminSales,
 		onRequest: guarded,
 		handler: async (_request, reply) => {
 			const listed = (await deps.admin.list()).map(({ sale, status }) =>
@@ -54,7 +54,7 @@ export function registerAdminRoutes(
 	// An operator changes a sale. What may change depends on whether the sale has started (see `changeSaleFrom`).
 	app.route<{ Params: SaleParams }>({
 		method: "PATCH",
-		url: "/admin/sales/:saleId",
+		url: API_PATHS.adminSale,
 		onRequest: guarded,
 		handler: async (request, reply) => {
 			const patch = salePatchBody(request.body);
@@ -77,7 +77,7 @@ export function registerAdminRoutes(
 	// A sale with a purchase is refused (`sale_has_purchases`), so only a sale nobody bought from is removed.
 	app.route<{ Params: SaleParams }>({
 		method: "DELETE",
-		url: "/admin/sales/:saleId",
+		url: API_PATHS.adminSale,
 		onRequest: guarded,
 		handler: async (request, reply) =>
 			sendResult(

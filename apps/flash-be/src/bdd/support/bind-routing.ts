@@ -53,10 +53,10 @@ function notJson(newWorld: () => RoutingWorld): ScenarioBinder {
 		const last: ReplyBox = { response: undefined };
 
 		When(
-			"a client sends POST /sales/00000000-0000-4000-8000-000000000000/queue with a body that is not JSON",
+			"a client sends POST /api/v1/sales/00000000-0000-4000-8000-000000000000/queue with a body that is not JSON",
 			async () => {
 				last.response = await world.post(
-					"/sales/00000000-0000-4000-8000-000000000000/queue",
+					"/api/v1/sales/00000000-0000-4000-8000-000000000000/queue",
 					"{oops",
 				);
 			},
@@ -84,6 +84,24 @@ function badField(newWorld: () => RoutingWorld): OutlineBinder {
 	};
 }
 
+// A path the API served before the version prefix, sent with the method the old route had. The POST body is valid JSON, so
+// only the missing route can refuse it.
+function oldPath(newWorld: () => RoutingWorld): OutlineBinder {
+	return ({ When, Then, And }, examples) => {
+		const world = newWorld();
+		const last: ReplyBox = { response: undefined };
+
+		When("a client sends <method> <path>", async () => {
+			last.response =
+				examples.method === "GET"
+					? await world.get(String(examples.path))
+					: await world.post(String(examples.path), "{}");
+		});
+		Then("the response status is {int}", statusIs(last));
+		And("the error is {string}", errorIs(last));
+	};
+}
+
 // The steps of each scenario in the routing feature, by the scenario's name in the feature's own words.
 export function bindRouting(newWorld: () => RoutingWorld) {
 	return {
@@ -91,5 +109,6 @@ export function bindRouting(newWorld: () => RoutingWorld) {
 		errorSentence: errorSentence(newWorld),
 		notJson: notJson(newWorld),
 		badField: badField(newWorld),
+		oldPath: oldPath(newWorld),
 	};
 }

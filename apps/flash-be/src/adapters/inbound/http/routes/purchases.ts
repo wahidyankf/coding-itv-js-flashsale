@@ -1,6 +1,6 @@
 // The purchase routes: a shopper pays for the item their hold keeps, and asks "did I get it?". Inbound HTTP adapter.
 
-import { HTTP_STATUS } from "@flash/flash-commons";
+import { API_PATHS, HTTP_STATUS } from "@flash/flash-commons";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import type { Dependencies } from "../../../../application/dependencies.js";
 import type { Outcome, Purchase } from "../../../../domain/purchase.js";
@@ -43,7 +43,7 @@ function outcomeReply(
 	}
 }
 
-// Registers the purchase routes. The shopper is the one who is logged in (`.../purchases/me`); no URL names a user.
+// Registers the purchase routes. The shopper is the one who is logged in (the `purchaseMe` path); no URL names a user.
 export function registerPurchaseRoutes(
 	app: FastifyInstance,
 	deps: Dependencies,
@@ -53,7 +53,7 @@ export function registerPurchaseRoutes(
 	// Pays for the held item. The reservation id makes it safe to send twice.
 	app.route<{ Params: SaleParams }>({
 		method: "POST",
-		url: "/sales/:saleId/purchases",
+		url: API_PATHS.purchases,
 		preValidation: limit,
 		handler: async (request, reply) => {
 			const body = reservationBody(request.body);
@@ -74,7 +74,7 @@ export function registerPurchaseRoutes(
 	// "Did I get it?": a purchase, a live hold, or nothing.
 	app.route<{ Params: SaleParams }>({
 		method: "GET",
-		url: "/sales/:saleId/purchases/me",
+		url: API_PATHS.purchaseMe,
 		preValidation: needSession,
 		handler: async (request, reply) =>
 			sendResult(

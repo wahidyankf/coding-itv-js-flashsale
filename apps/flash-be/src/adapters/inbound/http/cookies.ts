@@ -1,12 +1,14 @@
 // The cookies of a login, as HTTP carries them. The domain says how long a login lasts; this file says how a cookie
 // is written and read. The access cookie goes with every request, the refresh cookie only to the auth routes.
 
+import { AUTH_BASE_PATH } from "@flash/flash-commons";
+
 // The access token's cookie. The browser sends it with every request.
 export const ACCESS_COOKIE = "access_token";
 // The refresh token's cookie. The token is used once, then replaced.
 export const REFRESH_COOKIE = "refresh_token";
-// The only path the refresh cookie is sent to, so the token reaches the auth routes alone.
-export const REFRESH_COOKIE_PATH = "/auth";
+// The only path the refresh cookie is sent to, so the token reaches the auth routes alone. It is the auth base path of the table.
+export const REFRESH_COOKIE_PATH = AUTH_BASE_PATH;
 
 // A user agent is text from the client, so only this much of it is kept for the record of a login.
 const MAX_USER_AGENT_LENGTH = 200;
