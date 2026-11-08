@@ -14,7 +14,7 @@ The brief wants the stock never oversold, and says nothing about what to do when
 - The Redis client fails at once while it is down (`disableOfflineQueue`), so a request learns in milliseconds.
 - The queue fails open: the shopper gets a valid ticket and is admitted. Reserve then runs on Postgres alone, under a
   row lock on the sale. Paying already works from Postgres.
-- Each failed Redis call marks the sale stale in that process. The next reservation deletes `ready`, and one instance rebuilds the gate from Postgres.
+- Each failed call to the hold gate (a reserve, a release or a confirm) marks the sale stale in that process. The next reservation deletes `ready`, and one instance rebuilds the gate from Postgres.
 - `GET /ready` answers `503` with `redis: error`, while the process keeps serving.
 
 ## Alternatives considered
