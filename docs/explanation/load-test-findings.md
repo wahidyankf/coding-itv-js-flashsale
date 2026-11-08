@@ -21,14 +21,14 @@ are in `profiles.ts` and were written before they ran. The limits are the same a
 that runs the load generator, not a result about the system. The herd was cut to 700, close to the 670 users that `full`
 starts. The runner now reports a missing k6 summary as a load-generator failure and removes the stack.
 
-**The invariants held.** In eight runs (four of each profile) `sales.sold` equalled the number of purchase rows and never
-passed the stock (100 of 100 in `burst`, 50 of 50 in `contention`), no shopper bought twice, k6, Postgres and Redis agreed,
+**The invariants held.** In nine runs (four of `burst`, five of `contention`) `sales.sold` equalled the number of
+purchase rows and never passed the stock (100 of 100 in `burst`, 50 of 50 in `contention`), no shopper bought twice, k6, Postgres and Redis agreed,
 the flooding users got `429`, and there were no server errors. In the first six runs Postgres never had a session waiting
 for a lock; `burst 4` saw at most 5 waiting at once, and they did not slow it past the limits. The
 `contention` profile is the first one that sends hundreds of reserves for 50 items in the same moment, and the Lua gate
 and `UPDATE ... WHERE sold < stock` held.
 
-**The speed limits failed in five of the eight runs, as k6 measures them.**
+**The speed limits failed in five of the nine runs, as k6 measures them.**
 
 | Run          | Reserve p95 | Purchase p95 | Dropped | Note                                                                      |
 | ------------ | ----------- | ------------ | ------- | ------------------------------------------------------------------------- |
@@ -40,6 +40,7 @@ and `UPDATE ... WHERE sold < stock` held.
 | contention 3 | 27 ms       | 297 ms       | 0       | after the refactor; both under                                            |
 | burst 4      | 83 ms       | 474 ms       | 0       | 2026-11-08; every check passed                                            |
 | contention 4 | 23 ms       | 247 ms       | 5       | 2026-11-08; both under, but k6 started 5 shoppers late, so the run failed |
+| contention 5 | 55 ms       | 405 ms       | 1       | 2026-11-08; both under, but k6 started 1 shopper late, so the run failed  |
 
 **Where the time is not.** In the runs with logs, the API logged a reserve at a median of 1.5 ms and a 95th percentile of
 5.3 to 5.5 ms (largest 46 ms). A purchase took 155 ms in the median, which is the 150 ms of the mock payment. A join took
@@ -53,7 +54,8 @@ time a request waits before that, in nginx, in the network or in a busy event lo
 handlers, but they do not prove that a real client would see 5 ms. A faithful speed result needs the load generator on
 another machine. Until then the two profiles are judged on speed with the fixed limits. After the refactor `contention` passed
 and `burst` still failed on purchase (521 ms against 500 ms). On 2026-11-08 `burst` passed every check, and `contention`
-met both speed limits but failed because k6 started 5 shoppers late.
+met both speed limits twice but failed both times because k6 started 5, then 1, shoppers late. Every shopper in the
+herd also signs up in that second, so the late starts likely have the same cause as the `full` failure below.
 
 ## Paying during a Redis outage was slow
 

@@ -404,8 +404,9 @@ Postgres agree on the buyers, and there are no server errors.
 `smoke` and the earlier `full` runs had a reserve p95 of a few milliseconds and a purchase p95 of about 160 ms, most of
 it the mock payment; the latest `full` runs were slower, as said above. The two herd
 runs, `burst` and `contention`, put 700 shoppers into the system within one second, which the other runs never do. In
-all eight herd runs every check of the data held (100/100 and 50/50 sold, no server errors; in two runs k6 started a
-few shoppers late), but the speed limits failed in five of them as k6 measures them: reserve p95 reached 2,379 ms while the API logged about 5 ms per reserve. So these
+all nine herd runs every check of the data held (100/100 and 50/50 sold, no server errors; in four runs k6 started 1
+to 5 shoppers late), but the speed limits failed in five of them as k6 measures them: reserve p95 reached 2,379 ms
+while the API logged about 5 ms per reserve. So these
 runs show that the sale stays correct under a herd, not how fast production would answer.
 
 The chaos run found that paying while Redis was down took about two seconds, because of how the Redis client queues a
