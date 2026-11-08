@@ -86,8 +86,9 @@ back.
 
 ## Trade-offs
 
-- **Two writes per reservation.** The hold goes to Redis and to Postgres. The Postgres write has no contention, because
-  each user has at most one live row in a sale, so it stays cheap. The price is one more round trip.
+- **Two writes per reservation.** The hold goes to Redis and to Postgres. The Postgres write takes a shared lock on the sale
+  row and a lock on the shopper's row, so it waits only while a commit, a removal or a rebuild of the same sale holds
+  the sale row; each user has at most one live row in a sale, so it stays short. The price is one more round trip.
 - **Clocks.** Expiry uses the clock of the instance that takes the request, and the Redis count uses that instance's
   `now` too. An instance whose clock runs fast can count a live hold as ended and give its item to a second shopper. It
   cannot oversell: the purchase commit checks `sold < stock` in Postgres, and the shopper who loses is refunded and told

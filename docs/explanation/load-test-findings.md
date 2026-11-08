@@ -10,14 +10,14 @@ One run of each profile on one laptop, where k6 and every server share six CPUs 
 
 | Profile    | Result             | Stock sold     | Reserve p95 | Purchase p95 | Dropped |
 | ---------- | ------------------ | -------------- | ----------- | ------------ | ------- |
-| smoke      | every check passed | 20 of 20       | 3.2 ms      | 162.6 ms     | 0       |
-| full       | every check passed | 100 of 100     | 2.6 ms      | 162.9 ms     | 0       |
-| burst      | every check passed | 100 of 100     | 3.6 ms      | 160.5 ms     | 0       |
-| contention | every check passed | 50 of 50       | 3.6 ms      | 162.6 ms     | 0       |
-| chaos      | every check passed | 1,000 of 1,000 | 72.6 ms     | 265.2 ms     | 0       |
+| smoke      | every check passed | 20 of 20       | 4.2 ms      | 161.7 ms     | 0       |
+| full       | every check passed | 100 of 100     | 2.5 ms      | 159.7 ms     | 0       |
+| burst      | every check passed | 100 of 100     | 3.4 ms      | 162.5 ms     | 0       |
+| contention | every check passed | 50 of 50       | 2.8 ms      | 159.8 ms     | 0       |
+| chaos      | every check passed | 1,000 of 1,000 | 47.2 ms     | 239.1 ms     | 0       |
 
 Every profile answered with 0 server errors, and the three API instances shared the requests evenly (for example
-7,410 / 7,422 / 7,381 in `full`).
+5,960 / 6,073 / 5,977 in `full`).
 
 `burst` also ran five times in a row earlier. Each run sold 100 of 100 with no dropped shopper and every data check
 green. Four runs passed every check. One run failed the purchase speed limit: 519.8 ms against 500 ms. In that run the
@@ -27,7 +27,7 @@ and the limit stays.
 
 In every run `sales.sold` equalled the number of `purchases` rows and never passed the stock, no shopper bought twice,
 k6 and Postgres agreed on the purchases, and the flooding shopper got `429`. In `chaos`, Redis stops at +4 s and starts
-again, and the Redis buyers set is rebuilt to the same size as the rows in Postgres. The invariants hold while Redis is
+again, and the sale goes on from Postgres while it is down. The invariants hold while Redis is
 stopped, because the Postgres path takes a row lock and the database constraints refuse a second sale. Chaos is judged on
 the data only, so its speed is for information: while Redis is down, every reserve takes the slower Postgres path.
 

@@ -33,7 +33,7 @@ src/
                          reply.ts (reading a script's reply)
     outbound/crypto/     scrypt password hashes and random tokens
     outbound/payment/    the in-process mock payment and the contract of its ledger
-    outbound/memory/     the rate limit store used when Redis is down, and the memory payment ledger
+    outbound/memory/     the rate limit store used when Redis is down; the memory payment ledger (unit tests only)
     outbound/system/     the clock
   composition.ts         the one place that picks an adapter for each port
   config.ts              the config, read once from process.env; local-defaults.ts holds the local addresses
@@ -49,7 +49,7 @@ src/
 
 Port names follow the suffix rule (Repository, Store, Gate) in
 [hexagonal architecture](../../docs/explanation/hexagonal-architecture.md#the-three-layers). Some ports have no suffix (Clock, Payment, PasswordHasher, TokenSource,
-SaleSeeder, SaleAdmin). `SaleAdmin` writes sale rows, but `SaleRepository` already names the reads. Each port file starts with a `Kind:` line that says which one it is.
+SaleSeeder, SaleAdmin, Logger). `SaleAdmin` writes sale rows, but `SaleRepository` already names the reads. Each port file starts with a `Kind:` line that says which one it is.
 
 ## To add something
 

@@ -17,7 +17,9 @@ The names in the first column are the names the verdict table of a run prints.
 | the stock sold out                          | the sold count equals the stock                           | all           |
 | the shopper who floods the queue is limited | the flooders received at least one `429` reply            | all           |
 | Redis and Postgres agree on buyers          | the size of the Redis buyers set equals the purchase rows | all but chaos |
-| reserve p95, purchase p95 and server errors | the limits in [limits](limits.md) hold                    | all but chaos |
+| reserve p95                                 | the limit in [limits](limits.md) holds                    | all but chaos |
+| purchase p95                                | the limit in [limits](limits.md) holds                    | all but chaos |
+| server errors                               | no `5xx` reply and no reply missing                       | all but chaos |
 
 The row "Redis and Postgres agree on buyers" is left out of the verdict, not failed, when Redis does not answer a
 `PING` once k6 has finished: the runner then has no count of buyers to compare.

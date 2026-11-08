@@ -21,7 +21,7 @@ The API's events, one line each:
 | `redis connection lost`, `redis connection back`                           | warn, info         | once when the connection goes, once when it returns                                             |
 | `sale gate rebuild started`, `sale gate rebuild done` (with `saleId`)      | info               | the gate of a sale is rebuilt from Postgres                                                     |
 | `sale gate rebuild failed` (with `saleId` and `cause`)                     | warn               | the rebuild could not run; the request still answers                                            |
-| `payment refunded: <ref>`                                                  | info               | a charge that lost the race for the last item is refunded                                       |
+| `payment refunded: <ref>`                                                  | info               | a charge is given back: the item was gone, the shopper had bought already, or the commit failed |
 | `request failed`, `admission tick failed`, `event read failed`             | error, error, warn | an unexpected error, with `err`                                                                 |
 | `SIGTERM received: stopping`, `draining for N ms`, `closed ...`, `stopped` | info               | the API stops (see [liveness and readiness](../explanation/liveness-and-readiness.md#stopping)) |
 | `shutdown took longer than N ms: exiting`                                  | error              | the stop passed `SHUTDOWN_TIMEOUT_MS`                                                           |

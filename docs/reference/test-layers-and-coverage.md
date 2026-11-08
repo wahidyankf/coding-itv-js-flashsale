@@ -84,7 +84,8 @@ a trigger in the scratch database that raises an error, and dropping it lets wri
 
 ## How the web end-to-end tests control the API
 
-The Playwright config starts one built web server with `FLASH_BE_URL` set to a fixed forwarder address (port 18082). The
+The Playwright config starts one built web server with `FLASH_BE_URL` set to a fixed forwarder address (port 18082),
+and one built `flash-be` on port 8080 for the scenarios that need no API of their own. The
 forwarder lives in the test process. Each scenario starts its own `flash-be` on a free port over its own scratch
 database, and the forwarder sends the web server there. A scenario can also cut the forwarder, so the API cannot be
 reached, or make it answer with a canned reply, such as a `500`. Scenarios therefore never share state, and none needs

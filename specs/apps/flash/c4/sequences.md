@@ -96,7 +96,7 @@ sequenceDiagram
   A->>P: save the hold
   A-->>S: reservation id and end
   S->>A: POST /api/v1/sales/:id/purchases
-  A->>A: charge the mock payment
+  A->>P: charge the mock payment (payments ledger)
   A->>P: lock, count, insert
   A->>R: mark the buyer
   A-->>S: purchase id

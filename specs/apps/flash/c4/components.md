@@ -43,14 +43,14 @@ flowchart LR
 - **Application** (`application/`) has one service per use case: the sale status with its read cache, the waiting queue,
   reserving, paying, the rate limiter, the operator's sale service (create, change, remove, list), the seed service that the seed command calls, the auth service (sign up, log in, refresh, log out, and who a cookie is) and the admission step that serves the current sale. Its ports are in
   [`application/ports/`](../../../../apps/flash-be/src/application/ports): `SaleRepository`, `QueueStore`, `HoldGate`, `ReservationRepository`, `PurchaseRepository`,
-  `RateLimitStore`, `Payment`, `Clock`, `SaleSeeder`, `SaleAdmin`, `AccountRepository`, `SessionRepository`, `PasswordHasher` and `TokenSource`.
+  `RateLimitStore`, `LocalRateLimitStore`, `Payment`, `Clock`, `Logger`, `SaleSeeder`, `SaleAdmin`, `AccountRepository`, `SessionRepository`, `PasswordHasher` and `TokenSource`.
 - **Domain** (`domain/`) holds the rules and does no I/O: when a sale is upcoming, active, sold out or
   ended, who may queue or reserve, how long a hold lives, how many shoppers one tick admits, what a user name, a
   password, a token and a role are, who is an operator, and whether a new sale has a usable window and overlaps another.
 - **Driven adapters** ([`adapters/outbound/`](../../../../apps/flash-be/src/adapters/outbound)) implement the ports. `postgres/` reads and writes the sales, holds,
   purchases, users and sessions and runs the migrations. `redis/` holds the gate script, the queue, the rate counters and
   the cache of live sessions. `crypto/` hashes passwords with scrypt and makes random tokens. `memory/` counts
-  rate limits when Redis fails. `payment/` is the mock provider, which keeps its charges in a ledger: `postgres/payment-ledger.ts` in the app, a memory one in the unit scenarios. `system/` reads the clock.
+  rate limits when Redis fails and holds the memory payment ledger. `payment/` is the mock provider, which keeps its charges in a ledger: `postgres/payment-ledger.ts` in the app, a memory one in the unit scenarios. `system/` reads the clock.
 - **Composition root** ([`main.ts`](../../../../apps/flash-be/src/main.ts), [`composition.ts`](../../../../apps/flash-be/src/composition.ts)) picks an adapter for each port of the API. The command entry
   points [`seed-sale.ts`](../../../../apps/flash-be/src/seed-sale.ts) and [`create-operator.ts`](../../../../apps/flash-be/src/create-operator.ts) pick their own. No other file does.
 

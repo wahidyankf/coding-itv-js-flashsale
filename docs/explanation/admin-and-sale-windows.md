@@ -73,8 +73,9 @@ The routes need a session whose account has the role `operator`. A request witho
   become an operator through the API.
 - The check runs in the `onRequest` hook, before the body is read, so a client without the login learns nothing from a
   broken body. The address is counted by the rate limiter first, so guesses are counted too.
-- The author of each change is kept: `created_by`, `updated_by` and `deleted_by` of the sale hold the operator's user id.
-  The seed command writes the `$system` user instead.
+- The author of each change is kept: `created_by` and `deleted_by` of the sale hold the operator's user id, and so does
+  `updated_by` after a change; a purchase also stamps `updated_by` with the buyer, since it changes `sold`. The seed
+  command writes the `$system` user instead.
 - The web server does not pass `/api/v1/admin` on. Its proxy has an allow-list of method and path pairs, no `/api/v1/admin` route
   is on it, and a test fails if one ever is.
 

@@ -4,7 +4,7 @@ The Gherkin corpus for the API, grouped by business area.
 
 ## Directory Map
 
-- [health/](health/README.md) - liveness and readiness.
+- [health/](health/README.md) - liveness, readiness and the graceful stop.
 - [db/](db/README.md) - the database schema and its migrations.
 - [auth/](auth/README.md) - accounts and logins: sign up, log in, the two cookies, refreshing and logging out.
 - [sale/](sale/README.md) - the sale status a shopper reads, how reads are cached, the command that seeds a sale, and how an operator creates, changes, removes and lists sales.

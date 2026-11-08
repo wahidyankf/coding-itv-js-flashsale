@@ -1,6 +1,7 @@
 # Health
 
-Scenarios for the two health endpoints: liveness for the process and readiness for its dependencies.
+Scenarios for the two health endpoints, liveness for the process and readiness for its dependencies, and for how the
+API stops.
 
 ## Directory Map
 

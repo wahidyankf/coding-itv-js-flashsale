@@ -67,8 +67,8 @@ domain knows nothing. The only packages the inner layers may import are [`@flash
 pure: no I/O, no timer and no randomness of their own. The one timer helper, `@flash/flash-commons/timers`, is refused
 in the domain and the application; [`composition.ts`](../../apps/flash-be/src/composition.ts) passes the real `sleep` in, and a test passes its own. The HTTP words (error codes, statuses, sentences, cookies) live in
 the inbound HTTP adapter, and the rules the domain needs, such as the user name rule, live in the domain.
-Inbound adapters never import outbound adapters, and outbound adapters import only ports and the
-domain. Only [`composition.ts`](../../apps/flash-be/src/composition.ts) and the entry points see both sides.
+Inbound adapters never import outbound adapters, and outbound adapters never import inbound adapters, the
+use cases or the wiring: they implement ports, use the domain, and may use each other. Only [`composition.ts`](../../apps/flash-be/src/composition.ts) and the entry points see both sides.
 
 [`apps/flash-be/src/architecture_tests.ts`](../../apps/flash-be/src/architecture_tests.ts) reads the imports of every source file and fails when one crosses a layer
 it must not know. It runs with the unit tests, so the pre-push hook enforces it.
@@ -103,8 +103,9 @@ case [decision 003](decisions/003-keep-selling-without-redis.md) names for a sec
 
 In DDD terms the sale is the aggregate: its row is the root, and its holds and purchases belong to it by `sale_id`.
 The rules that must hold at every moment are about one sale: `sold` never passes `stock`, and one shopper has at most one
-purchase in it. Every write that can break them takes the sale row lock first (`SELECT ... FOR UPDATE`): the commit of a
-purchase, a reservation without Redis, a rebuild, and an operator's change or removal. So the lock of the root is the
+purchase in it. Every write that can break them takes the sale row lock (`SELECT ... FOR UPDATE`) before it changes anything: the
+commit of a purchase, a reservation without Redis, a rebuild, and an operator's change or removal (a change takes the
+window's advisory lock just before it). So the lock of the root is the
 boundary, and a shopper waits only behind shoppers of the same sale.
 
 These rules are not methods on a `Sale` object. Two shoppers paying at the same moment read the same `sold`, so a check
@@ -114,8 +115,9 @@ functions (`hasRoom` and the reservation decision) that the memory copies and th
 the third copy, for speed, and Postgres can rebuild it ([decision 002](decisions/002-redis-gate-postgres-last-word.md)).
 
 One step crosses the boundary: a commit or a reservation looks up the shopper's user row by name inside the sale's
-transaction, and creates it for a name that has none, which happens only in tests, because a logged-in shopper always has a row. It is one indexed read, and the user row is
-not locked, so it adds no wait between sales.
+transaction, and creates it for a name that has none, which happens only in tests, because a logged-in shopper always has a row. It is one indexed read. A hold write also locks
+that user row (`FOR NO KEY UPDATE`), after the sale, so two saves of one shopper take turns; the commit does not lock
+it. Both waits stay inside one sale.
 
 ## Two names for a shopper
 
