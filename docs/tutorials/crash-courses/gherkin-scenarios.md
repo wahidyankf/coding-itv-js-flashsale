@@ -7,7 +7,7 @@ the choice.
 
 ## Why this repo uses Gherkin
 
-**The problem.** A rule such as "a shopper who already bought cannot buy again" is worth proving where a fake can lie
+**The problem.** A rule such as "a shopper who already bought cannot buy again" is worth proving with in-memory fakes
 (unit), against the real stores (integration), and over HTTP or in a browser (end-to-end). Three hand-written tests
 of the same rule would slowly say three different things. One scenario, bound at each layer, keeps them the same.
 
@@ -50,6 +50,7 @@ const steps = bindQueueJoining(unitShopLayer());
 describeFeature(
 	await loadFeature(specFile("flash/be/behaviours/queue/joining.feature")),
 	({ Scenario, ScenarioOutline }) => {
+		// ...
 		Scenario("Joining twice keeps the place and the ticket", steps.joinsTwice);
 ```
 

@@ -66,6 +66,7 @@ app.route<{ Params: SaleParams }>({
 		sendResult(
 			reply,
 			await deps.queue.join(request.params.saleId, shopperOf(request)),
+			// The ticket sits between the user and the place, which keeps the key order of the reply.
 			({ created, user, ticket, place }) =>
 				createdOrOk(reply, created).send({ userId: user, ticket, ...place }),
 		),
@@ -130,7 +131,10 @@ What a stream sends and when is in [live updates](../../explanation/live-updates
 [`app_tests.ts`](../../../apps/flash-be/src/adapters/inbound/http/app_tests.ts) build the app over fake dependencies:
 
 ```ts
-const reply = await app.inject({ method: "GET", url: "/api/v1/sales/current" });
+const reply = await app.inject({
+	method: "GET",
+	url: "/api/v1/sales/current",
+});
 expect(reply.statusCode).toBe(500);
 expect(reply.json()).toEqual(errorPayload("internal"));
 ```

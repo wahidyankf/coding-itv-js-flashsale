@@ -48,8 +48,8 @@ It only formats code and JSON. It does not lint, and it does not touch Markdown.
 [`.husky/pre-push`](../../../.husky/pre-push) runs eight checks, the cheap ones first and the slow ones last. The list
 is in [the pre-push hook](../../reference/test-layers-and-coverage.md#pre-push-hook).
 
-The first five need no Docker. The last two use `nx affected --base=origin/main`, so they run only for the projects
-your branch touches ([Nx crash course](nx.md)), and `test:coverage` starts the dev stack.
+The first seven need no Docker. The last two use `nx affected --base=origin/main`, so they run only for the projects
+your branch touches ([Nx crash course](nx.md)), and the last one, `test:coverage`, starts the dev stack.
 
 ## Try it here
 
@@ -73,6 +73,7 @@ added stuff
 ✖   type may not be empty [type-empty]
 
 ✖   found 2 problems, 0 warnings
+ⓘ   Get help: https://github.com/conventional-changelog/commitlint/#what-is-commitlint
 ```
 
 ## Traps to avoid

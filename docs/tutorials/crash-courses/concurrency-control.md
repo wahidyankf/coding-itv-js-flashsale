@@ -6,7 +6,7 @@ that nothing can split: an atomic script, a conditional update, a lock, or a con
 
 ## Why this repo uses it
 
-The task says the stock must never be oversold and a shopper may buy one item. In a flash sale hundreds of shoppers
+The stock must never be oversold, and a shopper may buy one item. In a flash sale hundreds of shoppers
 ask for the last items in the same second, so a race is the normal case, not a rare bug. This repository answers it
 in layers ([decision 002](../../explanation/decisions/002-redis-gate-postgres-last-word.md)): a Redis Lua script
 decides fast who gets a hold, and Postgres has the last word with walls that stay whatever Redis says.
@@ -93,6 +93,7 @@ lock first
 ```ts
 const SALE_WINDOW_LOCK = 7_204_001;
 
+// Takes the sale-window lock for this transaction.
 async function lockSaleWindows(trx: Transaction<Database>): Promise<void> {
 	await sql`select pg_advisory_xact_lock(${sql.lit(SALE_WINDOW_LOCK)})`.execute(
 		trx,

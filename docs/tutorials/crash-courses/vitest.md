@@ -60,6 +60,7 @@ describe("who may reserve", () => {
 		coverage: {
 			enabled: true,
 			provider: "v8",
+			// ...
 			thresholds: { lines: 99, functions: 99, branches: 99, statements: 99 },
 ```
 

@@ -32,9 +32,15 @@ fixtures as its first argument ([`be.steps.ts`](../../../apps/flash-be-e2e/steps
 ```ts
 const { Given, When, Then } = createBdd();
 
-When(/^a client sends GET (\/\S*)$/, async ({ request }, path: string) => {
-	setResponse(await request.get(`${world.api?.url ?? ""}${path}`));
-});
+When(
+	/^a client sends (GET|POST) (\/\S*)$/,
+	async ({ request }, method: string, path: string) => {
+		const url = `${world.api?.url ?? ""}${path}`;
+		setResponse(
+			method === "GET" ? await request.get(url) : await request.post(url),
+		);
+	},
+);
 ```
 
 ### `webServer` waits for a health route

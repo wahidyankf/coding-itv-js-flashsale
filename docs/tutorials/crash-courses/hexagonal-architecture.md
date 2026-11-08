@@ -46,8 +46,13 @@ the sale is open, asks the queue whether the shopper was admitted, builds the ho
 
 ```ts
 async reserve(saleId, user, ticket) {
-	const open = actionableSale(await sales.details(saleId), clock(), reserveBlock);
+	const open = actionableSale(
+		await sales.details(saleId),
+		clock(),
+		reserveBlock,
+	);
 	if (open.isErr()) return new Err(open.error);
+
 	const inLine = await admitted(saleId, user, ticket);
 	if (inLine.isErr()) return new Err(inLine.error);
 	const request = holdRequest(open.value, user, newId(), clock());
@@ -109,9 +114,15 @@ const gate = createGuardedGate(createRedisHoldGate(redis));
 reservations: createReservationService({
 	gate,
 	repository: createReservationRepository(db),
-	sales, queue, clock,
+	sales,
+	queue,
+	clock,
 	newId: randomUUID,
-	options: { rebuildWaitMs: REBUILD_WAIT_MS, wait: sleep, random: Math.random },
+	options: {
+		rebuildWaitMs: REBUILD_WAIT_MS,
+		wait: sleep,
+		random: Math.random,
+	},
 }),
 ```
 

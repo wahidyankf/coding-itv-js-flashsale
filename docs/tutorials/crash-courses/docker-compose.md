@@ -6,8 +6,8 @@ Docker Compose v5.6.0.
 
 ## Why this repo uses it
 
-**The problem.** The API needs Postgres and Redis to run at all, and its claim that it scales out needs several API
-instances behind one door. A developer, the coverage gate, the smoke test and the load test each need that setup in
+**The problem.** The API needs Postgres and Redis to run at all. To show that it scales out, it also needs several API
+instances behind one entry point (nginx). A developer, the coverage gate, the smoke test and the load test each need that setup in
 one command, and each needs to remove it again without touching the others.
 
 **How each file answers it.**
