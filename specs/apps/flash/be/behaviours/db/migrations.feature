@@ -19,15 +19,6 @@ Feature: Database migrations of the flash-be API
     When the migrations run to the latest version
     Then the users table holds only the user "$system"
 
-  # Exemption(e2e): the shipped migrate command only goes to the latest version, so no process can stop at an older one; alternative-proof: flash-be:integration / An existing database keeps its data when it is migrated
-  @e2e-exempt
-  Scenario: An existing database keeps its data when it is migrated
-    Given a database migrated to the version before users and products
-    And that database holds a sale named "Sneakers" with a hold and a purchase by "ana"
-    When the migrations run to the latest version
-    Then the sale belongs to a product named "Sneakers"
-    And the user "ana" holds that hold and that purchase
-
   Scenario: The database refuses a sale that has sold more than its stock
     Given a database migrated to the latest version
     When a sale with stock 5 and 6 sold is inserted

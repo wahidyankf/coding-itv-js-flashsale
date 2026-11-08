@@ -37,7 +37,7 @@ The output ends with the two containers, `flash-dev-postgres-1` and `flash-dev-r
 npx nx db:migrate flash-be
 ```
 
-The command prints one line for each migration it applies, such as `0001_create_products: Success`, and nothing when
+The command prints one line for each migration it applies, such as `0001_users: Success`, and nothing when
 the schema is already current. Nx ends with `Successfully ran target db:migrate for project flash-be`.
 
 ## 5. Start the API
@@ -71,7 +71,7 @@ npx nx db:seed-sale flash-be --stock=3 --starts-in-minutes=0 --duration-minutes=
 The command prints the id of the new sale, such as `seeded sale ed225112-64e6-40d8-8cf3-30c4fe023bdb`. Read it back:
 
 ```bash
-curl -s localhost:8080/sales/current
+curl -s localhost:8080/api/v1/sales/current
 ```
 
 The body shows `"status":"active"`, `"stock":3` and `"remaining":3`.

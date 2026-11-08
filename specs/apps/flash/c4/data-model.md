@@ -2,9 +2,10 @@
 
 The tables of the Postgres database, as the migrations build them. It sits beside the C4 views because Postgres
 is the data store that has the last word on stock and on who bought (see [containers.md](containers.md)). The
-sources are [`apps/flash-be/src/adapters/outbound/postgres/migrations/`](../../../../apps/flash-be/src/adapters/outbound/postgres/migrations): [`0002_create_sales.ts`](../../../../apps/flash-be/src/adapters/outbound/postgres/migrations/0002_create_sales.ts) makes the sale tables,
-[`0003_users_products_audit.ts`](../../../../apps/flash-be/src/adapters/outbound/postgres/migrations/0003_users_products_audit.ts) adds users, products, the audit columns and soft delete, and [`0004_auth_sessions.ts`](../../../../apps/flash-be/src/adapters/outbound/postgres/migrations/0004_auth_sessions.ts) adds
-passwords, roles and sessions.
+sources are [`apps/flash-be/src/adapters/outbound/postgres/migrations/`](../../../../apps/flash-be/src/adapters/outbound/postgres/migrations): [`0001_users.ts`](../../../../apps/flash-be/src/adapters/outbound/postgres/migrations/0001_users.ts) makes the users and the
+`$system` user, [`0002_products_and_sales.ts`](../../../../apps/flash-be/src/adapters/outbound/postgres/migrations/0002_products_and_sales.ts) the products and the sales,
+[`0003_reservations_and_purchases.ts`](../../../../apps/flash-be/src/adapters/outbound/postgres/migrations/0003_reservations_and_purchases.ts) the holds and the purchases, and
+[`0004_sessions.ts`](../../../../apps/flash-be/src/adapters/outbound/postgres/migrations/0004_sessions.ts) the sessions.
 
 ```mermaid
 erDiagram
@@ -157,8 +158,8 @@ Every table has these six columns, and nothing is ever hard-deleted: a row that 
 | `deleted_at` | `timestamptz` | Empty while the row is live.                                                |
 | `deleted_by` | `uuid`        | Foreign key to `users.id`. Empty while the row is live.                     |
 
-`$system` (the migration, the seed command and `create-operator`) is a user that is its own
-author. A deleted `$operator` row is also there: migration `0004` marked it deleted, and nothing uses it.
+`$system` is the author when no person acts: the migration, the seed command and `create-operator`. It is its own
+author, and it cannot log in.
 
 ## Tables in Prose
 

@@ -69,7 +69,7 @@ export function purchasesWithBuyer(from: Kysely<Database>) {
 
 Nothing is erased. A removal sets `deleted_at`, and every read adds `live(table)`, which is `<table>.deleted_at is null`.
 The unique indexes are partial, so a removed row frees its key.
-[Migration 0003](../../../apps/flash-be/src/adapters/outbound/postgres/migrations/0003_users_products_audit.ts) writes
+[Migration 0003](../../../apps/flash-be/src/adapters/outbound/postgres/migrations/0003_reservations_and_purchases.ts) writes
 them in plain SQL:
 
 ```ts
@@ -111,7 +111,7 @@ and then runs its steps in a fixed order. The order is the rule:
 
 `takeItem` raises `sold` only while items remain. Postgres checks the `WHERE` and writes in one step, so two
 transactions cannot both take the last item. The `CHECK (sold <= stock)` from
-[migration 0002](../../../apps/flash-be/src/adapters/outbound/postgres/migrations/0002_create_sales.ts) repeats the rule:
+[migration 0002](../../../apps/flash-be/src/adapters/outbound/postgres/migrations/0002_products_and_sales.ts) repeats the rule:
 
 ```ts
 const updated = await trx
@@ -186,8 +186,8 @@ npx vitest run --config vitest.integration.config.ts src/adapters/outbound/postg
 - **A rebuild snapshot must hold the lock.** The Redis rebuild reads holds inside a transaction that locks the sale, so
   no hold is written between the read and the restore (see
   [reservations and recovery](../../explanation/reservations-and-recovery.md#when-redis-loses-its-state)).
-- **A migration never reads live code.** Migration 0002 freezes its defaults (`HOLD_SECONDS_DEFAULT = 120`) in the file,
-  or an old database would change with the code.
+- **A migration never reads live code.** Migration 0002 writes its defaults (`HOLD_SECONDS_DEFAULT = 120`) in the file,
+  so a change to the app's code never changes what the migration builds.
 
 ## Read next
 

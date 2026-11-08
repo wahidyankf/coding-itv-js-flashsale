@@ -165,93 +165,13 @@ describeFeature(
 						expect(system).toBe(SYSTEM_USERNAME);
 						// The system user is made before any user exists, so it names itself as author.
 						expect(rows[0]?.created_by).toBe(rows[0]?.id);
-						// The stand-in operator of the first migration is kept as a row marked deleted by the system.
-						const retired = await db
-							.selectFrom("users")
-							.select("deleted_by")
-							.where("username", "=", "$operator")
-							.where("deleted_at", "is not", null)
-							.executeTakeFirst();
-						expect(retired?.deleted_by).toBe(rows[0]?.id);
-					},
-				);
-			},
-		);
-
-		Scenario(
-			"An existing database keeps its data when it is migrated",
-			({ Given, And, When, Then }) => {
-				let db: Kysely<Database>;
-
-				Given(
-					"a database migrated to the version before users and products",
-					async () => {
-						db = await scratch();
-						const { error } =
-							await createMigrator(db).migrateTo("0002_create_sales");
-						if (error) throw error;
-					},
-				);
-
-				// The old schema has no `product_id` and stores the user as text, so this step writes raw SQL.
-				And(
-					"that database holds a sale named {string} with a hold and a purchase by {string}",
-					async (_ctx, name: string, user: string) => {
-						const sale = await sql<{
-							id: string;
-						}>`insert into sales (name, starts_at, ends_at, stock, sold)
-							values (${name}, now() - interval '1 hour', now() + interval '1 hour', 5, 1) returning id`.execute(
-							db,
-						);
-						const saleId = sale.rows[0]?.id;
-						await sql`insert into reservations (sale_id, user_id, expires_at)
-							values (${saleId}, ${user}, now() + interval '1 minute')`.execute(
-							db,
-						);
-						await sql`insert into purchases (sale_id, user_id, reservation_id, payment_ref)
-							values (${saleId}, ${user}, gen_random_uuid(), 'pay-old')`.execute(
-							db,
-						);
-					},
-				);
-
-				When("the migrations run to the latest version", async () => {
-					await migrate(db);
-				});
-
-				Then(
-					"the sale belongs to a product named {string}",
-					async (_ctx, name: string) => {
-						const rows = await db
-							.selectFrom("sales")
-							.innerJoin("products", "products.id", "sales.product_id")
-							.select("products.name")
-							.execute();
-						expect(rows.map((row) => row.name)).toEqual([name]);
-					},
-				);
-
-				And(
-					"the user {string} holds that hold and that purchase",
-					async (_ctx, user: string) => {
-						const owner = await db
+						// No operator stand-in: an operator is made by a command, never by a migration, so no row has that name.
+						const operators = await db
 							.selectFrom("users")
 							.select("id")
-							.where("username", "=", user)
-							.executeTakeFirstOrThrow();
-						const hold = await db
-							.selectFrom("reservations")
-							.select(["user_id", "created_by"])
-							.executeTakeFirstOrThrow();
-						const purchase = await db
-							.selectFrom("purchases")
-							.select(["user_id", "created_by"])
-							.executeTakeFirstOrThrow();
-						expect(hold).toEqual({ user_id: owner.id, created_by: owner.id });
-						expect(purchase).toEqual({
-							user_id: owner.id,
-							created_by: owner.id,
-						});
+							.where("username", "=", "$operator")
+							.execute();
+						expect(operators).toEqual([]);
 					},
 				);
 			},

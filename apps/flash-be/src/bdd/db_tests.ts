@@ -3,10 +3,10 @@
 // scenarios against a real database (db_integration_tests.ts). The two differ on purpose, so the steps stay in each file.
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import { expect } from "vitest";
-import { up as upProducts } from "../adapters/outbound/postgres/migrations/0001_create_products.js";
-import { up } from "../adapters/outbound/postgres/migrations/0002_create_sales.js";
-import { up as upUsers } from "../adapters/outbound/postgres/migrations/0003_users_products_audit.js";
-import { up as upAuth } from "../adapters/outbound/postgres/migrations/0004_auth_sessions.js";
+import { up as upUsers } from "../adapters/outbound/postgres/migrations/0001_users.js";
+import { up as upSales } from "../adapters/outbound/postgres/migrations/0002_products_and_sales.js";
+import { up as upHolds } from "../adapters/outbound/postgres/migrations/0003_reservations_and_purchases.js";
+import { up as upSessions } from "../adapters/outbound/postgres/migrations/0004_sessions.js";
 import { SYSTEM_USERNAME } from "../domain/actors.js";
 import { specFile } from "./support/paths.js";
 import { recordingDb } from "./support/recording-db.js";
@@ -33,10 +33,10 @@ const AUDIT_COLUMNS = [
 
 // Runs every migration, in order, on a database that only records.
 async function runMigrations(db: Recording): Promise<void> {
-	await upProducts(db.db);
-	await up(db.db);
 	await upUsers(db.db);
-	await upAuth(db.db);
+	await upSales(db.db);
+	await upHolds(db.db);
+	await upSessions(db.db);
 }
 
 // A recording database with every migration run on it.
@@ -137,66 +137,10 @@ describeFeature(
 						const inserts = db.statements.filter((statement) =>
 							/insert into users/.test(statement.sql),
 						);
+						expect(inserts).toHaveLength(1);
 						expect(inserts[0]?.parameters).toEqual([SYSTEM_USERNAME]);
-						const retired = db.statements.find((statement) =>
-							/update users set deleted_at = now\(\)/.test(statement.sql),
-						);
-						expect(retired?.parameters).toEqual([SYSTEM_USERNAME, "$operator"]);
 					},
 				);
-			},
-		);
-
-		Scenario(
-			"An existing database keeps its data when it is migrated",
-			({ Given, And, When, Then }) => {
-				let db: Recording;
-
-				Given(
-					"a database migrated to the version before users and products",
-					() => {
-						db = recordingDb();
-					},
-				);
-
-				And(
-					"that database holds a sale named {string} with a hold and a purchase by {string}",
-					() => {
-						// Nothing to insert: without a database, the proof is the statements the migration sends.
-					},
-				);
-
-				When("the migrations run to the latest version", async () => {
-					await upUsers(db.db);
-					await upAuth(db.db);
-				});
-
-				// Without a database, the proof is the SQL that moves the old rows to the new tables.
-				Then("the sale belongs to a product named {string}", () => {
-					expect(
-						sent(
-							db,
-							/insert into products \(id, name, created_at, created_by\)\s+select product_id, name, created_at, created_by from sales/,
-						),
-					).toBe(true);
-				});
-
-				And("the user {string} holds that hold and that purchase", () => {
-					expect(
-						sent(
-							db,
-							/insert into users \(username, created_by\)\s+select name, \(select id from users where username = \$1\)\s+from \(select user_id as name from purchases union select user_id from reservations\)/,
-						),
-					).toBe(true);
-					for (const table of ["purchases", "reservations"]) {
-						expect(
-							sent(
-								db,
-								new RegExp(`update "${table}" as t set user_uuid = u.id`),
-							),
-						).toBe(true);
-					}
-				});
 			},
 		);
 
@@ -251,7 +195,7 @@ describeFeature(
 						expect(
 							sent(
 								db,
-								/alter table "sales" alter column "product_id" set not null/,
+								/create table "sales" \([^;]*"product_id" uuid not null /,
 							),
 						).toBe(true);
 					},
@@ -285,7 +229,7 @@ describeFeature(
 						expect(
 							sent(
 								db,
-								/add constraint users_role_known check \(role in \('shopper', 'operator'\)\)/,
+								/constraint "users_role_known" check \(role in \('shopper', 'operator'\)\)/,
 							),
 						).toBe(true);
 					},
