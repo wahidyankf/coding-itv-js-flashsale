@@ -52,6 +52,9 @@ export type WebWorld = {
 	// Things that happen to the sale while the page is open.
 	setSold: (sold: number) => Promise<void>;
 	endSale: () => Promise<void>;
+	openSale: () => Promise<void>;
+	// The line is lost while the shopper waits in it.
+	loseQueue: () => Promise<void>;
 	// The live streams stop working for good: the watcher has tried again until it gave up.
 	liveUpdatesFail: () => Promise<void>;
 	advance: (seconds: number) => Promise<void>;
@@ -66,12 +69,16 @@ export type WebWorld = {
 	// The page as the server renders it, and the address the web server uses for the API.
 	renderedPage: () => string;
 	apiAddress: () => string;
-	// A request to the web server, from this site unless `origin` names another.
+	// A request to the web server, from this site unless `origin` names another. `headers` are written by the client.
 	send: (
 		method: "GET" | "POST",
 		path: string,
 		body?: unknown,
 		origin?: string,
+		headers?: Record<string, string>,
 	) => Promise<ApiAnswer>;
+	// The address the web server sees a request come from, and the address the API was told for the last request.
+	callerAddress: () => string;
+	apiToldAddress: () => string | undefined;
 	saleId: string;
 };

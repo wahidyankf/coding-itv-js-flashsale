@@ -13,15 +13,10 @@ const ALLOWED: Array<[method: string, path: RegExp]> = BROWSER_ROUTES.map(
 	([method, template]) => [method, routePattern(template)],
 );
 
-// Headers that carry something the API needs, or something the browser needs back. The API limits by address, so it
-// needs the browser's address (`x-forwarded-for`) and not this server's.
-const SENT = [
-	"content-type",
-	TICKET_HEADER,
-	"accept",
-	"cookie",
-	"x-forwarded-for",
-];
+// Headers that carry something the API needs, or something the browser needs back. `x-forwarded-for` is not copied: the
+// browser could write any address there, so the proxy sets it itself (see `callerAddress`).
+const SENT = ["content-type", TICKET_HEADER, "accept", "cookie"];
+const FORWARDED_FOR = "x-forwarded-for";
 const RETURNED = ["content-type", "cache-control", RETRY_AFTER_HEADER];
 
 // The answers this server gives on its own, in the shape of the API's errors. `not_found` is a copy of flash-be's code,
@@ -97,6 +92,15 @@ function pick(source: Headers, names: readonly string[]): Headers {
 	return picked;
 }
 
+// The address of the caller as the socket saw it. The Node server under Nitro (srvx) puts it on the request as `ip`, and
+// reads no `x-forwarded-for` for it, because no proxy is trusted here. A browser cannot choose it. The API limits by
+// address, so this is what it gets; nginx's internal listener passes it on as sent (`nginx.prod.conf`).
+function callerAddress(request: Request): string | undefined {
+	if (!("ip" in request)) return undefined;
+	const { ip } = request;
+	return typeof ip === "string" && ip !== "" ? ip : undefined;
+}
+
 // The proxy's one entry point. Streams flash-be's answer back with only the allowed headers. A failed call becomes a
 // 502 reply, so the shopper never sees a crash.
 export async function proxyToBackend(
@@ -112,6 +116,8 @@ export async function proxyToBackend(
 	}
 
 	const headers = pick(request.headers, SENT);
+	const address = callerAddress(request);
+	if (address !== undefined) headers.set(FORWARDED_FOR, address);
 
 	const answered = await attemptAsync(async (): Promise<Response> => {
 		const upstream = await fetcher(`${buildConfig(env).backendUrl}${path}`, {

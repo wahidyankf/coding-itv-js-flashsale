@@ -120,7 +120,6 @@ describe("proxyToBackend", () => {
 				headers: {
 					"content-type": "application/json",
 					"x-queue-ticket": "t1",
-					"x-forwarded-for": "203.0.113.9",
 					cookie: "session=1",
 					authorization: "Bearer x",
 				},
@@ -133,11 +132,48 @@ describe("proxyToBackend", () => {
 		expect(init?.body).toBe('{"userId":"ana"}');
 		const sent = new Headers(init?.headers);
 		expect(sent.get("x-queue-ticket")).toBe("t1");
-		expect(sent.get("x-forwarded-for")).toBe("203.0.113.9");
 		expect(sent.get("content-type")).toBe("application/json");
 		expect(sent.get("cookie")).toBe("session=1");
 		expect(sent.get("authorization")).toBeNull();
 	});
+
+	// The Node server puts the address of the socket on the request as `ip`.
+	const from = (ip: string, request: Request) => Object.assign(request, { ip });
+
+	it("tells the API the caller's own address, and drops the one the browser wrote", async () => {
+		const fetcher = vi.fn<typeof fetch>(async () => new Response("{}"));
+		await proxyToBackend(
+			from(
+				"198.51.100.4",
+				new Request("http://web.test/api/v1/auth/login", {
+					method: "POST",
+					body: "{}",
+					headers: { "x-forwarded-for": "203.0.113.9, 192.0.2.1" },
+				}),
+			),
+			ENV,
+			fetcher,
+		);
+		const sent = new Headers(fetcher.mock.calls[0]?.[1]?.headers);
+		expect(sent.get("x-forwarded-for")).toBe("198.51.100.4");
+	});
+
+	it.each([
+		["no address", new Request("http://web.test/api/v1/auth/me")],
+		[
+			"an empty address",
+			from("", new Request("http://web.test/api/v1/auth/me")),
+		],
+	])(
+		"sends no address when the request has %s, even if the browser wrote one",
+		async (_name, request) => {
+			request.headers.set("x-forwarded-for", "203.0.113.9");
+			const fetcher = vi.fn<typeof fetch>(async () => new Response("{}"));
+			await proxyToBackend(request, ENV, fetcher);
+			const sent = new Headers(fetcher.mock.calls[0]?.[1]?.headers);
+			expect(sent.get("x-forwarded-for")).toBeNull();
+		},
+	);
 
 	it("sends the cookie of the shopper on, which is how the API knows who it is", async () => {
 		const fetcher = vi.fn<typeof fetch>(async () => new Response("{}"));

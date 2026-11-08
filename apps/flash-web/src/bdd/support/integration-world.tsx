@@ -29,6 +29,7 @@ import { ACCESS_COOKIE, REFRESH_COOKIE } from "./fake-account";
 import { createFakeBackend, type FakeBackend } from "./fake-backend";
 import { type Match, matchRoute } from "./fake-http";
 import { SALE_ID, type SaleSpec } from "./fake-state";
+import { requestOf } from "./node-request";
 import type { WebWorld } from "./web-world";
 
 const WAIT = { timeout: 8000, interval: 50 };
@@ -122,7 +123,11 @@ function backendServer(current: () => FakeBackend): Server {
 			const reply = backend.handle(
 				request.method ?? "GET",
 				path,
-				{ [TICKET_HEADER]: ticket, cookie: request.headers.cookie },
+				{
+					[TICKET_HEADER]: ticket,
+					cookie: request.headers.cookie,
+					"x-forwarded-for": request.headers["x-forwarded-for"]?.toString(),
+				},
 				text ? JSON.parse(text) : {},
 			);
 			response.writeHead(reply.status, {
@@ -138,15 +143,6 @@ function backendServer(current: () => FakeBackend): Server {
 	});
 }
 
-// The request headers, as the proxy takes them. Only text headers are kept.
-function headersOf(request: IncomingMessage): Headers {
-	const headers = new Headers();
-	for (const [name, value] of Object.entries(request.headers)) {
-		if (typeof value === "string") headers.set(name, value);
-	}
-	return headers;
-}
-
 // Hands one browser request to the proxy, and writes the answer back, cookies included.
 async function relay(
 	request: IncomingMessage,
@@ -157,12 +153,7 @@ async function relay(
 	response.on("close", () => controller.abort());
 	const body = request.method === "POST" ? await readBody(request) : null;
 	const reply = await proxyToBackend(
-		new Request(new URL(request.url ?? "/", "http://web.test"), {
-			method: request.method ?? "GET",
-			headers: headersOf(request),
-			body,
-			signal: controller.signal,
-		}),
+		requestOf(request, body, controller.signal),
 		{ FLASH_BE_URL: backendUrl() },
 	);
 	response.writeHead(reply.status, {
@@ -334,6 +325,8 @@ function pageOf(h: Harness, browserFetch: typeof fetch, backendHttp: Server) {
 		async endSale() {
 			h.backend.endSale();
 		},
+		openSale: async () => h.backend.openSale(),
+		loseQueue: async () => h.backend.loseQueue(),
 		async liveUpdatesFail() {
 			// The backend stops answering and its open streams are cut, as a dropped connection cuts them. The page then
 			// tries to open each stream again, and gives up after its last failed attempt.
@@ -394,16 +387,21 @@ function apiOf(h: Harness, browserFetch: typeof fetch) {
 			renderToStaticMarkup(<HomePage status="ok" sale={h.load} />) +
 			document.body.innerHTML,
 		apiAddress: () => h.backendUrl,
+		// The browser and the web server are both on the loopback address.
+		callerAddress: () => "127.0.0.1",
+		apiToldAddress: () => h.backend.toldAddress(),
 		async send(
 			method: "GET" | "POST",
 			path: string,
 			body?: unknown,
 			origin?: string,
+			written: Record<string, string> = {},
 		) {
 			const before = h.backend.requestCount();
 			const reply = await browserFetch(`${h.webUrl}${path}`, {
 				method,
 				headers: {
+					...written,
 					...(body === undefined ? {} : { "content-type": JSON_CONTENT_TYPE }),
 					...(origin === undefined ? {} : { origin }),
 				},

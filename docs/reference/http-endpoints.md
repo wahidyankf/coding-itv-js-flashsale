@@ -419,7 +419,8 @@ flowchart LR
   class api service
 ```
 
-Only `content-type`, `accept`, `cookie`, `x-queue-ticket` and `x-forwarded-for` are sent on. Only `content-type`,
+Only `content-type`, `accept`, `cookie` and `x-queue-ticket` are sent on. `x-forwarded-for` is written by the web
+server from the caller's socket address; the one the browser sent is dropped. Only `content-type`,
 `cache-control`, `retry-after` and every `set-cookie` come back. The path and the cookies pass unchanged: `flash-be` sets
 the refresh cookie for `/api/v1/auth`, the same path the browser calls. When `flash-be` cannot be reached the answer is `502`
 with `errorCode` `backend_unavailable`. The address of `flash-be` is read on the server and never reaches the page. See

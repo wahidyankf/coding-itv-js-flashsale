@@ -1,6 +1,6 @@
 // Steps for the web server's /api proxy: a shopper's request reaches the API through it, the cookies a reply sets must be
-// HttpOnly on the right path, the body must not hold a token, and a request from another site must not reach the API.
-// Binds proxy/api.feature.
+// HttpOnly on the right path, the body must not hold a token, a request from another site must not reach the API, and the API
+// is told the address the request came from. Binds proxy/api.feature.
 
 import { API_PATHS, parseSetCookie } from "@flash/flash-commons";
 import { expect } from "@playwright/test";
@@ -16,10 +16,15 @@ import {
 	world,
 } from "../../flash-be-e2e/steps/support/world.js";
 import { saleRoute } from "./support/api.js";
-import { FORWARDER_URL } from "./support/forwarder.js";
-import { connectWebServer } from "./support/shop.js";
+import { FORWARDER_URL, forwarder } from "./support/forwarder.js";
+import { answerWith, connectWebServer } from "./support/shop.js";
 
 const { When, Then } = createBdd();
+
+// The tests and the web server run on one machine, so a request reaches the web server from a loopback address. Which
+// one depends on whether the server listens on IPv4, IPv6 or both.
+const LOOPBACK = ["127.0.0.1", "::1", "::ffff:127.0.0.1"];
+const FORWARDED_FOR = "x-forwarded-for";
 
 // The client is the page's own browser context, so it sends the cookies the page holds, if there are any.
 When("a client joins the queue through the web server", async ({ page }) => {
@@ -120,3 +125,30 @@ Then("the page does not contain the address of the API", async ({ page }) => {
 	expect(await page.content()).not.toContain(FORWARDER_URL);
 	expect(await page.content()).not.toContain(new URL(FORWARDER_URL).host);
 });
+
+// The API gives a canned reply, so the forwarder holds the request exactly as the real web server sent it.
+When(
+	/^a client that writes its address as "([^"]+)" sends GET \/api\/v1\/sales\/current$/,
+	async ({ request }, written: string) => {
+		await answerWith(200, "{}");
+		setResponse(
+			await request.get(API_PATHS.saleCurrent, {
+				headers: { [FORWARDED_FOR]: written },
+			}),
+		);
+	},
+);
+
+Then(
+	"the API is told the address the request came from",
+	async ({ request: _request }) => {
+		expect(LOOPBACK).toContain(forwarder.headerOfLast(FORWARDED_FOR) ?? "none");
+	},
+);
+
+Then(
+	/^the API is not told "([^"]+)"$/,
+	async ({ request: _request }, written: string) => {
+		expect(forwarder.headerOfLast(FORWARDED_FOR) ?? "").not.toContain(written);
+	},
+);

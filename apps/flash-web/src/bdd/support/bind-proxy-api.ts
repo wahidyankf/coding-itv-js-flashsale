@@ -210,6 +210,26 @@ function otherSiteRefused(world: WebWorld): ScenarioBinder {
 	};
 }
 
+// The API limits by address, so the web server tells it the address its socket saw, and never one the client wrote.
+function callerAddressPassedOn(world: WebWorld): ScenarioBinder {
+	return ({ When, Then, And }) => {
+		When(
+			"a client that writes its address as {string} sends GET /api/v1/sales/current",
+			async (_ctx, written: string) => {
+				await world.send("GET", "/api/v1/sales/current", undefined, undefined, {
+					"x-forwarded-for": written,
+				});
+			},
+		);
+		Then("the API is told the address the request came from", () => {
+			expect(world.apiToldAddress()).toBe(world.callerAddress());
+		});
+		And("the API is not told {string}", (_ctx, written: string) => {
+			expect(world.apiToldAddress()).not.toContain(written);
+		});
+	};
+}
+
 // The API cannot be reached, and the web server answers with a gateway error.
 function apiUnreachable(world: WebWorld): ScenarioBinder {
 	return ({ Given, When, Then, And }) => {
@@ -234,6 +254,7 @@ export function bindProxyApi(world: WebWorld) {
 		anonymousRefused: anonymousRefused(world),
 		signUpSetsCookies: signUpSetsCookies(world),
 		otherSiteRefused: otherSiteRefused(world),
+		callerAddressPassedOn: callerAddressPassedOn(world),
 		apiUnreachable: apiUnreachable(world),
 	};
 }

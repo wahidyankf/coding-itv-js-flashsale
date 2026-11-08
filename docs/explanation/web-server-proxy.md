@@ -14,7 +14,9 @@ server passes it on, with the login cookies. This page gives the reasons and wha
   [`proxy.ts`](../../apps/flash-web/src/proxy.ts) turns into its allow-list) and nothing else, so a path such as
   `../ready` cannot be used to reach other routes. The operator routes (`/api/v1/admin/sales` with POST, GET, PATCH and
   DELETE) are not on the list. A sale id must be a UUID, or the answer is `404 not_found`. The server also sends on only
-  the headers the API needs (the `cookie` header among them). The browser and the API use the same paths, so the path
+  the headers the API needs (the `cookie` header among them). It writes `X-Forwarded-For` itself, from the caller's
+  socket address, and never copies the one the browser sent, so the API's rate limit counts each shopper by their own
+  address. The browser and the API use the same paths, so the path
   and the cookies pass unchanged. A POST from another origin is refused with `403 cross_site`.
 
 ```mermaid

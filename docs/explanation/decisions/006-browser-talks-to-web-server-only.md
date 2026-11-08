@@ -13,7 +13,8 @@ and the health checks. A browser that calls the API directly needs its address, 
 
 - The page calls its own server under `/api/v1/sales` and `/api/v1/auth`. The server passes on a list of method and path pairs
   (`BROWSER_ROUTES` in [`api-paths.ts`](../../../apps/flash-web/src/api-paths.ts), checked in [`proxy.ts`](../../../apps/flash-web/src/proxy.ts)) and answers `404 not_found` to the rest. A sale id must be a UUID.
-- `FLASH_BE_URL` is read on the server only. Only the headers the API needs go on. The path and the cookies pass
+- `FLASH_BE_URL` is read on the server only. Only the headers the API needs go on, and the server writes
+  `X-Forwarded-For` from the caller's socket address instead of copying the browser's. The path and the cookies pass
   unchanged, because the browser and the API use the same paths. A POST from another origin gets `403 cross_site`. If the API cannot be reached the answer is `502 backend_unavailable`.
 - The operator routes are not on the list, and a test in [`proxy_tests.ts`](../../../apps/flash-web/src/proxy_tests.ts) fails if one is.
 
@@ -29,8 +30,9 @@ and the health checks. A browser that calls the API directly needs its address, 
 
 - It costs one more hop on each request, and a list to update with each public route. The proxy streams answers as they
   arrive, so event streams are not buffered.
-- It buys one origin (no CORS rules to get wrong), a private API address, and a small public surface. The per-address
-  rate limit sees the web server's address for every page shopper. The per-user limit still applies.
+- It buys one origin (no CORS rules to get wrong), a private API address, and a small public surface. The web server
+  reaches nginx on an internal port that keeps the address it wrote, so the per-address rate limit still counts each
+  page shopper by their own address. A TLS terminator in front of the web server would need a trusted-proxy list there.
 
 ## Revisit when
 

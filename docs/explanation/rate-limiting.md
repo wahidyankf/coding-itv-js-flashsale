@@ -70,3 +70,10 @@ the payment step open to floods.
 The client address comes from the socket by default. Behind a load balancer every request would then share the balancer
 address and one shopper could block everyone. Set `TRUST_PROXY=true` only when a proxy you control sets
 `X-Forwarded-For`; if the API faces the internet directly, the header could be forged to dodge the limit.
+
+In the production stack two paths reach the API, and each sets the header so that it cannot be forged:
+
+- A caller of the public API port reaches nginx on port 80, which replaces `X-Forwarded-For` with the address it sees.
+- A shopper on the page reaches `flash-web`. It writes the browser's socket address into `X-Forwarded-For` (it drops any
+  value the browser sent) and calls nginx on port 8081. That port is not published, and nginx passes the header on
+  unchanged there. So each page shopper is counted by their own address, for the write limit and the auth limit.

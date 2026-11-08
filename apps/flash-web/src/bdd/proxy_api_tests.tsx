@@ -61,6 +61,11 @@ describeFeature(
 		);
 
 		Scenario(
+			"The API is told the shopper's own address, not one the browser wrote",
+			steps.callerAddressPassedOn,
+		);
+
+		Scenario(
 			"An API that cannot be reached gives a gateway error",
 			steps.apiUnreachable,
 		);

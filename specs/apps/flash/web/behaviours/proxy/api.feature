@@ -73,6 +73,11 @@ Feature: The web server in front of the API
     And the body has error "cross_site"
     And the API was not asked
 
+  Scenario: The API is told the shopper's own address, not one the browser wrote
+    When a client that writes its address as "6.6.6.6" sends GET /api/v1/sales/current
+    Then the API is told the address the request came from
+    And the API is not told "6.6.6.6"
+
   Scenario: An API that cannot be reached gives a gateway error
     Given the sale cannot be reached
     When a client sends GET /api/v1/sales/current

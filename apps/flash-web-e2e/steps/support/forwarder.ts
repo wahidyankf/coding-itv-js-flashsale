@@ -18,6 +18,8 @@ type Mode =
 let mode: Mode = { kind: "cut" };
 let server: net.Server | undefined;
 const sockets = new Set<net.Socket>();
+// The head of the last request a canned reply answered, as the web server sent it, so a scenario can read its headers.
+let lastHead = "";
 
 // Handles one connection from the web server, in the mode that is set when it arrives.
 function handle(client: net.Socket): void {
@@ -33,7 +35,8 @@ function handle(client: net.Socket): void {
 		client.destroy();
 		return;
 	}
-	client.once("data", () => {
+	client.once("data", (chunk: Buffer) => {
+		lastHead = chunk.toString("latin1").split("\r\n\r\n")[0] ?? "";
 		client.end(
 			`HTTP/1.1 ${current.status} Canned\r\ncontent-type: application/json\r\ncontent-length: ${Buffer.byteLength(current.body)}\r\nconnection: close\r\n\r\n${current.body}`,
 		);
@@ -61,14 +64,26 @@ function dropConnections(): void {
 async function set(next: Mode): Promise<void> {
 	await listening();
 	mode = next;
+	lastHead = "";
 	dropConnections();
 }
 
-// The places a scenario can point the forwarder at. Each call waits until the forwarder listens.
+// The value of a header in the last request a canned reply answered, or undefined when it had none.
+function headerOfLast(name: string): string | undefined {
+	const prefix = `${name.toLowerCase()}:`;
+	const line = lastHead
+		.split("\r\n")
+		.find((entry) => entry.toLowerCase().startsWith(prefix));
+	return line?.slice(prefix.length).trim();
+}
+
+// The places a scenario can point the forwarder at, each waiting until the forwarder listens, and what the last request
+// that got a canned reply carried.
 export const forwarder = {
 	to: (port: number) => set({ kind: "to", port }),
 	cut: () => set({ kind: "cut" }),
 	canned: (status: number, body: string) =>
 		set({ kind: "canned", status, body }),
 	reset: () => set({ kind: "cut" }),
+	headerOfLast,
 };

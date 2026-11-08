@@ -21,7 +21,11 @@ import { SalePage } from "../../sale-page";
 import { createWebApi } from "../../web-api";
 import { createCookieJar } from "./cookie-jar";
 import { ACCESS_COOKIE, REFRESH_COOKIE } from "./fake-account";
-import { createFakeBackend, type FakeBackend } from "./fake-backend";
+import {
+	createFakeBackend,
+	type FakeBackend,
+	FORWARDED_FOR,
+} from "./fake-backend";
 import { matchRoute } from "./fake-http";
 import { SALE_ID, type SaleSpec } from "./fake-state";
 import type { WebWorld } from "./web-world";
@@ -30,6 +34,8 @@ const BACKEND = "http://flash-be.test";
 const ENV = { FLASH_BE_URL: BACKEND };
 const START = new Date("2026-06-01T12:00:00Z");
 const SITE = "http://web.test";
+// The address the web server's socket sees every request come from. The Node server puts it on the request as `ip`.
+const CALLER = "192.0.2.10";
 // The password of a shopper that a scenario logs in without naming one.
 const PASSWORD = "a long password";
 // How many times the page is given a turn to settle after an action.
@@ -56,6 +62,7 @@ function backendFetchOf(h: Harness): typeof fetch {
 			{
 				[TICKET_HEADER]: headers.get(TICKET_HEADER) ?? undefined,
 				cookie: headers.get("cookie") ?? undefined,
+				[FORWARDED_FOR]: headers.get(FORWARDED_FOR) ?? undefined,
 			},
 			text ? JSON.parse(text) : {},
 		);
@@ -82,7 +89,7 @@ function webFetchOf(h: Harness, backendFetch: typeof fetch): typeof fetch {
 			headers.set("origin", SITE);
 		}
 		const reply = await proxyToBackend(
-			new Request(url, { ...init, headers }),
+			Object.assign(new Request(url, { ...init, headers }), { ip: CALLER }),
 			ENV,
 			backendFetch,
 		);
@@ -261,6 +268,8 @@ function pageOf(
 			}),
 		setSold: (sold: number) => inPage(() => h.backend.setSold(sold)),
 		endSale: () => inPage(() => h.backend.endSale()),
+		openSale: () => inPage(() => h.backend.openSale()),
+		loseQueue: () => inPage(() => h.backend.loseQueue()),
 		// The unit world does not replay the retries (sse_tests.ts proves those). It gives the page the report the
 		// watcher makes after its last attempt, for every stream that is open.
 		liveUpdatesFail: () =>
@@ -306,16 +315,20 @@ function apiOf(h: Harness, webFetch: typeof fetch) {
 			renderToStaticMarkup(<HomePage status="ok" sale={h.load} />) +
 			document.body.innerHTML,
 		apiAddress: () => BACKEND,
+		callerAddress: () => CALLER,
+		apiToldAddress: () => h.backend.toldAddress(),
 		async send(
 			method: "GET" | "POST",
 			path: string,
 			body?: unknown,
 			origin?: string,
+			written: Record<string, string> = {},
 		) {
 			const before = h.backend.requestCount();
 			const reply = await webFetch(path, {
 				method,
 				headers: {
+					...written,
 					...(body === undefined ? {} : { "content-type": JSON_CONTENT_TYPE }),
 					...(origin === undefined ? {} : { origin }),
 				},
