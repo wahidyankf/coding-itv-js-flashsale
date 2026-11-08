@@ -17,6 +17,7 @@ Flash sale monorepo with five apps in [`apps/`](apps) and two libraries in [`lib
   [`specs/`](specs), every `README.md`, [`AGENTS.md`](AGENTS.md) and [`.claude/`](.claude) for each path, name, route, error code, env var, command and
   number you changed, and fix every page that is now wrong. Docs are the main session's job, so an agent names each
   stale page to its caller instead of leaving it.
+- [`REQUIREMENTS.md`](REQUIREMENTS.md) lists what the system must do (minimum), what it adds (extended) and what it leaves out, each with its proof. A change that adds, removes or moves a requirement, or moves its proof, updates it.
 - [`specs/`](specs) holds the apps' behaviour scenarios (`specs/apps/flash/be` and `web`), their C4 model, and the load test rules ([`specs/apps/flash/load/`](specs/apps/flash/load)). Start at [specs/README.md](specs/README.md). Specs win when they disagree with [`docs/`](docs).
 
 ## Claude Code agents and skills

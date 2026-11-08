@@ -22,13 +22,13 @@ report you can show if the live run cannot finish. Then follow [before the audie
 once, all the way to the end, so the names `ana` and `ben` and the sale are in the state the demo expects. On the day,
 start again from `npm run demo:reset` and `npm run demo:setup`.
 
-Keep these open in tabs: the [README](../../README.md) (the task table and the diagram), the
+Keep these open in tabs: [REQUIREMENTS.md](../../REQUIREMENTS.md), the [README](../../README.md) (the diagram), the
 [decision records](../explanation/decisions/README.md), and [what the load runs found](../explanation/load-test-findings.md).
 
 ## An order for the session
 
-1. **The problem and the two promises.** Never sell more than the stock, never sell one shopper twice. The task table in
-   the [README](../../README.md#what-the-task-asks-for-and-where-it-is) maps each line of the task to the code.
+1. **The problem and the two promises.** Never sell more than the stock, never sell one shopper twice. [REQUIREMENTS.md](../../REQUIREMENTS.md)
+   maps each line of the task to its proof, and says what was added and what was left out.
 2. **The demo.** [Run the demo](run-the-demo.md), sections 1 to 3: buy on the page, the API request by request, Redis down.
 3. **How a purchase works.** [The diagram and the steps](../../README.md#how-a-purchase-works), then the three files that
    keep the promises: [`domain/sale.ts`](../../apps/flash-be/src/domain/sale.ts),

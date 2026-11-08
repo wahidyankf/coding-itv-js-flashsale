@@ -46,23 +46,17 @@ These words have a fixed meaning in the code, the docs and the API.
 
 ## What the task asks for, and where it is
 
-Each line of the interview task, and the code or scenario that answers it.
+[REQUIREMENTS.md](REQUIREMENTS.md) lists each line of the interview task with the code, scenario or run that proves it.
+It covers the functional and the non-functional requirements, what was added beyond the task, and what was left out on
+purpose. In short:
 
-| The task asks for                  | Where it is                                                                                                                                                                                                                                                                                                                                                                 |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A configurable start and end time  | `sales.starts_at` and `ends_at`. Set them with `POST /api/v1/admin/sales` (absolute times, needs an operator login) or with the seed command (minutes from now). `PATCH` and `DELETE /api/v1/admin/sales/:saleId` change and remove a sale                                                                                                                                  |
-| One product, limited stock         | `sales.stock`, with `UPDATE ... WHERE sold < stock` and `CHECK (sold <= stock)` in Postgres                                                                                                                                                                                                                                                                                 |
-| One item per user                  | `UNIQUE(sale_id, user_id)` on purchases and on reservations; a Redis set of buyers in front of it                                                                                                                                                                                                                                                                           |
-| An endpoint for the sale status    | `GET /api/v1/sales/current` and `GET /api/v1/sales/:saleId`, plus a live stream at `.../events`                                                                                                                                                                                                                                                                             |
-| An endpoint to attempt a purchase  | Three calls, because a rush needs a queue: `POST /api/v1/sales/:saleId/queue` (join, get a ticket), `POST .../reservations` (hold one item), `POST .../purchases` (pay). **Buy Now** makes the first two; **Confirm purchase** makes the third                                                                                                                              |
-| An endpoint to check the outcome   | `GET /api/v1/sales/:saleId/purchases/me`: a purchase, a live hold, or nothing (for the shopper who is logged in)                                                                                                                                                                                                                                                            |
-| A simple React frontend            | `apps/flash-web`                                                                                                                                                                                                                                                                                                                                                            |
-| The frontend shows the sale status | the status badge, a sentence for what the shopper can do now, the window and the items left; it follows the sale live ([`specs/apps/flash/web/behaviours/sale/status.feature`](specs/apps/flash/web/behaviours/sale/status.feature))                                                                                                                                        |
-| A way to enter a user identifier   | log in or sign up with a user name. A password is added so one shopper cannot buy as another ([decision 007](docs/explanation/decisions/007-accounts-and-cookie-sessions.md), [`account/login.feature`](specs/apps/flash/web/behaviours/account/login.feature))                                                                                                             |
-| A Buy Now button, and feedback     | **Buy Now** and **Confirm purchase**; the page says "You got it! Your purchase is confirmed." with the Purchase ID, "You already bought an item.", "The sale has ended." or "Sold out. No items are left." ([`sale/buying.feature`](specs/apps/flash/web/behaviours/sale/buying.feature), [`sale/checking.feature`](specs/apps/flash/web/behaviours/sale/checking.feature)) |
-| A system diagram                   | below; the C4 views are in [specs/apps/flash/c4](specs/apps/flash/c4/README.md)                                                                                                                                                                                                                                                                                             |
-| Unit and integration tests         | next to the code; the apps add Gherkin scenarios bound at unit, integration and end-to-end level (see [Tests](#tests))                                                                                                                                                                                                                                                      |
-| Stress tests                       | `apps/flash-load` (see [Load test](#load-test))                                                                                                                                                                                                                                                                                                                             |
+- **The sale.** A start and an end time are set per sale. There is one product with a limited stock, and at most one
+  item per shopper.
+- **The API.** A status endpoint (`GET /api/v1/sales/current`). An attempt to buy in three calls: join the queue, hold
+  one item, pay. An endpoint that tells a shopper whether they got an item (`GET /api/v1/sales/:saleId/purchases/me`).
+- **The page.** A React page in `apps/flash-web` with the status, a login, **Buy Now** and a sentence for each outcome.
+- **The rest.** The system diagram is [below](#how-a-purchase-works). The tests are under [Tests](#tests), and the
+  stress tests under [Load test](#load-test).
 
 ## How a purchase works
 
@@ -415,6 +409,7 @@ is larger than the herd. Each of these, with its numbers, is in [what the load r
 
 ## Documentation
 
+- [REQUIREMENTS.md](REQUIREMENTS.md): what the system must do, what it adds, and what it leaves out, each with its proof.
 - [docs/](docs/README.md): tutorials (with a crash course on each tool and pattern), how-to guides, reference and explanations.
 - [specs/](specs/README.md): the apps' Gherkin behaviour scenarios and the C4 architecture. Specs win when they disagree with the docs.
 - [api-flash-be.http](api-flash-be.http) and [api-flash-web.http](api-flash-web.http): every route of the API and of the web server, one request each. [api-flash-demo.http](api-flash-demo.http): the demo, in order. All three are in the [kulala.nvim](https://github.com/wahidyankf/kulala.nvim) format.
