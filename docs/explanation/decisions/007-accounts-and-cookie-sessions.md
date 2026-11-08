@@ -6,7 +6,7 @@ Accepted. A shopper signs up with a user name and a password, and a login is two
 
 ## Context
 
-The brief only asks for "a user identifier". The first design used a name that anyone could type. Then anyone could read
+The task only asks for "a user identifier". The first design used a name that anyone could type. Then anyone could read
 the place, the hold or the purchase of another shopper, and the operator routes were guarded by one shared token.
 
 ## Decision
@@ -15,11 +15,11 @@ the place, the hold or the purchase of another shopper, and the operator routes 
 - A session is two cookies: `access_token` (15 minutes, path `/`) and `refresh_token` (7 days, path `/auth`, used once).
   Replaying an old refresh token ends the session. Only SHA-256 hashes of tokens are stored, in Postgres, with Redis as a cache.
 - No route takes a user id. The shopper is the session (`/queue/me`, `/purchases/me`). Cookies are `SameSite=Lax`, and `Secure` when `COOKIE_SECURE` is true.
-- The identifier of the brief is still there: it is the user name.
+- The identifier of the task is still there: it is the user name.
 
 ## Alternatives considered
 
-- **A plain user name, no password.** It matches the brief, but it lets anyone act as anyone, and it gives the audit columns nothing real to point at.
+- **A plain user name, no password.** It matches the task, but it lets anyone act as anyone, and it gives the audit columns nothing real to point at.
 - **One shared token for operators.** It cannot say who changed a sale.
 - **A signed JWT as the access token.** A replayed refresh token must end the session, which needs server state anyway,
   and a copied JWT cannot be revoked before it ends.

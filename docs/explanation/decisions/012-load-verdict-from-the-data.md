@@ -6,7 +6,7 @@ Accepted. The load runner decides pass or fail from Postgres and Redis after k6 
 
 ## Context
 
-The brief asks for stress tests. A client sees only replies, and a reply can be lost or wrong. An oversell, or a shopper who
+The task asks for stress tests. A client sees only replies, and a reply can be lost or wrong. An oversell, or a shopper who
 bought twice, may never show in what k6 saw. The claim of the project is that the data stays right.
 
 ## Decision

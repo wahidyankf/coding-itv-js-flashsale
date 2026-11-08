@@ -6,7 +6,7 @@ Accepted. The payment provider is a mock in the API process. The rules around it
 
 ## Context
 
-The brief is about the sale, not about money. But paying is the step that must be safe to repeat and safe to fail, and
+The task is about the sale, not about money. But paying is the step that must be safe to repeat and safe to fail, and
 the load test needs a payment that is slow like a real one.
 
 ## Decision

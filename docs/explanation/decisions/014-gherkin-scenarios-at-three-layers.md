@@ -6,7 +6,7 @@ Accepted. Behaviour is written once as a scenario, then bound at unit, integrati
 
 ## Context
 
-The brief asks for unit tests, integration tests and stress tests. A contract such as "a shopper who already bought cannot
+The task asks for unit tests, integration tests and stress tests. A contract such as "a shopper who already bought cannot
 buy again" is worth proving where a fake can lie (unit), against real stores (integration) and in a real browser or over
 HTTP (end-to-end). The three proofs must not drift apart.
 

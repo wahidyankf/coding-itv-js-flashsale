@@ -6,7 +6,7 @@ Accepted. Redis decides fast who gets an item. Postgres refuses any sale that br
 
 ## Context
 
-The brief says stock is limited and "must never be oversold", and a user may buy one item. Hundreds of shoppers can ask
+The task says stock is limited and "must never be oversold", and a user may buy one item. Hundreds of shoppers can ask
 for the last items in the same moment. The rule must hold even if the fast path is wrong or empty.
 
 ## Decision

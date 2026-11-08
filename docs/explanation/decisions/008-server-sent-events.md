@@ -6,7 +6,7 @@ Accepted. The page follows the sale and its queue place over Server-Sent Events 
 
 ## Context
 
-The brief wants a page that shows the sale status. In a flash sale thousands of pages are open, and shoppers wait for
+The task wants a page that shows the sale status. In a flash sale thousands of pages are open, and shoppers wait for
 "open now" and for the items left. A page that asks every second makes every shopper send a request every second.
 
 ## Decision

@@ -7,7 +7,7 @@ Accepted. A Redis outage makes the sale slower and less fair. It does not stop t
 ## Context
 
 Redis is a fast gate, not the source of truth. A flash sale is the worst time to lose it, and Redis is one instance here.
-The brief wants the stock never oversold, and says nothing about what to do when a store fails.
+The task wants the stock never oversold, and says nothing about what to do when a store fails.
 
 ## Decision
 

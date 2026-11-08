@@ -17,7 +17,7 @@ the other options, and link to those pages.
 - [004-hexagon-in-the-api-only.md](004-hexagon-in-the-api-only.md) - `flash-be` is a hexagon, and `flash-web` stays a plain React app.
 - [005-failures-as-values.md](005-failures-as-values.md) - failures are `Result` values, and product code has no `catch`.
 - [006-browser-talks-to-web-server-only.md](006-browser-talks-to-web-server-only.md) - the browser calls only its own web server, which passes on an allow-list.
-- [007-accounts-and-cookie-sessions.md](007-accounts-and-cookie-sessions.md) - accounts with passwords and two-cookie sessions, though the brief asks only for a user identifier.
+- [007-accounts-and-cookie-sessions.md](007-accounts-and-cookie-sessions.md) - accounts with passwords and two-cookie sessions, though the task asks only for a user identifier.
 - [008-server-sent-events.md](008-server-sent-events.md) - the page follows the sale over Server-Sent Events, not polling or WebSockets.
 - [009-in-process-mock-payment.md](009-in-process-mock-payment.md) - the payment is a mock in the process, with real idempotency, refund and retry rules.
 - [010-one-sale-at-a-time.md](010-one-sale-at-a-time.md) - the current sale is the running one, else the next to open, and windows may not overlap.

@@ -4,8 +4,8 @@ A flash sale sells a small stock of one product to a large crowd in a short time
 thousands of shoppers press **Buy Now** in the same second. This project sells through that rush and keeps two promises
 whatever happens: it never sells more than the stock, and it never sells one shopper more than one item.
 
-It answers a take-home brief with a REST API, a React page, tests at three levels and a load test that checks the data
-after each run. Everything runs on one laptop with Node.js and Docker.
+It was written in a coding interview setting. It answers the interview task with a REST API, a React page, tests at
+three levels and a load test that checks the data after each run. Everything runs on one laptop with Node.js and Docker.
 
 ## Start here
 
@@ -44,11 +44,11 @@ These words have a fixed meaning in the code, the docs and the API.
 | soft delete         | a removal sets `deleted_at` and `deleted_by` instead of erasing the row, so nothing is lost and the row says who removed it                                                                                                          |
 | scenario and layer  | a behaviour is written once as a Gherkin scenario (Given, When, Then) and bound, that is run as a test, at three layers: unit (in memory), integration (with Postgres and Redis, or a fake API) and end-to-end (the running servers) |
 
-## What the brief asks for, and where it is
+## What the task asks for, and where it is
 
-Each line of the brief, and the code or scenario that answers it.
+Each line of the interview task, and the code or scenario that answers it.
 
-| The brief asks for                 | Where it is                                                                                                                                                                                                                                                                                                                                                                 |
+| The task asks for                 | Where it is                                                                                                                                                                                                                                                                                                                                                                 |
 | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | A configurable start and end time  | `sales.starts_at` and `ends_at`. Set them with `POST /admin/sales` (absolute times, needs an operator login) or with the seed command (minutes from now). `PATCH` and `DELETE /admin/sales/:saleId` change and remove a sale                                                                                                                                                |
 | One product, limited stock         | `sales.stock`, with `UPDATE ... WHERE sold < stock` and `CHECK (sold <= stock)` in Postgres                                                                                                                                                                                                                                                                                 |
@@ -238,9 +238,9 @@ the other options that were weighed and when to look at it again. Longer explana
 | Microservices                            | One API holds every rule of one sale; a split would add network calls and a distributed transaction on the hot path                                        | Teams that ship separately, or parts that scale very differently    |
 | An ORM                                   | The guards are a few exact SQL statements (`WHERE sold < stock`, the unique indexes); Kysely keeps them visible and typed                                  | Many more tables with plain CRUD                                    |
 | An admin page                            | An operator needs only a few calls, and they are in the API with tests and in `api-flash-be.http`                                                          | Operators who are not developers                                    |
-| A real payment                           | The brief does not ask for one; the mock keeps the hard parts real: charge once, refund on a lost race, retry on a decline                                 | Real money; then the provider's idempotency keys replace the mock's |
-| Password reset, e-mail check, two-factor | The brief asks only for a user identifier; the password is there so one shopper cannot buy as another                                                      | Real shoppers' accounts                                             |
-| Several sales at once                    | The brief has one product and one sale; one current sale keeps the queue and the page simple ([010](docs/explanation/decisions/010-one-sale-at-a-time.md)) | A shop with many products on sale at the same time                  |
+| A real payment                           | The task does not ask for one; the mock keeps the hard parts real: charge once, refund on a lost race, retry on a decline                                 | Real money; then the provider's idempotency keys replace the mock's |
+| Password reset, e-mail check, two-factor | The task asks only for a user identifier; the password is there so one shopper cannot buy as another                                                      | Real shoppers' accounts                                             |
+| Several sales at once                    | The task has one product and one sale; one current sale keeps the queue and the page simple ([010](docs/explanation/decisions/010-one-sale-at-a-time.md)) | A shop with many products on sale at the same time                  |
 
 ## How it scales, and where it stops
 

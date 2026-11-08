@@ -6,7 +6,7 @@ Accepted. The current sale is the one running, else the next to open. Windows of
 
 ## Context
 
-The brief sells one product in limited quantity inside one configurable window. The page and the queue need to know which
+The task sells one product in limited quantity inside one configurable window. The page and the queue need to know which
 sale "now" means. If two sales could run together, "current" would be a guess.
 
 ## Decision
@@ -20,7 +20,7 @@ sale "now" means. If two sales could run together, "current" would be a guess.
 ## Alternatives considered
 
 - **Several sales at once.** The data would allow it, because every Redis key and table row has the sale id. But the page,
-  the "current" endpoint and the queue timer would need a choice of sale. The brief does not ask for it.
+  the "current" endpoint and the queue timer would need a choice of sale. The task does not ask for it.
 - **"The sale that opens last" as current.** A later sale would take the page from the one that is running.
 - **A database exclusion constraint on the window.** It would make the rule absolute, but many fixtures and the seed
   command create overlapping sales on purpose. They would need to change first.

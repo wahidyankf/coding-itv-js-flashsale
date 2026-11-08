@@ -6,7 +6,7 @@ Accepted. A purchase is three calls (join the queue, hold an item, pay), not one
 
 ## Context
 
-The brief asks for "an endpoint to attempt a purchase". A flash sale gets most of its traffic in the first seconds, the
+The task asks for "an endpoint to attempt a purchase". A flash sale gets most of its traffic in the first seconds, the
 stock is small, and payment is slow and can fail (the mock takes 150 ms and declines 2 percent by default). A shopper must
 never be charged for an item that is gone.
 

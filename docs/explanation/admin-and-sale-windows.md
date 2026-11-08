@@ -6,12 +6,12 @@ the sales, why a started sale is limited, and where the rules stop.
 
 ## What is for sale
 
-The brief sells one type of product in limited quantity, and each user may buy one unit. In the code:
+The task sells one type of product in limited quantity, and each user may buy one unit. In the code:
 
 - A sale sells one product, a row of the `products` table, with `stock` units. A product can have many sales over time
   (`sales.product_id`). `POST /admin/sales` takes an optional `productId`; without it, the sale gets the product of that
   `name`, which is made when there is none.
-  There is no product CRUD and no price: the brief needs neither.
+  There is no product CRUD and no price: the task needs neither.
 - One user gets one unit and holds one item at a time in a sale. The tables keep it with `UNIQUE(sale_id, user_id)` on
   reservations and on purchases, and Redis keeps a set of buyers in front of them.
 - A user is a row of the `users` table with a user name and a password hash. The name is trimmed and lowercased
@@ -79,7 +79,7 @@ The routes need a session whose account has the role `operator`. A request witho
 
 ## Windows may not overlap
 
-The brief sells one product at a time, and "the current sale" is the one that is running, or the next one to open. Two
+The task sells one product at a time, and "the current sale" is the one that is running, or the next one to open. Two
 overlapping sales would make "current" a guess. So the API refuses a window that overlaps another sale with
 `409 sale_overlaps`, on create and on change. A sale may open at the moment another one closes. A sale that is scheduled
 for later does not take the place of the one that is running.

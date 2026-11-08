@@ -6,7 +6,7 @@ sale is kept this way and how the code uses both. The official docs teach the re
 
 ## Why this repo uses them
 
-**The problem.** The brief says the stock must never be oversold, and a shopper may buy one item. Hundreds of shoppers
+**The problem.** The task says the stock must never be oversold, and a shopper may buy one item. Hundreds of shoppers
 can ask for the last items in the same moment, and Redis, the fast gate in front, can be wrong, empty or down. Something
 must refuse a bad sale whatever Redis said.
 
