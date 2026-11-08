@@ -8,5 +8,9 @@
 		"sourceMap": false
 	},
 	"include": ["src/**/*.ts"],
-	"exclude": ["src/**/*_tests.ts", "src/**/*_integration_tests.ts"]
+	"exclude": [
+		"src/**/*_tests.ts",
+		"src/**/*_integration_tests.ts",
+		"src/bdd/**"
+	]
 }
