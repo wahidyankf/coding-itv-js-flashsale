@@ -1,8 +1,9 @@
 // Unit tests for the proxy: which routes pass, which POSTs are refused as cross-site, which headers and cookies move, the
-// request id, and the line logged when the API cannot be reached.
+// request id, the line logged when the API cannot be reached, and an event stream that ends when the server stops.
 import { isUuid } from "@flash/flash-commons";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { isAllowed, isCrossSite, proxyToBackend } from "./proxy";
+import { proxiedStreams } from "./stream-closer";
 
 const ENV = { FLASH_BE_URL: "http://flash-be.test" };
 const ID = "11111111-1111-4111-8111-111111111111";
@@ -466,5 +467,33 @@ describe("the request id", () => {
 			cause: "fetch failed",
 		});
 		expect(line).not.toContain("secret");
+	});
+});
+
+describe("an event stream from the API", () => {
+	it("ends cleanly when this server stops, instead of holding the stop until it is cut", async () => {
+		let cancelled = false;
+		const events = new ReadableStream<Uint8Array>({
+			start(controller) {
+				controller.enqueue(new TextEncoder().encode("event: sale\n\n"));
+			},
+			cancel() {
+				cancelled = true;
+			},
+		});
+		const reply = await proxyToBackend(
+			new Request(`http://web.test/api/v1/sales/${ID}/events`),
+			ENV,
+			async () =>
+				new Response(events, {
+					headers: { "content-type": "text/event-stream" },
+				}),
+		);
+		const reader = reply.body?.getReader();
+		await reader?.read();
+		const pending = reader?.read();
+		proxiedStreams.endAll();
+		expect((await pending)?.done).toBe(true);
+		expect(cancelled).toBe(true);
 	});
 });

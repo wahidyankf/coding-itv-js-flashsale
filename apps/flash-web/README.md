@@ -15,7 +15,10 @@ src/
   api-paths.ts       BROWSER_ROUTES: the method and path pairs the browser may reach, in order, from API_PATHS in
                      @flash/flash-commons (no operator route)
   proxy.ts           checks a request against BROWSER_ROUTES, refuses a POST from another site, passes it on to flash-be
-                     unchanged, and keeps only some headers
+                     unchanged, keeps only some headers, and writes the caller's address and a new request id
+  stream-closer.ts   the proxied event streams, kept so they can be ended when the server stops
+  server-plugins/    Nitro runtime plugins, listed in vite.config.ts; end-streams.ts ends the proxied event streams
+                     on SIGTERM or SIGINT, so a restart cuts no stream
   api.ts             what the app knows about the API: header names, the error shape, and callApi, which decodes
                      every reply with the decoder its caller names (the decoders sit next to the view types)
   web-api.ts         the one set of clients the page uses, sharing a fetch that renews the login

@@ -46,7 +46,8 @@ flowchart LR
 ## What it costs
 
 Each request has one more hop. The server streams the answer back as it arrives, so event streams are not buffered and
-a stream closes upstream when the browser leaves. The extra hop shows up in latency, not in correctness. The web server
+a stream closes upstream when the browser leaves. When the web server stops, it ends each stream itself, so a
+restart cuts none and the page opens its streams again. The extra hop shows up in latency, not in correctness. The web server
 is stateless, so more copies can run behind a load balancer.
 
 ## What the page does

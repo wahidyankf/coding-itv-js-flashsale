@@ -1,4 +1,5 @@
 // Server only. The web server's proxy. It checks browser requests under /api, passes them to flash-be, and streams the answer back.
+// An event stream goes through stream-closer.ts, so it ends cleanly when this server stops.
 // Only the routes the browser needs get through, each with one method. A POST must come from this site, and the address of flash-be stays on the server.
 // Each request gets a request id here, which the API, nginx and the browser all see, so one request can be traced.
 // Decision: docs/explanation/decisions/006-browser-talks-to-web-server-only.md.
@@ -8,6 +9,7 @@ import { attempt, attemptAsync } from "@flash/typekit";
 import { RETRY_AFTER_HEADER, TICKET_HEADER } from "./api";
 import { BROWSER_ROUTES, routePattern } from "./api-paths";
 import { buildConfig } from "./config";
+import { proxiedStreams } from "./stream-closer";
 
 // The routes the browser may reach, each with its one method, built from the table in api-paths.ts. Operator routes are
 // not in the table.
@@ -157,7 +159,8 @@ export async function proxyToBackend(
 		for (const cookie of upstream.headers.getSetCookie()) {
 			returned.append("set-cookie", cookie);
 		}
-		return new Response(upstream.body, {
+		// An event stream is tracked, so it ends cleanly when this server stops instead of being cut.
+		return new Response(proxiedStreams.bodyOf(upstream), {
 			status: upstream.status,
 			headers: returned,
 		});
