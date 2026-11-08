@@ -2,11 +2,11 @@
 
 ## Layers
 
-| Layer       | Where the tests are                                                                                            | Needs                                                                                                            | Runs in                                       |
-| ----------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| Unit        | `apps/<app>/src/**/*_tests.ts(x)` and `apps/<app>/src/bdd/*_tests.ts(x)`; `apps/flash-load/scripts/*_tests.ts` | nothing                                                                                                          | `test:unit`, `test:quick`, pre-push           |
-| Integration | `apps/<app>/src/**/*_integration_tests.ts(x)`                                                                  | `flash-be`: the dev stack (`npx nx db:up flash-be`); `flash-web`: nothing, it serves a fake `flash-be` over HTTP | `test:integration`, `test:coverage`, pre-push |
-| End-to-end  | `apps/<app>-e2e/steps/*.steps.ts` and the Playwright specs                                                     | the dev stack and the apps                                                                                       | `test:e2e`                                    |
+| Layer       | Where the tests are                                                                                                                                | Needs                                                                                                            | Runs in                                       |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| Unit        | `apps/<app>/src/**/*_tests.ts(x)` and `apps/<app>/src/bdd/*_tests.ts(x)`; `apps/flash-load/scripts/*_tests.ts` and `apps/flash-load/k6/*_tests.ts` | nothing                                                                                                          | `test:unit`, `test:quick`, pre-push           |
+| Integration | `apps/<app>/src/**/*_integration_tests.ts(x)`                                                                                                      | `flash-be`: the dev stack (`npx nx db:up flash-be`); `flash-web`: nothing, it serves a fake `flash-be` over HTTP | `test:integration`, `test:coverage`, pre-push |
+| End-to-end  | `apps/<app>-e2e/steps/*.steps.ts` and the Playwright specs                                                                                         | Docker: `test:e2e` starts the dev stack and migrates it, and Playwright builds and starts the apps               | `test:e2e`                                    |
 
 Only the apps use Gherkin. In an app, a **scenario binding** (`src/bdd/*_tests.ts(x)`) runs a scenario from [`specs/apps/flash/`](../../specs/apps/flash).
 Everything else is a **plain test** next to the code (`*_tests.ts(x)`): it guards a branch, a rule of structure or an
@@ -38,6 +38,8 @@ Run a target with `npx nx <target> <app>`, for example `npx nx test:coverage fla
 The 99% floor is on the combined run: unit and integration tests together. It covers lines, statements, functions,
 and branches. The gate is `npx nx test:coverage <app>`. It starts the dev stack, and the pre-push hook runs it for the
 affected apps.
+
+For `typekit` and `flash-commons` the floor is on their unit tests, and their `test:coverage` needs no Docker.
 
 Unit tests alone do not reach 99% for `flash-be`, because the database code is covered by integration tests. So
 `test:unit` reports coverage without a floor.

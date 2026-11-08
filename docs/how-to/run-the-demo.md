@@ -56,10 +56,10 @@ Open [`api-flash-demo.http`](../../api-flash-demo.http) and send requests 1 to 2
 The reply to request 8 has only the id. To show the row that stayed:
 
 ```bash
-docker compose -f compose.dev.yaml exec postgres psql -U flash -d flash -c "SELECT s.name, s.deleted_at, u.username AS deleted_by FROM sales s JOIN users u ON u.id = s.deleted_by ORDER BY s.deleted_at DESC LIMIT 1"
+npm run demo:deleted-sale
 ```
 
-It prints `Demo sale for later`, the time and `ops`.
+It reads the last removed sale from Postgres and prints `Demo sale for later`, the time and `ops`.
 
 This buys the second item, so one is left. Requests 26 to 30 go through the web server: the browser reaches only a
 fixed list of routes, the operator routes answer `404`, and a `POST` from another site answers `403 cross_site`.
@@ -91,8 +91,8 @@ npm run demo:load
 
 It takes a few minutes. It starts its own stack (three API instances behind nginx on port 8088), so it does not touch
 the demo. 500 shoppers go for 20 items, and the runner then checks the data in Postgres and Redis. It exits `0` and
-prints a table where every check passes: no oversell, no shopper bought twice, k6 and Postgres agree, and the shopper
-who floods the queue gets `429`. The same table is written to `generated-reports/load/smoke.md`, so you can open it
+prints a table where every check passes: no oversell, no shopper bought twice, k6 and Postgres agree, and the shoppers
+who flood the queue get `429`. The same table is written to `generated-reports/load/smoke.md`, so you can open it
 while the audience looks. The rows are explained in [the load test reference](../reference/load-test.md).
 
 ## Afterwards

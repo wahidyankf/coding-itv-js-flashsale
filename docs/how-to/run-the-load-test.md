@@ -11,8 +11,9 @@ npx nx load:smoke flash-load
 
 The runner builds the API image, starts the stack, seeds a sale, runs k6, checks Postgres and Redis, and then removes the
 stack and its data. It exits with `0` when every check passed and `1` when one failed. Pass `--keep` to leave the stack
-up for a look: `npm run load:smoke --workspace flash-load -- --keep`. Stop it later with
-`docker compose -f apps/flash-load/compose.yaml down -v`.
+up for a look: `npm run load:smoke --workspace flash-load -- --keep`. That npm script does not build the libraries, so
+run the Nx target once first (or `npx nx build flash-commons`). Stop the stack and delete its data later with
+`npm run load:down`.
 
 The other profiles are `load:full`, `load:chaos`, `load:burst` and `load:contention`. What each one sends is in the
 [profile table](../reference/load-test.md#profiles).

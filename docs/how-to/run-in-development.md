@@ -56,7 +56,7 @@ Check that the API is up and sees both stores:
 curl localhost:8080/ready    # {"status":"ok","checks":{"database":"ok","redis":"ok"}}
 ```
 
-The apps read `.env` at start. Restart an app after you change it. The values are explained in [`.env.example`](../../.env.example); the
+`flash-be` reads `.env` at start. Restart it after you change it. The values are explained in [`.env.example`](../../.env.example); the
 ones you may want to change while you work are `PAYMENT_FAILURE_RATE` (set it to `0` so no payment is declined),
 `PAYMENT_LATENCY_MS` and `SALE_CACHE_MS`.
 
@@ -68,8 +68,8 @@ npx nx test:unit:watch flash-web    # only the unit tests
 npx nx test:integration flash-be    # needs the data stores above
 ```
 
-The watch targets keep running and test again when you save a file. They need a terminal: without one (in CI or a
-script), Vitest runs the tests once and exits. `git push` runs the full set of checks (see [test layers and coverage](../reference/test-layers-and-coverage.md)).
+The watch targets keep running and test again when you save a file. Without a terminal (in CI or a script),
+`test:unit:watch` runs the tests once and exits, and `test:quick:watch` keeps waiting for changes. `git push` runs the full set of checks (see [test layers and coverage](../reference/test-layers-and-coverage.md)).
 To try requests by hand, use [`api-flash-be.http`](../../api-flash-be.http) and [`api-flash-web.http`](../../api-flash-web.http) in Neovim with
 [kulala.nvim](https://github.com/wahidyankf/kulala.nvim), or `curl`; every route is in
 [HTTP endpoints](../reference/http-endpoints.md).

@@ -58,21 +58,23 @@ curl localhost:8080/ready                # {"status":"ok","checks":{"database":"
 
 ## 3. Make the first operator and a sale
 
-Nobody can sign up as an operator, so make the first one inside an API container. Choose your own password:
+Nobody can sign up as an operator, so make the first one inside an API container. `prod:create-operator` runs
+`node dist/create-operator.js` in `flash-be-1` and passes on what follows `--`. Choose your own password:
 
 ```bash
-docker compose -f compose.prod.yaml exec flash-be-1 node dist/create-operator.js --username=ops --password='<a long password>'
+npm run prod:create-operator -- --username=ops --password='<a long password>'
 ```
 
 Then create sales through the API with that login (`POST /api/v1/admin/sales`, see [seed a sale](seed-a-sale.md)), or seed one
 that starts now:
 
 ```bash
-docker compose -f compose.prod.yaml exec flash-be-1 node dist/seed-sale.js --stock=5 --duration-minutes=60
+npm run prod:seed-sale -- --stock=5 --duration-minutes=60
 ```
 
 The first prints `created operator ops`, the second `seeded sale <id>`. Open <http://localhost:3000>: the page shows the
-sale, and a shopper can sign up and buy.
+sale, and a shopper can sign up and buy. Over plain HTTP this works only with `COOKIE_SECURE=false` in `.env` (see
+step 1).
 
 ## 4. Put HTTPS in front
 

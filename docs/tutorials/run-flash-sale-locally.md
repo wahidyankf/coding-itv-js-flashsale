@@ -97,7 +97,8 @@ Open <http://localhost:3000>. The page shows **Flash Sale**, the status **On sal
    password of at least 8 characters (for example `a long password`), and press **Sign up**. You are logged in at once and
    the page says **Signed in as ana**. The login is two cookies that the browser keeps; the page never sees the tokens.
    If the page says the name is taken, choose another name: the e2e tests use `ana` and `ben` in the same database.
-2. Press **Buy Now**. The shopper is let in at once, because nobody is waiting. The page says **An item is held for you.
+2. Press **Buy Now**. The shopper is let in within about a second, at the next admission tick, because nobody
+   is ahead. The page says **An item is held for you.
    Confirm within 60 seconds.** (the hold time you seeded) and the seconds count down.
 3. Press **Confirm purchase**. The page says **You got it! Your purchase is confirmed.**, shows the **Purchase ID** (the
    id of the purchase row), and **Items left** drops to 2.

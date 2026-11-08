@@ -27,16 +27,16 @@ code, for a developer. A `500` never says what failed; the cause goes to the log
 | GET    | `/api/v1/sales/:saleId/queue/me/events` | Postgres, Redis    | event stream of a place; needs a login and `x-queue-ticket` |
 | POST   | `/api/v1/sales/:saleId/reservations`    | Postgres, Redis    | `201` on a new hold, `200` when the user already holds one  |
 | POST   | `/api/v1/sales/:saleId/purchases`       | Postgres, Redis    | `201` on a new purchase, `200` when it was already paid     |
-| GET    | `/api/v1/sales/:saleId/purchases/me`    | Postgres           | "did I get it?": a purchase, a live hold, or nothing        |
+| GET    | `/api/v1/sales/:saleId/purchases/me`    | Postgres, Redis    | "did I get it?": a purchase, a live hold, or nothing        |
 | POST   | `/api/v1/auth/register`                 | Postgres, Redis    | makes a shopper account and logs it in (`201`)              |
 | POST   | `/api/v1/auth/login`                    | Postgres, Redis    | checks the password and sets the two cookies                |
 | POST   | `/api/v1/auth/refresh`                  | Postgres, Redis    | trades the refresh token for a new pair                     |
 | POST   | `/api/v1/auth/logout`                   | Postgres, Redis    | ends the session and clears the cookies                     |
 | GET    | `/api/v1/auth/me`                       | Postgres, Redis    | who the cookie says you are                                 |
-| POST   | `/api/v1/admin/sales`                   | Postgres           | operator only; needs the login of an operator               |
-| GET    | `/api/v1/admin/sales`                   | Postgres           | operator only; every sale, the one that opens last first    |
-| PATCH  | `/api/v1/admin/sales/:saleId`           | Postgres           | operator only; changes a sale (see the rules below)         |
-| DELETE | `/api/v1/admin/sales/:saleId`           | Postgres           | operator only; removes a sale that has no purchase          |
+| POST   | `/api/v1/admin/sales`                   | Postgres, Redis    | operator only; needs the login of an operator               |
+| GET    | `/api/v1/admin/sales`                   | Postgres, Redis    | operator only; every sale, the one that opens last first    |
+| PATCH  | `/api/v1/admin/sales/:saleId`           | Postgres, Redis    | operator only; changes a sale (see the rules below)         |
+| DELETE | `/api/v1/admin/sales/:saleId`           | Postgres, Redis    | operator only; removes a sale that has no purchase          |
 
 Every route under `/api/v1/sales/:saleId` that writes or reads a shopper's own state needs a login (see
 [Accounts and login](#accounts-and-login)). The shopper is the account the cookie belongs to, so no route takes a user id
@@ -52,7 +52,7 @@ All bodies are JSON. Dates are ISO strings.
 | `GET /ready`                                                                                                | `{ "status": "ok" \| "unavailable", "checks": { "database": "ok" \| "error", "redis": "ok" \| "error" } }`                                   |
 | `GET /api/v1/sales/current`, `GET /api/v1/sales/:saleId`                                                    | `{ "id", "productId", "name", "status", "startsAt", "endsAt", "stock", "remaining" }` (a `SaleView`)                                         |
 | `POST /api/v1/sales/:saleId/queue`                                                                          | `{ "userId", "ticket", "state": "waiting", "place" }` or `{ "userId", "ticket", "state": "admitted" }`                                       |
-| `GET /api/v1/sales/:saleId/queue/me`                                                                        | `{ "userId", "state": "waiting", "place" }`, `{ "userId", "state": "admitted" }` or `{ "userId", "state": "absent" }`                        |
+| `GET /api/v1/sales/:saleId/queue/me`                                                                        | `{ "userId", "state": "waiting", "place" }` or `{ "userId", "state": "admitted" }`; a lost place is `404` `not_in_queue`                     |
 | `POST /api/v1/sales/:saleId/reservations`                                                                   | `{ "userId", "reservationId", "expiresAt" }`                                                                                                 |
 | `POST /api/v1/sales/:saleId/purchases`                                                                      | `{ "userId", "purchaseId", "reservationId", "purchasedAt" }`                                                                                 |
 | `GET /api/v1/sales/:saleId/purchases/me`                                                                    | `{ ...purchase, "state": "purchased" }`, `{ "userId", "state": "holding", "reservationId", "expiresAt" }` or `{ "userId", "state": "none" }` |
@@ -99,7 +99,7 @@ address and the user agent of the login. Why it is built this way is in [authent
 | Status | `errorCode`             | When                                                                                      |
 | ------ | ----------------------- | ----------------------------------------------------------------------------------------- |
 | `400`  | `invalid_user`          | sign-up only: the user name is missing or does not match the rule above                   |
-| `400`  | `invalid_password`      | the password is missing or has fewer than 8 or more than 128 characters                   |
+| `400`  | `invalid_password`      | sign-up only: the password is missing or has fewer than 8 or more than 128 characters     |
 | `401`  | `invalid_credentials`   | the name or the password is wrong (the same answer for both, so a name cannot be guessed) |
 | `401`  | `invalid_refresh_token` | the refresh cookie is missing, expired or already used; the cookies are cleared           |
 | `401`  | `not_authenticated`     | the route needs a login and the access cookie is missing or has ended                     |
@@ -156,8 +156,8 @@ server never passes the operator routes on, so they are reached on the API port 
 ```json
 {
 	"stock": 100,
-	"startsAt": "2026-06-01T12:00:00.000Z",
-	"endsAt": "2026-06-01T13:00:00.000Z"
+	"startsAt": "2035-01-01T12:00:00.000Z",
+	"endsAt": "2035-01-01T13:00:00.000Z"
 }
 ```
 
@@ -306,7 +306,8 @@ The scenarios are in [`specs/apps/flash/be/behaviours/purchase/`](../../specs/ap
 
 ## A shopper's path
 
-The three reads (`queue/me`, `purchases/me` and the place stream) report where the shopper is on this path.
+The three reads (`queue/me`, `purchases/me` and the place stream) report where the shopper is on this path. `queue/me`
+reports a lost place as `404` `not_in_queue`; only the place stream sends `absent`.
 
 ```mermaid
 stateDiagram-v2
@@ -343,7 +344,7 @@ The scenarios are in [`specs/apps/flash/be/behaviours/events/`](../../specs/apps
 
 The three write routes (`POST .../queue`, `POST .../reservations` and `POST .../purchases`) count each request against
 the user who is logged in and against the client address. Reads are not limited. The `/api/v1/admin` routes are counted by address only, before the login is read, so a wrong guess is
-counted too. The `/api/v1/auth` write routes have a limit of their own per address (`AUTH_RATE_LIMIT_PER_IP`, 20), so a crowd that signs up does not use the sale limit up, and a password cannot be guessed at speed. When either count passes its limit in
+counted too. The `/api/v1/auth` write routes have a limit of their own per address (`AUTH_RATE_LIMIT_PER_IP`, 20), so a crowd that signs up does not spend the sale's limit, and a password cannot be guessed at speed. When either count passes its limit in
 the current window, the answer is `429` `rate_limited`, with `retryAfterSeconds` in the body and a `Retry-After` header that
 holds the same number of seconds (at least 1). The window starts at
 the first request, not at a fixed clock tick. The limits are `RATE_LIMIT_PER_USER` (30), `RATE_LIMIT_PER_IP` (600) and
@@ -362,13 +363,13 @@ The scenarios are in [`specs/apps/flash/be/behaviours/degraded/`](../../specs/ap
 
 ## flash-web (port 3000)
 
-| Method    | Path              | Response                                                                                                                                              |
-| --------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| GET       | `/`               | HTML page. It shows the current sale, a login form or Buy Now, and `Backend: ok` when `flash-be` answers `GET /health` with `{"status":"ok"}`.        |
-| GET       | `/api/health`     | `200` `{"status":"ok"}`                                                                                                                               |
-| GET, POST | `/api/v1/sales/*` | The routes below, passed on to `flash-be`. Any other `GET` or `POST` under this path answers `404` with `errorCode` `not_found`.                      |
-| GET, POST | `/api/v1/auth/*`  | The login routes below, passed on to `flash-be`, with the cookies.                                                                                    |
-| any       | `/api/*`          | Any other path under `/api`, such as an old path without `/v1` or an operator route: `404` with `errorCode` `not_found`, and `flash-be` is not asked. |
+| Method                   | Path              | Response                                                                                                                                         |
+| ------------------------ | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| GET                      | `/`               | HTML page. It shows the current sale, a login form or Buy Now, and `Backend: ok` when `flash-be` answers `GET /health` with `{"status":"ok"}`.   |
+| GET                      | `/api/health`     | `200` `{"status":"ok"}`                                                                                                                          |
+| GET, POST                | `/api/v1/sales/*` | The routes below, passed on to `flash-be`. Any other `GET` or `POST` under this path answers `404` with `errorCode` `not_found`.                 |
+| GET, POST                | `/api/v1/auth/*`  | The login routes below, passed on to `flash-be`, with the cookies.                                                                               |
+| GET, POST, PATCH, DELETE | `/api/*`          | Any other path under `/api`, such as a path without `/v1` or an operator route: `404` with `errorCode` `not_found`, and `flash-be` is not asked. |
 
 ### The sale routes
 

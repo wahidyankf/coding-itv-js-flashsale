@@ -18,9 +18,9 @@ npm run demo:load    # builds the load images once, and writes generated-reports
 ```
 
 `demo:load` takes a few minutes. Running it the day before builds the images, so the live run is shorter, and it leaves a
-report you can show if the live run cannot finish. Then follow [before the audience arrives](run-the-demo.md#before-the-audience-arrives)
-once, all the way to the end, so the names `ana` and `ben` and the sale are in the state the demo expects. On the day,
-start again from `npm run demo:reset` and `npm run demo:setup`.
+report you can show if the live run cannot finish. Then run the whole demo once, end to end, as a rehearsal,
+starting from [before the audience arrives](run-the-demo.md#before-the-audience-arrives). On the day, start again from
+`npm run demo:reset` and `npm run demo:setup`, so the names `ana` and `ben` are free and the sale has 3 items again.
 
 Keep these open in tabs: [REQUIREMENTS.md](../../REQUIREMENTS.md), the [README](../../README.md) (the diagram), the
 [decision records](../explanation/decisions/README.md), and [what the load runs found](../explanation/load-test-findings.md).

@@ -149,8 +149,8 @@ Total: 156 tests in 20 files
 ```
 
 Open `.features-gen/queue/joining.feature.spec.js` to see each Gherkin line turned into a call such as
-`await When('"ana" joins the queue', null, { request })`. To run a suite, use `npx nx test:e2e flash-be-e2e`, which
-starts the dev stack itself, or `npx nx test:e2e flash-web-e2e` after `npx nx db:up flash-be`. How to bind a step is in
+`await When('"ana" joins the queue', null, { request })`. To run a suite, use `npx nx test:e2e flash-be-e2e` or
+`npx nx test:e2e flash-web-e2e`; each starts the dev stack itself. How to bind a step is in
 [add a behaviour](../../how-to/add-a-behaviour.md#4-bind-the-end-to-end-layer).
 
 ## Traps to avoid

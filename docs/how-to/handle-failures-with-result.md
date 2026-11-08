@@ -39,7 +39,7 @@ type ReserveResult = Result<Reserved, ReserveError>;
 Return early on the failure, then use the value:
 
 ```ts
-const reserved = await service.reserve(saleId, userId, ticket);
+const reserved = await service.reserve(saleId, user, ticket);
 if (reserved.isErr()) {
 	return reply.code(ERROR_STATUS[reserved.error]).send(errorPayload(reserved.error));
 }
@@ -82,4 +82,5 @@ npx nx run-many -t lint -p flash-be flash-web typekit
 npm run lint:rules:test
 ```
 
-The lint fails on a `catch` clause or a `.catch(` call in `apps/*/src` and `libs/*/src`. Tests and `src/bdd` are exempt.
+The lint fails on a `catch` clause or a `.catch(` call in `apps/*/src` and `libs/*/src`. Tests, `src/bdd` and `libs/typekit/src/boundary.ts` (the one
+catch behind `attempt`) are exempt.
