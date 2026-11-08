@@ -161,7 +161,8 @@ server never passes the operator routes on, so they are reached on the API port 
 }
 ```
 
-`name` (default `Flash sale`), `productId` (a product that exists; default: a product made from `name`),
+`name` (default `Flash sale`), `productId` (a product that exists; default: the product with that `name`, made if there
+is none),
 `holdSeconds` (default `120`) and `admitPerSecond` (default `50`) are optional. The reply is `201` with the new sale
 (`SaleView`).
 
@@ -365,7 +366,7 @@ The scenarios are in [`specs/apps/flash/be/behaviours/degraded/`](../../specs/ap
 | --------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | GET       | `/`            | HTML page. It shows the current sale, a login form or Buy Now, and `Backend: ok` when `flash-be` answers `GET /health` with `{"status":"ok"}`. |
 | GET       | `/api/health`  | `200` `{"status":"ok"}`                                                                                                                        |
-| GET, POST | `/api/sales/*` | The routes below, passed on to `flash-be`. Anything else under this path answers `404` with `errorCode` `not_found`.                           |
+| GET, POST | `/api/sales/*` | The routes below, passed on to `flash-be`. Any other `GET` or `POST` under this path answers `404` with `errorCode` `not_found`.               |
 | GET, POST | `/api/auth/*`  | The login routes below, passed on to `flash-be`, with the cookies.                                                                             |
 
 ### The sale routes
@@ -438,7 +439,8 @@ stack over plain HTTP.
 
 Three files at the root hold requests in the [kulala.nvim](https://github.com/wahidyankf/kulala.nvim) format. A request
 named with `# @name` keeps its reply, so later requests read the sale id, the ticket and the reservation id from it, and
-a `Shared` block attaches kulala's cookie jar to every request, so a login is kept.
+a `Shared` block attaches kulala's cookie jar to every request, so a login is kept. To send them, open a file in Neovim
+with the kulala.nvim plugin installed.
 
 | File                                               | What it holds                                                           |
 | -------------------------------------------------- | ----------------------------------------------------------------------- |
@@ -446,5 +448,5 @@ a `Shared` block attaches kulala's cookie jar to every request, so a login is ke
 | [`api-flash-web.http`](../../api-flash-web.http)   | every route the web server passes on, and what it refuses               |
 | [`api-flash-demo.http`](../../api-flash-demo.http) | the demo story in order (see [run the demo](../how-to/run-the-demo.md)) |
 
-The operator account is made first with `npx nx db:create-operator flash-be` or `npm run demo:setup` (see
-[seed a sale](../how-to/seed-a-sale.md)).
+The operator account is made first with `npx nx db:create-operator flash-be --username=<name> --password=<password>`
+or `npm run demo:setup`, which makes `ops` (see [seed a sale](../how-to/seed-a-sale.md)).

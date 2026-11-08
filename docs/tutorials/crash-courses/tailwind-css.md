@@ -27,6 +27,7 @@ and scrollbars follow the system theme. There is no `tailwind.config` file: Tail
 ```css
 @import "tailwindcss";
 
+/* Form controls and scrollbars follow the system theme; the classes in the components handle the rest. */
 @layer base {
 	:root {
 		color-scheme: light dark;
@@ -97,10 +98,15 @@ follows the same attribute a screen reader reads.
 
 ## Try it here
 
-Start the page, then ask Vite for the stylesheet it built from the classes in the components:
+Start the page and keep it running. Skip this if `npm run demo:dev` already serves it on port 3000:
 
 ```bash
 npx nx dev flash-web
+```
+
+In a second terminal, ask Vite for the stylesheet it built from the classes in the components:
+
+```bash
 curl 'localhost:3000/src/styles.css?direct'
 ```
 
@@ -116,7 +122,7 @@ The output starts with the version, and each prefix becomes a media query (trimm
     .dark\:border-amber-400\/30 {
 ```
 
-`sm:` is `40rem`, `md:` is `48rem` and `lg:` is `64rem`. Stop the dev page with Ctrl+C when you are done.
+`sm:` is `40rem`, `md:` is `48rem` and `lg:` is `64rem`. Stop the dev page with Ctrl+C when you are done, if you started it.
 
 ## Traps to avoid
 

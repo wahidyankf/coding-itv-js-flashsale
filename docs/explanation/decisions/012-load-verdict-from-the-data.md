@@ -23,7 +23,7 @@ bought twice, may never show in what k6 saw. The claim of the project is that th
 - **k6 thresholds only.** They judge what the client saw. They cannot see an extra row in `purchases`.
 - **Checks through the API after the run.** They can be wrong in the same way the API can, so they are not independent.
 - **Looser limits, or a pass for speed on a laptop.** That would hide a finding. The `burst` and `contention` speed limits
-  fail on the author's machine, and the README says so.
+  did not hold in most runs on the author's machine, and the README says so.
 
 ## Consequences
 

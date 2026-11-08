@@ -33,7 +33,7 @@ and may change with an upgrade. Doc comments have no Biome rule, so `swe-reviewe
 ```
 
 `biome check` runs both, plus the `organizeImports` assist. `npm run lint` is `biome check --error-on-warnings .`, so a
-warning fails too. The apps' own `lint` targets run `biome lint` only, without the formatter.
+warning fails too. The `lint` targets of the apps and libraries run `biome lint` only, without the formatter.
 
 ### The rules this repo turns into errors
 
@@ -61,8 +61,8 @@ and the e2e apps, where a literal is the expected value. The reasons are in
 
 ### A GritQL plugin: no `catch` in product code
 
-Biome has no built-in rule for `catch`, so [`.biome/no-catch.grit`](../../../.biome/no-catch.grit) matches the pattern
-and reports it:
+Biome has no built-in rule for `catch`, so [`.biome/no-catch.grit`](../../../.biome/no-catch.grit) matches each form of
+`try ... catch` and each `.catch(` call, and reports it. One of its patterns:
 
 ```text
 `try { $_ } catch { $_ }` as $c where {
@@ -77,8 +77,8 @@ config and checks that the plugin and the exhaustive switch rule still fire.
 
 ### Markdown is formatted too
 
-`biome check .` formats the Markdown files as well. `files.includes` skips `.claude/`, because the Markdown formatter
-would break the YAML frontmatter of the agent files.
+`biome check .` checks the format of the Markdown files as well, and `biome format --write` fixes it.
+`files.includes` skips `.claude/`, because the Markdown formatter would break the YAML frontmatter of the agent files.
 
 ## Try it here
 

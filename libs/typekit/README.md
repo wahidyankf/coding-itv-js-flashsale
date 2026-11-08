@@ -9,7 +9,7 @@ It is a workspace package used by `flash-be`, `flash-web`, `flash-be-e2e`, `flas
 with `npx nx build typekit`; the apps' Nx targets do that for you.
 
 ```ts
-import { attempt, attemptAsync, Err, Ok, type Result } from "@flash/typekit";
+import { attempt } from "@flash/typekit";
 
 const parse = (text: string) =>
 	attempt(() => JSON.parse(text) as number, SyntaxError);

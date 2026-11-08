@@ -10,7 +10,7 @@ flowchart LR
   operator["Operator<br/>person"]
   system["Flash sale<br/>software system"]
   shopper -->|browses over HTTP| system
-  operator -->|health, creates sales| system
+  operator -->|health, manages sales| system
   classDef person fill:#0173B2,stroke:#000000,color:#FFFFFF
   classDef software fill:#DE8F05,stroke:#000000,color:#000000
   classDef default fill:#808080,stroke:#000000,color:#000000

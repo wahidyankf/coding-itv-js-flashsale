@@ -44,8 +44,8 @@ Every `.feature` file must be linked from the `README.md` next to it. The check 
 
 ## 2. Bind the unit layer
 
-Every scenario needs a unit binding. Add it to `apps/flash-be/src/bdd/<area>_tests.ts`. The title must match the
-scenario title exactly:
+Every scenario needs a unit binding. Add it to a test file in `apps/flash-be/src/bdd/` named for the area and the
+feature file, such as `health_tests.ts` or `queue_joining_tests.ts`. The title must match the scenario title exactly:
 
 ```ts
 describeFeature(
@@ -59,8 +59,9 @@ describeFeature(
 ```
 
 When the unit and integration layers run the same steps, write the steps once in
-`apps/flash-be/src/bdd/support/bind-<area>.ts`. A binder takes a function that builds the layer's world and returns
-one step function per scenario. Each test file then names the scenarios and passes the steps in, as
+`apps/flash-be/src/bdd/support/bind-<area>-<feature>.ts`, such as `bind-queue-joining.ts`. A binder takes what the
+layer gives it (a function that builds the layer's world, or a `ShopLayer` for the queue features) and returns one step
+function per scenario. Each test file then names the scenarios and passes the steps in, as
 `queue_joining_tests.ts` does:
 
 ```ts
@@ -89,7 +90,8 @@ npx nx test:unit flash-be
 
 ## 3. Bind the integration layer
 
-Unless the scenario is tagged `@integration-exempt`, bind it in `apps/flash-be/src/bdd/<area>_integration_tests.ts`.
+Unless the scenario is tagged `@integration-exempt`, bind it in the matching `*_integration_tests.ts` file, such as
+`apps/flash-be/src/bdd/queue_joining_integration_tests.ts`.
 Integration tests use the real Postgres and Redis from the dev stack. Start the stack first:
 
 ```bash

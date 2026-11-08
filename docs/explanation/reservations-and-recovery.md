@@ -55,7 +55,7 @@ counter that can drift away from the truth.
 
 Redis answers fast, but it can be lost. So every new hold is also written to the `reservations` table, and a purchase is
 written to `purchases`. The database has the last word: a sale cannot sell more than its stock (a `CHECK`), and a user
-can buy once per sale (a unique constraint). If the write to Postgres fails, the hold is removed from Redis again, so a
+can buy once per sale (a unique index on `(sale_id, user_id)` over the rows that are not deleted). If the write to Postgres fails, the hold is removed from Redis again, so a
 hold never exists only in Redis.
 
 ## When an operator changes the sale

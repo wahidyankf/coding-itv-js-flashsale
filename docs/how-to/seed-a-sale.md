@@ -27,8 +27,8 @@ seeded sale ea6856b4-0cee-40c5-9cc9-deb80867039a
 | `--admit-per-second`  | users let in from the queue each second        | `50`         |
 
 A bad value stops the command with a message and exit code `1`, and nothing is written. For example, `--stock=0`
-fails with `stock must be a positive integer`. A name of only spaces, or a window that ends past the dates Postgres
-keeps, fails with `the sale is not usable: its name, window or holds are out of range`.
+fails with `stock must be a positive integer`. A name of only spaces or of more than 120 characters, or a window too far
+in the future to be a date, fails with `the sale is not usable: its name, window or holds are out of range`.
 
 ## Read it back
 
@@ -38,7 +38,12 @@ Start the API (`npx nx dev flash-be`), then:
 curl -s http://localhost:8080/sales/current
 ```
 
-The body is described in [HTTP endpoints](../reference/http-endpoints.md#the-sale).
+The body is described in [HTTP endpoints](../reference/http-endpoints.md#the-sale). If another sale is running too,
+`/sales/current` shows the one that started first. Read the new sale by the id the command printed instead:
+
+```bash
+curl -s http://localhost:8080/sales/<id>
+```
 
 The scenarios for this command are in
 [`specs/apps/flash/be/behaviours/sale/seeding.feature`](../../specs/apps/flash/be/behaviours/sale/seeding.feature).
@@ -52,7 +57,9 @@ because nobody can become one through the API (the password has 8 to 128 charact
 npx nx db:create-operator flash-be --username=ops --password=correct-horse-battery
 ```
 
-In the production image the same command is `node dist/create-operator.js --username ops --password "..."`.
+It prints `created operator ops`. If `ops` is already there (the demo makes it), it prints `the user ops already exists`;
+log in with it as below. In the production image the same command is
+`node dist/create-operator.js --username ops --password "..."`.
 
 Then log in. `-c` saves the cookies in a file and `-b` sends them back:
 
@@ -64,12 +71,19 @@ curl -s -b cookies.txt -X POST http://localhost:8080/admin/sales \
   -d '{"stock":100,"startsAt":"2030-01-01T12:00:00Z","endsAt":"2030-01-01T13:00:00Z"}'
 ```
 
-The login cookies last 15 minutes; `POST /auth/refresh` with the same cookie file renews them. The local `.env.example` sets
-`COOKIE_SECURE=false`, because a `Secure` cookie is not sent over plain HTTP.
+The access cookie lasts 15 minutes. To renew it, send the refresh cookie and save the new cookies in the same file
+(`-b` and `-c`), because a refresh token works only once:
 
-The reply is `201` with the sale. A window that overlaps another sale is refused with `409` `sale_overlaps`. The seed
-command above does not check this, so it can still create overlapping sales; the API is the safe way to set up a real
-sale. See [admin and sale windows](../explanation/admin-and-sale-windows.md).
+```bash
+curl -s -b cookies.txt -c cookies.txt -X POST http://localhost:8080/auth/refresh
+```
+
+The local `.env.example` sets `COOKIE_SECURE=false`, because a `Secure` cookie is not sent over plain HTTP.
+
+The reply is `201` with the sale. A window that overlaps another sale is refused with `409` `sale_overlaps`. If a sale
+already uses that hour (you ran this before, or the request in the root `README.md`), pick another day in `startsAt` and
+`endsAt`. The seed command above does not check overlaps, so it can still create overlapping sales; the API is the safe
+way to set up a real sale. See [admin and sale windows](../explanation/admin-and-sale-windows.md).
 
 ## Change, list or remove a sale
 

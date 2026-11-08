@@ -59,7 +59,8 @@ Check the message of the last commit, as the commit-msg hook would:
 npx --no -- commitlint --from HEAD~1
 ```
 
-It prints nothing and exits `0` when the message passes. Now give it a message that breaks the rule:
+When the message passes, commitlint prints nothing and exits `0`. npm may still print its own `npm notice run ...`
+lines first. Now give it a message that breaks the rule:
 
 ```bash
 echo "added stuff" | npx --no -- commitlint

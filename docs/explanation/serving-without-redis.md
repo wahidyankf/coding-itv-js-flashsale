@@ -13,7 +13,7 @@ request therefore learns within a few milliseconds that Redis is gone, and each 
 | Join the queue       | The shopper gets a valid ticket and is admitted at once. There is no line to wait in.                        |
 | Check the place      | A valid ticket is enough; the answer is `admitted`.                                                          |
 | Reserve              | Postgres decides alone (see below).                                                                          |
-| Confirm the purchase | Unchanged. It already works from Postgres. Telling Redis about the purchase is skipped.                      |
+| Confirm the purchase | Unchanged. It already works from Postgres. Telling Redis about the purchase fails at once and is ignored.    |
 | Log in and out       | Unchanged. Sessions are in Postgres; Redis only caches them, so each request reads Postgres for its session. |
 | Rate limits          | Each process counts in its own memory, so the limit stays on and grows with the number of processes.         |
 | `GET /ready`         | `503` with `redis: error`. The process still serves the other routes.                                        |
@@ -59,8 +59,8 @@ Redis may come back empty (a restart) or with its old data (a network break). Th
 - **Empty.** The `ready` key is missing, so the next reservation finds the gate not ready and one instance rebuilds
   it from Postgres. The rules for that rebuild are in [reservations and recovery](reservations-and-recovery.md#when-redis-loses-its-state).
 - **With old data.** Redis looks ready but it missed the holds and purchases that Postgres decided meanwhile. Every
-  failed Redis call marks the sale as stale in the process. The next reservation first deletes `ready`, which forces the
-  same rebuild.
+  failed call to the hold gate (a reserve, a release or a confirm) marks the sale as stale in the process. The next
+  reservation first deletes `ready`, which forces the same rebuild.
 
 The Postgres path also asks, under the sale lock, whether Redis is ready again. If it is, nothing is written there and the
 gate is used, so a rebuild and a degraded reservation can never both think they hold the last item.

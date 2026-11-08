@@ -49,6 +49,7 @@ Tests start only when the servers answer.
 				"npm --prefix ../flash-web run build && npm --prefix ../flash-web run start",
 			// Wait for the health route, so tests start only when the app is ready.
 			url: `${baseURL}/api/health`,
+			// The web server reaches flash-be through a forwarder that each scenario points where it needs.
 			env: { FLASH_BE_URL: FORWARDER_URL },
 			reuseExistingServer: !process.env.CI,
 ```
@@ -65,6 +66,7 @@ shared helpers (time, logins, the database) from `flash-be-e2e/steps/support/`; 
 ```ts
 const { After } = createBdd();
 
+// Every scenario cleans up what it started: its private API process and its scratch database.
 After(async () => {
 	await cleanup();
 });

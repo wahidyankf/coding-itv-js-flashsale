@@ -4,4 +4,4 @@ Scenarios for the schema: what the migrations build and what the database refuse
 
 ## Directory Map
 
-- [migrations.feature](migrations.feature) - the tables the migrations create and the constraints that stop overselling and repeat buyers.
+- [migrations.feature](migrations.feature) - the tables and audit columns the migrations create, the system user, migrating a database that has data, and the constraints that stop overselling and repeat buyers.

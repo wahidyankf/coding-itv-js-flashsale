@@ -110,8 +110,8 @@ Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `fla
 
 - Use TDD: write a failing test, make it pass with the least code, then refactor. Run the test first to see it fail.
 - Unit tests sit next to the source as `*_tests.ts` or `*_tests.tsx`. Integration tests are
-  `*_integration_tests.ts(x)` with their own Vitest config. They need the dev compose stack
-  (`npx nx db:up flash-be`) and are not part of `test:quick`.
+  `*_integration_tests.ts(x)` with their own Vitest config. Those of `flash-be` need the dev compose stack
+  (`npx nx db:up flash-be`); those of `flash-web` serve a fake `flash-be` over HTTP. They are not part of `test:quick`.
 - Vitest globals are off. Call `cleanup` in `afterEach` when rendering components.
 - Choose the kind of test by one question: if this breaks, does a shopper or an operator see the difference? If yes, write
   a Gherkin scenario in `specs/apps/flash/` (behaviour that is part of the contract: HTTP, queue, hold, payment). If only a developer cares (a branch, a rule of

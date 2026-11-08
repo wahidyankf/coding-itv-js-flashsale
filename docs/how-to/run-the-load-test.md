@@ -25,7 +25,7 @@ instances shared the work.
 
 ## If a check fails
 
-Read the k6 log in the same folder first. A failed limit is a finding: record the real numbers, find the cause, and fix
+Read the k6 log (`<profile>-k6.log`) in the same folder first. A failed limit is a finding: record the real numbers, find the cause, and fix
 the system. Do not change a limit in [`profiles.ts`](../../apps/flash-load/k6/profiles.ts) to make a run pass.
 
 The numbers of each profile are in [reference: load test](../reference/load-test.md), and the limits and checks in

@@ -43,7 +43,7 @@ describe("who may reserve", () => {
 ```ts
 		include: ["src/**/*_integration_tests.ts"],
 		fileParallelism: false,
-		// Creates an empty Postgres database for this run and drops it at the end.
+		// A fresh database per run keeps runs apart. global-setup.ts drops it at the end.
 		globalSetup: ["./src/bdd/support/global-setup.ts"],
 ```
 
@@ -131,8 +131,8 @@ failure.
 - **Unit coverage is not the gate.** `test:unit` reports coverage with no floor, because the database code of
   `flash-be` is covered only by the integration tests. Run `test:coverage` before you trust the number.
 - **A fake that shares rows lies.** `fakeRepository` in
-  [`fake-sales.ts`](../../../apps/flash-be/src/bdd/support/fake-sales.ts) returns copies, "as a database does: a cache
-  must not see later changes to the stored row". Without the copy a cache test passes that fails against Postgres.
+  [`fake-sales.ts`](../../../apps/flash-be/src/bdd/support/fake-sales.ts) returns copies, "as the database does, so a cache
+  never sees a later change to a stored row". Without the copy a cache test passes that fails against Postgres.
 - **A memory store must follow its real store.** `memoryHoldGate` follows the Redis script "so one scenario gives the
   same reply in both layers". If it drifts, the unit layer proves a rule the product does not have.
 - **Integration runs touch a shared server.** The global setup makes a new database for each run and empties only

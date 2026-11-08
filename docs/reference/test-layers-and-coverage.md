@@ -2,11 +2,11 @@
 
 ## Layers
 
-| Layer       | Where the tests are                                                      | Needs                                                                                                            | Runs in                                       |
-| ----------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| Unit        | `apps/<app>/src/**/*_tests.ts(x)` and `apps/<app>/src/bdd/*_tests.ts(x)` | nothing                                                                                                          | `test:unit`, `test:quick`, pre-push           |
-| Integration | `apps/<app>/src/**/*_integration_tests.ts(x)`                            | `flash-be`: the dev stack (`npx nx db:up flash-be`); `flash-web`: nothing, it serves a fake `flash-be` over HTTP | `test:integration`, `test:coverage`, pre-push |
-| End-to-end  | `apps/<app>-e2e/steps/*.steps.ts` and the Playwright specs               | the dev stack and the apps                                                                                       | `test:e2e`                                    |
+| Layer       | Where the tests are                                                                                            | Needs                                                                                                            | Runs in                                       |
+| ----------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| Unit        | `apps/<app>/src/**/*_tests.ts(x)` and `apps/<app>/src/bdd/*_tests.ts(x)`; `apps/flash-load/scripts/*_tests.ts` | nothing                                                                                                          | `test:unit`, `test:quick`, pre-push           |
+| Integration | `apps/<app>/src/**/*_integration_tests.ts(x)`                                                                  | `flash-be`: the dev stack (`npx nx db:up flash-be`); `flash-web`: nothing, it serves a fake `flash-be` over HTTP | `test:integration`, `test:coverage`, pre-push |
+| End-to-end  | `apps/<app>-e2e/steps/*.steps.ts` and the Playwright specs                                                     | the dev stack and the apps                                                                                       | `test:e2e`                                    |
 
 Only the apps use Gherkin. In an app, a **scenario binding** (`src/bdd/*_tests.ts(x)`) runs a scenario from `specs/apps/flash/`.
 Everything else is a **plain test** next to the code (`*_tests.ts(x)`): it guards a branch, a rule of structure or an
@@ -59,7 +59,9 @@ Every scenario in `specs/apps/flash/` must be bound at the unit layer. It must a
 layers, unless it carries an exemption tag. `npm run bdd:check` checks this without running any tests. It fails when:
 
 - a scenario has no unit binding, or a binding names no scenario;
+- a scenario without `@integration-exempt` has no integration binding, or a scenario with it is still bound there;
 - an exemption tag has no comment directly above it, or the comment is malformed;
+- an exemption tag is on the `Feature` line, or is not one of the two tags below;
 - the alternative proof names a scenario that is not bound at its layer;
 - an end-to-end step matches no step definition, or a step definition matches no step;
 - a feature file is not linked from the `README.md` in its folder;

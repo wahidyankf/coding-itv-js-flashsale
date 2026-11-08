@@ -38,6 +38,7 @@ const client = createClient({
 	socket: { reconnectStrategy: reconnectStrategy(Math.random) },
 });
 // Without a listener, a dropped socket emits an unhandled 'error' and exits the process.
+// The client reconnects on its own.
 client.on("error", (err) => console.error("redis:", err.message));
 await client.connect();
 ```

@@ -59,7 +59,7 @@ Six checks.
    `docs/reference/http-endpoints.md`, and the `.http` files.
 4. **Test design.** Each test sits at its layer, as `docs/explanation/scenario-or-plain-test.md` decides: a scenario for
    what a shopper or an operator would notice, a plain Vitest test next to the code for a detail. Unit tests are
-   `*_tests.ts`, integration tests `*_integration_tests.ts`. A double behaves like the adapter it replaces; test data
+   `*_tests.ts(x)`, integration tests `*_integration_tests.ts(x)`. A double behaves like the adapter it replaces; test data
    does not leak between tests; coverage is never bought with a test that asserts nothing.
 5. **Test-first evidence.** New or changed behaviour has a test, and a recorded red and green wherever the work kept
    them. Behaviour shipped with no test is a finding.

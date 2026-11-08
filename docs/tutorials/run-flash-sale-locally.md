@@ -37,7 +37,8 @@ The output ends with the two containers, `flash-dev-postgres-1` and `flash-dev-r
 npx nx db:migrate flash-be
 ```
 
-Nx reports `1 task: 1 succeeded`. The migration command prints nothing when the schema is already current.
+The command prints one line for each migration it applies, such as `0001_create_products: Success`, and nothing when
+the schema is already current. Nx ends with `Successfully ran target db:migrate for project flash-be`.
 
 ## 5. Start the API
 
@@ -75,6 +76,10 @@ curl -s localhost:8080/sales/current
 
 The body shows `"status":"active"`, `"stock":3` and `"remaining":3`.
 
+On a database you used before, you may see another sale here. When two sales run at once, the one that started first is
+the current one, and the seed command does not check for overlaps. Wait until that sale ends, or start from empty data
+as [the demo](../how-to/run-the-demo.md) does.
+
 ## 7. Start the web app
 
 Run this in a third terminal and leave it running:
@@ -91,13 +96,14 @@ Open <http://localhost:3000>. The page shows **Flash Sale**, the status **On sal
 1. The page shows **Log in to buy** instead of the buying buttons. Choose **I am new**, type `ana` in **Username** and a
    password of at least 8 characters (for example `a long password`), and press **Sign up**. You are logged in at once and
    the page says **Signed in as ana**. The login is two cookies that the browser keeps; the page never sees the tokens.
+   If the page says the name is taken, choose another name: the e2e tests use `ana` and `ben` in the same database.
 2. Press **Buy Now**. The shopper is let in at once, because nobody is waiting. The page says **An item is held for you.
    Confirm within 60 seconds.** (the hold time you seeded) and the seconds count down.
 3. Press **Confirm purchase**. The page says **You got it! Your purchase is confirmed.**, shows the **Purchase ID** (the
    id of the purchase row), and **Items left** drops to 2.
 4. Press **Buy Now** again. The page says **You already bought an item.** One shopper can buy one item.
-5. Press **Log out**, choose **I am new** and sign up as `ben` to see a shopper who has nothing: the page says **You
-   have no purchase and no hold.** after **Check my status**.
+5. Press **Log out**, choose **I am new** and sign up as `ben` (any password of at least 8 characters) to see a shopper
+   who has nothing: the page says **You have no purchase and no hold.** after **Check my status**.
 
 A wrong password says **Wrong name or password.**, and a name that is taken says **That name is taken. Choose another
 one.** If your login ends while the page is open (the access cookie lasts 15 minutes and the page renews it by itself),
@@ -123,6 +129,9 @@ npm run docker:dev:down
 ```
 
 ## Next steps
+
+- For the daily loop (reload, tests in watch mode, the data), read [how-to: run in development](../how-to/run-in-development.md).
+  To run everything in containers, read [how-to: run in production](../how-to/run-in-production.md).
 
 - To learn the tools and patterns the code is built with, read the [crash courses](crash-courses/README.md).
 - To add a behaviour, read [how-to: add a behaviour](../how-to/add-a-behaviour.md).

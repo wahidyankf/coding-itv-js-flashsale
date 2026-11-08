@@ -47,3 +47,7 @@ The steps write the API's paths, headers, error codes and expected statuses them
 npx nx test:quick flash-be-e2e    # typecheck and lint
 npx nx test:e2e flash-be-e2e      # builds flash-be, needs Docker for Postgres and Redis
 ```
+
+Each scenario runs the built API in `apps/flash-be/dist`. Playwright builds it only when nothing answers on `:8080`. If
+the dev API runs there (for example from `npm run demo:dev`), Playwright uses it as is and does not build, so the
+scenarios run the last build, which may be old. Stop the dev servers first.

@@ -60,9 +60,9 @@ completion.
 
 ## Where Decision Records Live
 
-`docs/explanation/decisions/NNN-<slug>.md`, numbered from `001`. The first record also creates
-`docs/explanation/decisions/README.md` listing each record and links it from `docs/explanation/README.md`, because
-`npm run docs:check` requires every folder under `docs/` to have a README that links its children. Records follow the
+`docs/explanation/decisions/NNN-<slug>.md`, numbered after the last record there. Each new record gets a line in
+`docs/explanation/decisions/README.md`, because `npm run docs:check` requires every folder under `docs/` to have a
+README that links its children. Records follow the
 docs rules of `AGENTS.md`: Diátaxis explanation mode, plain English, and Mermaid diagrams with `accTitle`, `accDescr`,
 and the palette in `repo-config.yml`.
 

@@ -16,7 +16,7 @@ The folder tree, file by file, is in the [flash-be README](../../apps/flash-be/R
   `application/ports/`, named in the language of the sale: `HoldGate`, `QueueStore`, `PurchaseRepository`. The suffix says what a port is: a
   **Repository** is the Postgres record of a thing, a **Store** holds keyed state, and a **Gate** is the fast check in
   front of Postgres. Randomness is a port too (`TokenSource`), so the domain only takes values.
-- **Adapters.** Inbound adapters drive the application (HTTP, the seed command). Outbound adapters implement ports
+- **Adapters.** Inbound adapters drive the application (HTTP, and the `seed-sale` and `create-operator` commands). Outbound adapters implement ports
   (Postgres through Kysely, Redis scripts, an in-process rate counter, the mock payment, the system clock).
 
 ## One request through the layers

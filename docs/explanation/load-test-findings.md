@@ -84,13 +84,16 @@ the chaos run passed all 1,384 k6 checks. The check was not loosened.
 
 ## How the runs went
 
-| Profile | Stock sold     | Reserve p95 | Purchase p95 | Server errors |
-| ------- | -------------- | ----------- | ------------ | ------------- |
-| smoke   | 20 of 20       | 2.1 ms      | 156 ms       | 0             |
-| full    | 100 of 100     | 1.6 ms      | 156 ms       | 0             |
-| chaos   | 1,000 of 1,000 | 3.0 ms      | 155 ms       | 0             |
+| Profile | Stock sold     | Reserve p95   | Purchase p95    | Server errors |
+| ------- | -------------- | ------------- | --------------- | ------------- |
+| smoke   | 20 of 20       | 2.1 to 3.1 ms | 156 to 160 ms   | 0             |
+| full    | 100 of 100     | 1.6 to 3.7 ms | 156 to 160 ms   | 0             |
+| chaos   | 1,000 of 1,000 | 3.0 to 547 ms | 155 to 1,046 ms | 0             |
 
-The client and the servers share one machine, so treat the times as relative. The correctness checks are exact.
+The client and the servers share one machine, so treat the times as relative. The correctness checks are exact. The
+times move with whatever else the machine runs. The slowest chaos run (547 ms and 1,046 ms) ran while other test suites
+used the same CPUs; k6 then marked its speed thresholds as crossed and exited with code 99. Chaos judges only the data,
+so the run still passed, with every k6 check (1,402 of 1,402) and every data check green.
 
 ## Harness changes the first runs forced
 

@@ -60,8 +60,11 @@ const viaRedis = await attemptAsync(() => viaGate(request), Error);
 if (viaRedis.isOk() && viaRedis.value.isOk()) {
 	return { answer: viaRedis.value.value, written: false };
 }
+
 gate.markStale(request.saleId);
-const fallback = await repository.reserveWithoutGate(request, () => gate.isReady(request.saleId));
+const fallback = await repository.reserveWithoutGate(request, () =>
+	gate.isReady(request.saleId),
+);
 ```
 
 Other paths fall back too. The queue fails open: without Redis a shopper gets a valid ticket and is admitted
@@ -76,7 +79,9 @@ which takes a rebuild lock in Redis. The others poll with backoff, for at most t
 ```ts
 if (await gate.lockRebuild(saleId, REBUILD_LOCK_MS, owner)) {
 	try {
-		await repository.rebuild(saleId, clock(), (snapshot) => gate.restore(saleId, snapshot));
+		await repository.rebuild(saleId, clock(), (snapshot) =>
+			gate.restore(saleId, snapshot),
+		);
 	} finally {
 		await gate.unlockRebuild(saleId, owner);
 	}

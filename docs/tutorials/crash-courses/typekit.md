@@ -60,7 +60,9 @@ return result.isErr() ? sendError(reply, result.error) : onOk(result.value);
 return found.match({
 	ok: (sale): SaleLoad => ({ state: "ok", sale }),
 	err: (failure): SaleLoad =>
-		failure.errorCode === "sale_not_found" ? { state: "none" } : { state: "error" },
+		failure.errorCode === "sale_not_found"
+			? { state: "none" }
+			: { state: "error" },
 });
 ```
 

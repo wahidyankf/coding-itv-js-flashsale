@@ -1,6 +1,6 @@
 # Sale
 
-Scenarios for the sale itself: the status a shopper reads, how reads are cached, how an operator creates a sale from the command line or through the API, and how the operator changes, removes and lists sales.
+Scenarios for the sale itself: the status a shopper reads, how reads are cached, how the seed command and an operator (through the API) create a sale, and how the operator changes, removes and lists sales.
 
 ## Directory Map
 

@@ -97,7 +97,13 @@ functions over a `Phase` union, with no React, so a test just calls them.
 in `useState`, `useEffect` and `useCallback`, and returns the text from the pure part:
 
 ```ts
-return { phase, text: phaseText(phase, secondsLeft(phase, clock)), buy, confirm, check };
+return {
+	phase,
+	text: phaseText(phase, secondsLeft(phase, clock)),
+	buy,
+	confirm,
+	check,
+};
 ```
 
 ### Live streams in the browser
@@ -127,13 +133,13 @@ then Tailwind. Components are tested with Testing Library in jsdom, next to the 
 
 ## Try it here
 
-Start the page, and keep it running:
+Start the page, and keep it running. Skip this if `npm run demo:dev` already serves it on port 3000:
 
 ```bash
 npx nx dev flash-web
 ```
 
-In a second terminal, ask its server routes. The API was not running, so the proxy answers `502`:
+In a second terminal, ask its server routes:
 
 ```bash
 curl localhost:3000/api/health
@@ -141,14 +147,18 @@ curl localhost:3000/api/sales/current
 curl localhost:3000/api/sales/not-a-uuid
 ```
 
+The first and the last answer come from the web server itself. The second goes through the proxy to `flash-be`. With
+`flash-be` running, it is the current sale as JSON, or `404 sale_not_found` when there is none. With `flash-be` stopped, the proxy
+answers `502`:
+
 ```text
 {"status":"ok"}
 {"errorCode":"backend_unavailable","errorMessage":"The API could not be reached."}
 {"errorCode":"not_found","errorMessage":"Nothing was found at this address."}
 ```
 
-The home page still renders, and says `Backend: down`. Stop the dev page with Ctrl+C. Then run the pure rules and a
-component test from `apps/flash-web`:
+Without `flash-be`, the home page still renders, and says `Backend: down`. Stop the dev page with Ctrl+C if you started
+it. Then run the pure rules and a component test from `apps/flash-web`:
 
 ```bash
 cd apps/flash-web
@@ -159,15 +169,16 @@ npx vitest run --config vitest.config.ts src/sale/shopper_state_tests.ts src/com
  ✓ |unit| src/sale/shopper_state_tests.ts > secondsLeft > counts the seconds of a hold, rounding a part second up
  ✓ |unit| src/components/sale-time_tests.tsx > SaleTime > is first written in UTC, so the server and the browser agree
  Test Files  2 passed (2)
-      Tests  21 passed (21)
+      Tests  23 passed (23)
 ```
 
 ## Traps to avoid
 
 - **The refresh cookie path.** `flash-be` sets the refresh cookie for `/auth`, but the browser reaches it as `/api/auth`
   and would never send it back. `rewritePath` in [`proxy.ts`](../../../apps/flash-web/src/proxy.ts) moves it.
-- **A callback that changes every render.** `onLiveStopped` must be stable (`useCallback`), or the effect in
-  [`sale-page.tsx`](../../../apps/flash-web/src/sale-page.tsx) opens the stream again on every render.
+- **A callback that changes every render.** `stopLive`, which `useLiveSale` gets as `onStopped`, must be stable
+  (`useCallback`), or the effect in [`sale-page.tsx`](../../../apps/flash-web/src/sale-page.tsx) opens the stream again
+  on every render.
 - **Server and browser text that differ.** [`sale-time.tsx`](../../../apps/flash-web/src/components/sale-time.tsx)
   writes the time in UTC first, the same on both sides, and switches to local time in an effect.
 - **A stream that keeps failing.** [`sse.ts`](../../../apps/flash-web/src/sale/sse.ts) retries with backoff and jitter

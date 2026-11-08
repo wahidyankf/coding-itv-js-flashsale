@@ -35,3 +35,7 @@ locator here too.
 npx nx test:quick flash-web-e2e   # typecheck and lint
 npx nx test:e2e flash-web-e2e     # builds both apps; needs the dev stack up (npx nx db:up flash-be)
 ```
+
+Stop the dev servers on `:3000` and `:8080` first (for example `npm run demo:dev`). Playwright starts its own web server
+only when nothing answers on `:3000`. A dev web server that already runs there reaches `flash-be` directly, not through
+the forwarder, so the scenarios that cut or change the API fail.

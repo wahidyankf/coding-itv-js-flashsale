@@ -164,14 +164,15 @@ author. A deleted `$operator` row is also there: migration `0004` marked it dele
 
 - `users` has one row per account: a shopper who signed up, an operator made with `create-operator`, and `$system`.
   Everything else points to it to say who did something.
-- `products` has one row per thing for sale. A sale that is made without a product gets the live product of
-  that name, which is made when there is none.
+- `products` has one row per thing for sale. A sale that is made without a product gets the live product with
+  the sale's name, which is made when there is none.
 - `sales` has one row per sale of one product: its stock, its window, how many are sold, the hold time and the
   admission rate. A sale is running while `starts_at <= now < ends_at`.
 - `purchases` has one row per confirmed item, tied to the user and to the hold it paid for.
 - `reservations` has one row per hold. A row past `expires_at` counts as free, so no sweep job runs. A hold that is
   paid for or removed is marked deleted.
-- `sessions` has one row per login. A logout, a replayed refresh token or a refresh that comes too late marks it deleted.
+- `sessions` has one row per login. A logout or a replayed refresh token marks it deleted. A refresh that comes too late
+  is refused, and the row stays as it is.
 - `kysely_migration` and `kysely_migration_lock` belong to the migrator. They are not part of the model.
 
 ## Constraints
@@ -195,5 +196,6 @@ author. A deleted `$operator` row is also there: migration `0004` marked it dele
 ## Not in the database
 
 Redis holds the waiting queue, the hold gate, the rate counters and a short-lived copy of each live session (so a request
-does not read Postgres to check a login), under keys that start with `sale:<saleId>:`, `session:` or `ratelimit:`. It holds nothing
-that Postgres cannot rebuild, so it has no place in this diagram.
+does not read Postgres to check a login), under keys that start with `sale:<saleId>:`, `session:` or `ratelimit:`. Postgres can rebuild
+the gate and the sessions. The queue places and the rate counters may be lost, and the sale goes on without them (a
+shopper joins the queue again). So Redis has no place in this diagram.

@@ -7,12 +7,12 @@ is still a few routes and has no component view.
 ```mermaid
 flowchart LR
   accTitle: flash-be components
-  accDescr: The HTTP and command line adapters call the application services. The services use the domain model and call the ports. The Postgres, Redis, memory, payment and clock adapters implement the ports. The composition root chooses which adapter sits behind each port.
+  accDescr: The HTTP and command line adapters call the application services. The services use the domain model and call the ports. The Postgres, Redis, crypto, memory, payment and clock adapters implement the ports. The composition root chooses which adapter sits behind each port.
   http["HTTP adapter<br/>Fastify routes, SSE"]
   cli["CLI adapter<br/>seed and create-operator"]
   app["Application<br/>services and ports"]
   domain["Domain<br/>sale, hold, purchase rules"]
-  driven["Driven adapters<br/>Postgres, Redis, memory,<br/>payment, clock"]
+  driven["Driven adapters<br/>Postgres, Redis, crypto,<br/>memory, payment, clock"]
   root["Composition root<br/>main.ts, composition.ts"]
   pg[("Postgres 18<br/>data store")]
   redis[("Redis 8<br/>data store")]
@@ -43,22 +43,23 @@ flowchart LR
   reserving, paying, the rate limiter, the operator's sale service (create, change, remove, list), the auth service (sign up, log in, refresh, log out, and who a cookie is) and the admission step that serves the current sale. Its ports are in
   `application/ports/`: `SaleRepository`, `QueueStore`, `HoldGate`, `ReservationRepository`, `PurchaseRepository`,
   `RateLimitStore`, `Payment`, `Clock`, `SaleSeeder`, `SaleAdmin`, `AccountRepository`, `SessionRepository`, `PasswordHasher` and `TokenSource`.
-- **Domain** (`domain/`) holds the rules and imports nothing else: when a sale is upcoming, active, sold out or
+- **Domain** (`domain/`) holds the rules and does no I/O: when a sale is upcoming, active, sold out or
   ended, who may queue or reserve, how long a hold lives, how many shoppers one tick admits, what a user name, a
   password, a token and a role are, who is an operator, and whether a new sale has a usable window and overlaps another.
 - **Driven adapters** (`adapters/outbound/`) implement the ports. `postgres/` reads and writes the sales, holds,
   purchases, users and sessions and runs the migrations. `redis/` holds the gate script, the queue, the rate counters and
   the cache of live sessions. `crypto/` hashes passwords with scrypt and makes random tokens. `memory/` counts
   rate limits when Redis fails. `payment/` is the mock provider. `system/` reads the clock.
-- **Composition root** (`main.ts`, `composition.ts`) is the only place that picks an adapter for a port.
+- **Composition root** (`main.ts`, `composition.ts`) picks an adapter for each port of the API. The command entry
+  points `seed-sale.ts` and `create-operator.ts` pick their own. No other file does.
 
 ## Constraints
 
 - Postgres wins every disagreement with Redis. The constraints `sold <= stock` and one live purchase per user and sale are
   in the schema, so no part can break them.
 - Dependencies point inward. The domain imports nothing but Node built-ins, `@flash/typekit` and the main entry of `@flash/flash-commons` (both pure, no I/O; the timer helper on `/timers` is refused). The
-  application imports the domain and its own ports. An inbound adapter never imports an outbound adapter, and an outbound adapter imports only ports and the
-  domain. `apps/flash-be/src/architecture_tests.ts` fails the unit tests when an import breaks this.
+  application imports the domain and its own ports. An inbound adapter never imports an outbound adapter, and an outbound adapter takes nothing from the
+  application but its ports. No adapter imports the wiring (`composition.ts`, `config.ts`). `apps/flash-be/src/architecture_tests.ts` fails the unit tests when an import breaks this.
 - The same rules run against memory in unit tests, because the ports `QueueStore`, `HoldGate`,
   `ReservationRepository`, `PurchaseRepository`, `SaleAdmin`, `AccountRepository` and `SessionRepository` have in-memory copies in `src/bdd/support/`. They are
   test code. `RateLimitStore` has an in-memory adapter that product code also uses, when Redis fails, and `Payment` is

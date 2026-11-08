@@ -36,7 +36,7 @@ sequenceDiagram
 - The refresh token is used once. When a token that was already replaced comes back, the session is marked deleted, because
   someone holds a copy. The Redis copy of the access token is forgotten on every rotation and on logout, so a revoked
   token stops working at once rather than at the end of its cache time.
-- The cookies are `HttpOnly` and `SameSite=Lax`, and `Secure` in production. The refresh cookie is sent to `/auth` only.
+- The cookies are `HttpOnly` and `SameSite=Lax`, and `Secure` when `COOKIE_SECURE` is true (the default in production). The refresh cookie is sent to `/auth` only.
 
 ### The calls in full
 
@@ -49,7 +49,7 @@ WHERE "username" = $1 AND "deleted_at" IS NULL;
 INSERT INTO "sessions" ("user_id", "access_hash", "access_expires_at", "refresh_hash", "refresh_expires_at",
   "ip", "user_agent", "created_by")
 VALUES ($1, $2, $3, $4, $5, $6, $7, $1);
-UPDATE "users" SET "last_login_at" = $8 WHERE "id" = $1;
+UPDATE "users" SET "last_login_at" = now() WHERE "id" = $1;
 
 -- read the session by token hash (on a miss in Redis)
 SELECT "users"."id", "users"."username", "users"."role", "sessions"."access_expires_at"
@@ -58,12 +58,17 @@ WHERE "sessions"."access_hash" = $1 AND "sessions"."deleted_at" IS NULL
   AND "sessions"."access_expires_at" > $2 AND "users"."deleted_at" IS NULL;
 
 -- swap the pair (refresh): one transaction. The old refresh hash is kept in previous_refresh_hash.
-SELECT * FROM "sessions" WHERE "refresh_hash" = $1 AND "deleted_at" IS NULL FOR UPDATE;
+SELECT "id", "user_id", "access_hash", "refresh_expires_at" FROM "sessions"
+WHERE "refresh_hash" = $1 AND "deleted_at" IS NULL FOR UPDATE;
+-- a refresh_expires_at in the past is refused here, and the row stays as it is
 UPDATE "sessions" SET "access_hash" = $2, "access_expires_at" = $3, "previous_refresh_hash" = $1,
-  "refresh_hash" = $4, "refresh_expires_at" = $5, "updated_at" = now(), "updated_by" = "user_id"
-WHERE "id" = $6;
--- a refresh token that was already replaced (SELECT ... WHERE "previous_refresh_hash" = $1) ends its session
-UPDATE "sessions" SET "deleted_at" = now(), "deleted_by" = "user_id" WHERE "id" = $6;
+  "refresh_hash" = $4, "refresh_expires_at" = $5, "updated_at" = now(), "updated_by" = $6
+WHERE "id" = $7;  -- $6 is the session's user_id, $7 its id
+
+-- a refresh token that was already replaced: when the first SELECT finds no row, this one ends the session
+SELECT "id", "user_id", "access_hash" FROM "sessions"
+WHERE "previous_refresh_hash" = $1 AND "deleted_at" IS NULL FOR UPDATE;
+UPDATE "sessions" SET "deleted_at" = now(), "deleted_by" = $2 WHERE "id" = $3;  -- $2 is its user_id, $3 its id
 ```
 
 ```text
@@ -181,7 +186,7 @@ WHERE "sale_id" = $1 AND "user_id" = $2 AND "deleted_at" IS NULL;
 ```
 
 - The first `SELECT` locks the sale row, so shoppers who confirm take turns.
-- The second `SELECT` finds a repeated confirm by its reservation id, and the third finds a shopper who already bought.
+- The second `SELECT` finds a repeated confirm by its reservation id, and the fourth finds a shopper who already bought.
   Both end the transaction without a change.
 - The `UPDATE` changes no row when the stock is gone, and the `CHECK` on the table repeats that rule. In that case the
   transaction stops with `sold_out`.
@@ -219,7 +224,8 @@ The calls are those of the first flow. _check the hold_ is this statement, run b
 ```sql
 SELECT "reservations".*, "users"."username" FROM "reservations"
 INNER JOIN "users" ON "users"."id" = "reservations"."user_id"
-WHERE "reservations"."deleted_at" IS NULL AND "reservations"."sale_id" = $1 AND "users"."username" = $2;
+WHERE "reservations"."deleted_at" IS NULL AND "users"."deleted_at" IS NULL
+AND "reservations"."sale_id" = $1 AND "users"."username" = $2;
 ```
 
 _lock, count, insert_ is the purchase transaction above. _no item left_ is its `UPDATE ... WHERE sold < stock` that
@@ -248,6 +254,7 @@ sequenceDiagram
   A->>P: rebuild buyers and holds
   A->>R: restore and mark ready
   A->>R: gate script
+  A->>P: save the hold
   A-->>S: answer from the gate
 ```
 
@@ -280,12 +287,13 @@ DO UPDATE SET "id" = $5, "expires_at" = $6, "updated_at" = now(), "updated_by" =
 
 -- rebuild buyers and holds: one transaction, under the same lock
 SELECT * FROM "sales" WHERE "id" = $1 AND "deleted_at" IS NULL FOR UPDATE;
-SELECT "users"."username" FROM "purchases"
+SELECT "purchases".*, "users"."username" FROM "purchases"
 INNER JOIN "users" ON "users"."id" = "purchases"."user_id"
-WHERE "purchases"."sale_id" = $1 AND "purchases"."deleted_at" IS NULL;
-SELECT "users"."username", "reservations"."id", "reservations"."expires_at" FROM "reservations"
+WHERE "purchases"."deleted_at" IS NULL AND "users"."deleted_at" IS NULL AND "purchases"."sale_id" = $1;
+SELECT "reservations".*, "users"."username" FROM "reservations"
 INNER JOIN "users" ON "users"."id" = "reservations"."user_id"
-WHERE "reservations"."sale_id" = $1 AND "reservations"."deleted_at" IS NULL AND "reservations"."expires_at" > $2;
+WHERE "reservations"."deleted_at" IS NULL AND "users"."deleted_at" IS NULL
+AND "reservations"."sale_id" = $1 AND "reservations"."expires_at" > $2;
 ```
 
 - The `sold` of the locked row plus the count is compared with the stock. A shopper who already holds or bought gets

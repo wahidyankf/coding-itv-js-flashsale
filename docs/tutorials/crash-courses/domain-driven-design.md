@@ -46,7 +46,7 @@ Feature: Reserving an item
 and the domain type uses the same words ([`domain/reservation.ts`](../../../apps/flash-be/src/domain/reservation.ts)):
 
 ```ts
-// The hold one shopper has on one item of a sale.
+// The hold as the stores keep it. The purchase checks its id, and the rules check its end time.
 export type Reservation = {
 	saleId: string;
 	user: Username;

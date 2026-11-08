@@ -5,5 +5,5 @@ Scenarios for accounts and logins: how a shopper signs up and logs in, how the t
 
 ## Directory Map
 
-- [accounts.feature](accounts.feature) - `POST /auth/register`, `POST /auth/login` and `GET /auth/me`: names and passwords, and refusing what cannot be used.
-- [sessions.feature](sessions.feature) - `POST /auth/refresh` and `POST /auth/logout`: how a login ends, expires and is renewed, and which routes need a login.
+- [accounts.feature](accounts.feature) - `POST /auth/register` and `POST /auth/login`: names and passwords, refusing what cannot be used, and storing only hashes.
+- [sessions.feature](sessions.feature) - `GET /auth/me`, `POST /auth/refresh` and `POST /auth/logout`: who is logged in, how a login ends, expires and is renewed, and which routes need a login.

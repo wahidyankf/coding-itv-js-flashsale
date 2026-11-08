@@ -23,11 +23,16 @@ app copies the targets of another one.
 
 ### A command runner, nothing more
 
-[`nx.json`](../../../nx.json) is small. It names the default base branch and the two folders:
+[`nx.json`](../../../nx.json) is small. It names the default base branch and the two folders, and turns off Nx
+analytics:
 
 ```json
 "defaultBase": "main",
-"workspaceLayout": { "appsDir": "apps", "libsDir": "libs" }
+"workspaceLayout": {
+	"appsDir": "apps",
+	"libsDir": "libs"
+},
+"analytics": false
 ```
 
 There is no `@nx/*` package in [`package.json`](../../../package.json), and AGENTS.md forbids adding one or running `nx init`.

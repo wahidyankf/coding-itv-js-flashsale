@@ -20,12 +20,13 @@ src/
     inbound/http/        app.ts (Fastify), errors.ts (error codes, statuses, sentences), headers.ts, cookies.ts,
                          sale-view.ts (the sale as a reply shows it), event-stream.ts
       routes/            one file per area: auth, health, sales, queue, reservations, purchases, admin;
-                         guards.ts, reply.ts and bodies.ts are shared by them
-    inbound/cli/         the options of the seed-sale and create-operator commands
+                         index.ts registers them all; guards.ts, reply.ts and bodies.ts are shared by them
+    inbound/cli/         the options of the seed-sale and create-operator commands, and the text a failed command prints
     outbound/postgres/   the repositories, the shared queries, health.ts (the /ready check), and migrations/
                          (hand-written; the SQL of one that has run never changes)
     outbound/redis/      the hold gate, the queue, the rate limit counters and the session cache, as single scripts;
-                         redis-health.ts (the /ready check), reply.ts (reading a script's reply)
+                         redis-client.ts (the one connection), redis-keys.ts (the key names), redis-health.ts
+                         (the /ready check), reply.ts (reading a script's reply)
     outbound/crypto/     scrypt password hashes and random tokens
     outbound/payment/    the in-process mock payment
     outbound/memory/     the rate limit store used when Redis is down
