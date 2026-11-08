@@ -14,8 +14,8 @@ Postgres and Redis. Vitest runs all three, and it merges their coverage into one
 [Decision 014](../../explanation/decisions/014-gherkin-scenarios-at-three-layers.md) turned down a separate Cucumber
 runner: it would need a second setup for coverage and watch mode.
 
-**What it costs.** `flash-be` and `flash-web` each have three Vitest configs to keep in step. The coverage gate needs Docker, because it includes the
-integration tests. Globals are off, so every file imports what it uses and cleans up after itself.
+**What it costs.** `flash-be` and `flash-web` each have three Vitest configs to keep in step. The coverage gate of `flash-be` needs Docker, because its
+integration tests use Postgres and Redis; `flash-web` fakes the API and needs none. Globals are off, so every file imports what it uses and cleans up after itself.
 
 ## The ideas this repo uses
 
@@ -64,7 +64,7 @@ describe("who may reserve", () => {
 			thresholds: { lines: 99, functions: 99, branches: 99, statements: 99 },
 ```
 
-`npx nx test:coverage <app>` runs it and starts the dev stack first. What is left out of the count, and why, is in
+`npx nx test:coverage <app>` runs it; for `flash-be` it starts the dev stack first. What is left out of the count, and why, is in
 [test layers and coverage](../../reference/test-layers-and-coverage.md#coverage-floor).
 
 ### Globals are off, so import and clean up

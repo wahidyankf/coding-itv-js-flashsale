@@ -36,8 +36,8 @@ Run a target with `npx nx <target> <app>`, for example `npx nx test:coverage fla
 ## Coverage floor
 
 The 99% floor is on the combined run: unit and integration tests together. It covers lines, statements, functions,
-and branches. The gate is `npx nx test:coverage <app>`. It starts the dev stack, and the pre-push hook runs it for the
-affected apps.
+and branches. The gate is `npx nx test:coverage <app>`. For `flash-be` it starts the dev stack, since its integration tests use
+Postgres and Redis; `flash-web` and the libraries need no Docker. The pre-push hook runs it for the affected projects.
 
 For `typekit` and `flash-commons` the floor is on their unit tests, and their `test:coverage` needs no Docker.
 

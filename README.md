@@ -360,7 +360,7 @@ Every app has `typecheck`, `lint`, `test:quick` (those two plus unit tests; only
 npx nx test:quick <app>        # typecheck + lint + unit tests
 npx nx test:integration <app>  # flash-be needs the dev stack; flash-web fakes the API
 npx nx test:e2e <app>          # Playwright (flash-be-e2e, flash-web-e2e)
-npx nx test:coverage <app>     # flash-be, flash-web, the libraries: unit + integration, 99% floor (flash-be starts the dev stack)
+npx nx test:coverage <app>     # 99% floor: flash-be (unit + integration, starts the dev stack), flash-web (unit + integration), the libraries (unit)
 npx nx test:quick typekit      # a library: typecheck + lint + unit tests (no Docker)
 npx nx test:quick flash-commons # the other library, the same way
 npm run lint:rules:test        # the lint rules: no catch, exhaustive switches

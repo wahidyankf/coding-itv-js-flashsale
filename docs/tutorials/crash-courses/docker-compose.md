@@ -19,7 +19,7 @@ one command, and each needs to remove it again without touching the others.
 - [`apps/flash-load/compose.yaml`](../../../apps/flash-load/compose.yaml) runs the same shape with its own Postgres and
   Redis and a k6 container, for the [load test](../../how-to/run-the-load-test.md).
 
-**What it costs.** Docker must run for `test:coverage`, the pre-push hook, the load test and the smoke test. The load
+**What it costs.** Docker must run for the `test:coverage` of `flash-be`, the pre-push hook, the load test and the smoke test. The load
 test shares one machine's CPUs with every server, so its times are only relative
 ([012](../../explanation/decisions/012-load-verdict-from-the-data.md)). No decision record weighs Compose against
 another tool; it is the plain choice for one machine.

@@ -13,8 +13,8 @@ bound) are only as strong as the hook that runs them.
 **What we did not pick.** No decision record covers the hooks. The split is deliberate: a commit only checks its
 message and formats its staged files, so it stays fast, and the slow checks wait for the push.
 
-**What it costs.** A push waits for the whole gate and needs Docker running, because the coverage gate starts the dev
-stack. The gate runs only on machines where `npm install` installed the hooks.
+**What it costs.** A push waits for the whole gate and needs Docker running, because the coverage gate of `flash-be` starts
+the dev stack. The gate runs only on machines where `npm install` installed the hooks.
 
 ## The ideas this repo uses
 
@@ -49,7 +49,8 @@ It only formats code and JSON. It does not lint, and it does not touch Markdown.
 is in [the pre-push hook](../../reference/test-layers-and-coverage.md#pre-push-hook).
 
 The first seven need no Docker. The last two use `nx affected --base=origin/main`, so they run only for the projects
-your branch touches ([Nx crash course](nx.md)), and the last one, `test:coverage`, starts the dev stack.
+your branch touches ([Nx crash course](nx.md)), and the last one, `test:coverage`, starts the dev stack when
+`flash-be` is affected.
 
 ## Try it here
 
