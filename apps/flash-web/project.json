@@ -21,14 +21,6 @@
 				"cwd": "apps/flash-web"
 			}
 		},
-		"start": {
-			"executor": "nx:run-commands",
-			"dependsOn": ["build"],
-			"options": {
-				"command": "npm run start",
-				"cwd": "apps/flash-web"
-			}
-		},
 		"typecheck": {
 			"executor": "nx:run-commands",
 			"dependsOn": ["^build"],

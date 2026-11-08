@@ -2,9 +2,7 @@
 	"name": "coding-itv-js-flashsale",
 	"version": "1.0.0",
 	"description": "",
-	"main": "index.js",
 	"scripts": {
-		"test": "echo \"Error: no test specified\" && exit 1",
 		"prepare": "husky",
 		"format": "biome format --write .",
 		"lint": "biome check --error-on-warnings .",
@@ -18,6 +16,8 @@
 		"docker:dev:down": "docker compose -f compose.dev.yaml down",
 		"docker:prod:up": "docker compose -f compose.prod.yaml up -d --build --wait",
 		"docker:prod:down": "docker compose -f compose.prod.yaml down",
+		"prod:create-operator": "docker compose -f compose.prod.yaml exec flash-be-1 node dist/create-operator.js",
+		"prod:seed-sale": "docker compose -f compose.prod.yaml exec flash-be-1 node dist/seed-sale.js",
 		"smoke:prod": "npx nx build typekit && npx nx build flash-commons && node scripts/smoke/prod.mjs",
 		"demo:reset": "npx nx db:reset flash-be",
 		"demo:operator": "npx nx db:create-operator flash-be --username=ops --password=correct-horse-battery --output-style=stream",
@@ -26,7 +26,9 @@
 		"demo:dev": "npx nx run-many -t dev -p flash-be flash-web --output-style=stream",
 		"demo:redis:stop": "docker compose -f compose.dev.yaml stop redis",
 		"demo:redis:start": "docker compose -f compose.dev.yaml up -d --wait redis",
-		"demo:load": "npx nx load:smoke flash-load --output-style=stream"
+		"demo:load": "npx nx load:smoke flash-load --output-style=stream",
+		"demo:deleted-sale": "docker compose -f compose.dev.yaml exec postgres psql -U flash -d flash -c \"SELECT s.name, s.deleted_at, u.username AS deleted_by FROM sales s JOIN users u ON u.id = s.deleted_by ORDER BY s.deleted_at DESC LIMIT 1\"",
+		"load:down": "docker compose -f apps/flash-load/compose.yaml down -v"
 	},
 	"repository": {
 		"type": "git",

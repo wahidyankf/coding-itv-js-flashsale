@@ -36,14 +36,26 @@
 			"options": {
 				"command": "npm run test:unit",
 				"cwd": "apps/flash-load"
-			}
+			},
+			"dependsOn": [
+				{
+					"projects": ["typekit", "flash-commons"],
+					"target": "build"
+				}
+			]
 		},
 		"test:unit:watch": {
 			"executor": "nx:run-commands",
 			"options": {
 				"command": "npm run test:unit:watch",
 				"cwd": "apps/flash-load"
-			}
+			},
+			"dependsOn": [
+				{
+					"projects": ["typekit", "flash-commons"],
+					"target": "build"
+				}
+			]
 		},
 		"test:quick": {
 			"executor": "nx:run-commands",

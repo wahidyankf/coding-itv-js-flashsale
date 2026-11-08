@@ -40,7 +40,7 @@
 				}
 			],
 			"options": {
-				"command": "npm run test:e2e",
+				"command": "npx nx run flash-be:db:up && npx nx run flash-be:db:migrate && npm run test:e2e",
 				"cwd": "apps/flash-web-e2e"
 			}
 		},

@@ -25,14 +25,6 @@
 				"cwd": "apps/flash-be"
 			}
 		},
-		"start": {
-			"executor": "nx:run-commands",
-			"dependsOn": ["build"],
-			"options": {
-				"command": "npm run start",
-				"cwd": "apps/flash-be"
-			}
-		},
 		"typecheck": {
 			"executor": "nx:run-commands",
 			"dependsOn": [
