@@ -82,23 +82,63 @@ describe("createWatcher", () => {
 		expect(init.headers).toEqual({ "x-queue-ticket": "t" });
 	});
 
-	it.each([401, 404])(
-		"stops for good on %i, and does not report a give-up",
-		async (status) => {
-			const fetcher = vi.fn(async () => new Response("no", { status }));
+	// A refusal is a reply asking again would not change. The shopper is told, so the page does not keep old words.
+	it.each([
+		["404", new Response("no", { status: 404 })],
+		[
+			"a 404 with the error of flash-be",
+			Response.json(
+				{ errorCode: "sale_not_found", errorMessage: "x" },
+				{ status: 404 },
+			),
+		],
+		["a 401 that is not JSON", new Response("no", { status: 401 })],
+		[
+			"a 401 for a wrong ticket",
+			Response.json(
+				{ errorCode: "invalid_ticket", errorMessage: "x" },
+				{ status: 401 },
+			),
+		],
+	])(
+		"stops for good on %s, and reports the give-up once",
+		async (_name, refusal) => {
+			const fetcher = vi.fn(async () => refusal.clone());
 			const onGiveUp = vi.fn();
 			createWatcher({ fetcher, sleep: tick, random: noJitter })(
 				"/x",
 				() => true,
 				{ onGiveUp },
 			);
-			await vi.waitFor(() => expect(fetcher).toHaveBeenCalled());
+			await vi.waitFor(() => expect(onGiveUp).toHaveBeenCalledOnce());
 			await tick();
 			await tick();
 			expect(fetcher).toHaveBeenCalledTimes(1);
-			expect(onGiveUp).not.toHaveBeenCalled();
+			expect(onGiveUp).toHaveBeenCalledOnce();
 		},
 	);
+
+	// The renewing fetch has tried the refresh token already and failed, and has told the page the login is gone. The page
+	// shows the login form for that, so a second notice about the stream would stay on screen after the shopper logs in.
+	it("stops for good on a lost login, and leaves the notice to the page", async () => {
+		const fetcher = vi.fn(async () =>
+			Response.json(
+				{ errorCode: "not_authenticated", errorMessage: "x" },
+				{ status: 401 },
+			),
+		);
+		const onGiveUp = vi.fn();
+		createWatcher({ fetcher, sleep: tick, random: noJitter })(
+			"/x",
+			() => true,
+			{ onGiveUp },
+		);
+		await vi.waitFor(() => expect(fetcher).toHaveBeenCalled());
+		await tick();
+		await tick();
+		expect(fetcher).toHaveBeenCalledTimes(1);
+		expect(onGiveUp).not.toHaveBeenCalled();
+	});
 
 	it("opens the stream again after it ends, fails, or answers with an error", async () => {
 		const answers = [
@@ -227,7 +267,11 @@ describe("createWatcher", () => {
 		const seen: unknown[] = [];
 		const plan = [
 			new Response(droppedBody(SALE_FRAME)),
-			new Response("gone", { status: 404 }),
+			// The login is lost on the second try, which stops the watcher without a report.
+			Response.json(
+				{ errorCode: "not_authenticated", errorMessage: "x" },
+				{ status: 401 },
+			),
 		];
 		const fetcher = vi.fn(
 			async () => plan.shift() ?? new Response("late", { status: 503 }),

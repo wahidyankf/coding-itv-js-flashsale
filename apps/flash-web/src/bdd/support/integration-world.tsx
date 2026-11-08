@@ -27,7 +27,7 @@ import { createWebApi } from "../../web-api";
 import { createCookieJar } from "./cookie-jar";
 import { ACCESS_COOKIE, REFRESH_COOKIE } from "./fake-account";
 import { createFakeBackend, type FakeBackend } from "./fake-backend";
-import { type Match, matchRoute } from "./fake-http";
+import { errorPayload, type Match, matchRoute } from "./fake-http";
 import { SALE_ID, type SaleSpec } from "./fake-state";
 import { requestOf, textHeadersOf } from "./node-request";
 import type { WebWorld } from "./web-world";
@@ -97,7 +97,11 @@ function stream(
 	const user = backend.userOf(request.headers.cookie) ?? "";
 	if (backend.isCutOff()) throw new Error("unreachable");
 	if (isPlace && (user === "" || ticket !== `ticket-${user}`)) {
-		response.writeHead(401).end();
+		// The body names the code, as flash-be's does, so the renewing fetch can tell a lost login from a wrong ticket.
+		const code = user === "" ? "not_authenticated" : "invalid_ticket";
+		response
+			.writeHead(401, { "content-type": JSON_CONTENT_TYPE })
+			.end(JSON.stringify(errorPayload(code)));
 		return;
 	}
 	response.writeHead(200, { "content-type": "text/event-stream" });
@@ -327,6 +331,11 @@ function pageOf(h: Harness, browserFetch: typeof fetch, backendHttp: Server) {
 			// The backend stops answering and its open streams are cut, as a dropped connection cuts them. The page then
 			// tries to open each stream again, and gives up after its last failed attempt.
 			h.backend.cutOff(true);
+			backendHttp.closeAllConnections();
+		},
+		// The connections of the open streams end, as when a network blips. The backend still answers, so the page opens
+		// each stream again.
+		async liveConnectionDrops() {
 			backendHttp.closeAllConnections();
 		},
 		advance: (seconds: number) => sleep(seconds * MS_PER_SECOND),

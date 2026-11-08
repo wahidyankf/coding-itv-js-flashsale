@@ -281,6 +281,11 @@ export async function cutWebServerOff(): Promise<void> {
 	await forwarder.cut();
 }
 
+// Ends every connection the web server holds to the scenario's API. The API still answers, so the page's streams open again.
+export async function dropApiConnections(): Promise<void> {
+	await forwarder.to(Number(new URL(await privateApi()).port));
+}
+
 // Makes the API answer every call of the web server with this status and body, instead of the real API.
 export async function answerWith(status: number, body: string): Promise<void> {
 	target.chosen = true;

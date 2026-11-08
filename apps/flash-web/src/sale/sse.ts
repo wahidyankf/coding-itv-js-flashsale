@@ -9,11 +9,13 @@ import {
 } from "@flash/flash-commons";
 import { sleep } from "@flash/flash-commons/timers";
 import { attempt, attemptAsync, Err, Ok, type Result } from "@flash/typekit";
+import { decodeRefusal, readBody } from "../api";
 
 // What one subscription asks for: its headers, and a call when the watcher has given up on it.
 export type Subscription = {
 	headers?: Record<string, string>;
-	// Called once, after the last attempt failed. A refused stream does not call it, because it is not retried at all.
+	// Called once when the watcher stops for good without being stopped: after the last attempt failed, or at once when the
+	// stream is refused (a gone sale, a wrong ticket). It is not called when the login is lost, because the page shows that.
 	onGiveUp?: () => void;
 };
 
@@ -49,8 +51,10 @@ const LIVE_POLICY: RetryPolicy = {
 
 type Frame = { event: string; data: unknown };
 type Listener = (event: string, data: unknown) => boolean;
-// `refused`: asking again would get the same answer, so the watcher stops. `failed`: no frame came, so the try counts.
-type Failure = "refused" | "failed";
+// `refused`: asking again would get the same answer, so the watcher stops and says so. `login-lost`: the renewing fetch could
+// not renew the login and has told the page already, so the watcher stops and says nothing. `failed`: no frame came, so
+// the try counts.
+type Failure = "refused" | "login-lost" | "failed";
 
 // Splits the text that arrived so far into complete frames. Returns the frames and the rest. A keep-alive comment and a
 // frame whose data is not JSON are skipped.
@@ -89,8 +93,19 @@ async function readFrames(
 	}
 }
 
-// One connection. A refusal (401, 404) is Err "refused". A stream that gave a used frame is Ok, even if it then ends or
-// breaks. Anything else is Err "failed", so a stream the page cannot read still gives up.
+// Whether a 401 says the login is gone. The fetch the watcher is given renews the login once on such a reply, so one that
+// reaches the watcher is a login the refresh token could not restore. Any other 401, such as a wrong ticket, is a refusal.
+async function isLoginLost(response: Response): Promise<boolean> {
+	if (response.status !== HTTP_STATUS.unauthorized) return false;
+	const text = await attemptAsync(() => response.text(), Error);
+	if (text.isErr()) return false;
+	const refusal = readBody(text.value, decodeRefusal);
+	return refusal.isOk() && refusal.value.errorCode === "not_authenticated";
+}
+
+// One connection. A refusal (401, 404) is Err "refused", or "login-lost" for a login that could not be renewed. A stream
+// that gave a used frame is Ok, even if it then ends or breaks. Anything else is Err "failed", so a stream the page
+// cannot read still gives up.
 async function connectOnce(
 	fetcher: typeof fetch,
 	url: string,
@@ -104,6 +119,7 @@ async function connectOnce(
 	);
 	if (reply.isErr()) return new Err("failed");
 	const response = reply.value;
+	if (await isLoginLost(response)) return new Err("login-lost");
 	if (
 		response.status === HTTP_STATUS.unauthorized ||
 		response.status === HTTP_STATUS.notFound
@@ -125,7 +141,8 @@ async function connectOnce(
 
 // Keeps a stream open until it is stopped. An outage gets up to `maxAttempts` tries, with jittered backoff between them.
 // A try that gave a used frame starts a new count. A try with no used frame is a failure, so a server that keeps
-// closing the stream still gives up. A refusal stops at once.
+// closing the stream still gives up. A refusal stops at once and is reported, so the page does not keep old words; a lost
+// login stops at once and is left to the page.
 export function createWatcher(options: WatchOptions = {}): Watcher {
 	const policy = options.policy ?? LIVE_POLICY;
 	const wait = options.sleep ?? sleep;
@@ -153,7 +170,7 @@ export function createWatcher(options: WatchOptions = {}): Watcher {
 					await wait(backoffDelayMs(0, policy, random));
 					continue;
 				}
-				if (outcome.error === "failed") subscription.onGiveUp?.();
+				if (outcome.error !== "login-lost") subscription.onGiveUp?.();
 				return;
 			}
 		};

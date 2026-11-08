@@ -17,7 +17,12 @@ import {
 	currentSaleId,
 	setApiEnv,
 } from "../../flash-be-e2e/steps/support/world.js";
-import { cutWebServerOff, planSale, reviseSale } from "./support/shop.js";
+import {
+	cutWebServerOff,
+	dropApiConnections,
+	planSale,
+	reviseSale,
+} from "./support/shop.js";
 
 const { Given, When } = createBdd();
 
@@ -97,6 +102,11 @@ When("the sale opens", async ({ request: _request }) => {
 // Redis loses the line, as a restart without its data does.
 When("the queue is lost", async ({ request: _request }) => {
 	await withRedis(E2E_REDIS_URL, (redis) => redis.flushDb());
+});
+
+// The network blips: the web server's connections to the API end, so each open stream ends, and the page opens it again.
+When("the live connection drops", async ({ request: _request }) => {
+	await dropApiConnections();
 });
 
 When(/^(\d+) seconds pass$/, async ({ page }, seconds: string) => {

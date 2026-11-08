@@ -18,7 +18,8 @@ export type WebApi = {
 
 // Wraps a fetch to retry a `not_authenticated` reply once, after a refresh. The access token lasts 15 minutes, so a
 // shopper who waits in the queue would otherwise be logged out. Requests that fail together share one refresh, since a
-// refresh token works only once.
+// refresh token works only once. When the refresh fails, or the retry is refused the same way, the login is gone for good
+// and `onExpired` runs.
 export function withRefresh(
 	base: string,
 	fetcher: typeof fetch,
@@ -51,7 +52,12 @@ export function withRefresh(
 	return async (input, init) => {
 		const reply = await fetcher(input, init);
 		if (!(await isLoginLost(reply))) return reply;
-		if (await refresh()) return fetcher(input, init);
+		if (await refresh()) {
+			// A login that the refresh restored must now be accepted. If it is not, it is gone for good.
+			const again = await fetcher(input, init);
+			if (await isLoginLost(again)) onExpired();
+			return again;
+		}
 		onExpired();
 		return reply;
 	};

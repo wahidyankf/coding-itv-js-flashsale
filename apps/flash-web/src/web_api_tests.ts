@@ -149,6 +149,110 @@ describe("withRefresh", () => {
 	});
 });
 
+// The place stream of the sale "s", as the page opens it.
+const PLACE_STREAM = "/api/v1/sales/s/queue/me/events";
+// One place frame, as flash-be sends it, in a body that ends after it.
+const placeStream = () =>
+	new Response(
+		'event: place\ndata: {"userId":"ana","state":"waiting","place":3}\n\n',
+	);
+// The same frame on a stream that stays open, as the real one does until the connection drops.
+const openPlaceStream = () =>
+	new Response(
+		new ReadableStream({
+			start(controller) {
+				controller.enqueue(
+					new TextEncoder().encode(
+						'event: place\ndata: {"userId":"ana","state":"waiting","place":3}\n\n',
+					),
+				);
+			},
+		}),
+	);
+const stillWaiting = { userId: "ana", state: "waiting", place: 3 };
+const noWait = async () => {};
+
+describe("the live streams of createWebApi", () => {
+	it("renews the login once when a stream is opened again after the access token ran out, then keeps reading", async () => {
+		const fetcher = fetcherOf({
+			[PLACE_STREAM]: [placeStream, unauthenticated, openPlaceStream],
+			"/api/v1/auth/refresh": [refreshed],
+		});
+		const api = createWebApi(BASE, fetcher as typeof fetch, {
+			live: { sleep: noWait, random: () => 0 },
+		});
+		const places: unknown[] = [];
+		const onGiveUp = vi.fn();
+		const stop = api.sale.watchPlace(
+			"s",
+			"t",
+			(place) => places.push(place),
+			onGiveUp,
+		);
+		await vi.waitFor(() => expect(places).toHaveLength(2));
+		stop();
+		expect(places[1]).toEqual(stillWaiting);
+		const refreshes = fetcher.mock.calls.filter(([url]) =>
+			String(url).endsWith("/api/v1/auth/refresh"),
+		);
+		expect(refreshes).toHaveLength(1);
+		expect(onGiveUp).not.toHaveBeenCalled();
+	});
+
+	it("tells the page the login ended, and stops without a notice of its own, when the refresh is refused", async () => {
+		const fetcher = fetcherOf({
+			[PLACE_STREAM]: [unauthenticated],
+			"/api/v1/auth/refresh": [refused],
+		});
+		const api = createWebApi(BASE, fetcher as typeof fetch, {
+			live: { sleep: noWait, random: () => 0 },
+		});
+		const expired = vi.fn();
+		api.onExpired(expired);
+		const onGiveUp = vi.fn();
+		api.sale.watchPlace("s", "t", () => {}, onGiveUp);
+		await vi.waitFor(() => expect(expired).toHaveBeenCalledOnce());
+		await noWait();
+		expect(fetcher).toHaveBeenCalledTimes(2);
+		expect(onGiveUp).not.toHaveBeenCalled();
+	});
+
+	it("tells the page the login ended when the stream is refused again after a good refresh", async () => {
+		const fetcher = fetcherOf({
+			[PLACE_STREAM]: [unauthenticated, unauthenticated],
+			"/api/v1/auth/refresh": [refreshed],
+		});
+		const api = createWebApi(BASE, fetcher as typeof fetch, {
+			live: { sleep: noWait, random: () => 0 },
+		});
+		const expired = vi.fn();
+		api.onExpired(expired);
+		const onGiveUp = vi.fn();
+		api.sale.watchPlace("s", "t", () => {}, onGiveUp);
+		await vi.waitFor(() => expect(expired).toHaveBeenCalledOnce());
+		expect(onGiveUp).not.toHaveBeenCalled();
+	});
+
+	it("reports the give-up when the place stream is refused for a gone sale", async () => {
+		const fetcher = fetcherOf({
+			[PLACE_STREAM]: [
+				() =>
+					Response.json(
+						{ errorCode: "sale_not_found", errorMessage: "x" },
+						{ status: 404 },
+					),
+			],
+		});
+		const api = createWebApi(BASE, fetcher as typeof fetch, {
+			live: { sleep: noWait, random: () => 0 },
+		});
+		const onGiveUp = vi.fn();
+		api.sale.watchPlace("s", "t", () => {}, onGiveUp);
+		await vi.waitFor(() => expect(onGiveUp).toHaveBeenCalledOnce());
+		expect(fetcher).toHaveBeenCalledTimes(1);
+	});
+});
+
 describe("createWebApi", () => {
 	it("tells every listener that the login ended, until it stops listening", async () => {
 		const fetcher = fetcherOf({

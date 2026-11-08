@@ -2,7 +2,7 @@
 // the loader are the real code. flash-be is the fake backend, called as a function, and time is fake, so a scenario can
 // move it. The unit scenarios run here under Vitest. Test support only.
 
-import { API_PATHS, MS_PER_SECOND } from "@flash/flash-commons";
+import { API_PATHS, HTTP_STATUS, MS_PER_SECOND } from "@flash/flash-commons";
 import {
 	act,
 	cleanup,
@@ -16,13 +16,12 @@ import { JSON_CONTENT_TYPE, jsonPost, TICKET_HEADER } from "../../api";
 import { proxyToBackend } from "../../proxy";
 import { HomePage } from "../../routes/index";
 import { loadSale, type SaleLoad } from "../../sale/load";
-import type { Watcher } from "../../sale/sse";
 import { SalePage } from "../../sale-page";
 import { createWebApi } from "../../web-api";
 import { createCookieJar } from "./cookie-jar";
 import { ACCESS_COOKIE, REFRESH_COOKIE } from "./fake-account";
 import { createFakeBackend, type FakeBackend } from "./fake-backend";
-import { matchRoute } from "./fake-http";
+import { errorPayload, matchRoute } from "./fake-http";
 import { SALE_ID, type SaleSpec } from "./fake-state";
 import type { WebWorld } from "./web-world";
 
@@ -34,6 +33,11 @@ const SITE = "http://web.test";
 const CALLER = "192.0.2.10";
 // The password of a shopper that a scenario logs in without naming one.
 const PASSWORD = "a long password";
+// The page's retry for a live stream: no wait between tries, so a dropped stream is opened again in the same turn. The
+// count of attempts is the page's own.
+const LIVE_RETRY = { random: () => 0 };
+// Longer than the page's waits between eight attempts put together (1, 2, 4, 8, 16, 30 and 30 seconds).
+const GIVE_UP_WITHIN_MS = 200 * MS_PER_SECOND;
 // How many times the page is given a turn to settle after an action.
 const SETTLE_ROUNDS = 10;
 
@@ -42,15 +46,87 @@ type Harness = {
 	backend: FakeBackend;
 	load: SaleLoad;
 	jar: ReturnType<typeof createCookieJar>;
-	// The give-up callbacks of the live streams that are open now.
-	giveUps: Set<() => void>;
+	// The ways to end the live streams that are open now, as a dropped connection ends them.
+	streams: Set<() => void>;
 };
+
+// One event stream of the fake flash-be, as the bytes flash-be would send. It sends a frame only when the value differs
+// from the last one, and it ends when the client leaves (`signal`) or when a scenario drops the connection.
+function eventStream(
+	h: Harness,
+	name: "saleEvents" | "placeEvents",
+	user: string,
+	signal: AbortSignal | null | undefined,
+): Response {
+	const encoder = new TextEncoder();
+	let end = () => {};
+	const body = new ReadableStream<Uint8Array>({
+		start(controller) {
+			let last = "";
+			const push = () => {
+				if (!h.backend.hasSale()) return;
+				const [event, data] =
+					name === "placeEvents"
+						? ["place", { userId: user, ...h.backend.placeOf(user) }]
+						: ["sale", h.backend.view()];
+				const frame = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+				if (frame === last) return;
+				last = frame;
+				controller.enqueue(encoder.encode(frame));
+			};
+			push();
+			const off = h.backend.onChange(push);
+			end = () => {
+				off();
+				h.streams.delete(end);
+				signal?.removeEventListener("abort", end);
+				controller.close();
+			};
+			h.streams.add(end);
+			signal?.addEventListener("abort", end);
+		},
+		cancel: () => end(),
+	});
+	return new Response(body, {
+		headers: { "content-type": "text/event-stream" },
+	});
+}
+
+// The refusal of a stream, in the body flash-be sends, so the renewing fetch can read the code.
+const refusalOf = (error: "not_authenticated" | "invalid_ticket") =>
+	Response.json(errorPayload(error), { status: HTTP_STATUS.unauthorized });
+
+// The fake flash-be's answer to a request for an event stream, or undefined when the request is for something else. A
+// place stream is a shopper's own: the cookie says who, and the ticket proves the place.
+function streamReply(
+	h: Harness,
+	url: URL,
+	headers: Headers,
+	signal: AbortSignal | null | undefined,
+): Response | undefined {
+	const match = matchRoute("GET", url.pathname);
+	if (match?.name !== "saleEvents" && match?.name !== "placeEvents") {
+		return undefined;
+	}
+	// The fake counts the request and refuses it when it is cut off, as for any other call. Its own answer is not used.
+	h.backend.handle("GET", url.pathname, Object.fromEntries(headers), {});
+	if (match.name === "saleEvents")
+		return eventStream(h, match.name, "", signal);
+	const user = h.backend.userOf(headers.get("cookie") ?? undefined);
+	if (user === undefined) return refusalOf("not_authenticated");
+	if (headers.get(TICKET_HEADER) !== `ticket-${user}`) {
+		return refusalOf("invalid_ticket");
+	}
+	return eventStream(h, match.name, user, signal);
+}
 
 // The fake flash-be as a fetch. Its answers are the replies of the fake, as flash-be would send them.
 function backendFetchOf(h: Harness): typeof fetch {
 	return async (input, init) => {
 		const url = new URL(String(input));
 		const headers = new Headers(init?.headers);
+		const streamed = streamReply(h, url, headers, init?.signal);
+		if (streamed) return streamed;
 		const text = typeof init?.body === "string" ? init.body : "";
 		const reply = h.backend.handle(
 			init?.method ?? "GET",
@@ -90,51 +166,9 @@ function webFetchOf(h: Harness, backendFetch: typeof fetch): typeof fetch {
 	};
 }
 
-// The event streams, pushed from the fake's changes the way the real streams push from flash-be. A stream sends a value
-// only when it differs from the last one.
-function watchOf(h: Harness): Watcher {
-	return (url, onEvent, subscription = {}) => {
-		const stop = streamOf(h, url, onEvent, subscription.headers ?? {});
-		// The give-up is kept, so a scenario can make the streams give up as the real watcher does after its retries.
-		const giveUp = subscription.onGiveUp;
-		if (giveUp) h.giveUps.add(giveUp);
-		return () => {
-			stop();
-			if (giveUp) h.giveUps.delete(giveUp);
-		};
-	};
-}
-
-// The fake of one stream: what it sends, and when it sends it. Returns the way to stop it.
-function streamOf(
-	h: Harness,
-	url: string,
-	onEvent: (event: string, data: unknown) => void,
-	headers: Record<string, string>,
-): () => void {
-	const match = matchRoute("GET", url.replace(/^.*?(?=\/api)/, ""));
-	let last = "";
-	const send = (event: string, data: unknown) => {
-		const key = JSON.stringify([event, data]);
-		if (key === last) return;
-		last = key;
-		onEvent(event, data);
-	};
-	if (match?.name === "saleEvents") {
-		const push = () => h.backend.hasSale() && send("sale", h.backend.view());
-		push();
-		return h.backend.onChange(push);
-	}
-	// The user is the one whose cookie the browser holds.
-	const user =
-		h.backend.userOf(h.jar.header(url.replace(/^.*?(?=\/api)/, ""))) ?? "";
-	if (user === "" || headers[TICKET_HEADER] !== `ticket-${user}`) {
-		return () => {};
-	}
-	const push = () =>
-		send("place", { userId: user, ...h.backend.placeOf(user) });
-	push();
-	return h.backend.onChange(push);
+// Ends every open stream, as a dropped connection does.
+function dropStreams(h: Harness): void {
+	for (const end of [...h.streams]) end();
 }
 
 // Lets the promises of a request and the effects that follow run.
@@ -180,7 +214,7 @@ function lifecycleOf(h: Harness) {
 			h.backend = createFakeBackend(() => Date.now());
 			h.load = { state: "none" };
 			h.jar.clear();
-			h.giveUps.clear();
+			h.streams.clear();
 		},
 		clear() {
 			cleanup();
@@ -234,12 +268,11 @@ function pageOf(
 	h: Harness,
 	backendFetch: typeof fetch,
 	webFetch: typeof fetch,
-	watch: Watcher,
 ) {
 	return {
 		async openPage() {
 			h.load = await loadSale(ENV, backendFetch);
-			const api = createWebApi("", webFetch, { watch });
+			const api = createWebApi("", webFetch, { live: LIVE_RETRY });
 			await act(async () => {
 				render(<SalePage load={h.load} api={api} />);
 				await settle();
@@ -262,14 +295,16 @@ function pageOf(
 		endSale: () => inPage(() => h.backend.endSale()),
 		openSale: () => inPage(() => h.backend.openSale()),
 		loseQueue: () => inPage(() => h.backend.loseQueue()),
-		// The unit world does not replay the retries (sse_tests.ts proves those). It gives the page the report the
-		// watcher makes after its last attempt, for every stream that is open.
+		// The backend stops answering and its open streams end. The page's watcher opens each stream again, fails, and gives up
+		// after its last attempt, which the fake clock reaches by moving past the longest wait.
 		liveUpdatesFail: () =>
-			inPage(() => {
-				const giveUps = [...h.giveUps];
-				h.giveUps.clear();
-				for (const giveUp of giveUps) giveUp();
+			act(async () => {
+				h.backend.cutOff(true);
+				dropStreams(h);
+				await vi.advanceTimersByTimeAsync(GIVE_UP_WITHIN_MS);
 			}),
+		// The connection of every open stream ends, as when a network blips. The watcher opens each one again.
+		liveConnectionDrops: () => inPage(() => dropStreams(h)),
 		advance: (seconds: number) =>
 			act(async () => {
 				await vi.advanceTimersByTimeAsync(seconds * MS_PER_SECOND);
@@ -343,17 +378,16 @@ export function unitWorld(): WebWorld {
 		backend: createFakeBackend(() => Date.now()),
 		load: { state: "none" },
 		jar: createCookieJar(),
-		giveUps: new Set(),
+		streams: new Set(),
 	};
 	const backendFetch = backendFetchOf(h);
 	const webFetch = webFetchOf(h, backendFetch);
-	const watch = watchOf(h);
 	return {
 		saleId: SALE_ID,
 		now: () => new Date(),
 		...lifecycleOf(h),
 		...setupOf(h, webFetch),
-		...pageOf(h, backendFetch, webFetch, watch),
+		...pageOf(h, backendFetch, webFetch),
 		...expectationsOf(h),
 		...apiOf(h, webFetch),
 	};

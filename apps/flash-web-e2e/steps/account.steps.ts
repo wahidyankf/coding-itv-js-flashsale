@@ -47,6 +47,11 @@ Given("the short token of every login has ended", async ({ context }) => {
 	await context.clearCookies({ name: "access_token" });
 });
 
+// The access cookie runs out while the page is open. The page still holds its streams, and the refresh cookie is all that is left.
+When("the access cookie runs out", async ({ context }) => {
+	await context.clearCookies({ name: "access_token" });
+});
+
 // The refresh cookie lives 7 days. After that the browser sends neither cookie.
 Given("every login has ended", async ({ context }) => {
 	await context.clearCookies({ name: "access_token" });

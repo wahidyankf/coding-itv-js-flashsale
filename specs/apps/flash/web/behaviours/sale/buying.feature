@@ -99,3 +99,17 @@ Feature: Buying the item
     Then the page says "You are in the queue. Your place: 6."
     When the queue is lost
     Then the page says "Your place was lost. Press Buy Now to join again."
+
+  Scenario: A waiting shopper whose access cookie runs out keeps seeing their place
+    Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
+    And the queue admits shoppers slowly
+    And 5 shoppers are ahead in the queue
+    And "ana" is logged in
+    And a visitor has the page open
+    When she presses Buy Now
+    Then the page says "You are in the queue. Your place: 6."
+    When the access cookie runs out
+    And the live connection drops
+    And the queue is lost
+    Then the page says "Your place was lost. Press Buy Now to join again."
+    And the page says "Signed in as ana"

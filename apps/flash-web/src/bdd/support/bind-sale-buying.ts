@@ -186,6 +186,33 @@ function placeLost(world: WebWorld): ScenarioBinder {
 	};
 }
 
+// A waiting shopper whose access cookie runs out keeps seeing their place: the page renews the login when it opens the
+// place stream again, so the loss of the place still reaches the shopper, who stays logged in.
+function waitingCookieRunsOut(world: WebWorld): ScenarioBinder {
+	return ({ Given, And, When, Then }) => {
+		Given(SALE_10, openTenSale(world));
+		And("the queue admits shoppers slowly", admitsSlowly(world));
+		And("{int} shoppers are ahead in the queue", shoppersAhead(world));
+		And("{string} is logged in", isLoggedIn(world));
+		And("a visitor has the page open", visitorOpensPage(world));
+		When("she presses Buy Now", pressBuyNow(world));
+		Then("the page says {string}", pageSays(world));
+		When("the access cookie runs out", () => world.accessTokenEnds());
+		And("the live connection drops", async () => world.liveConnectionDrops());
+		And("the queue is lost", async () => world.loseQueue());
+		Then(
+			'the page says "Your place was lost. Press Buy Now to join again."',
+			async () =>
+				world.expectPageSays(
+					"Your place was lost. Press Buy Now to join again.",
+				),
+		);
+		And('the page says "Signed in as ana"', async () =>
+			world.expectPageSays("Signed in as ana"),
+		);
+	};
+}
+
 // The steps of each scenario in the buying feature, by the scenario's name in the layer's test file.
 export function bindSaleBuying(world: WebWorld) {
 	return {
@@ -199,5 +226,6 @@ export function bindSaleBuying(world: WebWorld) {
 		declinedKeepsHold: declinedKeepsHold(world),
 		holdEnds: holdEnds(world),
 		placeLost: placeLost(world),
+		waitingCookieRunsOut: waitingCookieRunsOut(world),
 	};
 }

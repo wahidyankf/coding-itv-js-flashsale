@@ -49,5 +49,10 @@ describeFeature(
 			"A waiting shopper whose place is lost is told to join again",
 			steps.placeLost,
 		);
+
+		Scenario(
+			"A waiting shopper whose access cookie runs out keeps seeing their place",
+			steps.waitingCookieRunsOut,
+		);
 	},
 );

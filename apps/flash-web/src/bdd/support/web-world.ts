@@ -58,6 +58,8 @@ export type WebWorld = {
 	loseQueue: () => Promise<void>;
 	// The live streams stop working for good: the watcher has tried again until it gave up.
 	liveUpdatesFail: () => Promise<void>;
+	// The connection of each live stream ends, as when a network blips. The page opens each stream again.
+	liveConnectionDrops: () => Promise<void>;
 	advance: (seconds: number) => Promise<void>;
 	// What the visitor sees. Each waits for the page to catch up, so a slow layer does not fail a correct page.
 	expectPageSays: (text: string) => Promise<void>;
