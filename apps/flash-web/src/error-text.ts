@@ -1,5 +1,5 @@
 // Part of the sale page, shared by its hooks. The sentence the shopper reads for each error code. Account and sale codes have their own messages files; this file
-// joins them and adds `rate_limited` and `network`, which either can get. Only sale-page.tsx imports it, so the account
+// joins them and adds `rate_limited`, `network` and `backend_unavailable`, which either can get. Only sale-page.tsx imports it, so the account
 // and sale folders never import each other.
 import { authErrorText } from "./auth/messages";
 import { saleErrorText } from "./sale/messages";
@@ -18,6 +18,10 @@ export function errorText(
 	if (errorCode === "rate_limited") {
 		return `Too many requests. Try again in ${retryAfterSeconds ?? SHORTEST_WAIT_SECONDS} seconds.`;
 	}
-	if (errorCode === "network") return NETWORK;
+	// The web server answers `backend_unavailable` when flash-be cannot be reached. The shopper gets the same sentence as
+	// for a lost connection, since in both cases the sale could not be reached.
+	if (errorCode === "network" || errorCode === "backend_unavailable") {
+		return NETWORK;
+	}
 	return authErrorText(errorCode) ?? saleErrorText(errorCode) ?? FALLBACK;
 }

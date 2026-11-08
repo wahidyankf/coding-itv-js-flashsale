@@ -43,7 +43,13 @@ describe("errorText", () => {
 		);
 	});
 
-	it.each(["unexpected", "internal"])(
+	it("says the sale could not be reached when the web server cannot reach the API", () => {
+		expect(errorText("backend_unavailable")).toBe(
+			"The sale could not be reached. Please try again.",
+		);
+	});
+
+	it.each(["unexpected", "internal", "unavailable"])(
 		"says something went wrong for %s",
 		(code) => {
 			expect(errorText(code)).toBe("Something went wrong. Please try again.");
