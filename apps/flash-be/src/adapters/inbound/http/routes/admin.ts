@@ -22,7 +22,7 @@ export function registerAdminRoutes(
 	app.route({
 		method: "POST",
 		url: "/admin/sales",
-		// onRequest runs before the body is read, so a client without the token learns nothing from a broken body.
+		// onRequest runs before the body is read, so a client without an operator's login learns nothing from a broken body.
 		onRequest: guarded,
 		handler: async (request, reply) => {
 			const draft = saleDraftBody(request.body);
