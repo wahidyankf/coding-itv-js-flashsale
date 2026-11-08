@@ -391,10 +391,9 @@ npx nx load:contention flash-load  # 700 shoppers reserve in the same moment, fo
 150 ms of the mock payment), and no server errors. A failed run is a finding about the system; a limit is not changed
 to make a run pass.
 
-**Expected outcome.** `smoke`, `full` and `chaos` should exit `0` and print a table where every check passes. Today
-`smoke` and `chaos` do, but `full` fails its purchase speed check while every data check holds. The likely cause is
-that each load shopper signs up during the run, and the password hashing uses the CPU that purchases need (see
-[what the load runs found](docs/explanation/load-test-findings.md#full-fails-now-the-sign-ups-use-the-cpu)).
+**Expected outcome.** `smoke`, `full` and `chaos` should exit `0` and print a table where every check passes. They do
+since the load shoppers sign up before the sale starts; before that, `full` failed its purchase speed check (see
+[what the load runs found](docs/explanation/load-test-findings.md#full-failed-while-the-shoppers-signed-up-during-the-run)).
 The checks are:
 k6 started every planned shopper, no oversell (`sold` is at most the stock), `sold` equals the purchase rows, no shopper
 bought twice, k6 and Postgres agree, the stock sells out, the shopper who floods the queue gets `429`, Redis and

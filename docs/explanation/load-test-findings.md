@@ -101,14 +101,14 @@ times move with whatever else the machine runs. The slowest chaos run (547 ms an
 used the same CPUs; k6 then marked its speed thresholds as crossed and exited with code 99. Chaos judges only the data,
 so the run still passed, with every k6 check (1,402 of 1,402) and every data check green.
 
-## `full` fails now: the sign-ups use the CPU
+## `full` failed while the shoppers signed up during the run
 
-`full` does judge speed, and it is failing now. On 2026-11-08 five `full` runs of the current code sold 100 of 100
-with every data check green, but failed: purchase p95 was 521 to 709 ms against the 500 ms limit, and k6 started up to
-563 shoppers late. `smoke` passed twice on the same day with a purchase p95 of 160 ms.
+On 2026-11-08 five `full` runs sold 100 of 100 with every data check green, but failed: purchase p95 was 521 to 709 ms
+against the 500 ms limit, and k6 started up to 563 shoppers late. `smoke` passed on the same day with a purchase p95 of
+160 ms.
 
-**It is the code, not the machine.** The same day, the code of the last passing run (commit `64bfa17`, 2026-11-06) and
-the current code ran `full` in turn on the same machine:
+**It was the code, not the machine.** The same day, the code of the last passing run (commit `64bfa17`, 2026-11-06) and
+the code of that day ran `full` in turn on the same machine:
 
 | Run   | Code    | Reserve p95 | Purchase p95 | Dropped | Result |
 | ----- | ------- | ----------- | ------------ | ------- | ------ |
@@ -117,16 +117,28 @@ the current code ran `full` in turn on the same machine:
 | old 2 | 64bfa17 | 2.0 ms      | 156.0 ms     | 0       | passed |
 | new 2 | current | 40.8 ms     | 673.2 ms     | 563     | failed |
 
-**The likely cause is the sign-up.** Since `64bfa17`, every shopper has an account, and each load shopper signs up
-during the run (`POST /auth/register` in [`shop.ts`](../../apps/flash-load/k6/shop.ts)). A sign-up hashes the password with scrypt at the cost Node uses by
-default, which takes about 32 ms of CPU. `full` sends 250 shoppers a second, so the sign-ups alone need about 8
-CPU-seconds every second, on a Docker VM with 6 CPUs. In `new 2`, all requests together had a p95 of 3.7 s and the
-slowest took 24.6 s, while reserve stayed at 41 ms. A purchase waits behind the hashing, and k6 runs out of virtual
-users, so it starts shoppers late. `smoke` sends far fewer shoppers a second, so it passes.
+**Cause: the sign-ups.** Since `64bfa17`, every shopper has an account, and each load shopper signed up inside its
+visit (`POST /auth/register`). A sign-up hashes the password with scrypt at the cost Node uses by default, which takes
+about 32 ms of CPU. `full` sends 250 shoppers a second, so the sign-ups alone needed about 8 CPU-seconds every second,
+on a Docker VM with 6 CPUs. In `new 2`, all requests together had a p95 of 3.7 s while reserve stayed at 41 ms. A
+purchase waited behind the hashing, and k6 ran out of virtual users, so it started shoppers late.
 
-This is a fault of the test plan more than of the sale path: a real shopper signs up before the sale, not at the moment
-it opens. The next step is to make the load shoppers sign up before the sale starts, and then run `full` again. Until
-then this is an open finding, and the limit stays.
+This was a fault of the test plan, not of the sale path: a real shopper signs up before a sale, not at the moment it
+opens. **Fix:** the runner now signs every account up before k6 starts
+([`scripts/accounts.ts`](../../apps/flash-load/scripts/accounts.ts)), and k6 reads the tokens from a file. A new check
+fails the run if a shopper has no account. The limits did not change. The runs after the fix, one of each profile:
+
+| Profile    | Result                               | Reserve p95 | Purchase p95 | Dropped |
+| ---------- | ------------------------------------ | ----------- | ------------ | ------- |
+| smoke      | every check passed                   | 2.8 ms      | 159.8 ms     | 0       |
+| full       | every check passed                   | 2.2 ms      | 157.4 ms     | 0       |
+| contention | every check passed                   | 2.6 ms      | 159.2 ms     | 0       |
+| chaos      | every check passed                   | 8.6 ms      | 162.5 ms     | 0       |
+| burst      | failed one check: sold 99 of the 100 | 2.5 ms      | 158.1 ms     | 0       |
+
+In that `burst` run every invariant held (no oversell, no double purchase, k6 and Postgres agreed), but one item was
+still unsold when the run ended: 105 holds, 99 purchases. Why is not known yet. It is an open finding, and the check
+stays.
 
 ## Harness changes the first runs forced
 
