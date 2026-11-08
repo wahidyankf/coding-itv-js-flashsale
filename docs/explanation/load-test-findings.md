@@ -10,16 +10,20 @@ One run of each profile on one laptop, where k6 and every server share six CPUs 
 
 | Profile    | Result             | Stock sold     | Reserve p95 | Purchase p95 | Dropped |
 | ---------- | ------------------ | -------------- | ----------- | ------------ | ------- |
-| smoke      | every check passed | 20 of 20       | 2.6 ms      | 158.9 ms     | 0       |
-| full       | every check passed | 100 of 100     | 4.4 ms      | 167.4 ms     | 0       |
-| contention | every check passed | 50 of 50       | 3.0 ms      | 160.8 ms     | 0       |
-| chaos      | every check passed | 1,000 of 1,000 | 131.7 ms    | 365.0 ms     | 0       |
+| smoke      | every check passed | 20 of 20       | 3.2 ms      | 162.6 ms     | 0       |
+| full       | every check passed | 100 of 100     | 2.6 ms      | 162.9 ms     | 0       |
+| burst      | every check passed | 100 of 100     | 3.6 ms      | 160.5 ms     | 0       |
+| contention | every check passed | 50 of 50       | 3.6 ms      | 162.6 ms     | 0       |
+| chaos      | every check passed | 1,000 of 1,000 | 72.6 ms     | 265.2 ms     | 0       |
 
-`burst` ran five times. Each run sold 100 of 100 with no dropped shopper and every data check green. Four runs passed
-every check, with a reserve p95 of 3.1 to 9.1 ms and a purchase p95 of 159.6 to 179.5 ms. One run failed the purchase
-speed limit: 519.8 ms against 500 ms. In that run the whole distribution was slower, not only the tail (median 243 ms,
-reserve p95 19.2 ms), and other projects' containers shared the VM, with a load average of about 16.7 when it was
-checked. The cause is not proven. It is an open finding, and the limit stays.
+Every profile answered with 0 server errors, and the three API instances shared the requests evenly (for example
+7,410 / 7,422 / 7,381 in `full`).
+
+`burst` also ran five times in a row earlier. Each run sold 100 of 100 with no dropped shopper and every data check
+green. Four runs passed every check. One run failed the purchase speed limit: 519.8 ms against 500 ms. In that run the
+whole distribution was slower, not only the tail (median 243 ms, reserve p95 19.2 ms), and other projects' containers
+shared the VM, with a load average of about 16.7 when it was checked. The cause is not proven. It is an open finding,
+and the limit stays.
 
 In every run `sales.sold` equalled the number of `purchases` rows and never passed the stock, no shopper bought twice,
 k6 and Postgres agreed on the purchases, and the flooding shopper got `429`. In `chaos`, Redis stops at +4 s and starts
