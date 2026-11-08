@@ -10,6 +10,11 @@
 	},
 	"dependencies": {
 		"@flash/flash-commons": "*",
-		"@flash/typekit": "*"
+		"@flash/typekit": "*",
+		"pg": "^8.23.1",
+		"redis": "^6.3.1"
+	},
+	"devDependencies": {
+		"@types/pg": "^8.23.1"
 	}
 }
