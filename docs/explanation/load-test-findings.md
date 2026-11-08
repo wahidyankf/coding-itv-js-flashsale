@@ -21,22 +21,25 @@ are in `profiles.ts` and were written before they ran. The limits are the same a
 that runs the load generator, not a result about the system. The herd was cut to 700, close to the 670 users that `full`
 starts. The runner now reports a missing k6 summary as a load-generator failure and removes the stack.
 
-**The invariants held.** In six runs (three of each profile) `sales.sold` equalled the number of purchase rows and never
+**The invariants held.** In eight runs (four of each profile) `sales.sold` equalled the number of purchase rows and never
 passed the stock (100 of 100 in `burst`, 50 of 50 in `contention`), no shopper bought twice, k6, Postgres and Redis agreed,
-the flooding users got `429`, and there were no server errors. Postgres never had a session waiting for a lock. The
+the flooding users got `429`, and there were no server errors. In the first six runs Postgres never had a session waiting
+for a lock; `burst 4` saw at most 5 waiting at once, and they did not slow it past the limits. The
 `contention` profile is the first one that sends hundreds of reserves for 50 items in the same moment, and the Lua gate
 and `UPDATE ... WHERE sold < stock` held.
 
-**The speed limits failed in five of the six runs, as k6 measures them.**
+**The speed limits failed in five of the eight runs, as k6 measures them.**
 
-| Run          | Reserve p95 | Purchase p95 | Dropped | Note                                   |
-| ------------ | ----------- | ------------ | ------- | -------------------------------------- |
-| burst 1      | 2,379 ms    | 1,949 ms     | 3       |                                        |
-| burst 2      | 701 ms      | 724 ms       | 0       | API logs kept                          |
-| contention 1 | 349 ms      | 213 ms       | 0       | reserve over the limit, purchase under |
-| contention 2 | 551 ms      | 194 ms       | 0       | API logs kept                          |
-| burst 3      | 70 ms       | 521 ms       | 1       | after the refactor; purchase over      |
-| contention 3 | 27 ms       | 297 ms       | 0       | after the refactor; both under         |
+| Run          | Reserve p95 | Purchase p95 | Dropped | Note                                                                      |
+| ------------ | ----------- | ------------ | ------- | ------------------------------------------------------------------------- |
+| burst 1      | 2,379 ms    | 1,949 ms     | 3       |                                                                           |
+| burst 2      | 701 ms      | 724 ms       | 0       | API logs kept                                                             |
+| contention 1 | 349 ms      | 213 ms       | 0       | reserve over the limit, purchase under                                    |
+| contention 2 | 551 ms      | 194 ms       | 0       | API logs kept                                                             |
+| burst 3      | 70 ms       | 521 ms       | 1       | after the refactor; purchase over                                         |
+| contention 3 | 27 ms       | 297 ms       | 0       | after the refactor; both under                                            |
+| burst 4      | 83 ms       | 474 ms       | 0       | 2026-11-08; every check passed                                            |
+| contention 4 | 23 ms       | 247 ms       | 5       | 2026-11-08; both under, but k6 started 5 shoppers late, so the run failed |
 
 **Where the time is not.** In the runs with logs, the API logged a reserve at a median of 1.5 ms and a 95th percentile of
 5.3 to 5.5 ms (largest 46 ms). A purchase took 155 ms in the median, which is the 150 ms of the mock payment. A join took
@@ -49,7 +52,8 @@ the noisy part.
 time a request waits before that, in nginx, in the network or in a busy event loop. So the logs lower the suspicion on the
 handlers, but they do not prove that a real client would see 5 ms. A faithful speed result needs the load generator on
 another machine. Until then the two profiles are judged on speed with the fixed limits. After the refactor `contention` passed
-and `burst` still failed on purchase (521 ms against 500 ms).
+and `burst` still failed on purchase (521 ms against 500 ms). On 2026-11-08 `burst` passed every check, and `contention`
+met both speed limits but failed because k6 started 5 shoppers late.
 
 ## Paying during a Redis outage was slow
 
@@ -94,6 +98,12 @@ The client and the servers share one machine, so treat the times as relative. Th
 times move with whatever else the machine runs. The slowest chaos run (547 ms and 1,046 ms) ran while other test suites
 used the same CPUs; k6 then marked its speed thresholds as crossed and exited with code 99. Chaos judges only the data,
 so the run still passed, with every k6 check (1,402 of 1,402) and every data check green.
+
+`full` does judge speed. On 2026-11-08, with the machine's load average at 6 to 9 (a system scan used most of one CPU),
+two `full` runs in a row sold 100 of 100 with every data check green but failed: purchase p95 was 563 ms and 521 ms
+against the 500 ms limit, and the second run also had 237 shoppers that k6 started late. The code under test had not
+changed since the last `full` run that passed (reserve p95 3.7 ms, purchase p95 160 ms), so this is the machine, not the
+system. It is recorded as a failed run, and the limit stays.
 
 ## Harness changes the first runs forced
 
