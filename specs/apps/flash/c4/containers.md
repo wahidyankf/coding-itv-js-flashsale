@@ -34,9 +34,13 @@ flowchart LR
 
 - `flash-web` renders the sale page from `GET /api/v1/sales/current` and shows the backend status from `GET /health`. It passes
   the browser's requests under `/api/v1/sales` and `/api/v1/auth` on to the API, streams and cookies included. The address comes from `FLASH_BE_URL`,
-  read only on the server. In production that address is nginx.
-- `nginx` is the one door to the API. It sends each request to the instance with the fewest open requests and sets
-  `X-Forwarded-For` to the address it sees, so a caller cannot choose its own address for the rate limit. The operator
+  read only on the server. In production that address is nginx's internal port 8081. `flash-web` writes the browser's
+  socket address into `X-Forwarded-For` and drops the one the browser sent.
+- `nginx` is the one door to the API. It sends each request to the instance with the fewest open requests. On its
+  published port 80 it sets `X-Forwarded-For` to the address it sees, so a caller cannot choose its own address for the
+  rate limit. On port 8081, which only the containers of the stack reach, it passes on the address `flash-web` wrote, so
+  each page shopper is counted by their own address. It looks the instances up again through Docker's DNS, so an
+  instance that came back at a new address gets traffic again. The operator
   logs in and manages sales through it with the `/api/v1/auth` and `/api/v1/admin/sales` routes (create, list, change, remove); the web server never passes them on.
 - The three `flash-be` instances are identical. A queue ticket is signed with a shared secret, the state lives in
   Postgres and Redis, and one instance wins each admission tick, so any instance can serve any request.
@@ -56,6 +60,8 @@ flowchart LR
 - In production, `flash-be` refuses to start when `DATABASE_URL`, `REDIS_URL` or `TICKET_SECRET` is missing.
 - When Redis is down, `flash-be` keeps selling from Postgres alone (see [sequences.md](sequences.md)).
 - Compose in production does not publish Postgres, Redis or the API instances to the host. Only the web port and the
-  API port (nginx) are published.
+  API port (nginx port 80) are published; nginx's port 8081 is only exposed inside the network.
+- Every long-running container has `restart: unless-stopped`, so a process that exits is started again. The migration
+  job does not restart.
 - The database and Redis are single instances. The API tier scales by adding instances; the data tier does not (see
   [how it scales](../../../../README.md#how-it-scales-and-where-it-stops) in the root README for what that would take).

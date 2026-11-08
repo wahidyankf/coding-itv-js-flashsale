@@ -4,8 +4,11 @@ name: flash-prod
 # Only the web port and the API port (nginx) are published to the host. Postgres and Redis stay on the internal network.
 # Three API instances share one Postgres, one Redis and one TICKET_SECRET. Behind nginx the address of a caller comes
 # from X-Forwarded-For, so TRUST_PROXY is on; the instances are on the internal network only.
+# Every long-running service has `restart: unless-stopped`: a process that exits or crashes is started again, so a lost
+# Redis does not leave the API on its slower Postgres-only path for good. `docker compose stop` is still honoured.
 x-api: &api
   image: flash-be:prod
+  restart: unless-stopped
   environment:
     DATABASE_URL: postgres://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:?}
     REDIS_URL: redis://redis:6379
@@ -24,6 +27,7 @@ x-api: &api
 services:
   postgres:
     image: postgres:18-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
@@ -38,6 +42,7 @@ services:
 
   redis:
     image: redis:8-alpine
+    restart: unless-stopped
     volumes:
       - redis-data:/data
     healthcheck:
@@ -52,6 +57,7 @@ services:
       dockerfile: apps/flash-be/Dockerfile
     image: flash-be:prod
     command: ["node", "dist/migrate.js"]
+    # A one-off job: it runs once before the API instances start and is never started again.
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:?}
       # config.ts requires every URL in production, even though migrations only use Postgres.
@@ -69,13 +75,18 @@ services:
   flash-be-3:
     <<: *api
 
-  # The one door to the API. The API instances are not published; nginx spreads the requests over them.
+  # The one door to the API. The API instances are not published; nginx spreads the requests over them. Port 80 is the
+  # public door, published to the host, and it replaces X-Forwarded-For with the caller's address. Port 8081 is for
+  # flash-web only and is never published: it passes on the browser's address that flash-web sets.
   nginx:
     image: nginx:alpine
+    restart: unless-stopped
     volumes:
       - ./nginx.prod.conf:/etc/nginx/nginx.conf:ro
     ports:
       - "${FLASH_BE_PORT:-8080}:80"
+    expose:
+      - "8081"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health"]
       interval: 2s
@@ -93,8 +104,10 @@ services:
     build:
       context: .
       dockerfile: apps/flash-web/Dockerfile
+    restart: unless-stopped
     environment:
-      FLASH_BE_URL: http://nginx
+      # nginx's internal door, so the API counts each shopper by their own address and not by this container's.
+      FLASH_BE_URL: http://nginx:8081
     ports:
       - "${FLASH_WEB_PORT:-3000}:3000"
     depends_on:

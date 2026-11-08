@@ -79,8 +79,11 @@ services:
 ```
 
 nginx is the only API port on the host. [`nginx.prod.conf`](../../../nginx.prod.conf) sends each request to the
-instance with the fewest open requests (`least_conn`), and replaces `X-Forwarded-For` so a client cannot choose its own
-address for the rate limit.
+instance with the fewest open requests (`least_conn`). It has two listeners. Port 80, published, replaces
+`X-Forwarded-For` so a client cannot choose its own address for the rate limit. Port 8081, only exposed inside the
+network, is for `flash-web`, which writes the shopper's address itself; nginx passes it on. Every long-running service
+has `restart: unless-stopped`, and nginx looks the instances up again through Docker's DNS (`resolve`), so an instance
+that crashed and came back at a new address gets traffic again.
 
 ### Volumes, and what `down -v` deletes
 

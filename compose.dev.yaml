@@ -2,9 +2,12 @@ name: flash-dev
 
 # Local infrastructure for development. Apps run on the host through Nx, so only Postgres and Redis run here.
 # Values come from the root .env (copy .env.example). They are for local use only; never reuse them elsewhere.
+# `restart: unless-stopped` starts a store again when its process exits. `docker compose stop` (the demo's planned Redis
+# outage, `npm run demo:redis:stop`) is still honoured, and a stopped store stays stopped.
 services:
   postgres:
     image: postgres:18-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-flash}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-flash}
@@ -21,6 +24,7 @@ services:
 
   redis:
     image: redis:8-alpine
+    restart: unless-stopped
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:

@@ -21,6 +21,10 @@ shortcuts below; each one is a plain `docker compose -f compose.prod.yaml ...` c
 
 The Compose project is named `flash-prod`, so its containers and volumes never mix with the development ones.
 
+Every service except `flash-be-migrate` has `restart: unless-stopped`: Docker starts a process that exited again, and
+nginx finds an API instance that came back. A service you stop with `docker compose stop` stays down. `flash-web`
+reaches nginx on port 8081, which is not published and keeps the shopper's address that `flash-web` wrote.
+
 ## 1. Set the secrets
 
 The stack reads its settings from `.env` at the root. It does not start when one of these is missing:
@@ -81,7 +85,9 @@ step 1).
 The stack speaks plain HTTP. In a real deployment, put a TLS terminator (a load balancer or a reverse proxy) in front of
 the web port, and keep `COOKIE_SECURE=true`. Shoppers need only the web port. The API port is for operators and
 monitoring; do not expose it to the internet unless you need to. Behind nginx each instance reads the caller's address
-from `X-Forwarded-For` (`TRUST_PROXY` is on in the stack), and the rate limit counts that address.
+from `X-Forwarded-For` (`TRUST_PROXY` is on in the stack), and the rate limit counts that address. `flash-web` trusts no
+proxy: it writes the address of the socket it sees. Behind a TLS terminator that is the terminator's address for every
+shopper, so `flash-web` would then need a list of trusted proxies.
 
 ## Update to a new version
 
@@ -115,8 +121,8 @@ To delete the data as well, run `docker compose -f compose.prod.yaml down -v`. I
 
 ## Before you ship a change
 
-`npm run smoke:prod` builds this stack under another name with random secrets, walks one shopper through it, and removes
-it (see [the smoke test](smoke-test-the-production-stack.md)). Run it after a change to a Dockerfile,
+`npm run smoke:prod` builds this stack under another name with random secrets, walks one shopper through it, makes Redis and
+one API instance exit and come back, and removes it (see [the smoke test](smoke-test-the-production-stack.md)). Run it after a change to a Dockerfile,
 [`compose.prod.yaml`](../../compose.prod.yaml) or [`nginx.prod.conf`](../../nginx.prod.conf).
 
 This stack runs on one machine, with one Postgres and one Redis and no backups. What it takes to go further is in

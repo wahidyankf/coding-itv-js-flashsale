@@ -1,10 +1,10 @@
 // Smoke test of the production stack (compose.prod.yaml), under its own project name, with random secrets and free ports.
 // An operator, made with the create-operator command, makes a sale through the API. A shopper then buys through the web server.
+// Then Redis and one API instance each exit by themselves and must be started again by Docker. Last, a burst of logins
+// through the web server checks that the API counts each shopper's address apart.
 // At the end the stack and its volumes are removed.
 // Usage: npm run smoke:prod   (needs Docker; builds the images, so the first run takes a few minutes)
-import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import net from "node:net";
 import path from "node:path";
 // The API's paths, the status numbers and the retry come from flash-commons, the same ones flash-be and flash-web use.
 // `npm run smoke:prod` builds flash-commons and typekit before this script runs, so the imports resolve to their dist.
@@ -17,6 +17,7 @@ import {
 } from "@flash/flash-commons";
 import { sleep } from "@flash/flash-commons/timers";
 import { Err, Ok } from "@flash/typekit";
+import { composeFor, freePort } from "./docker.mjs";
 
 const root = path.resolve(import.meta.dirname, "../..");
 const PROJECT = "flash-smoke";
@@ -29,17 +30,20 @@ const ADMISSION_POLICY = { baseMs: 250, capMs: 1000, maxAttempts: 30 };
 const PAYMENT_POLICY = { baseMs: 100, capMs: 800, maxAttempts: 5 };
 const MINUTE_MS = 60_000;
 const TICKET_HEADER = "x-queue-ticket";
-
-async function freePort() {
-	return new Promise((resolve, reject) => {
-		const server = net.createServer();
-		server.once("error", reject);
-		server.listen(0, "127.0.0.1", () => {
-			const { port } = server.address();
-			server.close(() => resolve(port));
-		});
-	});
-}
+// Sign-ups and logins one address may make in a window: flash-be's default AUTH_RATE_LIMIT_PER_IP, which the stack keeps.
+const AUTH_LIMIT = 20;
+// The burst from one address must meet a 429 within this many logins. Earlier steps of the walk may have opened the
+// window, which can close mid-burst; twice the limit plus one still reaches the limit in the window that follows.
+const AUTH_BURST_MAX = 2 * (AUTH_LIMIT + 1);
+// Logins sent from a second address once the first is limited. Any number up to the limit would do.
+const SECOND_ADDRESS_LOGINS = 3;
+// flash-web's port inside the compose network, where another container reaches it.
+const WEB_INTERNAL_URL = "http://flash-web:3000";
+// The port an API instance listens on inside its container (FLASH_BE_PORT in compose.prod.yaml).
+const API_INTERNAL_PORT = 8080;
+// A service that exited is waited for until Docker has started it again and it is healthy. Docker's restart backoff and
+// the healthcheck interval (2 seconds for Redis, 10 for an API instance) fit well inside this.
+const RECOVERY_POLICY = { baseMs: 250, capMs: 2000, maxAttempts: 60 };
 
 const secret = () => randomBytes(24).toString("hex");
 
@@ -62,13 +66,13 @@ const env = {
 	FLASH_WEB_PORT: String(webPort),
 };
 
-function compose(...words) {
-	return execFileSync(
-		"docker",
-		["compose", "-p", PROJECT, "-f", "compose.prod.yaml", ...words],
-		{ cwd: root, env, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] },
-	);
-}
+const stack = composeFor({
+	root,
+	env,
+	project: PROJECT,
+	file: "compose.prod.yaml",
+});
+const compose = stack.run;
 
 function step(label) {
 	console.log(`- ${label}`);
@@ -327,6 +331,121 @@ async function checkOutcome(web, routes, shopperCookie, headers) {
 	);
 }
 
+// Whether one API instance answers /ready with 200, which it does only when both Postgres and Redis answer it. Asked
+// inside the instance, so nginx does not pick which instance answers.
+function instanceReady(service) {
+	return stack.succeeds(
+		"exec",
+		"-T",
+		service,
+		"wget",
+		"-qO-",
+		`http://127.0.0.1:${API_INTERNAL_PORT}${PROBE_PATHS.ready}`,
+	);
+}
+
+// Makes the process of a service exit from inside, as a crash would, then waits until Docker has started it again
+// (restart: unless-stopped) and `isReady` holds. `docker stop` would prove nothing: a container stopped on purpose is not
+// started again. The command that ends the process may itself fail as the container goes, so its exit is not read.
+async function exitAndComeBack(service, command, isReady) {
+	const before = stack.state(service).restarts;
+	stack.succeeds("exec", "-T", service, ...command);
+	const back = await retryAsync(
+		async () => {
+			const state = stack.state(service);
+			return state.restarts > before && state.up && isReady()
+				? new Ok(state)
+				: new Err(state);
+		},
+		{ ...RECOVERY_POLICY, sleep, random: Math.random },
+	);
+	if (back.isErr()) {
+		throw new Error(
+			`${service} did not come back: ${JSON.stringify(back.error)}`,
+		);
+	}
+}
+
+// A store or an instance that exits is started again, so the API does not stay on its Postgres-only path, nor short of
+// an instance, for good. The sale can still be read after each.
+async function checkRecovery(web, sale) {
+	step(
+		"Redis exits by itself, Docker starts it again, and every API instance is ready again",
+	);
+	await exitAndComeBack("redis", ["redis-cli", "SHUTDOWN", "NOSAVE"], () =>
+		API_INSTANCES.every(instanceReady),
+	);
+	await checkShopperSeesSale(web, sale);
+
+	const instance = API_INSTANCES[1];
+	step(`${instance} exits, Docker starts it again, and it is ready again`);
+	// SIGTERM, which flash-be answers by closing and exiting. A process that is PID 1 ignores a signal it has no handler for.
+	await exitAndComeBack(instance, ["kill", "1"], () => instanceReady(instance));
+	await checkShopperSeesSale(web, sale);
+}
+
+// Logs in through the web server from a fresh container on the compose network, so from an address that is not this
+// machine's. Returns the status of each try.
+function loginsFromAnotherAddress(body) {
+	const script = [
+		"const [url, count, body] = process.argv.slice(1);",
+		"const statuses = [];",
+		"for (let i = 0; i < Number(count); i += 1) {",
+		'  const reply = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body });',
+		"  statuses.push(reply.status);",
+		"}",
+		"console.log(JSON.stringify(statuses));",
+	].join("\n");
+	const printed = compose(
+		"run",
+		"--rm",
+		"--no-deps",
+		"flash-be-1",
+		"node",
+		"--input-type=module",
+		"-e",
+		script,
+		`${WEB_INTERNAL_URL}${API_PATHS.authLogin}`,
+		String(SECOND_ADDRESS_LOGINS),
+		JSON.stringify(body),
+	);
+	return JSON.parse(printed.trim().split("\n").at(-1));
+}
+
+// The API counts the logins of the page by the address of each shopper, not by the web server's. A burst from this
+// machine through the web server meets the limit, even with a new X-Forwarded-For on every try, because the web server
+// writes the address itself. A shopper at another address is then still let in. Runs last: it uses up this machine's
+// logins for the window.
+async function checkAuthLimitPerAddress(web) {
+	step(
+		"a burst of logins through the web server is limited per address, and a written address does not dodge it",
+	);
+	const body = { username: SHOPPER, password: secret() };
+	let tries = 0;
+	let limited = false;
+	while (!limited && tries < AUTH_BURST_MAX) {
+		tries += 1;
+		const reply = await web("POST", API_PATHS.authLogin, {
+			headers: { "x-forwarded-for": `198.51.100.${tries}` },
+			body,
+		});
+		limited = reply.status === HTTP_STATUS.tooManyRequests;
+	}
+	if (!limited) {
+		throw new Error(
+			`${AUTH_BURST_MAX} logins from one address were never limited`,
+		);
+	}
+
+	step("a shopper at another address can still log in through the web server");
+	const statuses = loginsFromAnotherAddress(body);
+	if (statuses.includes(HTTP_STATUS.tooManyRequests)) {
+		throw new Error(
+			`another address was limited with this one: ${JSON.stringify(statuses)}`,
+		);
+	}
+}
+
 // The whole walk, one phase after another. Each phase stops the walk by throwing when a reply is not the one expected.
 async function walk() {
 	await startStack();
@@ -350,6 +469,8 @@ async function walk() {
 	const held = await holdItem(web, routes, headers);
 	await payForItem(web, routes, shopperCookie, held);
 	await checkOutcome(web, routes, shopperCookie, headers);
+	await checkRecovery(web, sale);
+	await checkAuthLimitPerAddress(web);
 }
 
 try {

@@ -255,10 +255,16 @@ share one read through the event stream.
   or a managed failover. Redis Cluster spreads many sales over shards, but one sale's keys stay together, so it does not
   speed up a single sale.
 
-**Another limit to know.** The per-address rate limit counts the address nginx sees. Behind `flash-web` that is the web
-server for every shopper, so shoppers who buy through the page share one address limit (`RATE_LIMIT_PER_IP`, 600 writes
-per 10 seconds); the per-user limit still applies to each of them. A real deployment would put the browser's address in
-front of that.
+**Each shopper keeps their own address.** The per-address rate limit counts the caller's address. `flash-web` writes the
+browser's socket address into `X-Forwarded-For` itself (never the value the browser sent) and calls nginx on an internal
+port, 8081, that passes that header on. The public port replaces the header with the caller's address, so nobody outside
+can choose one. A TLS terminator in front of `flash-web` would need a trusted-proxy list in `flash-web`, or every
+shopper would share the terminator's address.
+
+**Services come back by themselves.** Every long-running service in [`compose.prod.yaml`](compose.prod.yaml) has
+`restart: unless-stopped`, so a Redis, Postgres, API, nginx or `flash-web` process that exits is started again, and nginx
+looks the instances up again when one comes back. A service stopped on purpose with `docker compose stop` stays down.
+`npm run smoke:prod` makes Redis and one API instance exit and checks that both come back.
 
 ## Run it
 

@@ -54,7 +54,14 @@ payment. A hold that has expired no longer counts, so no cleanup job is needed.
 
 ## Coming back
 
-Redis may come back empty (a restart) or with its old data (a network break). The two cases need different care:
+Nothing has to be done by hand to bring Redis back. In both compose files Redis has `restart: unless-stopped`, so Docker
+starts a Redis process that exited again. The API's Redis client reconnects by itself, with backoff and no attempt limit
+(see [retry policies](../reference/retry-policies.md)), and `/ready` answers `200` again once Redis answers. A Redis
+stopped on purpose (`docker compose stop redis`, as the demo does) stays down until `docker compose start redis`.
+`npm run smoke:prod` makes Redis exit and checks that every API instance is ready again.
+
+Redis may come back empty (a restart) or with its old data (a network break, or a restart that loaded an old snapshot
+from its volume). The two cases need different care:
 
 - **Empty.** The `ready` key is missing, so the next reservation finds the gate not ready and one instance rebuilds
   it from Postgres. The rules for that rebuild are in [reservations and recovery](reservations-and-recovery.md#when-redis-loses-its-state).
