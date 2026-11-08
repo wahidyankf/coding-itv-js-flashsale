@@ -29,7 +29,7 @@ import { ACCESS_COOKIE, REFRESH_COOKIE } from "./fake-account";
 import { createFakeBackend, type FakeBackend } from "./fake-backend";
 import { type Match, matchRoute } from "./fake-http";
 import { SALE_ID, type SaleSpec } from "./fake-state";
-import { requestOf } from "./node-request";
+import { requestOf, textHeadersOf } from "./node-request";
 import type { WebWorld } from "./web-world";
 
 const WAIT = { timeout: 8000, interval: 50 };
@@ -123,11 +123,7 @@ function backendServer(current: () => FakeBackend): Server {
 			const reply = backend.handle(
 				request.method ?? "GET",
 				path,
-				{
-					[TICKET_HEADER]: ticket,
-					cookie: request.headers.cookie,
-					"x-forwarded-for": request.headers["x-forwarded-for"]?.toString(),
-				},
+				textHeadersOf(request),
 				text ? JSON.parse(text) : {},
 			);
 			response.writeHead(reply.status, {
@@ -389,7 +385,7 @@ function apiOf(h: Harness, browserFetch: typeof fetch) {
 		apiAddress: () => h.backendUrl,
 		// The browser and the web server are both on the loopback address.
 		callerAddress: () => "127.0.0.1",
-		apiToldAddress: () => h.backend.toldAddress(),
+		apiTold: (header: string) => h.backend.told(header),
 		async send(
 			method: "GET" | "POST",
 			path: string,
@@ -412,6 +408,7 @@ function apiOf(h: Harness, browserFetch: typeof fetch) {
 				json: (await reply.json()) as Record<string, unknown>,
 				cookies: reply.headers.getSetCookie(),
 				reachedApi: h.backend.requestCount() > before,
+				requestId: reply.headers.get("x-request-id"),
 			};
 		},
 	};

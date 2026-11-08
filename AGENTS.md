@@ -108,7 +108,7 @@ Flash sale monorepo with five apps in [`apps/`](apps) and two libraries in [`lib
 - Docs are checked by RHINO, which reads the policy in [`repo-config.yml`](repo-config.yml). Run `npm run docs:install` once per machine,
   then `npm run docs:check`. The version and digests are pinned in [`scripts/install-rhino.sh`](scripts/install-rhino.sh); bump them together.
 - The pre-push hook runs, in order, `npm run lint` (Biome check of the whole repo, warnings fail), `npm run docs:check`,
-  `bdd:check:test`, `lint:rules:test`, `build:script:test` (the tests of the build script), `bdd:check` (the behaviour coverage check), then
+  `bdd:check:test`, `lint:rules:test`, `build:script:test` (the tests of the build script), `trace:script:test` (the tests of the log tracer), `bdd:check` (the behaviour coverage check), then
   `nx affected -t test:quick` (typecheck, lint, unit tests) and `nx affected -t test:coverage` (the 99% floor) against
   `origin/main`. `test:coverage` starts the dev stack itself, so Docker must run. Do not skip hooks with `--no-verify`
   unless the user asks.

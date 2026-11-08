@@ -66,6 +66,11 @@ describeFeature(
 		);
 
 		Scenario(
+			"Each request is given a request id the API and the browser both see",
+			steps.requestIdShared,
+		);
+
+		Scenario(
 			"An API that cannot be reached gives a gateway error",
 			steps.apiUnreachable,
 		);

@@ -3,6 +3,9 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import net from "node:net";
 
+// The most a command may print. The logs of a whole walk pass Node's default of 1 MiB, which would stop the run.
+const MAX_OUTPUT_BYTES = 67_108_864; // 64 MiB
+
 // A host port nothing listens on now, so the smoke stack never takes the port of a stack that is already running.
 export async function freePort() {
 	return new Promise((resolve, reject) => {
@@ -15,9 +18,11 @@ export async function freePort() {
 	});
 }
 
-// The compose commands of one project and file, run from `root` with `env`, so every step talks to the same stack.
+// The compose commands of one project and file, run from `root` with `env`, so every step talks to the same stack. With
+// no `project`, compose takes the name the file gives.
 export function composeFor({ root, env, project, file }) {
-	const args = (words) => ["compose", "-p", project, "-f", file, ...words];
+	const named = project === undefined ? [] : ["-p", project];
+	const args = (words) => ["compose", ...named, "-f", file, ...words];
 
 	// Runs a command and returns what it printed. A failed command throws, which stops the walk.
 	const run = (...words) =>
@@ -26,6 +31,7 @@ export function composeFor({ root, env, project, file }) {
 			env,
 			encoding: "utf8",
 			stdio: ["ignore", "pipe", "inherit"],
+			maxBuffer: MAX_OUTPUT_BYTES,
 		});
 
 	// Runs a command whose failure is an answer, not a stop: says whether it exited with 0.

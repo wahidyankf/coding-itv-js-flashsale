@@ -16,7 +16,8 @@ server passes it on, with the login cookies. This page gives the reasons and wha
   DELETE) are not on the list. A sale id must be a UUID, or the answer is `404 not_found`. The server also sends on only
   the headers the API needs (the `cookie` header among them). It writes `X-Forwarded-For` itself, from the caller's
   socket address, and never copies the one the browser sent, so the API's rate limit counts each shopper by their own
-  address. The browser and the API use the same paths, so the path
+  address. It also gives each request a new `X-Request-Id`, sends it to the API and returns it on the reply, so one
+  request can be traced through the logs. The browser and the API use the same paths, so the path
   and the cookies pass unchanged. A POST from another origin is refused with `403 cross_site`.
 
 ```mermaid

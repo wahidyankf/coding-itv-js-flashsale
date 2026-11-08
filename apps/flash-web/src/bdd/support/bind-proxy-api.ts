@@ -1,6 +1,7 @@
 // Binds specs/apps/flash/web/behaviours/proxy/api.feature at both the unit and the integration layer: the steps of each
 // scenario, over the layer's world. Each scenario keeps the reply of its own last request, so no reply carries from one
 // scenario to the next. The layer names the scenarios in its own test file, where the behaviour checker reads the titles.
+import { isUuid } from "@flash/flash-commons";
 import { expect } from "vitest";
 import {
 	isLoggedIn,
@@ -222,10 +223,42 @@ function callerAddressPassedOn(world: WebWorld): ScenarioBinder {
 			},
 		);
 		Then("the API is told the address the request came from", () => {
-			expect(world.apiToldAddress()).toBe(world.callerAddress());
+			expect(world.apiTold("x-forwarded-for")).toBe(world.callerAddress());
 		});
 		And("the API is not told {string}", (_ctx, written: string) => {
-			expect(world.apiToldAddress()).not.toContain(written);
+			expect(world.apiTold("x-forwarded-for")).not.toContain(written);
+		});
+	};
+}
+
+// The web server gives each request an id of its own, which the API logs and the browser gets back, so one request can be
+// traced from the reply to the logs. An id the client wrote is never passed on.
+function requestIdShared(world: WebWorld): ScenarioBinder {
+	return ({ When, Then, And }) => {
+		const last: AnswerBox = { answer: undefined };
+		When(
+			"a client that writes the request id {string} sends GET /api/v1/sales/current",
+			async (_ctx, written: string) => {
+				last.answer = await world.send(
+					"GET",
+					"/api/v1/sales/current",
+					undefined,
+					undefined,
+					{ "x-request-id": written },
+				);
+			},
+		);
+		Then("the API is told a request id that is a UUID", () => {
+			expect(isUuid(world.apiTold("x-request-id") ?? "")).toBe(true);
+		});
+		And(
+			"the API is not told the request id {string}",
+			(_ctx, written: string) => {
+				expect(world.apiTold("x-request-id")).not.toBe(written);
+			},
+		);
+		And("the reply carries the request id the API was told", () => {
+			expect(answerOf(last).requestId).toBe(world.apiTold("x-request-id"));
 		});
 	};
 }
@@ -255,6 +288,7 @@ export function bindProxyApi(world: WebWorld) {
 		signUpSetsCookies: signUpSetsCookies(world),
 		otherSiteRefused: otherSiteRefused(world),
 		callerAddressPassedOn: callerAddressPassedOn(world),
+		requestIdShared: requestIdShared(world),
 		apiUnreachable: apiUnreachable(world),
 	};
 }

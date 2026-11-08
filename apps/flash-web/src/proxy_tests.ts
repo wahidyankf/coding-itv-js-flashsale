@@ -1,9 +1,20 @@
-// Unit tests for the proxy: which routes pass, which POSTs are refused as cross-site, and which headers and cookies move.
-import { describe, expect, it, vi } from "vitest";
+// Unit tests for the proxy: which routes pass, which POSTs are refused as cross-site, which headers and cookies move, the
+// request id, and the line logged when the API cannot be reached.
+import { isUuid } from "@flash/flash-commons";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { isAllowed, isCrossSite, proxyToBackend } from "./proxy";
 
 const ENV = { FLASH_BE_URL: "http://flash-be.test" };
 const ID = "11111111-1111-4111-8111-111111111111";
+
+afterEach(() => {
+	vi.restoreAllMocks();
+});
+
+// A fetch that cannot reach the API, as `fetch` fails when nothing listens.
+const unreachable = async (): Promise<Response> => {
+	throw new TypeError("fetch failed");
+};
 
 describe("isAllowed", () => {
 	it.each([
@@ -355,12 +366,11 @@ describe("proxyToBackend", () => {
 	);
 
 	it("answers 502 when the API cannot be reached", async () => {
+		vi.spyOn(console, "error").mockImplementation(() => undefined);
 		const reply = await proxyToBackend(
 			new Request("http://web.test/api/v1/sales/current"),
 			ENV,
-			async () => {
-				throw new TypeError("fetch failed");
-			},
+			unreachable,
 		);
 		expect(reply.status).toBe(502);
 		expect(await reply.json()).toEqual({
@@ -383,5 +393,78 @@ describe("proxyToBackend", () => {
 		} finally {
 			vi.unstubAllGlobals();
 		}
+	});
+});
+
+describe("the request id", () => {
+	it("gives each request a new UUID, sends it to the API, and drops the one the browser wrote", async () => {
+		const fetcher = vi.fn<typeof fetch>(async () => new Response("{}"));
+		const browser = () =>
+			new Request("http://web.test/api/v1/sales/current", {
+				headers: { "x-request-id": "chosen-by-the-browser" },
+			});
+		await proxyToBackend(browser(), ENV, fetcher);
+		await proxyToBackend(browser(), ENV, fetcher);
+		const [first, second] = fetcher.mock.calls.map((call) =>
+			new Headers(call[1]?.headers).get("x-request-id"),
+		);
+		expect(isUuid(first ?? "")).toBe(true);
+		expect(isUuid(second ?? "")).toBe(true);
+		expect(first).not.toBe(second);
+	});
+
+	it("gives the browser the id the API was told, whatever the API sends back", async () => {
+		const fetcher = vi.fn<typeof fetch>(
+			async () =>
+				new Response("{}", { headers: { "x-request-id": "other-id" } }),
+		);
+		const reply = await proxyToBackend(
+			new Request("http://web.test/api/v1/sales/current"),
+			ENV,
+			fetcher,
+		);
+		const sent = new Headers(fetcher.mock.calls[0]?.[1]?.headers);
+		expect(isUuid(reply.headers.get("x-request-id") ?? "")).toBe(true);
+		expect(reply.headers.get("x-request-id")).toBe(sent.get("x-request-id"));
+	});
+
+	it("is on the web server's own refusals too", async () => {
+		const reply = await proxyToBackend(
+			new Request("http://web.test/api/v1/admin/sales"),
+			ENV,
+			vi.fn<typeof fetch>(),
+		);
+		expect(reply.status).toBe(404);
+		expect(isUuid(reply.headers.get("x-request-id") ?? "")).toBe(true);
+	});
+
+	it("logs one line when the API cannot be reached: the id, the method, the path and the cause, and no header value", async () => {
+		const logged = vi
+			.spyOn(console, "error")
+			.mockImplementation(() => undefined);
+		const reply = await proxyToBackend(
+			new Request(`http://web.test/api/v1/sales/${ID}/reservations?x=1`, {
+				method: "POST",
+				body: "{}",
+				headers: {
+					cookie: "access_token=secret-cookie",
+					"x-queue-ticket": "secret-ticket",
+					"x-request-id": "secret-browser-id",
+				},
+			}),
+			ENV,
+			unreachable,
+		);
+		expect(reply.status).toBe(502);
+		expect(logged).toHaveBeenCalledTimes(1);
+		const line = String(logged.mock.calls[0]?.[0]);
+		expect(JSON.parse(line)).toEqual({
+			msg: "the API could not be reached",
+			requestId: reply.headers.get("x-request-id"),
+			method: "POST",
+			path: `/api/v1/sales/${ID}/reservations`,
+			cause: "fetch failed",
+		});
+		expect(line).not.toContain("secret");
 	});
 });

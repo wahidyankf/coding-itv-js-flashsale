@@ -21,11 +21,7 @@ import { SalePage } from "../../sale-page";
 import { createWebApi } from "../../web-api";
 import { createCookieJar } from "./cookie-jar";
 import { ACCESS_COOKIE, REFRESH_COOKIE } from "./fake-account";
-import {
-	createFakeBackend,
-	type FakeBackend,
-	FORWARDED_FOR,
-} from "./fake-backend";
+import { createFakeBackend, type FakeBackend } from "./fake-backend";
 import { matchRoute } from "./fake-http";
 import { SALE_ID, type SaleSpec } from "./fake-state";
 import type { WebWorld } from "./web-world";
@@ -59,11 +55,7 @@ function backendFetchOf(h: Harness): typeof fetch {
 		const reply = h.backend.handle(
 			init?.method ?? "GET",
 			url.pathname,
-			{
-				[TICKET_HEADER]: headers.get(TICKET_HEADER) ?? undefined,
-				cookie: headers.get("cookie") ?? undefined,
-				[FORWARDED_FOR]: headers.get(FORWARDED_FOR) ?? undefined,
-			},
+			Object.fromEntries(headers),
 			text ? JSON.parse(text) : {},
 		);
 		const returned = new Headers(reply.headers);
@@ -316,7 +308,7 @@ function apiOf(h: Harness, webFetch: typeof fetch) {
 			document.body.innerHTML,
 		apiAddress: () => BACKEND,
 		callerAddress: () => CALLER,
-		apiToldAddress: () => h.backend.toldAddress(),
+		apiTold: (header: string) => h.backend.told(header),
 		async send(
 			method: "GET" | "POST",
 			path: string,
@@ -339,6 +331,7 @@ function apiOf(h: Harness, webFetch: typeof fetch) {
 				json: (await reply.json()) as Record<string, unknown>,
 				cookies: reply.headers.getSetCookie(),
 				reachedApi: h.backend.requestCount() > before,
+				requestId: reply.headers.get("x-request-id"),
 			};
 		},
 	};

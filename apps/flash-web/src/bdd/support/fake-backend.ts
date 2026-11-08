@@ -93,14 +93,11 @@ function answer(
 	return shopperRoute(state, name, user, headers, body);
 }
 
-// The header that tells flash-be the address of the caller, which flash-be limits by. The worlds pass it to `handle`.
-export const FORWARDED_FOR = "x-forwarded-for";
-
 // Builds one fake flash-be. The scenario drives it through the controls, and the web server and the page call `handle`.
 export function createFakeBackend(now: () => number) {
 	const state = createFakeState(now);
-	// The address the last request said it came from, as the web server wrote it.
-	let toldAddress: string | undefined;
+	// The headers of the last request, as the web server sent them, so a scenario can check what the API was told.
+	let told: Record<string, string | undefined> = {};
 	return {
 		settings: state.settings,
 		onChange(listener: () => void): () => void {
@@ -148,7 +145,7 @@ export function createFakeBackend(now: () => number) {
 		placeOf: (user: string) => placeOf(state, user),
 		hasSale: () => state.sale !== undefined,
 		purchaseIdOf: (user: string) => state.bought.get(user)?.purchaseId,
-		toldAddress: () => toldAddress,
+		told: (header: string) => told[header],
 		// The API. `path` is the path of the contract, such as `/api/v1/sales/current`.
 		handle(
 			method: string,
@@ -157,7 +154,7 @@ export function createFakeBackend(now: () => number) {
 			body: Record<string, unknown>,
 		): Reply {
 			state.requests += 1;
-			toldAddress = headers[FORWARDED_FOR];
+			told = headers;
 			if (state.unreachable) throw new TypeError("fetch failed");
 			const match = matchRoute(method, path);
 			return match ? answer(state, match, headers, body) : refuse("not_found");

@@ -1,5 +1,6 @@
 // Smoke test of the production stack (compose.prod.yaml), under its own project name, with random secrets and free ports.
 // An operator, made with the create-operator command, makes a sale through the API. A shopper then buys through the web server.
+// One request through the web server is then traced by its request id, in the logs of nginx and of an API instance.
 // Then Redis and one API instance each exit by themselves and must be started again by Docker. Last, a burst of logins
 // through the web server checks that the API counts each shopper's address apart.
 // At the end the stack and its volumes are removed.
@@ -18,6 +19,7 @@ import {
 import { sleep } from "@flash/flash-commons/timers";
 import { Err, Ok } from "@flash/typekit";
 import { composeFor, freePort } from "./docker.mjs";
+import { stackChecks } from "./stack-checks.mjs";
 
 const root = path.resolve(import.meta.dirname, "../..");
 const PROJECT = "flash-smoke";
@@ -39,11 +41,6 @@ const AUTH_BURST_MAX = 2 * (AUTH_LIMIT + 1);
 const SECOND_ADDRESS_LOGINS = 3;
 // flash-web's port inside the compose network, where another container reaches it.
 const WEB_INTERNAL_URL = "http://flash-web:3000";
-// The port an API instance listens on inside its container (FLASH_BE_PORT in compose.prod.yaml).
-const API_INTERNAL_PORT = 8080;
-// A service that exited is waited for until Docker has started it again and it is healthy. Docker's restart backoff and
-// the healthcheck interval (2 seconds for Redis, 10 for an API instance) fit well inside this.
-const RECOVERY_POLICY = { baseMs: 250, capMs: 2000, maxAttempts: 60 };
 
 const secret = () => randomBytes(24).toString("hex");
 
@@ -331,59 +328,6 @@ async function checkOutcome(web, routes, shopperCookie, headers) {
 	);
 }
 
-// Whether one API instance answers /ready with 200, which it does only when both Postgres and Redis answer it. Asked
-// inside the instance, so nginx does not pick which instance answers.
-function instanceReady(service) {
-	return stack.succeeds(
-		"exec",
-		"-T",
-		service,
-		"wget",
-		"-qO-",
-		`http://127.0.0.1:${API_INTERNAL_PORT}${PROBE_PATHS.ready}`,
-	);
-}
-
-// Makes the process of a service exit from inside, as a crash would, then waits until Docker has started it again
-// (restart: unless-stopped) and `isReady` holds. `docker stop` would prove nothing: a container stopped on purpose is not
-// started again. The command that ends the process may itself fail as the container goes, so its exit is not read.
-async function exitAndComeBack(service, command, isReady) {
-	const before = stack.state(service).restarts;
-	stack.succeeds("exec", "-T", service, ...command);
-	const back = await retryAsync(
-		async () => {
-			const state = stack.state(service);
-			return state.restarts > before && state.up && isReady()
-				? new Ok(state)
-				: new Err(state);
-		},
-		{ ...RECOVERY_POLICY, sleep, random: Math.random },
-	);
-	if (back.isErr()) {
-		throw new Error(
-			`${service} did not come back: ${JSON.stringify(back.error)}`,
-		);
-	}
-}
-
-// A store or an instance that exits is started again, so the API does not stay on its Postgres-only path, nor short of
-// an instance, for good. The sale can still be read after each.
-async function checkRecovery(web, sale) {
-	step(
-		"Redis exits by itself, Docker starts it again, and every API instance is ready again",
-	);
-	await exitAndComeBack("redis", ["redis-cli", "SHUTDOWN", "NOSAVE"], () =>
-		API_INSTANCES.every(instanceReady),
-	);
-	await checkShopperSeesSale(web, sale);
-
-	const instance = API_INSTANCES[1];
-	step(`${instance} exits, Docker starts it again, and it is ready again`);
-	// SIGTERM, which flash-be answers by closing and exiting. A process that is PID 1 ignores a signal it has no handler for.
-	await exitAndComeBack(instance, ["kill", "1"], () => instanceReady(instance));
-	await checkShopperSeesSale(web, sale);
-}
-
 // Logs in through the web server from a fresh container on the compose network, so from an address that is not this
 // machine's. Returns the status of each try.
 function loginsFromAnotherAddress(body) {
@@ -469,7 +413,9 @@ async function walk() {
 	const held = await holdItem(web, routes, headers);
 	await payForItem(web, routes, shopperCookie, held);
 	await checkOutcome(web, routes, shopperCookie, headers);
-	await checkRecovery(web, sale);
+	const checks = stackChecks({ stack, step, origin, instances: API_INSTANCES });
+	await checks.checkTrace();
+	await checks.checkRecovery(() => checkShopperSeesSale(web, sale));
 	await checkAuthLimitPerAddress(web);
 }
 

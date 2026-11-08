@@ -1,6 +1,8 @@
 // Server only. The web server's proxy. It checks browser requests under /api, passes them to flash-be, and streams the answer back.
 // Only the routes the browser needs get through, each with one method. A POST must come from this site, and the address of flash-be stays on the server.
+// Each request gets a request id here, which the API, nginx and the browser all see, so one request can be traced.
 // Decision: docs/explanation/decisions/006-browser-talks-to-web-server-only.md.
+import { randomUUID } from "node:crypto";
 import { HTTP_STATUS, isUuid } from "@flash/flash-commons";
 import { attempt, attemptAsync } from "@flash/typekit";
 import { RETRY_AFTER_HEADER, TICKET_HEADER } from "./api";
@@ -18,6 +20,9 @@ const ALLOWED: Array<[method: string, path: RegExp]> = BROWSER_ROUTES.map(
 const SENT = ["content-type", TICKET_HEADER, "accept", "cookie"];
 const FORWARDED_FOR = "x-forwarded-for";
 const RETURNED = ["content-type", "cache-control", RETRY_AFTER_HEADER];
+// The id of one request, made here and never taken from the browser. The API logs it, and the browser gets it back, so a
+// shopper or a tester can quote it.
+const REQUEST_ID = "x-request-id";
 
 // The answers this server gives on its own, in the shape of the API's errors. `not_found` is a copy of flash-be's code,
 // status and sentence (`same_as_be_tests.ts` checks it); `backend_unavailable` exists only here.
@@ -77,9 +82,26 @@ export function isCrossSite(request: Request): boolean {
 	return site !== null && site !== "same-origin" && site !== "none";
 }
 
-function refuse(code: keyof typeof REFUSALS): Response {
+function refuse(code: keyof typeof REFUSALS, requestId: string): Response {
 	const { status, message } = REFUSALS[code];
-	return Response.json({ errorCode: code, errorMessage: message }, { status });
+	return Response.json(
+		{ errorCode: code, errorMessage: message },
+		{ status, headers: { [REQUEST_ID]: requestId } },
+	);
+}
+
+// One JSON line on the server's error output, so an API that cannot be reached is seen with the id the shopper got. It
+// names the request but holds no header value, so no cookie or ticket reaches the log.
+function logUnreachable(requestId: string, request: Request, cause: Error) {
+	console.error(
+		JSON.stringify({
+			msg: "the API could not be reached",
+			requestId,
+			method: request.method,
+			path: new URL(request.url).pathname,
+			cause: cause.message,
+		}),
+	);
 }
 
 // Copies only the named headers, so no other header passes between the browser and flash-be.
@@ -101,21 +123,23 @@ function callerAddress(request: Request): string | undefined {
 	return typeof ip === "string" && ip !== "" ? ip : undefined;
 }
 
-// The proxy's one entry point. Streams flash-be's answer back with only the allowed headers. A failed call becomes a
-// 502 reply, so the shopper never sees a crash.
+// The proxy's one entry point. Streams flash-be's answer back with only the allowed headers. Every reply carries the
+// request id the API was told. A failed call is logged with that id and becomes a 502 reply, so the shopper never sees a
+// crash.
 export async function proxyToBackend(
 	request: Request,
 	env: NodeJS.ProcessEnv,
 	fetcher: typeof fetch = fetch,
 ): Promise<Response> {
-	const url = new URL(request.url);
-	const path = url.pathname;
-	if (!isAllowed(request.method, path)) return refuse("not_found");
+	const requestId = randomUUID();
+	const path = new URL(request.url).pathname;
+	if (!isAllowed(request.method, path)) return refuse("not_found", requestId);
 	if (request.method === "POST" && isCrossSite(request)) {
-		return refuse("cross_site");
+		return refuse("cross_site", requestId);
 	}
 
 	const headers = pick(request.headers, SENT);
+	headers.set(REQUEST_ID, requestId);
 	const address = callerAddress(request);
 	if (address !== undefined) headers.set(FORWARDED_FOR, address);
 
@@ -127,6 +151,7 @@ export async function proxyToBackend(
 			signal: request.signal,
 		});
 		const returned = pick(upstream.headers, RETURNED);
+		returned.set(REQUEST_ID, requestId);
 		// Every cookie, one header each: they cannot be joined into one value. The browser and the API use the same paths,
 		// so a cookie passes unchanged.
 		for (const cookie of upstream.headers.getSetCookie()) {
@@ -137,5 +162,7 @@ export async function proxyToBackend(
 			headers: returned,
 		});
 	}, Error);
-	return answered.isOk() ? answered.value : refuse("backend_unavailable");
+	if (answered.isOk()) return answered.value;
+	logUnreachable(requestId, request, answered.error);
+	return refuse("backend_unavailable", requestId);
 }

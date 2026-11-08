@@ -8,12 +8,13 @@ export type SaleSpec = {
 };
 
 // What came back from the web server: the status, the body, and the cookies it asked the client to keep.
-// `reachedApi` tells whether the request got as far as the API behind it.
+// `reachedApi` tells whether the request got as far as the API behind it, and `requestId` is the id the reply carries.
 export type ApiAnswer = {
 	status: number;
 	json: Record<string, unknown>;
 	cookies: string[];
 	reachedApi: boolean;
+	requestId: string | null;
 };
 
 // What a web scenario may do. Both worlds provide it, so the scenario code is the same for each.
@@ -77,8 +78,8 @@ export type WebWorld = {
 		origin?: string,
 		headers?: Record<string, string>,
 	) => Promise<ApiAnswer>;
-	// The address the web server sees a request come from, and the address the API was told for the last request.
+	// The address the web server sees a request come from, and a header of the last request the API got.
 	callerAddress: () => string;
-	apiToldAddress: () => string | undefined;
+	apiTold: (header: string) => string | undefined;
 	saleId: string;
 };

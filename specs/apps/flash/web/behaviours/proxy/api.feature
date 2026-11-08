@@ -78,6 +78,12 @@ Feature: The web server in front of the API
     Then the API is told the address the request came from
     And the API is not told "6.6.6.6"
 
+  Scenario: Each request is given a request id the API and the browser both see
+    When a client that writes the request id "chosen-by-the-browser" sends GET /api/v1/sales/current
+    Then the API is told a request id that is a UUID
+    And the API is not told the request id "chosen-by-the-browser"
+    And the reply carries the request id the API was told
+
   Scenario: An API that cannot be reached gives a gateway error
     Given the sale cannot be reached
     When a client sends GET /api/v1/sales/current

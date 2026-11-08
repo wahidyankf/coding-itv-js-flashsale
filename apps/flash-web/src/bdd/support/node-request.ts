@@ -2,11 +2,14 @@
 // proxy reads, the way the Node server under Nitro (srvx) hands it to a route. Test support only.
 import type { IncomingMessage } from "node:http";
 
-// The request headers, as the proxy takes them. Only text headers are kept.
-function headersOf(request: IncomingMessage): Headers {
-	const headers = new Headers();
+// The text headers of a request, by their lower-case names. A header that comes as a list, such as `set-cookie`, is left
+// out: neither the proxy nor the fake flash-be reads one. The fake flash-be gets its requests' headers this way too.
+export function textHeadersOf(
+	request: IncomingMessage,
+): Record<string, string> {
+	const headers: Record<string, string> = {};
 	for (const [name, value] of Object.entries(request.headers)) {
-		if (typeof value === "string") headers.set(name, value);
+		if (typeof value === "string") headers[name] = value;
 	}
 	return headers;
 }
@@ -21,7 +24,7 @@ export function requestOf(
 	return Object.assign(
 		new Request(new URL(request.url ?? "/", "http://web.test"), {
 			method: request.method ?? "GET",
-			headers: headersOf(request),
+			headers: textHeadersOf(request),
 			body,
 			signal,
 		}),

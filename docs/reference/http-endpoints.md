@@ -420,10 +420,14 @@ flowchart LR
 ```
 
 Only `content-type`, `accept`, `cookie` and `x-queue-ticket` are sent on. `x-forwarded-for` is written by the web
-server from the caller's socket address; the one the browser sent is dropped. Only `content-type`,
+server from the caller's socket address; the one the browser sent is dropped. `x-request-id` is a new UUID the web
+server makes for each request (the browser's is dropped); it is sent to the API and comes back on every reply, the web
+server's own `404`, `403` and `502` included, so one request can be found in the logs of `flash-web`, nginx and
+`flash-be`. Only `content-type`,
 `cache-control`, `retry-after` and every `set-cookie` come back. The path and the cookies pass unchanged: `flash-be` sets
 the refresh cookie for `/api/v1/auth`, the same path the browser calls. When `flash-be` cannot be reached the answer is `502`
-with `errorCode` `backend_unavailable`. The address of `flash-be` is read on the server and never reaches the page. See
+with `errorCode` `backend_unavailable`, and the web server logs one JSON line with the request id, the method, the path
+and the cause. The address of `flash-be` is read on the server and never reaches the page. See
 [the web server in front of the API](../explanation/web-server-proxy.md).
 
 The scenarios are in [`specs/apps/flash/web/behaviours/proxy/`](../../specs/apps/flash/web/behaviours/proxy/README.md) and

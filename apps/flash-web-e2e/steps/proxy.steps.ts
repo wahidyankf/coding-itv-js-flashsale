@@ -1,8 +1,8 @@
 // Steps for the web server's /api proxy: a shopper's request reaches the API through it, the cookies a reply sets must be
-// HttpOnly on the right path, the body must not hold a token, a request from another site must not reach the API, and the API
-// is told the address the request came from. Binds proxy/api.feature.
+// HttpOnly on the right path, the body must not hold a token, a request from another site must not reach the API, the API
+// is told the address the request came from, and the API and the reply share the request id. Binds proxy/api.feature.
 
-import { API_PATHS, parseSetCookie } from "@flash/flash-commons";
+import { API_PATHS, isUuid, parseSetCookie } from "@flash/flash-commons";
 import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { E2E_PASSWORD } from "../../flash-be-e2e/steps/support/auth.js";
@@ -25,6 +25,7 @@ const { When, Then } = createBdd();
 // one depends on whether the server listens on IPv4, IPv6 or both.
 const LOOPBACK = ["127.0.0.1", "::1", "::ffff:127.0.0.1"];
 const FORWARDED_FOR = "x-forwarded-for";
+const REQUEST_ID = "x-request-id";
 
 // The client is the page's own browser context, so it sends the cookies the page holds, if there are any.
 When("a client joins the queue through the web server", async ({ page }) => {
@@ -150,5 +151,41 @@ Then(
 	/^the API is not told "([^"]+)"$/,
 	async ({ request: _request }, written: string) => {
 		expect(forwarder.headerOfLast(FORWARDED_FOR) ?? "").not.toContain(written);
+	},
+);
+
+// The API gives a canned reply, so the forwarder holds the request exactly as the real web server sent it.
+When(
+	/^a client that writes the request id "([^"]+)" sends GET \/api\/v1\/sales\/current$/,
+	async ({ request }, written: string) => {
+		await answerWith(200, "{}");
+		setResponse(
+			await request.get(API_PATHS.saleCurrent, {
+				headers: { [REQUEST_ID]: written },
+			}),
+		);
+	},
+);
+
+Then(
+	"the API is told a request id that is a UUID",
+	async ({ request: _request }) => {
+		expect(isUuid(forwarder.headerOfLast(REQUEST_ID) ?? "")).toBe(true);
+	},
+);
+
+Then(
+	/^the API is not told the request id "([^"]+)"$/,
+	async ({ request: _request }, written: string) => {
+		expect(forwarder.headerOfLast(REQUEST_ID)).not.toBe(written);
+	},
+);
+
+Then(
+	"the reply carries the request id the API was told",
+	async ({ request: _request }) => {
+		expect(currentResponse().headers()[REQUEST_ID]).toBe(
+			forwarder.headerOfLast(REQUEST_ID),
+		);
 	},
 );

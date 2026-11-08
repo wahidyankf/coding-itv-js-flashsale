@@ -35,11 +35,14 @@ flowchart LR
 - `flash-web` renders the sale page from `GET /api/v1/sales/current` and shows the backend status from `GET /health`. It passes
   the browser's requests under `/api/v1/sales` and `/api/v1/auth` on to the API, streams and cookies included. The address comes from `FLASH_BE_URL`,
   read only on the server. In production that address is nginx's internal port 8081. `flash-web` writes the browser's
-  socket address into `X-Forwarded-For` and drops the one the browser sent.
+  socket address into `X-Forwarded-For` and drops the one the browser sent. It gives each request a new
+  `X-Request-Id`, sends it on and returns it to the browser.
 - `nginx` is the one door to the API. It sends each request to the instance with the fewest open requests. On its
   published port 80 it sets `X-Forwarded-For` to the address it sees, so a caller cannot choose its own address for the
   rate limit. On port 8081, which only the containers of the stack reach, it passes on the address `flash-web` wrote, so
-  each page shopper is counted by their own address. It looks the instances up again through Docker's DNS, so an
+  each page shopper is counted by their own address. Port 80 sets `X-Request-Id` to an id of its own, port 8081
+  passes on the one `flash-web` made, and both write it in nginx's access log. Port 80 returns the id on every reply, nginx's own `502` and `504`
+  included. It looks the instances up again through Docker's DNS, so an
   instance that came back at a new address gets traffic again. The operator
   logs in and manages sales through it with the `/api/v1/auth` and `/api/v1/admin/sales` routes (create, list, change, remove); the web server never passes them on.
 - The three `flash-be` instances are identical. A queue ticket is signed with a shared secret, the state lives in

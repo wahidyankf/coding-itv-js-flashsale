@@ -358,6 +358,7 @@ npx nx test:quick flash-commons # the other library, the same way
 npm run lint:rules:test        # the lint rules: no catch, exhaustive switches
 npm run build:script:test      # the build script: tsc, then remove outputs this run did not write
 npm run bdd:check              # every scenario is bound at the layers it needs
+npm run trace:script:test      # the log tracer of prod:trace
 npm run lint                   # Biome check of the whole repo: format, lint, imports
 npm run docs:install           # once: fetch the docs checker
 npm run docs:check             # links, structure and diagrams in the docs
