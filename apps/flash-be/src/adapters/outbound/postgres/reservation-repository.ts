@@ -34,36 +34,34 @@ type HoldInput = {
 	expiresAt: Date;
 };
 
-// Locks what a write of the shopper's hold depends on, always in the same order: the sale row (shared, so shoppers do not
-// wait for each other), then the shopper's row (exclusive, so two writes of one shopper's hold run one at a time). The
-// Postgres fallback takes the sale row first too, so the two paths can never wait on each other in a circle. Returns the
-// id of the shopper's live row in the sale, if there is one.
-async function lockShopperHold(
-	trx: Kysely<Database>,
-	hold: HoldInput,
-): Promise<string | undefined> {
+// Takes the sale row in share mode before anything else a save does, so shoppers do not wait for each other, and a
+// removal or a purchase, which lock the row for update, cannot change the shopper's holds under the write. The Postgres
+// fallback takes the same row first (for update), so the two paths never wait on each other in a circle.
+async function shareSale(trx: Kysely<Database>, saleId: string): Promise<void> {
 	await trx
 		.selectFrom("sales")
 		.select("id")
-		.where("id", "=", hold.saleId)
+		.where("id", "=", saleId)
 		.forKeyShare()
 		.execute();
-	const row = await trx
-		.selectFrom("users")
-		.leftJoin("reservations", (join) =>
-			join
-				.onRef("reservations.user_id", "=", "users.id")
-				.on("reservations.sale_id", "=", hold.saleId)
-				.on(live("reservations")),
-		)
-		.select("reservations.id")
-		.where("users.id", "=", hold.userId)
-		.forNoKeyUpdate("users")
-		.executeTakeFirst();
-	return row?.id ?? undefined;
 }
 
-// The same hold again: its row stays, with its new end, and records who renewed it.
+// Locks the shopper's row, so two writes of one shopper's hold run one at a time. The live hold is read after this, in
+// a statement of its own: a read in the same statement would see the rows as they were before the wait.
+async function lockShopper(
+	trx: Kysely<Database>,
+	userId: string,
+): Promise<void> {
+	await trx
+		.selectFrom("users")
+		.select("id")
+		.where("id", "=", userId)
+		.forNoKeyUpdate()
+		.execute();
+}
+
+// The same hold again: its row stays, with its new end, and records who renewed it. A row that is no longer live (its
+// sale was removed) is left as it is, because a removed hold stays removed.
 async function renewHold(
 	trx: Kysely<Database>,
 	hold: HoldInput,
@@ -76,6 +74,7 @@ async function renewHold(
 			updated_by: hold.userId,
 		})
 		.where("id", "=", hold.id)
+		.where(live("reservations"))
 		.execute();
 }
 
@@ -112,12 +111,13 @@ async function insertHold(
 
 // Writes the hold as the shopper's one live row in the sale, by the domain's rule (`holdWriteOf`). A row is never
 // overwritten by another hold, so an expired hold the shopper takes again is kept, marked deleted. The caller runs it in
-// a transaction, so the old row and the new one change together.
+// a transaction that has already locked the sale row, so the old row and the new one change together.
 async function writeHold(
 	trx: Kysely<Database>,
 	hold: HoldInput,
 ): Promise<void> {
-	const liveId = await lockShopperHold(trx, hold);
+	await lockShopper(trx, hold.userId);
+	const liveId = (await ownHoldOf(trx, hold.saleId, hold.userId))?.id;
 	switch (holdWriteOf(liveId, hold.id)) {
 		case "renew":
 			await renewHold(trx, hold);
@@ -132,12 +132,14 @@ async function writeHold(
 	}
 }
 
-// Writes the hold a reservation asks for, as the shopper's one live hold in the sale, in one transaction.
+// Writes the hold a reservation asks for, as the shopper's one live hold in the sale, in one transaction. The sale row is
+// taken first and the user second, in the order the fallback takes them.
 async function saveHold(
 	db: Kysely<Database>,
 	reservation: Reservation,
 ): Promise<void> {
 	await db.transaction().execute(async (trx) => {
+		await shareSale(trx, reservation.saleId);
 		const userId = await ensureUser(trx, reservation.user);
 		await writeHold(trx, {
 			id: reservation.reservationId,

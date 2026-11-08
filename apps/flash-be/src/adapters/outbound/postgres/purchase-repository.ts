@@ -1,6 +1,8 @@
 // Purchases and their holds, kept in Postgres. Postgres has the last word on the stock: a purchase is written in the same
 // transaction that locks the sale and checks the sold count, so the sale cannot oversell and a shopper cannot buy twice.
 // Outbound Postgres adapter for the PurchaseRepository port. The choice is recorded in decision 002.
+// The commit also reads the mock payment's ledger (`payments`, written by payment-ledger.ts in this folder): it locks the
+// row of its charge, so a commit and a refund of one charge take turns (decision 009). Both live in this adapter folder.
 import { type Kysely, type Selectable, sql } from "kysely";
 import type {
 	CommitInput,
@@ -101,6 +103,24 @@ async function takeItem(
 	return updated.numUpdatedRows !== 0n;
 }
 
+// Whether the charge is still live, read under a share lock on its ledger row. A refund locks the same row for update,
+// so whichever comes first wins: a refund that ran first leaves no charged row here, and a refund that comes after
+// waits for this commit and then finds the purchase that holds the ref.
+async function chargeIsLive(
+	trx: Kysely<Database>,
+	ref: string,
+): Promise<boolean> {
+	const row = await trx
+		.selectFrom("payments")
+		.select("ref")
+		.where("ref", "=", ref)
+		.where("status", "=", "charged")
+		.where(live("payments"))
+		.forShare()
+		.executeTakeFirst();
+	return row !== undefined;
+}
+
 // Writes the purchase row. The buyer is its author.
 async function insertPurchase(
 	trx: Kysely<Database>,
@@ -154,6 +174,10 @@ async function commitPurchase(
 		// this check, so a second purchase cannot be written even if the check is ever skipped.
 		if (await livePurchaseOf(trx, input.saleId, input.user)) {
 			return { kind: "already_purchased" };
+		}
+		// The charge check, before any write, so a refused commit changes nothing.
+		if (!(await chargeIsLive(trx, input.paymentRef))) {
+			return { kind: "charge_refunded" };
 		}
 		// The stock check. The sold count is updated only while items remain.
 		if (!(await takeItem(trx, input.saleId, userId))) {

@@ -61,7 +61,12 @@ import {
 import { insertPurchase, insertSale, loginAs } from "./seed.js";
 import type { ShopLayer } from "./shop-steps.js";
 import { switchable } from "./switchable.js";
-import { confirmOnBoth, setProvider, twoPayments } from "./two-instances.js";
+import {
+	confirmOnBoth,
+	giveBackNextCharge,
+	setProvider,
+	twoPayments,
+} from "./two-instances.js";
 
 // The stores, services and switches the whole run shares. Each scenario reads them through `scenario()`.
 type IntegrationParts = {
@@ -294,6 +299,7 @@ function timeAndPaymentActions(
 		async setPaymentAccepts() {
 			setProvider(parts.payments, { failureRate: 0 });
 		},
+		giveBackNextCharge: async () => giveBackNextCharge(parts.payment),
 		async paymentOf(user: string) {
 			const id = current().holds.get(user)?.reservationId;
 			return id === undefined ? undefined : await parts.payment.statusOf(id);

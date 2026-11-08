@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { queueWorld } from "../bdd/support/queue-world.js";
 import { relativeTime } from "../bdd/support/time.js";
 import { usernameOf } from "../bdd/support/users.js";
+import type { CommitInput } from "./ports/purchase-repository.js";
 
 // Answers that no scenario reaches by itself: odd requests, and a purchase row that Postgres would refuse.
 const NOW = new Date("2026-06-01T12:00:00Z");
@@ -166,6 +167,114 @@ describe("a commit that fails after the charge", () => {
 		expect(reply.json().errorCode).toBe("internal");
 		expect((await world.payment.statusOf(reservationId ?? ""))?.status).toBe(
 			"refunded",
+		);
+	});
+
+	// Two confirmations of one hold share one charge. This one's commit throws and its lookup finds nothing, and then the
+	// other one's commit lands with the same ref before this one refunds. The shopper keeps the item, so the charge stays.
+	it("keeps the charge when the other confirmation of the hold commits it before this one refunds", async () => {
+		const world = queueWorld(NOW);
+		await world.addSale({
+			stock: 5,
+			startsAt: relativeTime("1 hour ago", NOW),
+			endsAt: relativeTime("in 1 hour", NOW),
+		});
+		await world.admitted("ana");
+		await world.reserve("ana");
+		const reservationId = world.holds.get("ana")?.reservationId ?? "";
+		const repository = world.purchaseRepository;
+		const otherCommit = repository.commit;
+		const lookUp = repository.findByReservation;
+		let failed: CommitInput | undefined;
+		repository.commit = async (input) => {
+			failed = input;
+			throw new Error("deadlock detected");
+		};
+		repository.findByReservation = async (id) => {
+			const found = await lookUp(id);
+			if (failed !== undefined && found === undefined) {
+				const input = failed;
+				failed = undefined;
+				await otherCommit(input);
+			}
+			return found;
+		};
+
+		const reply = await world.confirm("ana");
+		expect(reply.statusCode).toBe(500);
+		const entry = await world.payment.statusOf(reservationId);
+		expect(entry?.status).toBe("charged");
+		expect(repository.purchases.map((purchase) => purchase.paymentRef)).toEqual(
+			[entry?.ref],
+		);
+	});
+
+	// The other order: the confirmation that gave up refunds the shared charge before this one commits. The commit then
+	// writes nothing, and the shopper is told the payment failed, with the hold still theirs to pay again.
+	it("answers payment_failed and keeps the hold when the charge was refunded before the commit", async () => {
+		const world = queueWorld(NOW);
+		await world.addSale({
+			stock: 5,
+			startsAt: relativeTime("1 hour ago", NOW),
+			endsAt: relativeTime("in 1 hour", NOW),
+		});
+		await world.admitted("ana");
+		await world.reserve("ana");
+		const reservationId = world.holds.get("ana")?.reservationId ?? "";
+		const repository = world.purchaseRepository;
+		const commit = repository.commit;
+		let refundedFirst = false;
+		repository.commit = async (input) => {
+			if (!refundedFirst) {
+				refundedFirst = true;
+				await world.payment.refund(input.paymentRef);
+			}
+			return commit(input);
+		};
+
+		const reply = await world.confirm("ana");
+		expect(reply.statusCode).toBe(402);
+		expect(reply.json().errorCode).toBe("payment_failed");
+		expect(repository.purchases).toEqual([]);
+		expect(
+			await repository.findReservation(world.saleId, usernameOf("ana")),
+		).toMatchObject({ reservationId });
+		expect((await world.payment.statusOf(reservationId))?.status).toBe(
+			"refunded",
+		);
+	});
+
+	// A retry after that refusal is a new attempt: the refunded charge is not reused, a new one is made with a new ref.
+	it("charges again with a new ref when the shopper retries after the refused commit", async () => {
+		const world = queueWorld(NOW);
+		await world.addSale({
+			stock: 5,
+			startsAt: relativeTime("1 hour ago", NOW),
+			endsAt: relativeTime("in 1 hour", NOW),
+		});
+		await world.admitted("ana");
+		await world.reserve("ana");
+		const reservationId = world.holds.get("ana")?.reservationId ?? "";
+		const repository = world.purchaseRepository;
+		const commit = repository.commit;
+		const refs: string[] = [];
+		repository.commit = async (input) => {
+			refs.push(input.paymentRef);
+			if (refs.length === 1) await world.payment.refund(input.paymentRef);
+			return commit(input);
+		};
+
+		expect((await world.confirm("ana")).statusCode).toBe(402);
+		const retry = await world.confirm("ana");
+		expect(retry.statusCode).toBe(201);
+		expect(new Set(refs).size).toBe(2);
+		expect(await world.payment.statusOf(reservationId)).toEqual({
+			status: "charged",
+			ref: refs[1],
+			attempts: 2,
+		});
+		expect(repository.purchases.map((purchase) => purchase.paymentRef)).toEqual(
+			[refs[1]],
 		);
 	});
 

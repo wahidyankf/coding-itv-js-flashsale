@@ -27,8 +27,14 @@ in Redis or in one process.
   `INSERT ... ON CONFLICT (reservation_id) DO UPDATE ... WHERE payments.status <> 'charged' RETURNING ...`. If another
   instance charged first, the update touches no row, the mock reads the row, and both callers get the same ref.
 - A decline is written as `declined`. A retry finds no `charged` row and is a new attempt, and the hold stays.
-- Each charged write gets a new ref (`mock-<uuid>`). `refund(ref)` sets `refunded` only `WHERE ref = $1 AND status =
-  'charged'`, so a second refund, or a stale refund of a ref that a later charge replaced, changes no row.
+- Each charged write gets a new ref (`mock-<uuid>`). `refund(ref)` locks the row (`FOR UPDATE`), then sets `refunded`
+  only `WHERE ref = $1 AND status = 'charged' AND NOT EXISTS (a live purchase with payment_ref = $1)`. A second refund,
+  a stale refund of a ref that a later charge replaced, or a refund after another confirm committed the purchase
+  changes no row.
+- The purchase commit reads the ledger row with `FOR SHARE` before it writes. A charge that was refunded first makes the
+  commit write nothing and answer `402 payment_failed`; the hold stays, and the next confirm charges again. So the
+  refund and the commit take turns, and a purchase never holds a refunded charge. The commit reads `payments` because
+  both live in the same Postgres adapter.
 - If the commit in Postgres says `sold_out` or `already_purchased`, the charge is refunded and the shopper gets `409`.
 - The check of the hold runs before the charge. A hold that ends during the payment is sold if the item is still free.
 - The ledger is an adapter detail of the mock, not an application port: a Postgres ledger for the app and a memory one

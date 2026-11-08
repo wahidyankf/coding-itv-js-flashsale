@@ -112,6 +112,22 @@ Feature: Confirming a purchase
     And the payment of "ana" is charged on the second attempt
     And 9 items remain
 
+  # Exemption(e2e): the refund must land between this confirmation's charge and its commit, and a running server gives no way to place it there; alternative-proof: flash-be:unit / A confirm whose charge another confirm gave back first is refused, and the hold stays
+  @e2e-exempt
+  Scenario: A confirm whose charge another confirm gave back first is refused, and the hold stays
+    Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
+    And "ana" has been admitted
+    And "ana" has reserved an item
+    And another confirmation of the hold gives the charge back before the commit of "ana"
+    When "ana" confirms the purchase
+    Then the response status is 402
+    And the error is "payment_failed"
+    And "ana" still holds the item
+    And 10 items remain
+    When "ana" confirms the purchase again
+    Then the response status is 201
+    And 9 items remain
+
   Scenario: Many buyers confirming at once sell exactly the stock
     Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
     And 30 shoppers have been admitted

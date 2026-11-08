@@ -1,14 +1,18 @@
-// Integration test for committing a purchase over the dev Postgres: the same reservation gives the same purchase, a shopper buys once, and the stock is never oversold.
+// Integration test for committing a purchase over the dev Postgres: the same reservation gives the same purchase, a shopper
+// buys once, the stock is never oversold, and a charge refunded before the commit writes nothing.
 import { afterAll, describe, expect, it } from "vitest";
 import { insertSale } from "../../../bdd/support/seed.js";
 import { usernameOf } from "../../../bdd/support/users.js";
 import { config } from "../../../config.js";
 import { createDb } from "./database.js";
+import { createPostgresPaymentLedger } from "./payment-ledger.js";
 import { createPurchaseRepository } from "./purchase-repository.js";
+import { createReservationRepository } from "./reservation-repository.js";
 
 // The three ways a commit can end besides a new purchase, against the real tables.
 const db = createDb(config.databaseUrl);
 const repository = createPurchaseRepository(db);
+const ledger = createPostgresPaymentLedger(db);
 
 afterAll(async () => {
 	await db.destroy();
@@ -23,46 +27,75 @@ async function sale(stock: number) {
 	});
 }
 
-const input = (
+// A commit of a hold whose charge is in the ledger, as the mock payment leaves it before a commit.
+async function input(
 	saleId: string,
 	user: string,
-	reservationId = crypto.randomUUID(),
-) => ({
-	saleId,
-	user: usernameOf(user),
-	reservationId,
-	paymentRef: `pay-${user}`,
-});
+	reservationId: string = crypto.randomUUID(),
+) {
+	const paymentRef = `pay-${user}-${crypto.randomUUID()}`;
+	await ledger.settle(reservationId, { status: "charged", ref: paymentRef });
+	return { saleId, user: usernameOf(user), reservationId, paymentRef };
+}
+
+async function soldOf(saleId: string): Promise<number> {
+	const row = await db
+		.selectFrom("sales")
+		.select("sold")
+		.where("id", "=", saleId)
+		.executeTakeFirstOrThrow();
+	return row.sold;
+}
 
 describe("committing a purchase", () => {
 	it("returns the same purchase for the same reservation, without selling twice", async () => {
 		const saleId = await sale(3);
-		const request = input(saleId, "ana");
+		const request = await input(saleId, "ana");
 		const first = await repository.commit(request);
 		const second = await repository.commit(request);
 		expect(first).toMatchObject({ kind: "purchased", created: true });
 		expect(second).toMatchObject({ kind: "purchased", created: false });
-		const row = await db
-			.selectFrom("sales")
-			.select("sold")
-			.where("id", "=", saleId)
-			.executeTakeFirstOrThrow();
-		expect(row.sold).toBe(1);
+		expect(await soldOf(saleId)).toBe(1);
 	});
 
 	it("refuses a second purchase by the same user", async () => {
 		const saleId = await sale(3);
-		await repository.commit(input(saleId, "ana"));
-		expect(await repository.commit(input(saleId, "ana"))).toEqual({
+		await repository.commit(await input(saleId, "ana"));
+		expect(await repository.commit(await input(saleId, "ana"))).toEqual({
 			kind: "already_purchased",
 		});
 	});
 
 	it("refuses a purchase when no item is left", async () => {
 		const saleId = await sale(1);
-		await repository.commit(input(saleId, "ana"));
-		expect(await repository.commit(input(saleId, "ben"))).toEqual({
+		await repository.commit(await input(saleId, "ana"));
+		expect(await repository.commit(await input(saleId, "ben"))).toEqual({
 			kind: "sold_out",
 		});
+	});
+
+	// A confirmation that gave up refunded the shared charge before this commit ran. The commit writes nothing, so the
+	// shopper keeps the hold and can pay again.
+	it("refuses a purchase whose charge was refunded first, and leaves the hold and the stock as they were", async () => {
+		const saleId = await sale(3);
+		const request = await input(saleId, "ana");
+		await createReservationRepository(db).save({
+			saleId,
+			user: request.user,
+			reservationId: request.reservationId,
+			expiresAt: new Date(Date.now() + 60_000),
+		});
+		expect(await ledger.refund(request.paymentRef)).toBe(true);
+
+		expect(await repository.commit(request)).toEqual({
+			kind: "charge_refunded",
+		});
+		expect(await soldOf(saleId)).toBe(0);
+		expect(
+			await repository.findReservation(saleId, request.user),
+		).toMatchObject({ reservationId: request.reservationId });
+		expect(await repository.findByReservation(request.reservationId)).toBe(
+			undefined,
+		);
 	});
 });

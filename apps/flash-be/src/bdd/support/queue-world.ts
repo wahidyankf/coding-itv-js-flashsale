@@ -9,10 +9,7 @@ import { expect } from "vitest";
 import { buildApp } from "../../adapters/inbound/http/app.js";
 import { DEFAULT_STREAM_OPTIONS } from "../../adapters/inbound/http/event-stream.js";
 import { createMemoryRateLimitStore } from "../../adapters/outbound/memory/memory-rate-limit-store.js";
-import type {
-	createMockPayment,
-	MockPayment,
-} from "../../adapters/outbound/payment/mock-payment.js";
+import type { MockPayment } from "../../adapters/outbound/payment/mock-payment.js";
 import { admitCurrentSale } from "../../application/admission.js";
 import { createGuardedGate } from "../../application/guarded-gate.js";
 import type { Clock } from "../../application/ports/clock.js";
@@ -67,7 +64,12 @@ import {
 import { sharedCounter } from "./shared-counter.js";
 import type { ShopLayer } from "./shop-steps.js";
 import { switchable } from "./switchable.js";
-import { confirmOnBoth, setProvider, unitPayments } from "./two-instances.js";
+import {
+	confirmOnBoth,
+	giveBackNextCharge,
+	setProvider,
+	unitPayments,
+} from "./two-instances.js";
 import { byClock } from "./unit-clock.js";
 import { usernameOf } from "./users.js";
 
@@ -97,7 +99,7 @@ export type UnitQueueScenario = ShopScenario & {
 	repository: MemoryReservationRepository;
 	// The purchase rows and the payment, so a test can make a commit fail and read the refunds.
 	purchaseRepository: MemoryPurchaseRepository;
-	payment: ReturnType<typeof createMockPayment>;
+	payment: MockPayment;
 	queue: QueueService;
 	reservations: ReservationService;
 	saleService: SaleService;
@@ -115,7 +117,7 @@ type UnitParts = {
 	memoryGate: MemoryHoldGate;
 	repository: MemoryReservationRepository;
 	purchased: MemoryPurchaseRepository;
-	payment: ReturnType<typeof createMockPayment>;
+	payment: MockPayment;
 	cache: { ttlMs: number };
 	limits: RateLimits;
 	// This scenario's copy of the queue settings, so a scenario that shortens the admission changes only its own.
@@ -152,7 +154,7 @@ function unitParts(start: Date): UnitParts {
 	purchaseRepository = purchased;
 	// Time in memory: a payment that "takes 3 seconds" waits on a timer that only the clock can fire.
 	const timers: UnitParts["timers"] = [];
-	const [payment, secondPayment] = unitPayments(() => time.now, timers);
+	const [payment, secondPayment] = unitPayments(clock, timers, purchased);
 	const cache = { ttlMs: 0 };
 	const saleService = createSaleService(fakeRepository(sales), clock, cache);
 	const queueOptions = { ...QUEUE_OPTIONS };
@@ -337,6 +339,7 @@ function timeAndPaymentActions(
 		async setPaymentAccepts() {
 			setProvider(parts.payments, { failureRate: 0 });
 		},
+		giveBackNextCharge: async () => giveBackNextCharge(parts.payment),
 		async paymentOf(user: string) {
 			const id = current().holds.get(user)?.reservationId;
 			return id === undefined ? undefined : await parts.payment.statusOf(id);

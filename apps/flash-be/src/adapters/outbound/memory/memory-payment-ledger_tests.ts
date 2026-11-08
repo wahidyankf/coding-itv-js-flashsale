@@ -52,3 +52,12 @@ it("refunds a charge once, and ignores a second or a stale refund", async () => 
 		attempts: 2,
 	});
 });
+
+it("keeps a charge whose ref a purchase holds, so a refund cannot take it back", async () => {
+	const ledger = createMemoryPaymentLedger({
+		heldByPurchase: (ref) => ref === "mock-held",
+	});
+	await ledger.settle("r1", { status: "charged", ref: "mock-held" });
+	expect(await ledger.refund("mock-held")).toBe(false);
+	expect((await ledger.find("r1"))?.status).toBe("charged");
+});

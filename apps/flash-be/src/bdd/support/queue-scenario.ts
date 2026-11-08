@@ -90,6 +90,8 @@ export type ShopScenario = QueueScenario & {
 	// The ledger entry of the payment for the shopper's first hold, if it was ever charged or declined.
 	paymentOf: (user: string) => Promise<LedgerEntry | undefined>;
 	setPaymentAccepts: () => Promise<void>;
+	// Another confirmation of the same hold gives the next charge back between that charge and its commit.
+	giveBackNextCharge: () => Promise<void>;
 	// The shopper confirms their hold on two instances of the API at once, each with its own payment over one ledger.
 	confirmOnTwoInstances: (user: string) => Promise<Response[]>;
 	// The sale read cache: its time to live, and a change the cache does not see.

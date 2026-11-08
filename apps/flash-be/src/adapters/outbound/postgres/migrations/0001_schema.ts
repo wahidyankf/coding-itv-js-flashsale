@@ -121,6 +121,10 @@ async function createPurchasesAndHolds(db: Kysely<unknown>): Promise<void> {
 	await sql`create unique index purchases_one_per_user on purchases (sale_id, user_id) where deleted_at is null`.execute(
 		db,
 	);
+	// A refund of the mock payment checks that no live purchase holds the ref it would give back.
+	await sql`create index purchases_live_by_payment_ref on purchases (payment_ref) where deleted_at is null`.execute(
+		db,
+	);
 
 	// An expired hold counts as free by its time, so no sweep job is needed. A hold taken again gets a row of its own, and
 	// the old row is marked deleted.

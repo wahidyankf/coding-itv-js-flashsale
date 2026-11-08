@@ -3,6 +3,7 @@
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import { afterAll } from "vitest";
 import { bindPurchaseConfirming } from "./support/bind-purchase-confirming.js";
+import { bindChargeGivenBack } from "./support/bind-purchase-given-back.js";
 import { specFile } from "./support/paths.js";
 import {
 	integrationShopLayer,
@@ -64,6 +65,11 @@ describeFeature(
 		Scenario(
 			"A shopper who is declined and tries again is charged once",
 			steps.chargesOnceAfterDecline,
+		);
+
+		Scenario(
+			"A confirm whose charge another confirm gave back first is refused, and the hold stays",
+			bindChargeGivenBack(integrationShopLayer(real.scenario)),
 		);
 
 		Scenario(

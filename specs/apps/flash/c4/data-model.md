@@ -229,6 +229,7 @@ Besides the primary keys and the unique constraints above, each index serves a q
 | index                            | on                                                            | serves                                                                                                               |
 | -------------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | `reservations_live_by_expiry`    | `reservations (sale_id, expires_at) WHERE deleted_at IS NULL` | the Postgres path counts the live holds of a sale on every reservation while Redis is down, and a rebuild reads them |
+| `purchases_live_by_payment_ref`  | `purchases (payment_ref) WHERE deleted_at IS NULL`            | a refund checks that no live purchase holds the ref it gives back                                                    |
 | `sessions_user`                  | `sessions (user_id)`                                          | the sessions of one user                                                                                             |
 | `sessions_previous_refresh_live` | `sessions (previous_refresh_hash) WHERE deleted_at IS NULL`   | the replay check of a refresh and a logout look a session up by its previous refresh token                           |
 

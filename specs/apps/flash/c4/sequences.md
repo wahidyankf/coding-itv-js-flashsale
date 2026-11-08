@@ -162,15 +162,16 @@ return 1
 Postgres. The purchase is one transaction, in this order.
 
 ```sql
--- save the hold: one transaction. $3 is the id of the user row. Lock the sale (shared), then the shopper's row with
--- their live hold, if any.
+-- save the hold: one transaction, locking sale, then user, then hold, as the fallback without Redis does.
+-- $3 is the id of the user row, made first if the shopper has none.
 SELECT "id" FROM "sales" WHERE "id" = $2 FOR KEY SHARE;
-SELECT "reservations"."id" FROM "users"
-LEFT JOIN "reservations" ON "reservations"."user_id" = "users"."id"
-  AND "reservations"."sale_id" = $2 AND "reservations"."deleted_at" IS NULL
-WHERE "users"."id" = $3 FOR NO KEY UPDATE OF "users";
+SELECT "id" FROM "users" WHERE "id" = $3 FOR NO KEY UPDATE;
+-- read after the lock, in its own statement, so it sees a hold another save just committed
+SELECT "id", "expires_at" FROM "reservations"
+WHERE "sale_id" = $2 AND "user_id" = $3 AND "deleted_at" IS NULL;
 -- the same hold again (renew): its row keeps its id and gets the new end
-UPDATE "reservations" SET "expires_at" = $4, "updated_at" = now(), "updated_by" = $3 WHERE "id" = $1;
+UPDATE "reservations" SET "expires_at" = $4, "updated_at" = now(), "updated_by" = $3
+WHERE "id" = $1 AND "deleted_at" IS NULL;
 -- another hold (an expired one taken again): the old row is marked deleted by the shopper, then a new row
 UPDATE "reservations" SET "deleted_at" = now(), "deleted_by" = $3
 WHERE "sale_id" = $2 AND "user_id" = $3 AND "deleted_at" IS NULL;
@@ -186,6 +187,8 @@ SELECT "purchases".*, "users"."username" FROM "purchases"
 INNER JOIN "users" ON "users"."id" = "purchases"."user_id"
 WHERE "purchases"."deleted_at" IS NULL AND "users"."deleted_at" IS NULL
 AND "purchases"."sale_id" = $1 AND "users"."username" = $2;
+SELECT "ref" FROM "payments"                                  -- the charge is still live
+WHERE "ref" = $4 AND "status" = 'charged' AND "deleted_at" IS NULL FOR SHARE;
 UPDATE "sales" SET "sold" = sold + 1, "updated_at" = now(), "updated_by" = $2
 WHERE "id" = $1 AND "deleted_at" IS NULL AND sold < stock;
 INSERT INTO "purchases" ("sale_id", "user_id", "reservation_id", "payment_ref", "created_by")
@@ -197,6 +200,9 @@ WHERE "sale_id" = $1 AND "user_id" = $2 AND "deleted_at" IS NULL;
 - The first `SELECT` locks the sale row, so shoppers who confirm take turns.
 - The second `SELECT` finds a repeated confirm by its reservation id, and the fourth finds a shopper who already bought.
   Both end the transaction without a change.
+- The `SELECT` on `payments` finds no row when another confirm of the hold refunded the charge first. The transaction
+  then writes nothing and the shopper gets `402 payment_failed`. A refund locks the same row and changes nothing while a
+  live purchase holds the ref, so the two take turns.
 - The `UPDATE` changes no row when the stock is gone, and the `CHECK` on the table repeats that rule. In that case the
   transaction stops with `sold_out`.
 - The hold is not deleted. It is marked deleted by the buyer, and the partial unique index only counts live rows.

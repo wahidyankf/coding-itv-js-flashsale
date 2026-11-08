@@ -2,6 +2,7 @@
 // clock the scenario moves. The steps are in support/bind-purchase-confirming.ts.
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import { bindPurchaseConfirming } from "./support/bind-purchase-confirming.js";
+import { bindChargeGivenBack } from "./support/bind-purchase-given-back.js";
 import { specFile } from "./support/paths.js";
 import { unitShopLayer } from "./support/queue-world.js";
 
@@ -53,6 +54,11 @@ describeFeature(
 		Scenario(
 			"A shopper who is declined and tries again is charged once",
 			steps.chargesOnceAfterDecline,
+		);
+
+		Scenario(
+			"A confirm whose charge another confirm gave back first is refused, and the hold stays",
+			bindChargeGivenBack(unitShopLayer()),
 		);
 
 		Scenario(

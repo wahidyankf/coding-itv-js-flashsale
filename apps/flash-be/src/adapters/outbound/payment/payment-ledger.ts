@@ -26,7 +26,7 @@ export type PaymentLedger = {
 	// Writes the attempt, unless the entry is already charged: a stored charge wins over this attempt, so its ref is the
 	// one returned. Returns the entry as it stands after the write.
 	settle(reservationId: string, settlement: Settlement): Promise<LedgerEntry>;
-	// Moves the charged entry with this ref to refunded. A second refund, or a stale ref, changes nothing. True when the
-	// entry changed.
+	// Moves the charged entry with this ref to refunded. A second refund, a stale ref, or a ref that a live purchase holds
+	// changes nothing. True when the entry changed.
 	refund(ref: string): Promise<boolean>;
 };

@@ -1,6 +1,7 @@
 // Two instances of the API for the scenarios that confirm one hold twice at once: the payment of each layer, built twice
 // over one ledger, and the request that sends the same confirmation to both. A real deployment runs several instances
 // behind nginx, and only a shared ledger keeps them from charging twice (decision 009).
+
 import type { FastifyInstance } from "fastify";
 import { createMemoryPaymentLedger } from "../../adapters/outbound/memory/memory-payment-ledger.js";
 import {
@@ -8,8 +9,10 @@ import {
 	type MockPayment,
 } from "../../adapters/outbound/payment/mock-payment.js";
 import type { PaymentLedger } from "../../adapters/outbound/payment/payment-ledger.js";
+import type { MemoryPurchaseRepository } from "./memory-purchase-repository.js";
 import { shopperKey } from "./queue-requests.js";
 import type { Response, ShopScenario } from "./queue-scenario.js";
+import { salePath } from "./sale-path.js";
 
 // The payments of two instances over one ledger. Latency and declines start at zero, so only a scenario that asks for
 // them meets them; `sleep` is the layer's way to wait.
@@ -35,19 +38,38 @@ export function setProvider(
 	for (const payment of payments) Object.assign(payment.settings, change);
 }
 
-// The payments of the unit layer: a ledger in memory, and a wait that only the scenario's clock ends. `timers` holds the
-// waits until the clock passes them.
+// The payments of the unit layer: a ledger in memory and the purchases in memory, each told about the other as the
+// Postgres tables are, and a wait that only the scenario's clock ends. `timers` holds the waits until the clock passes
+// them.
 export function unitPayments(
 	now: () => Date,
 	timers: Array<{ at: number; resolve: () => void }>,
+	purchased: Pick<MemoryPurchaseRepository, "purchases" | "chargeIsLive">,
 ): [MockPayment, MockPayment] {
-	return twoPayments(createMemoryPaymentLedger(), (ms) =>
+	const ledger = createMemoryPaymentLedger({
+		heldByPurchase: (ref) =>
+			purchased.purchases.some((purchase) => purchase.paymentRef === ref),
+	});
+	purchased.chargeIsLive = ledger.isCharged;
+	return twoPayments(ledger, (ms) =>
 		ms <= 0
 			? Promise.resolve()
 			: new Promise((resolve) => {
 					timers.push({ at: now().getTime() + ms, resolve });
 				}),
 	);
+}
+
+// The other confirmation of the same hold gave up and refunded the shared charge, and its refund lands between this
+// confirmation's charge and its commit: the next charge of `payment` is refunded as soon as it is made. Only that charge.
+export function giveBackNextCharge(payment: MockPayment): void {
+	const charge = payment.charge;
+	payment.charge = async (reservationId) => {
+		payment.charge = charge;
+		const charged = await charge(reservationId);
+		if (charged.isOk()) await payment.refund(charged.value.ref);
+		return charged;
+	};
 }
 
 // The shopper's confirmation of their hold, sent to both instances at the same moment. Both replies are kept in
@@ -63,7 +85,7 @@ export async function confirmOnBoth(
 		apps.map((app) =>
 			app.inject({
 				method: "POST",
-				url: `/api/v1/sales/${scenario.saleId}/purchases`,
+				url: salePath("purchases", scenario.saleId),
 				headers: { cookie },
 				payload: { reservationId },
 			}),

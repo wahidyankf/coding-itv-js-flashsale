@@ -121,6 +121,10 @@ it("builds the constraints and indexes that the code names", async () => {
 	expect(named.get("reservations_live_by_expiry")).toContain(
 		"INDEX reservations_live_by_expiry ON public.reservations USING btree (sale_id, expires_at) WHERE (deleted_at IS NULL)",
 	);
+	// The refund's check for a live purchase that holds the ref it would give back.
+	expect(named.get("purchases_live_by_payment_ref")).toContain(
+		"INDEX purchases_live_by_payment_ref ON public.purchases USING btree (payment_ref) WHERE (deleted_at IS NULL)",
+	);
 	// The payment ledger: one row per reservation for good, a ref of its own for each charge, and a charge always has one.
 	expect(named.get("payments_reservation_id_key")).toContain(
 		"UNIQUE INDEX payments_reservation_id_key ON public.payments USING btree (reservation_id)",

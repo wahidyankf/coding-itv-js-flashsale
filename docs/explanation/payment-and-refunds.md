@@ -14,7 +14,7 @@ explains how a hold becomes a purchase, and what happens when something goes wro
 ```mermaid
 flowchart TD
   accTitle: How a hold becomes a purchase
-  accDescr: The service checks the hold, then charges the provider. A declined charge gives 402 payment_failed and the hold stays. If the charge works, one Postgres transaction commits the purchase. If the commit says sold_out or already_purchased, the charge is refunded and a 409 is returned. If the commit works, the service tells Redis and returns the purchase.
+  accDescr: The service checks the hold, then charges the provider. A declined charge gives 402 payment_failed and the hold stays. If the charge works, one Postgres transaction commits the purchase. If the commit says sold_out or already_purchased, the charge is refunded and a 409 is returned. If the charge was refunded before the commit, nothing is written and 402 payment_failed is returned with the hold kept. If the commit works, the service tells Redis and returns the purchase.
   check["Check the hold<br/>no side effects"]
   charge{"Charge the provider"}
   declined["402 payment_failed<br/>hold stays"]
@@ -26,6 +26,7 @@ flowchart TD
   charge -->|declined| declined
   charge -->|ok| commit
   commit -->|refused| refund
+  commit -->|charge refunded first| declined
   commit -->|ok| tell
   tell --> done
   classDef step fill:#0173B2,stroke:#000000,color:#FFFFFF
@@ -50,7 +51,10 @@ The reservation id is the key. A second request for the same reservation does no
   with one upsert that never overwrites a `charged` row. So two confirms of one hold on two instances, at the same moment
   or one after the other, charge once, get the same ref, and both answer with the same purchase. A decline is stored as `declined`, so a retry is a new
   attempt.
-- A refund sets the row to `refunded` only if it is still `charged` with that ref, so a repeated refund does nothing.
+- A refund first locks the ledger row, then sets it to `refunded` only if it is still `charged` with that ref and no
+  live purchase holds that ref. A repeated refund does nothing, and so does a refund that comes after another confirm
+  of the same hold committed the purchase.
+- A refunded row is not the end: the next confirm of the hold charges again, with a new ref.
 - The commit looks for a purchase with the same reservation id and returns it. The `purchases` table repeats this with a
   unique constraint on `reservation_id`.
 
@@ -60,9 +64,15 @@ The transaction first locks the sale row, which lines up everyone who confirms f
 
 1. If a purchase with this reservation id exists, return it.
 2. If the user already has a purchase in the sale, answer `already_purchased`.
-3. `UPDATE sales SET sold = sold + 1 WHERE id = $1 AND sold < stock`. If no row changes, answer `sold_out`.
-4. Insert the purchase and mark the reservation row deleted (`deleted_at`, `deleted_by`): the hold is spent, and the
+3. Read the ledger row of the charge with `FOR SHARE`. If it is no longer `charged` (another confirm of the same hold
+   failed and refunded it first), write nothing and answer `402 payment_failed`; the hold stays.
+4. `UPDATE sales SET sold = sold + 1 WHERE id = $1 AND sold < stock`. If no row changes, answer `sold_out`.
+5. Insert the purchase and mark the reservation row deleted (`deleted_at`, `deleted_by`): the hold is spent, and the
    row stays as a record.
+
+The share lock on the ledger row and the refund's lock on the same row make the two take turns: either the refund
+comes first and the commit refuses, or the commit comes first and the refund changes nothing. A purchase never holds a
+refunded charge.
 
 The lock is held for a few statements and never across the payment. The `CHECK (sold <= stock)` on the table and the
 partial unique index on `(sale_id, user_id)` (one live purchase per shopper and sale) stay as the last walls if a bug
@@ -81,6 +91,7 @@ itself: if the item is still free, the commit sells it. If another shopper took 
 | The provider declines               | `402 payment_failed`. The hold stays, so the shopper can try again until it ends.                                                                                                                                                                                        |
 | The commit says `sold_out`          | The charge is refunded, `409 sold_out`.                                                                                                                                                                                                                                  |
 | The commit says `already_purchased` | The charge is refunded, `409 already_purchased`.                                                                                                                                                                                                                         |
+| The charge was refunded first       | Another confirm of the hold failed and gave the charge back. The commit writes nothing, `402 payment_failed`, the hold stays, and the next try charges again.                                                                                                            |
 | Redis fails after the commit        | The purchase stands. The next rebuild from Postgres fixes the gate.                                                                                                                                                                                                      |
 | The commit fails (Postgres error)   | The service looks for the purchase of this reservation. If it is there, the commit landed and only its reply was lost: the shopper gets the purchase and nothing is refunded. If it is not there, or the lookup fails too, the charge is refunded and the request fails. |
 

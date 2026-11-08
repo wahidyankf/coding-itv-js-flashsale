@@ -143,6 +143,9 @@ export function createPurchaseService(
 			// This call is the one that wrote it, as far as this call can tell, so it is reported as created.
 			result = { kind: "purchased", purchase: written, created: true };
 		}
+		// The charge was refunded before the commit, by a confirmation of the same hold that gave up. Nothing was written and
+		// the hold stays, so the shopper is told the payment failed and can pay again; that retry is a new charge.
+		if (result.kind === "charge_refunded") return new Err("payment_failed");
 		if (result.kind !== "purchased") {
 			await payment.refund(ref);
 			return new Err(result.kind);

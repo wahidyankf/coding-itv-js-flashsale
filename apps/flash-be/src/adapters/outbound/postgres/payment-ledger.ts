@@ -36,6 +36,7 @@ function rowOf(db: Kysely<Database>, reservationId: string) {
 
 // The ledger over Postgres. A settle is one statement: the insert, or an update that runs only while the row is not
 // charged. When another instance charged first, the update touches no row, and the stored charge is read and returned.
+// A refund locks the row, then changes it only while no live purchase holds its ref.
 export function createPostgresPaymentLedger(
 	db: Kysely<Database>,
 ): PaymentLedger {
@@ -74,19 +75,41 @@ export function createPostgresPaymentLedger(
 			return toEntry(await rowOf(db, reservationId).executeTakeFirstOrThrow());
 		},
 
+		// Two statements in one transaction. The lock comes first, so a commit that holds the row finishes before the
+		// update starts, and the update's own snapshot then sees that commit's purchase. A check in the locking statement
+		// itself would not: after the wait, Postgres rechecks the row but not the purchase lookup.
 		async refund(ref) {
-			const refunded = await db
-				.updateTable("payments")
-				.set({
-					status: "refunded",
-					updated_at: dbNow,
-					updated_by: systemUser(db),
-				})
-				.where("ref", "=", ref)
-				.where("status", "=", "charged")
-				.where(live("payments"))
-				.executeTakeFirst();
-			return refunded.numUpdatedRows !== 0n;
+			return db.transaction().execute(async (trx) => {
+				await trx
+					.selectFrom("payments")
+					.select("ref")
+					.where("ref", "=", ref)
+					.forUpdate()
+					.execute();
+				const refunded = await trx
+					.updateTable("payments")
+					.set({
+						status: "refunded",
+						updated_at: dbNow,
+						updated_by: systemUser(trx),
+					})
+					.where("ref", "=", ref)
+					.where("status", "=", "charged")
+					.where(live("payments"))
+					// A live purchase that holds the ref keeps it.
+					.where(({ not, exists, selectFrom }) =>
+						not(
+							exists(
+								selectFrom("purchases")
+									.select("purchases.id")
+									.where("purchases.payment_ref", "=", ref)
+									.where(live("purchases")),
+							),
+						),
+					)
+					.executeTakeFirst();
+				return refunded.numUpdatedRows !== 0n;
+			});
 		},
 	};
 }

@@ -11,6 +11,7 @@ import { config } from "../../config.js";
 import type { GateAnswer, HoldSnapshot } from "../../domain/reservation.js";
 import { createDb } from "./postgres/database.js";
 import { createReservationRepository } from "./postgres/reservation-repository.js";
+import { ensureUser } from "./postgres/users.js";
 import { createRedis } from "./redis/redis-client.js";
 import { createRedisHoldGate } from "./redis/redis-hold-gate.js";
 
@@ -233,5 +234,91 @@ describe("the rebuild leaves out removed users, as the live checks do", () => {
 			},
 		);
 		expect(snapshot).toEqual({ buyers: [], holds: [] });
+	});
+});
+
+// The writes of one shopper's hold run one at a time under the lock on the shopper's row. The live row is read only once
+// that lock is held, so a write that waited sees the row the other one wrote.
+describe("writes of one shopper's hold at once", () => {
+	const RACERS = 10;
+
+	async function openSaleNow() {
+		const now = new Date();
+		return insertSale(db, {
+			stock: RACERS,
+			startsAt: new Date(now.getTime() - 3_600_000),
+			endsAt: new Date(now.getTime() + 3_600_000),
+		});
+	}
+
+	async function liveRowsOf(saleId: string): Promise<number> {
+		const rows = await db
+			.selectFrom("reservations")
+			.select("id")
+			.where("sale_id", "=", saleId)
+			.where("deleted_at", "is", null)
+			.execute();
+		return rows.length;
+	}
+
+	it("keeps one live row, with no failure, when first holds with different ids are saved at once", async () => {
+		const saleId = await openSaleNow();
+		const user = usernameOf(`racer-${crypto.randomUUID()}`);
+		const repository = createReservationRepository(db);
+		const expiresAt = new Date(Date.now() + 60_000);
+		// The shopper's row exists before the race, as it does for anyone who logged in, and no hold is live yet.
+		await ensureUser(db, user);
+		// Every racer gets a connection that is already open, so they all start inside one another's transactions.
+		await Promise.all(
+			Array.from({ length: RACERS }, () =>
+				sql`select pg_sleep(0.05)`.execute(db),
+			),
+		);
+		const saves = await Promise.allSettled(
+			Array.from({ length: RACERS }, () =>
+				repository.save({
+					saleId,
+					user,
+					reservationId: crypto.randomUUID(),
+					expiresAt,
+				}),
+			),
+		);
+		expect(saves.filter((save) => save.status === "rejected")).toEqual([]);
+		expect(await liveRowsOf(saleId)).toBe(1);
+	});
+
+	// A new name is made inside both paths. Both take the sale row before they make the user, so neither waits for the
+	// other in a circle.
+	it("does not deadlock a save and a reservation without Redis of one new shopper", async () => {
+		const saleId = await openSaleNow();
+		const repository = createReservationRepository(db);
+		const expiresAt = new Date(Date.now() + 60_000);
+		const runs = await Promise.allSettled(
+			Array.from({ length: RACERS }, (_, index) => {
+				const user = usernameOf(`newcomer-${index}-${crypto.randomUUID()}`);
+				const now = new Date();
+				return Promise.all([
+					repository.save({
+						saleId,
+						user,
+						reservationId: crypto.randomUUID(),
+						expiresAt,
+					}),
+					repository.reserveWithoutGate(
+						{
+							saleId,
+							user,
+							reservationId: crypto.randomUUID(),
+							now,
+							expiresAt,
+							stock: RACERS,
+						},
+						async () => false,
+					),
+				]);
+			}),
+		);
+		expect(runs.filter((run) => run.status === "rejected")).toEqual([]);
 	});
 });

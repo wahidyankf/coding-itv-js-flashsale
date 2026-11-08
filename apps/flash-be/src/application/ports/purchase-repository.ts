@@ -14,10 +14,13 @@ export type CommitInput = {
 
 // What a commit answered. `created` is true only when this call wrote the purchase. It is false when an earlier call
 // with the same reservation already did, so a retry gets the same purchase back and is not counted twice.
+// `charge_refunded` means the charge was given back before the commit ran (by a confirmation of the same hold that gave
+// up), so nothing was written and the hold is still the shopper's.
 export type CommitResult =
 	| { kind: "purchased"; purchase: Purchase; created: boolean }
 	| { kind: "sold_out" }
-	| { kind: "already_purchased" };
+	| { kind: "already_purchased" }
+	| { kind: "charge_refunded" };
 
 // Purchases and their holds, kept in Postgres. The commit checks the stock and writes the purchase in one transaction, so
 // Postgres has the last word on who got the item.
@@ -32,6 +35,6 @@ export type PurchaseRepository = {
 		user: Username,
 	): Promise<Reservation | undefined>;
 	// Turns a hold into a purchase in one transaction under a lock on the sale row. The lock makes the stock check and
-	// the write one step, so the sale cannot oversell.
+	// the write one step, so the sale cannot oversell. A charge that is no longer live refuses the commit.
 	commit(input: CommitInput): Promise<CommitResult>;
 };

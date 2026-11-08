@@ -1,5 +1,6 @@
 // Purchases in memory for the unit layer. `commit` gives the answers the Postgres transaction gives: the same purchase
-// for the same reservation, a refusal for a second purchase, and sold out when the stock is gone.
+// for the same reservation, a refusal for a second purchase, a refusal for a charge already refunded, and sold out when
+// the stock is gone.
 import type { PurchaseRepository } from "../../application/ports/purchase-repository.js";
 import type { Purchase } from "../../domain/purchase.js";
 import type { Reservation } from "../../domain/reservation.js";
@@ -13,6 +14,9 @@ export type MemoryPurchaseRepository = PurchaseRepository & {
 	buyersOf: (saleId: string) => Username[];
 	// Another instance sold an item: the same effect as a committed purchase.
 	sellTo: (saleId: string, user: Username) => void;
+	// Whether a payment ref is still charged, as the Postgres commit reads the ledger. The unit layer points it at the
+	// memory ledger once both exist; until then every ref counts as charged.
+	chargeIsLive: (ref: string) => boolean;
 };
 
 // Purchases in memory, for unit tests. `commit` follows the transaction in the Postgres repository.
@@ -22,6 +26,7 @@ export function memoryPurchaseRepository(
 ): MemoryPurchaseRepository {
 	const repository: MemoryPurchaseRepository = {
 		purchases: [],
+		chargeIsLive: () => true,
 		buyersOf: (saleId) =>
 			repository.purchases
 				.filter((purchase) => purchase.saleId === saleId)
@@ -70,6 +75,9 @@ export function memoryPurchaseRepository(
 					purchase.saleId === input.saleId && purchase.user === input.user,
 			);
 			if (bought) return { kind: "already_purchased" };
+			if (!repository.chargeIsLive(input.paymentRef)) {
+				return { kind: "charge_refunded" };
+			}
 			const sale = sales.find((candidate) => candidate.id === input.saleId);
 			if (!sale || sale.sold >= sale.stock) return { kind: "sold_out" };
 			sale.sold += 1;
