@@ -146,6 +146,9 @@
 		},
 		"db:create-operator": {
 			"executor": "nx:run-commands",
+			"dependsOn": [
+				{ "projects": ["typekit", "flash-commons"], "target": "build" }
+			],
 			"options": {
 				"command": "npm run create-operator --",
 				"cwd": "apps/flash-be"
@@ -153,6 +156,9 @@
 		},
 		"db:seed-sale": {
 			"executor": "nx:run-commands",
+			"dependsOn": [
+				{ "projects": ["typekit", "flash-commons"], "target": "build" }
+			],
 			"options": {
 				"command": "npm run seed-sale --",
 				"cwd": "apps/flash-be"
