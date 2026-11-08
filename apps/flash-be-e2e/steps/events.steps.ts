@@ -116,7 +116,7 @@ Then(
 );
 
 Then(
-	/^the next event is "([^"]+)" with the state "([^"]+)"$/,
+	/^the (?:first|next) event is "([^"]+)" with the state "([^"]+)"$/,
 	async ({ request: _request }, event: string, state: string) => {
 		const next = await currentStream().next();
 		expect(next.event).toBe(event);

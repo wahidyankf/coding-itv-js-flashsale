@@ -40,3 +40,10 @@ Feature: Live updates
     When "ana" watches her place with a wrong ticket
     Then the response status is 401
     And the error is "invalid_ticket"
+
+  Scenario: A shopper whose place was lost before watching is told it is gone
+    Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
+    And "ana" has joined the queue
+    And the queue is lost
+    When "ana" watches her place
+    Then the first event is "place" with the state "absent"

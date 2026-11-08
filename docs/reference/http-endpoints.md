@@ -338,8 +338,9 @@ A frame is `event: <name>`, `data: <JSON>` and a blank line.
 
 Both answer `Content-Type: text/event-stream`. The first event comes at once. Later events come only when the data
 changed, checked every `EVENTS_INTERVAL_MS` (1000). When nothing changes for 15 seconds, a `: keep-alive` comment line is
-sent. If the sale, the user or the ticket is wrong, the answer is a normal JSON error (such as `404 sale_not_found` or
-`401 invalid_ticket`) and no stream opens. If a shopper's place is lost while watching, the stream sends `{"userId":"<name>","state":"absent"}`.
+sent. If the sale or the ticket is wrong, the answer is a normal JSON error (such as `404 sale_not_found` or
+`401 invalid_ticket`) and no stream opens. A shopper whose place is lost, before the stream opens or while watching,
+gets the stream all the same, with `{"userId":"<name>","state":"absent"}`, so the page can say the place is gone.
 
 The scenarios are in [`specs/apps/flash/be/behaviours/events/`](../../specs/apps/flash/be/behaviours/events/README.md).
 

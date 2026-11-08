@@ -197,6 +197,37 @@ function refusesWrongPlaceTicket(layer: ShopLayer): ScenarioBinder {
 	};
 }
 
+function toldPlaceIsGone(layer: ShopLayer): ScenarioBinder {
+	return ({ Given, And, When, Then }) => {
+		const world = layer.newWorld();
+
+		Given(OPEN_SALE, async () =>
+			openSale(world, layer.now, { stock: 10, sold: 0 }),
+		);
+
+		And('"ana" has joined the queue', async () => {
+			await world.join("ana");
+		});
+
+		And("the queue is lost", async () => {
+			await world.loseQueue();
+		});
+
+		When('"ana" watches her place', async () => {
+			await world.watchPlace("ana");
+		});
+
+		Then(
+			"the first event is {string} with the state {string}",
+			async (_ctx, event: string, state: string) => {
+				const first = await watcherOf(world).next();
+				expect(first.event).toBe(event);
+				expect(first.data.state).toBe(state);
+			},
+		);
+	};
+}
+
 // The steps of each scenario in the streaming feature, by the scenario's name in the feature's own words.
 export function bindEventsStreaming(layer: ShopLayer) {
 	return {
@@ -206,5 +237,6 @@ export function bindEventsStreaming(layer: ShopLayer) {
 		hearsAdmitted: hearsAdmitted(layer),
 		watchesPlaceFirst: watchesPlaceFirst(layer),
 		refusesWrongPlaceTicket: refusesWrongPlaceTicket(layer),
+		toldPlaceIsGone: toldPlaceIsGone(layer),
 	};
 }

@@ -36,5 +36,10 @@ describeFeature(
 			"Watching a place with a wrong ticket is refused",
 			steps.refusesWrongPlaceTicket,
 		);
+
+		Scenario(
+			"A shopper whose place was lost before watching is told it is gone",
+			steps.toldPlaceIsGone,
+		);
 	},
 );

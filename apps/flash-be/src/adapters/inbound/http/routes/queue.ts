@@ -65,23 +65,26 @@ export function registerQueueRoutes(
 			),
 	});
 
-	// Pushes the shopper's place when it changes. The first check runs before the stream opens, so a bad ticket gets a normal reply.
+	// Pushes the shopper's place when it changes. The first check runs before the stream opens, so a bad ticket gets a normal
+	// reply. A place that is already lost is not a bad request: the stream opens and its first event says the place is
+	// absent, as a later loss does. A `404` here would reach the page as a refusal, which it never retries or shows.
 	app.route<{ Params: SaleParams }>({
 		method: "GET",
 		url: API_PATHS.queueMeEvents,
 		preValidation: needSession,
 		handler: async (request, reply) => {
 			const { saleId } = request.params;
-			const username = shopperOf(request);
+			const user = shopperOf(request);
 			const ticket = ticketOf(request);
-			const first = await deps.queue.check(saleId, username, ticket);
-			if (first.isErr()) return sendError(reply, first.error);
-			const { user } = first.value;
+			const first = await deps.queue.check(saleId, user, ticket);
+			if (first.isErr() && first.error !== "not_in_queue") {
+				return sendError(reply, first.error);
+			}
 			return serveEvents(
 				request,
 				reply,
 				async () => {
-					const latest = await deps.queue.check(saleId, username, ticket);
+					const latest = await deps.queue.check(saleId, user, ticket);
 					const place = latest.isOk()
 						? latest.value.place
 						: ({ state: "absent" } as const);

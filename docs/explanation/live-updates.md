@@ -43,6 +43,8 @@ reads the stream with `fetch` and sets `x-queue-ticket` itself. A stream that en
 reached is opened again with backoff and jitter, for a limited number of tries
 ([the retry policies](../reference/retry-policies.md), [decision 017](decisions/017-retry-backoff-jitter.md)).
 After the last try the page says "Live updates stopped. Reload the page to see the latest sale.", so a shopper does not
-trust words that may be old. A `401` or `404` stops the reader at once, since asking again will not change the answer.
+trust words that may be old. A `401` or `404` stops the reader at once, since asking again will not change the answer. A lost place
+is not a `404`: the place stream opens and its first event says `absent`, even when the place was lost before the page
+opened it.
 An event the page cannot decode is dropped and does not count as a live frame
 ([decision 018](decisions/018-decode-payloads-at-the-edge.md)).
