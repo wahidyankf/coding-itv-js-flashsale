@@ -117,7 +117,7 @@ npm run bdd:check
 ```
 
 ```text
-behaviour coverage: 216/216 (100%)
+behaviour coverage: 247/247 (100%)
 ```
 
 The list of scenarios and their layers is in `generated-reports/behaviour-status.md`. Then run one scenario at the
@@ -134,7 +134,7 @@ npx vitest run --config vitest.config.ts --reporter=verbose -t "Joining twice" s
  ✓ |unit| ... > Scenario: Joining twice keeps the place and the ticket > Then the response status is 200 0ms
 
  Test Files  1 passed (1)
-      Tests  7 passed | 28 skipped (35)
+      Tests  7 passed | 25 skipped (32)
 ```
 
 ## Traps to avoid
