@@ -139,7 +139,8 @@ failure.
   same reply in both layers". If it drifts, the unit layer proves a rule the product does not have.
 - **Integration runs touch a shared server.** The global setup makes a new database for each run and empties only
   Redis index 15 ([`global-setup.ts`](../../../apps/flash-be/src/bdd/support/global-setup.ts)). Keep test data off index
-  0, where the dev data lives.
+  0, where the dev data lives. Run one integration or coverage run of `flash-be` at a time: a second run empties index 15
+  when it starts, and a scenario of the first run that is waiting for a hold to expire then loses its queue entry.
 
 ## Read next
 
