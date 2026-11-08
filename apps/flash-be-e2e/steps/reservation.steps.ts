@@ -1,6 +1,7 @@
 // Steps for the hold on an item: reserving it with a ticket, the hold's length, the rule that one shopper holds one item, the
-// sold-out answer, a write that fails in Postgres, and the hold state lost from Redis. Binds reservation/reserving.feature
-// and recovery/rebuild.feature. The reserve and waitUntilAdmitted calls are in support/shoppers.ts.
+// sold-out answer, a write that fails in Postgres, the hold state lost from Redis, and the hold rows Postgres keeps when a
+// hold is taken again. Binds reservation/reserving.feature and recovery/rebuild.feature, and the hold rows of
+// degraded/serving.feature. The reserve and waitUntilAdmitted calls are in support/shoppers.ts.
 
 import { MS_PER_SECOND } from "@flash/flash-commons";
 import { sleep } from "@flash/flash-commons/timers";
@@ -12,6 +13,7 @@ import { patchSale } from "./support/operator.js";
 import { E2E_REDIS_URL, withRedis } from "./support/processes.js";
 import { currentResponse } from "./support/response.js";
 import {
+	holdOf,
 	join,
 	postReserve,
 	reserve,
@@ -22,6 +24,27 @@ import {
 import { currentSaleId } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
+
+// One hold row of the sale, as Postgres keeps it: whose it is, who marked it deleted, and whether it still counts.
+type HoldRow = {
+	user: string;
+	reservationId: string;
+	deletedBy: string | null;
+	counts: boolean;
+};
+
+// Every hold row of the scenario's sale, the ones marked deleted too.
+function holdRows(): Promise<HoldRow[]> {
+	return query<HoldRow>(
+		`select holder.username as "user", r.id as "reservationId", remover.username as "deletedBy",
+		        (r.deleted_at is null and r.expires_at > now()) as counts
+		   from reservations r
+		   join users holder on holder.id = r.user_id
+		   left join users remover on remover.id = r.deleted_by
+		  where r.sale_id = $1`,
+		[currentSaleId()],
+	);
+}
 
 // A trigger in the scenario's own database refuses every reservation write, the way a failing disk or a full table would.
 // Dropping it lets writes through again.
@@ -167,5 +190,73 @@ Then(
 			(reply) => reply.status === 409 && reply.error === "sold_out",
 		);
 		expect(soldOut).toHaveLength(Number(count));
+	},
+);
+
+// Every shopper asks at once, and each granted hold is kept as the shopper's first one.
+Given(
+	/^all (\d+) shoppers have reserved an item at the same time$/,
+	async ({ request }, count: string) => {
+		await Promise.all(
+			shopperNames(Number(count)).map((user) => reserve(request, user)),
+		);
+	},
+);
+
+Then(
+	/^the reservation is a new one, not the one "([^"]+)" had before$/,
+	async ({ request: _request }, user: string) => {
+		const { reservationId } = await currentResponse().json();
+		expect(reservationId).toMatch(/^[0-9a-f-]{36}$/);
+		expect(reservationId).not.toBe(holdOf(user)?.reservationId);
+	},
+);
+
+Then(
+	/^the hold "([^"]+)" had before is kept as a row marked deleted by "([^"]+)"$/,
+	async ({ request: _request }, user: string, by: string) => {
+		const before = holdOf(user)?.reservationId;
+		const rows = await holdRows();
+		expect(rows.find((row) => row.reservationId === before)).toEqual({
+			user,
+			reservationId: before,
+			deletedBy: by,
+			counts: false,
+		});
+	},
+);
+
+Then(
+	/^"([^"]+)" has one hold that counts, the new one$/,
+	async ({ request: _request }, user: string) => {
+		const { reservationId } = await currentResponse().json();
+		const rows = await holdRows();
+		expect(
+			rows.filter((row) => row.user === user && row.deletedBy === null),
+		).toEqual([{ user, reservationId, deletedBy: null, counts: true }]);
+	},
+);
+
+Then(
+	/^(\d+) holds count, and no shopper has more than one hold that is not marked deleted$/,
+	async ({ request: _request }, count: string) => {
+		const rows = await holdRows();
+		expect(rows.filter((row) => row.counts)).toHaveLength(Number(count));
+		const notDeleted = rows
+			.filter((row) => row.deletedBy === null)
+			.map((row) => row.user);
+		expect(new Set(notDeleted).size).toBe(notDeleted.length);
+	},
+);
+
+Then(
+	"every hold granted before is still kept as a row",
+	async ({ request: _request }) => {
+		const before = [...shoppers().holds.values()].map(
+			(hold) => hold.reservationId,
+		);
+		const kept = (await holdRows()).map((row) => row.reservationId);
+		expect(before).toHaveLength(10);
+		expect(kept).toEqual(expect.arrayContaining(before));
 	},
 );

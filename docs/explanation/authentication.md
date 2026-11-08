@@ -79,3 +79,12 @@ says whether an account is still used.
 - A session is not bound to an address. The address and the user agent are recorded to be read, not enforced, because a
   phone changes its address often.
 - Redis is a cache for sessions. If it is down, each request reads Postgres, which is slower but correct.
+
+## Any instance accepts a login
+
+No session lives in the memory of an API process. The sessions are rows in Postgres, and the cache of live sessions is
+the one Redis that every instance shares. A logout or a refresh marks the row and drops the cached copy, so the change
+holds on every instance at once. A login made on one instance is accepted by another, a logout on one ends the login on
+all of them, and a refresh on one is honoured by another while the old refresh token is refused everywhere. So the API
+can run as many instances as the load needs, behind any balancer, with no sticky sessions. The scenarios in
+[`auth/sessions.feature`](../../specs/apps/flash/be/behaviours/auth/sessions.feature) run these on two instances.

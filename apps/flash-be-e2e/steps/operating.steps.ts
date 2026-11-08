@@ -56,6 +56,9 @@ Given("an item of that sale was bought", async ({ request }) => {
 	expect(currentResponse().status()).toBe(201);
 });
 
+// A phrase may name its sale by id ("the sale with id "..."") instead of "that sale", the scenario's sale.
+const NAMED_SALE = /the sale with id "([^"]+)"/;
+
 // One request of an operator, written the way the scenarios say it. `sender` is who sends it.
 async function operate(
 	request: APIRequestContext,
@@ -64,7 +67,10 @@ async function operate(
 	what: string,
 ) {
 	const headers = await senderHeaders(request, sender);
-	const phrase = `${verb} ${what}`;
+	const named = NAMED_SALE.exec(`${verb} ${what}`);
+	// Read only by the requests about one sale, so listing needs no sale.
+	const saleId = () => named?.[1] ?? currentSaleId();
+	const phrase = `${verb} ${what}`.replace(NAMED_SALE, "that sale");
 	const change =
 		/^changes that sale to stock (\d+)(?: and a hold time of (\d+) seconds)?$/.exec(
 			phrase,
@@ -74,7 +80,7 @@ async function operate(
 	if (change) {
 		setResponse(
 			await send(request, routes.updateSale, {
-				params: { saleId: currentSaleId() },
+				params: { saleId: saleId() },
 				headers,
 				body: givenFields({
 					stock: Number(change[1]),
@@ -89,7 +95,7 @@ async function operate(
 		);
 		setResponse(
 			await send(request, routes.updateSale, {
-				params: { saleId: currentSaleId() },
+				params: { saleId: saleId() },
 				headers,
 				body: {
 					startsAt: startsAt.toISOString(),
@@ -100,7 +106,7 @@ async function operate(
 	} else if (phrase === "removes that sale") {
 		setResponse(
 			await send(request, routes.removeSale, {
-				params: { saleId: currentSaleId() },
+				params: { saleId: saleId() },
 				headers,
 			}),
 		);
@@ -167,6 +173,14 @@ Then(
 		expect(stocks).toEqual([Number(first), Number(second)]);
 	},
 );
+
+// Another sale may be current, but never the one that was removed.
+Then("that sale is not the current sale", async ({ request }) => {
+	const reply = await send(request, routes.currentSale, {});
+	const body = await reply.json();
+	if (reply.status() === 200) expect(body.id).not.toBe(world.saleId);
+	else expect(body.errorCode).toBe("sale_not_found");
+});
 
 Then("that sale is not listed", async ({ request }) => {
 	const listed = await bodyOf(

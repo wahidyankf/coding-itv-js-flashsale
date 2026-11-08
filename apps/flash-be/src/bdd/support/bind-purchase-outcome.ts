@@ -28,12 +28,9 @@ function buyerSeesPurchase(layer: ShopLayer): ScenarioBinder {
 
 		And("{string} has confirmed the purchase", confirmUser(world));
 
-		When(
-			"a client asks for the outcome of {string}",
-			async (_ctx, user: string) => {
-				await world.outcome(user);
-			},
-		);
+		When("{string} asks for the outcome", async (_ctx, user: string) => {
+			await world.outcome(user);
+		});
 
 		Then("the response status is {int}", statusIs(world));
 
@@ -61,12 +58,9 @@ function holdIsSeen(layer: ShopLayer): ScenarioBinder {
 
 		And("{string} has reserved an item", reserveUser(world));
 
-		When(
-			"a client asks for the outcome of {string}",
-			async (_ctx, user: string) => {
-				await world.outcome(user);
-			},
-		);
+		When("{string} asks for the outcome", async (_ctx, user: string) => {
+			await world.outcome(user);
+		});
 
 		Then("the outcome state is {string}", (_ctx, state: string) => {
 			expect(responseOf(world).json().state).toBe(state);
@@ -91,12 +85,9 @@ function nothingIsSeen(layer: ShopLayer): ScenarioBinder {
 			openSale(world, layer.now, { stock: 10, sold: 0 }),
 		);
 
-		When(
-			"a client asks for the outcome of {string}",
-			async (_ctx, user: string) => {
-				await world.outcome(user);
-			},
-		);
+		When("{string} asks for the outcome", async (_ctx, user: string) => {
+			await world.outcome(user);
+		});
 
 		Then("the outcome state is {string}", (_ctx, state: string) => {
 			expect(responseOf(world).json().state).toBe(state);
@@ -120,12 +111,9 @@ function expiredHoldIsHidden(layer: ShopLayer): ScenarioBinder {
 
 		When("{int} seconds pass", secondsPass(world));
 
-		And(
-			"a client asks for the outcome of {string}",
-			async (_ctx, user: string) => {
-				await world.outcome(user);
-			},
-		);
+		And("{string} asks for the outcome", async (_ctx, user: string) => {
+			await world.outcome(user);
+		});
 
 		Then("the outcome state is {string}", (_ctx, state: string) => {
 			expect(responseOf(world).json().state).toBe(state);
@@ -140,7 +128,7 @@ function unknownSaleRefused(layer: ShopLayer): ScenarioBinder {
 		Given("no sale exists", () => {});
 
 		When(
-			"a client asks for the outcome of {string} in the sale with id {string}",
+			"{string} asks for the outcome in the sale with id {string}",
 			async (_ctx, user: string, saleId: string) => {
 				await world.outcome(user, saleId);
 			},

@@ -8,7 +8,10 @@ import {
 	holdEndsIn,
 	holdSecondsIs,
 	joinUser,
+	newHoldGiven,
 	OPEN_SALE,
+	oldHoldKept,
+	oneHoldCounts,
 	openSale,
 	reserveUser,
 	type ShopLayer,
@@ -141,6 +144,28 @@ function toldQueueLost(layer: ShopLayer): ScenarioBinder {
 	};
 }
 
+function placeLostMustJoinAgain(layer: ShopLayer): ScenarioBinder {
+	return ({ Given, And, When, Then }) => {
+		const world = layer.newWorld();
+
+		Given(OPEN_SALE, async () =>
+			openSale(world, layer.now, { stock: 10, sold: 0 }),
+		);
+
+		And("{string} has been admitted", admitUser(world));
+
+		And("the queue is lost", async () => {
+			await world.loseQueue();
+		});
+
+		When("{string} reserves an item", reserveUser(world));
+
+		Then("the response status is {int}", statusIs(world));
+
+		And("the error is {string}", errorIs(world));
+	};
+}
+
 function notSelling(layer: ShopLayer): OutlineBinder {
 	return ({ Given, When, Then, And }, examples) => {
 		const world = layer.newWorld();
@@ -252,6 +277,110 @@ function expiredHoldGivesBack(layer: ShopLayer): ScenarioBinder {
 	};
 }
 
+function takenAgainAfterExpiry(layer: ShopLayer): ScenarioBinder {
+	return ({ Given, And, When, Then }) => {
+		const world = layer.newWorld();
+
+		Given(OPEN_SALE, async () =>
+			openSale(world, layer.now, { stock: 10, sold: 0 }),
+		);
+
+		And("the hold time of the sale is {int} second", holdSecondsIs(world));
+
+		And("{string} has been admitted", admitUser(world));
+
+		And("{string} has reserved an item", reserveUser(world));
+
+		When("{int} seconds pass", secondsPass(world));
+
+		And("{string} reserves an item", reserveUser(world));
+
+		Then("the response status is {int}", statusIs(world));
+
+		And(
+			"the reservation is a new one, not the one {string} had before",
+			newHoldGiven(world),
+		);
+
+		And(
+			"the hold {string} had before is kept as a row marked deleted by {string}",
+			oldHoldKept(world),
+		);
+
+		And("{string} has one hold that counts, the new one", oneHoldCounts(world));
+	};
+}
+
+// The ids of the holds the replies granted.
+const grantedIds = (replies: Response[]): string[] =>
+	replies
+		.filter((reply) => reply.statusCode === 201)
+		.map((reply) => reply.json().reservationId);
+
+function manyReserveAgainAfterExpiry(layer: ShopLayer): ScenarioBinder {
+	return ({ Given, And, When, Then }) => {
+		const world = layer.newWorld();
+		const users = shopperNames(30);
+		let before: string[] = [];
+		let replies: Response[] = [];
+
+		Given(OPEN_SALE, async () =>
+			openSale(world, layer.now, { stock: 10, sold: 0 }),
+		);
+
+		And("the hold time of the sale is {int} second", holdSecondsIs(world));
+
+		And("{int} shoppers have been admitted", async (_ctx, count: number) => {
+			await world.admitMany(users.slice(0, count));
+		});
+
+		And(
+			"all {int} shoppers have reserved an item at the same time",
+			async () => {
+				before = grantedIds(await world.reserveAll(users));
+			},
+		);
+
+		When("{int} seconds pass", secondsPass(world));
+
+		And("all {int} shoppers reserve an item at the same time", async () => {
+			replies = await world.reserveAll(users);
+		});
+
+		Then("{int} reservations are granted", (_ctx, count: number) => {
+			expect(grantedIds(replies)).toHaveLength(count);
+		});
+
+		And(
+			"{int} shoppers are told the item is sold out",
+			(_ctx, count: number) => {
+				const soldOut = replies.filter(
+					(r) => r.statusCode === 409 && r.json().errorCode === "sold_out",
+				);
+				expect(soldOut).toHaveLength(count);
+			},
+		);
+
+		And(
+			"{int} holds count, and no shopper has more than one hold that is not marked deleted",
+			async (_ctx, count: number) => {
+				const rows = await world.holdRows();
+				expect(rows.filter((row) => row.counts)).toHaveLength(count);
+				const notDeleted = rows
+					.filter((row) => row.deletedBy === undefined)
+					.map((row) => row.user);
+				expect(new Set(notDeleted).size).toBe(notDeleted.length);
+			},
+		);
+
+		And("every hold granted before is still kept as a row", async () => {
+			const kept = (await world.holdRows()).map((row) => row.reservationId);
+			expect(before).toHaveLength(10);
+			expect(kept).toEqual(expect.arrayContaining(before));
+		});
+	};
+}
+
 function manyReserveAtOnce(layer: ShopLayer): ScenarioBinder {
 	return ({ Given, And, When, Then }) => {
 		const world = layer.newWorld();
@@ -335,7 +464,10 @@ export function bindReservationReserving(layer: ShopLayer) {
 		refusesUnknownSale: refusesUnknownSale(layer),
 		holdsCountAgainstStock: holdsCountAgainstStock(layer),
 		expiredHoldGivesBack: expiredHoldGivesBack(layer),
+		takenAgainAfterExpiry: takenAgainAfterExpiry(layer),
 		manyReserveAtOnce: manyReserveAtOnce(layer),
+		manyReserveAgainAfterExpiry: manyReserveAgainAfterExpiry(layer),
 		writeFailureGivesBack: writeFailureGivesBack(layer),
+		placeLostMustJoinAgain: placeLostMustJoinAgain(layer),
 	};
 }

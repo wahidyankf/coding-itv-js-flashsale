@@ -1,6 +1,7 @@
 // Steps for accounts and sessions: signing up and logging in, the two cookies a login sets (their names, HttpOnly, and their
-// paths), the stored tokens (only hashes), logging out, refreshing, and the copy of a cookie that must stop working. The
-// shopper's cookie jar is kept here, as a browser would keep it. Binds auth/accounts.feature and auth/sessions.feature.
+// paths), the stored tokens (only hashes), who the users row says changed it last, logging out, refreshing, and the copy
+// of a cookie that must stop working, and one login served by two instances of the API. The shopper's cookie jar is kept
+// here, as a browser would keep it. Binds auth/accounts.feature and auth/sessions.feature.
 
 import { createHash } from "node:crypto";
 import { applySetCookies, cookieHeader } from "@flash/flash-commons";
@@ -9,13 +10,17 @@ import { expect } from "@playwright/test";
 import { createBdd } from "playwright-bdd";
 import { routes, send } from "./support/api.js";
 import { ensureDatabase, query } from "./support/database.js";
-import { E2E_REDIS_URL, withRedis } from "./support/processes.js";
+import {
+	E2E_REDIS_URL,
+	startSecondApi,
+	withRedis,
+} from "./support/processes.js";
 import {
 	currentResponse,
 	setCookiesOf,
 	setResponse,
 } from "./support/response.js";
-import { world } from "./support/world.js";
+import { currentSaleId, world } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
 
@@ -38,14 +43,23 @@ function remember() {
 async function go(
 	request: APIRequestContext,
 	route: Parameters<typeof send>[1],
-	options: { body?: unknown; from?: Jar; record?: boolean } = {},
+	options: {
+		body?: unknown;
+		from?: Jar;
+		record?: boolean;
+		on?: "first" | "second";
+		params?: Record<string, string>;
+	} = {},
 ) {
 	await ensureDatabase();
 	const path = route.path;
+	const base = options.on === "second" ? await startSecondApi() : undefined;
 	setResponse(
 		await send(request, route, {
 			headers: { cookie: cookieHeader(options.from ?? jar(), path) ?? "" },
 			body: options.body,
+			...(base === undefined ? {} : { base }),
+			...(options.params === undefined ? {} : { params: options.params }),
 		}),
 	);
 	if (options.record !== false) remember();
@@ -135,6 +149,21 @@ Then(
 	},
 );
 
+Then(
+	/^the stored row of "([^"]+)" was last changed by "([^"]+)", at the time of the login$/,
+	async ({ request: _request }, name: string, by: string) => {
+		const rows = await query<{ byAuthor: boolean; atLogin: boolean }>(
+			`select row.updated_by = author.id as "byAuthor",
+			        row.updated_at is not null and row.updated_at = row.last_login_at as "atLogin"
+			   from users row, users author
+			  where row.username = $1 and row.deleted_at is null
+			    and author.username = $2 and author.deleted_at is null`,
+			[name, by],
+		);
+		expect(rows).toEqual([{ byAuthor: true, atLogin: true }]);
+	},
+);
+
 When("the shopper asks who is logged in", async ({ request }) => {
 	await go(request, routes.me);
 });
@@ -218,5 +247,90 @@ When(
 				{ headers: { cookie: "" } },
 			),
 		);
+	},
+);
+
+// Two flash-be processes over the scenario's database and Redis, as two servers behind a load balancer. The shopper's
+// browser and its cookies stay the same; each step names the instance it reaches.
+Given(
+	"two instances of the API share one database and one Redis",
+	async ({ request: _request }) => {
+		await ensureDatabase();
+		await startSecondApi();
+	},
+);
+
+Given(
+	/^"([^"]*)" has signed up with the password "([^"]*)" on the first instance$/,
+	async ({ request }, name: string, password: string) => {
+		await go(request, routes.register, { body: { username: name, password } });
+		expect(currentResponse().status()).toBe(201);
+	},
+);
+
+When(
+	"the shopper asks who is logged in on the second instance",
+	async ({ request }) => {
+		await go(request, routes.me, { on: "second" });
+	},
+);
+
+Given(
+	"the shopper has asked who is logged in on the second instance",
+	async ({ request }) => {
+		await go(request, routes.me, { on: "second" });
+		expect(currentResponse().status()).toBe(200);
+	},
+);
+
+When(
+	"the shopper joins the queue on the second instance",
+	async ({ request }) => {
+		await go(request, routes.joinQueue, {
+			on: "second",
+			params: { saleId: currentSaleId() },
+		});
+	},
+);
+
+When("the shopper logs out on the first instance", async ({ request }) => {
+	await go(request, routes.logout, { on: "first" });
+});
+
+When(
+	"the copy of the access token is sent to the second instance",
+	async ({ request }) => {
+		await go(request, routes.me, {
+			from: world.jarCopy ?? new Map(),
+			record: false,
+			on: "second",
+		});
+	},
+);
+
+When(
+	"the shopper refreshes the login on the first instance",
+	async ({ request }) => {
+		await go(request, routes.refresh, { on: "first" });
+		expect(currentResponse().status()).toBe(200);
+	},
+);
+
+When(
+	"the copy of the refresh token is used on the second instance",
+	async ({ request }) => {
+		await go(request, routes.refresh, {
+			from: world.jarCopy ?? new Map(),
+			record: false,
+			on: "second",
+		});
+	},
+);
+
+Then(
+	"the shopper is no longer logged in on the second instance",
+	async ({ request }) => {
+		await go(request, routes.me, { on: "second" });
+		expect(currentResponse().status()).toBe(401);
 	},
 );

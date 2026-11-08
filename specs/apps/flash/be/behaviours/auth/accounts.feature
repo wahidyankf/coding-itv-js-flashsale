@@ -23,11 +23,12 @@ Feature: Accounts of shoppers
     And the reply sets no cookie
 
     Examples:
-      | name                                                              | password        | error            |
-      | has space                                                         | a long password | invalid_user     |
-      | semi;colon                                                        | a long password | invalid_user     |
-      | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | a long password | invalid_user     |
-      | ana                                                               | short           | invalid_password |
+      | name                                                              | password                                                                                                                          | error            |
+      | has space                                                         | a long password                                                                                                                   | invalid_user     |
+      | semi;colon                                                        | a long password                                                                                                                   | invalid_user     |
+      | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | a long password                                                                                                                   | invalid_user     |
+      | ana                                                               | short                                                                                                                             | invalid_password |
+      | ana                                                               | ppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp | invalid_password |
 
   Scenario: A name that is taken is refused, whatever its case
     Given "ana" has signed up with the password "a long password"
@@ -42,6 +43,12 @@ Feature: Accounts of shoppers
     Then the response status is 200
     And the reply sets an "access_token" cookie and a "refresh_token" cookie, both HttpOnly
     And the shopper is logged in as "ana"
+
+  Scenario: A login records the user as the one who changed their row
+    Given "ana" has signed up with the password "a long password"
+    When "ana" logs in with the password "a long password"
+    Then the response status is 200
+    And the stored row of "ana" was last changed by "ana", at the time of the login
 
   Scenario Outline: A wrong password and an unknown name are refused in the same way
     Given "ana" has signed up with the password "a long password"

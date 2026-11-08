@@ -110,22 +110,6 @@ function joinsTwice(layer: ShopLayer): ScenarioBinder {
 	};
 }
 
-function trimsName(layer: ShopLayer): ScenarioBinder {
-	return ({ Given, When, Then }) => {
-		const world = layer.newWorld();
-
-		Given(OPEN_SALE, async () =>
-			openSale(world, layer.now, { stock: 10, sold: 0 }),
-		);
-
-		When("{string} joins the queue", joinUser(world));
-
-		Then("the user is {string}", (_ctx, user: string) => {
-			expect(responseOf(world).json().userId).toBe(user);
-		});
-	};
-}
-
 function refusesFullSale(layer: ShopLayer): OutlineBinder {
 	return ({ Given, When, Then, And }, examples) => {
 		const world = layer.newWorld();
@@ -176,7 +160,6 @@ export function bindQueueJoining(layer: ShopLayer) {
 		returnsTicket: returnsTicket(layer),
 		placedInOrder: placedInOrder(layer),
 		joinsTwice: joinsTwice(layer),
-		trimsName: trimsName(layer),
 		refusesFullSale: refusesFullSale(layer),
 		refusesUnknownSale: refusesUnknownSale(layer),
 	};

@@ -19,8 +19,9 @@ describeFeature(
 	await loadFeature(specFile("flash/be/behaviours/queue/admission.feature")),
 	({ Scenario, BeforeEachScenario }) => {
 		// The server admits shoppers to the sale it shows now. A sale left by an earlier scenario could be that
-		// sale, so the sales are cleared first.
+		// sale, so the sales are cleared first, and an admission time a scenario shortened is put back.
 		BeforeEachScenario(async () => {
+			real.resetSettings();
 			await resetSales(real.db);
 		});
 
@@ -43,6 +44,13 @@ describeFeature(
 		Scenario(
 			"A shopper whose place was lost is told to join again",
 			steps.placeLost,
+		);
+
+		Scenario("An admission that is not used in time ends", steps.admissionEnds);
+
+		Scenario(
+			"A shopper whose admission ended joins the line again",
+			steps.joinsAgainAfterAdmission,
 		);
 	},
 );

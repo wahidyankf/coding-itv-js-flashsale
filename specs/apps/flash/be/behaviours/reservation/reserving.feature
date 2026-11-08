@@ -84,12 +84,36 @@ Feature: Reserving an item
     And "ben" reserves an item
     Then the response status is 201
 
+  Scenario: A hold taken again after the last one expired keeps the old hold as a row marked deleted
+    Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
+    And the hold time of the sale is 1 second
+    And "ana" has been admitted
+    And "ana" has reserved an item
+    When 2 seconds pass
+    And "ana" reserves an item
+    Then the response status is 201
+    And the reservation is a new one, not the one "ana" had before
+    And the hold "ana" had before is kept as a row marked deleted by "ana"
+    And "ana" has one hold that counts, the new one
+
   Scenario: Many shoppers reserving at once never hold more than the stock
     Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
     And 30 shoppers have been admitted
     When all 30 shoppers reserve an item at the same time
     Then 10 reservations are granted
     And 20 shoppers are told the item is sold out
+
+  Scenario: Many shoppers reserving again at once after their holds expired never hold more than the stock
+    Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
+    And the hold time of the sale is 1 second
+    And 30 shoppers have been admitted
+    And all 30 shoppers have reserved an item at the same time
+    When 2 seconds pass
+    And all 30 shoppers reserve an item at the same time
+    Then 10 reservations are granted
+    And 20 shoppers are told the item is sold out
+    And 10 holds count, and no shopper has more than one hold that is not marked deleted
+    And every hold granted before is still kept as a row
 
   Scenario: A failed write to Postgres gives the item back
     Given a sale with stock 1 and 0 sold that opens 1 hour ago and closes in 1 hour
@@ -100,3 +124,11 @@ Feature: Reserving an item
     And Postgres saves reservations again
     And "ben" reserves an item
     Then the response status is 201
+
+  Scenario: A shopper whose place was lost must join again before reserving
+    Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
+    And "ana" has been admitted
+    And the queue is lost
+    When "ana" reserves an item
+    Then the response status is 403
+    And the error is "not_admitted"

@@ -36,5 +36,7 @@ describeFeature(
 			"The count starts again in the next window",
 			steps.countStartsAgain,
 		);
+
+		Scenario("Logins from one address are limited", steps.loginsLimited);
 	},
 );

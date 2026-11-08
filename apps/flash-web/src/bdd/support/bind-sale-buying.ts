@@ -165,6 +165,27 @@ function holdEnds(world: WebWorld): ScenarioBinder {
 	};
 }
 
+// A waiting shopper whose place is lost is told to join again.
+function placeLost(world: WebWorld): ScenarioBinder {
+	return ({ Given, And, When, Then }) => {
+		Given(SALE_10, openTenSale(world));
+		And("the queue admits shoppers slowly", admitsSlowly(world));
+		And("{int} shoppers are ahead in the queue", shoppersAhead(world));
+		And("{string} is logged in", isLoggedIn(world));
+		And("a visitor has the page open", visitorOpensPage(world));
+		When("she presses Buy Now", pressBuyNow(world));
+		Then("the page says {string}", pageSays(world));
+		When("the queue is lost", async () => world.loseQueue());
+		Then(
+			'the page says "Your place was lost. Press Buy Now to join again."',
+			async () =>
+				world.expectPageSays(
+					"Your place was lost. Press Buy Now to join again.",
+				),
+		);
+	};
+}
+
 // The steps of each scenario in the buying feature, by the scenario's name in the layer's test file.
 export function bindSaleBuying(world: WebWorld) {
 	return {
@@ -177,5 +198,6 @@ export function bindSaleBuying(world: WebWorld) {
 		tooManyRequests: tooManyRequests(world),
 		declinedKeepsHold: declinedKeepsHold(world),
 		holdEnds: holdEnds(world),
+		placeLost: placeLost(world),
 	};
 }

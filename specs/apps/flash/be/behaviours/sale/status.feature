@@ -17,6 +17,7 @@ Feature: Sale status
       | 10    | 3    | 1 hour ago  | in 1 hour  | active   | 7         |
       | 10    | 3    | 2 hours ago | 1 hour ago | ended    | 7         |
       | 10    | 10   | 1 hour ago  | in 1 hour  | sold_out | 0         |
+      | 10    | 10   | 2 hours ago | 1 hour ago | ended    | 0         |
 
   Scenario: The current sale is the one that is running, even when a later sale is scheduled
     Given a sale named "Running" that opens 1 hour ago and closes in 1 hour

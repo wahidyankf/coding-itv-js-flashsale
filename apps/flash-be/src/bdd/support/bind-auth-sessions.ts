@@ -15,6 +15,17 @@ const SIGNED_UP = "{string} has signed up with the password {string}";
 const COPY = "the shopper keeps a copy of the tokens";
 const COPY_REFUSED = "the copy of the access token is refused";
 const LOGGED_IN_AS = "the shopper is logged in as {string}";
+const CLEARS_COOKIES = "the reply clears both cookies";
+
+// The reply ends both session cookies, so the browser stops sending them.
+function clearsCookies(world: AuthWorld) {
+	return () => {
+		expect(world.setCookies).toHaveLength(2);
+		for (const cookie of world.setCookies) {
+			expect(cookie).toContain("Max-Age=0");
+		}
+	};
+}
 
 // Both session cookies must be HttpOnly, so page scripts cannot read them.
 function cookies(world: AuthWorld) {
@@ -72,12 +83,7 @@ function logsOutEnds(newWorld: () => AuthWorld): ScenarioBinder {
 			await world.logOut();
 		});
 		Then("the response status is {int}", statusIs(world));
-		And("the reply clears both cookies", () => {
-			expect(world.setCookies).toHaveLength(2);
-			for (const cookie of world.setCookies) {
-				expect(cookie).toContain("Max-Age=0");
-			}
-		});
+		And(CLEARS_COOKIES, clearsCookies(world));
 		And(COPY_REFUSED, copyRefused(world));
 	};
 }
@@ -146,6 +152,7 @@ function refreshTwiceEnds(newWorld: () => AuthWorld): ScenarioBinder {
 		});
 		Then("the response status is {int}", statusIs(world));
 		And("the error is {string}", errorIs(world));
+		And(CLEARS_COOKIES, clearsCookies(world));
 		And("the shopper is no longer logged in", async () => {
 			const reply = await world.me();
 			expect(reply.statusCode).toBe(401);
@@ -162,6 +169,7 @@ function refreshWithoutToken(newWorld: () => AuthWorld): ScenarioBinder {
 		});
 		Then("the response status is {int}", statusIs(world));
 		And("the error is {string}", errorIs(world));
+		And(CLEARS_COOKIES, clearsCookies(world));
 	};
 }
 
@@ -200,6 +208,109 @@ function routesNeedLogin(newWorld: () => AuthWorld): OutlineBinder {
 	};
 }
 
+const TWO_INSTANCES =
+	"two instances of the API share one database and one Redis";
+const SIGNED_UP_ON_FIRST =
+	"{string} has signed up with the password {string} on the first instance";
+
+// Both layers build the second instance with the world, over the same stores, so there is nothing more to start.
+const twoInstances = () => {};
+
+function loginAcrossInstances(newWorld: () => AuthWorld): ScenarioBinder {
+	return ({ Given, And, When, Then }) => {
+		const world = newWorld();
+
+		Given(TWO_INSTANCES, twoInstances);
+		And(
+			"a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour",
+			async () => {
+				await world.openSale();
+			},
+		);
+		And(SIGNED_UP_ON_FIRST, signedUp(world));
+		When(
+			"the shopper asks who is logged in on the second instance",
+			async () => {
+				await world.me("second");
+			},
+		);
+		Then("the response status is {int}", statusIs(world));
+		And("the account is {string}, a {string}", account(world));
+		When("the shopper joins the queue on the second instance", async () => {
+			await world.joinQueue("second");
+		});
+		// A second check of the status, bound by its exact text so it finds its own line.
+		Then("the response status is 201", () => {
+			expect(world.response.statusCode).toBe(201);
+		});
+	};
+}
+
+function logoutAcrossInstances(newWorld: () => AuthWorld): ScenarioBinder {
+	return ({ Given, And, When, Then }) => {
+		const world = newWorld();
+
+		Given(TWO_INSTANCES, twoInstances);
+		And(SIGNED_UP_ON_FIRST, signedUp(world));
+		And(COPY, keepsCopy(world));
+		// The second instance answers once first, so the login is in the shared cache when the first instance ends it.
+		And(
+			"the shopper has asked who is logged in on the second instance",
+			async () => {
+				expect((await world.me("second")).statusCode).toBe(200);
+			},
+		);
+		When("the shopper logs out on the first instance", async () => {
+			await world.logOut("first");
+		});
+		And(
+			"the copy of the access token is sent to the second instance",
+			async () => {
+				await world.meWithCopy("second");
+			},
+		);
+		Then("the response status is {int}", statusIs(world));
+		And("the error is {string}", errorIs(world));
+	};
+}
+
+function refreshAcrossInstances(newWorld: () => AuthWorld): ScenarioBinder {
+	return ({ Given, And, When, Then }) => {
+		const world = newWorld();
+
+		Given(TWO_INSTANCES, twoInstances);
+		And(SIGNED_UP_ON_FIRST, signedUp(world));
+		And(COPY, keepsCopy(world));
+		When("the shopper refreshes the login on the first instance", async () => {
+			expect((await world.refresh("first")).statusCode).toBe(200);
+		});
+		And(
+			"the shopper asks who is logged in on the second instance",
+			async () => {
+				await world.me("second");
+			},
+		);
+		Then("the response status is {int}", statusIs(world));
+		And("the account is {string}, a {string}", account(world));
+		When(
+			"the copy of the refresh token is used on the second instance",
+			async () => {
+				await world.refreshWithCopy("second");
+			},
+		);
+		Then("the response status is 401", () => {
+			expect(world.response.statusCode).toBe(401);
+		});
+		And("the error is {string}", errorIs(world));
+		And(
+			"the shopper is no longer logged in on the second instance",
+			async () => {
+				expect((await world.me("second")).statusCode).toBe(401);
+			},
+		);
+	};
+}
+
 // The steps of each scenario in the sessions feature, by the scenario's name in the feature's own words.
 export function bindAuthSessions(newWorld: () => AuthWorld) {
 	return {
@@ -212,5 +323,8 @@ export function bindAuthSessions(newWorld: () => AuthWorld) {
 		refreshWithoutToken: refreshWithoutToken(newWorld),
 		cookieLimitedToAuth: cookieLimitedToAuth(newWorld),
 		routesNeedLogin: routesNeedLogin(newWorld),
+		loginAcrossInstances: loginAcrossInstances(newWorld),
+		logoutAcrossInstances: logoutAcrossInstances(newWorld),
+		refreshAcrossInstances: refreshAcrossInstances(newWorld),
 	};
 }

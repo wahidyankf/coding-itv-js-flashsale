@@ -222,6 +222,59 @@ function keepsRemovedRow(newWorld: () => OperatorWorld): ScenarioBinder {
 	};
 }
 
+function hidesRemovedSale(newWorld: () => OperatorWorld): ScenarioBinder {
+	return ({ Given, When, Then, And }) => {
+		const world = newWorld();
+		const last: ReplyBox = { response: undefined };
+
+		Given("an operator is logged in", operatorLoggedIn(world));
+		And(SALE_OPENING, openingSale(world));
+
+		When("the operator removes that sale", async () => {
+			expect(
+				(await world.operate("removes that sale", "operator")).statusCode,
+			).toBe(200);
+		});
+
+		And("a client asks for that sale", async () => {
+			last.response = await world.readSale();
+		});
+
+		Then("the response status is {int}", statusIs(last));
+
+		And("the error is {string}", errorIs(last));
+
+		// Another sale may be current, but never the one that was removed.
+		And("that sale is not the current sale", async () => {
+			const current = await world.readCurrentSale();
+			if (current.statusCode === 200) {
+				expect(current.json().id).not.toBe(world.saleId);
+			} else {
+				expect(current.json().errorCode).toBe("sale_not_found");
+			}
+		});
+	};
+}
+
+function refusesUnknownSaleOutline(
+	newWorld: () => OperatorWorld,
+): OutlineBinder {
+	return ({ Given, When, Then, And }, examples) => {
+		const world = newWorld();
+		const last: ReplyBox = { response: undefined };
+
+		Given("an operator is logged in", operatorLoggedIn(world));
+
+		When("the operator <request>", async () => {
+			last.response = await world.operate(String(examples.request), "operator");
+		});
+
+		Then("the response status is {int}", statusIs(last));
+
+		And("the error is {string}", errorIs(last));
+	};
+}
+
 function refusesRemovalWithPurchase(
 	newWorld: () => OperatorWorld,
 ): ScenarioBinder {
@@ -327,6 +380,8 @@ export function bindAdminOperating(newWorld: () => OperatorWorld) {
 		refusesUnusableChange: refusesUnusableChange(newWorld),
 		removesUnbought: removesUnbought(newWorld),
 		keepsRemovedRow: keepsRemovedRow(newWorld),
+		hidesRemovedSale: hidesRemovedSale(newWorld),
+		refusesUnknownSaleOutline: refusesUnknownSaleOutline(newWorld),
 		refusesRemovalWithPurchase: refusesRemovalWithPurchase(newWorld),
 		listsNewestFirst: listsNewestFirst(newWorld),
 		needsLoginOutline: needsLoginOutline(newWorld),

@@ -14,6 +14,7 @@ import type { PasswordHasher } from "../../application/ports/password-hasher.js"
 import type { SessionRepository } from "../../application/ports/session-repository.js";
 import type { Principal, Role } from "../../domain/auth.js";
 import { type UserId, type Username, userIdOf } from "../../domain/user.js";
+import type { UserRow } from "./auth-world.js";
 import { usernameOf } from "./users.js";
 
 // A password check that costs nothing, so a scenario with many shoppers is not slowed down by hashing.
@@ -25,8 +26,14 @@ export const plainHasher: PasswordHasher = {
 // The password every scenario's logins use. The memory login helper sets it, and then logs in with it.
 const SCENARIO_PASSWORD = "a long password";
 
-// One account: its principal and the hash of its password.
-type Account = { principal: Principal; passwordHash: string };
+// One account: its principal, the hash of its password, and the audit fields its Postgres row would hold.
+type Account = {
+	principal: Principal;
+	passwordHash: string;
+	lastLoginAt: Date | undefined;
+	updatedAt: Date | undefined;
+	updatedBy: UserId | undefined;
+};
 
 // One login: the hashes of its tokens, when they end, and whether it was ended.
 type Row = {
@@ -49,6 +56,11 @@ export type MemoryAuth = {
 	stored: () => { passwordHashes: string[]; tokenHashes: string[] };
 	// The id of a user who has an account, if there is one.
 	idOf: (username: string) => string | undefined;
+	// The audit fields of the account's row, as Postgres would hold them.
+	userRow: (username: string) => UserRow | undefined;
+	// The auth service of another instance: its own service object over the same accounts and logins, as a second server
+	// over the same Postgres is.
+	anotherInstance: () => AuthService;
 };
 
 // Accounts by name: a name is taken once, and a principal is found by name.
@@ -66,6 +78,9 @@ function memoryAccounts(users: Map<Username, Account>): AccountRepository {
 			users.set(account.username, {
 				principal,
 				passwordHash: account.passwordHash,
+				lastLoginAt: undefined,
+				updatedAt: undefined,
+				updatedBy: undefined,
 			});
 			return new Ok(principal);
 		},
@@ -76,10 +91,12 @@ function memoryAccounts(users: Map<Username, Account>): AccountRepository {
 	};
 }
 
-// Logins: one row per login, holding only the hashes of its tokens. A refresh token used twice ends its login.
+// Logins: one row per login, holding only the hashes of its tokens. A refresh token used twice ends its login. `stamp`
+// records the login on the user's row, as the Postgres adapter does in the same transaction.
 function memorySessions(
 	rows: Row[],
 	principalById: (userId: UserId) => Principal | undefined,
+	stamp: (userId: UserId) => void,
 ): SessionRepository {
 	const liveRows = (predicate: (row: Row) => boolean) =>
 		rows.filter((row) => !row.deleted && predicate(row));
@@ -94,6 +111,7 @@ function memorySessions(
 				previousRefreshHash: undefined,
 				deleted: false,
 			});
+			stamp(session.userId);
 		},
 		findByAccess: async (accessHash, now) => {
 			const row = liveRows(
@@ -157,22 +175,47 @@ export function memoryAuth(
 	const principalById = (userId: UserId): Principal | undefined =>
 		[...users.values()].find((user) => user.principal.userId === userId)
 			?.principal;
+	// A login is the user's own act, so the user is the one who changed the row.
+	const stamp = (userId: UserId) => {
+		const account = [...users.values()].find(
+			(user) => user.principal.userId === userId,
+		);
+		if (account === undefined) return;
+		const at = sessionClock();
+		account.lastLoginAt = at;
+		account.updatedAt = at;
+		account.updatedBy = userId;
+	};
 	const accounts = memoryAccounts(users);
-	const service = createAuthService(
-		accounts,
-		memorySessions(rows, principalById),
-		hasher,
-		sessionClock,
-		randomTokenSource,
-	);
+	const instance = () =>
+		createAuthService(
+			accounts,
+			memorySessions(rows, principalById, stamp),
+			hasher,
+			sessionClock,
+			randomTokenSource,
+		);
+	const service = instance();
 	const cookies = new Map<string, string>();
 	return {
 		service,
+		anotherInstance: instance,
 		stored: () => ({
 			passwordHashes: [...users.values()].map((user) => user.passwordHash),
 			tokenHashes: rows.flatMap((row) => [row.accessHash, row.refreshHash]),
 		}),
 		idOf: (username) => users.get(usernameOf(username))?.principal.userId,
+		userRow: (username) => {
+			const found = users.get(usernameOf(username));
+			return (
+				found && {
+					id: found.principal.userId,
+					lastLoginAt: found.lastLoginAt,
+					updatedAt: found.updatedAt,
+					updatedBy: found.updatedBy,
+				}
+			);
+		},
 		login: async (username, role = "shopper") => {
 			const known = cookies.get(username);
 			if (known !== undefined) return known;

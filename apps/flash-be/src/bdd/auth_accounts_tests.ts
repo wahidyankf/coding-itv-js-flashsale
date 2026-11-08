@@ -36,6 +36,11 @@ describeFeature(
 
 		Scenario("A shopper logs in with the right password", steps.logsIn);
 
+		Scenario(
+			"A login records the user as the one who changed their row",
+			steps.loginStampsRow,
+		);
+
 		ScenarioOutline(
 			"A wrong password and an unknown name are refused in the same way",
 			steps.refusesWrongLogin,

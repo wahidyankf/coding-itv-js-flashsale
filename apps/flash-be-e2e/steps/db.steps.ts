@@ -24,6 +24,7 @@ const TABLES = [
 	"products",
 	"users",
 	"sessions",
+	"payments",
 ];
 const AUDIT_COLUMNS = [
 	"created_at",
@@ -40,6 +41,15 @@ async function exists(table: string): Promise<boolean> {
 		[`public.${table}`],
 	);
 	return rows[0]?.name === table;
+}
+
+// Every table of the schema except the migrator's own, in name order. The scenario lists them all, so a new table that
+// it does not name fails it instead of going unseen.
+async function tablesOfSchema(): Promise<string[]> {
+	const rows = await query<{ name: string }>(
+		"select table_name as name from information_schema.tables where table_schema = 'public' and table_name not like 'kysely_migration%' order by table_name",
+	);
+	return rows.map((row) => row.name);
 }
 
 // A sale that opened an hour ago and closes in an hour, for the rows that only need a valid window.
@@ -63,9 +73,10 @@ When("the migrations run to the latest version", () => {
 });
 
 Then(
-	"the sales, purchases, reservations, products, users and sessions tables exist",
+	"the sales, purchases, reservations, products, users, sessions and payments tables exist",
 	async () => {
 		for (const table of TABLES) expect(await exists(table)).toBe(true);
+		expect(await tablesOfSchema()).toEqual([...TABLES].sort());
 	},
 );
 

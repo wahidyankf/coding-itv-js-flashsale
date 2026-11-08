@@ -116,7 +116,7 @@ export async function loginAs(
 // Empties the tables, so each scenario starts with no sale. Only tests do this, because product code never deletes a row.
 // The two users the migration made stay, and so does every table that nothing here refers to.
 export async function resetSales(db: Kysely<Database>): Promise<void> {
-	await sql`truncate table sessions, sales, purchases, reservations, products cascade`.execute(
+	await sql`truncate table sessions, sales, purchases, reservations, products, payments cascade`.execute(
 		db,
 	);
 	await sql`delete from users where username <> ${SYSTEM_USERNAME}`.execute(db);

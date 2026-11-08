@@ -3,10 +3,7 @@
 // scenarios against a real database (db_integration_tests.ts). The two differ on purpose, so the steps stay in each file.
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import { expect } from "vitest";
-import { up as upUsers } from "../adapters/outbound/postgres/migrations/0001_users.js";
-import { up as upSales } from "../adapters/outbound/postgres/migrations/0002_products_and_sales.js";
-import { up as upHolds } from "../adapters/outbound/postgres/migrations/0003_reservations_and_purchases.js";
-import { up as upSessions } from "../adapters/outbound/postgres/migrations/0004_sessions.js";
+import { up as upSchema } from "../adapters/outbound/postgres/migrations/0001_schema.js";
 import { SYSTEM_USERNAME } from "../domain/actors.js";
 import { specFile } from "./support/paths.js";
 import { recordingDb } from "./support/recording-db.js";
@@ -21,6 +18,7 @@ const TABLES = [
 	"products",
 	"users",
 	"sessions",
+	"payments",
 ];
 const AUDIT_COLUMNS = [
 	"created_at",
@@ -31,12 +29,9 @@ const AUDIT_COLUMNS = [
 	"deleted_by",
 ];
 
-// Runs every migration, in order, on a database that only records.
+// Runs the migration on a database that only records.
 async function runMigrations(db: Recording): Promise<void> {
-	await upUsers(db.db);
-	await upSales(db.db);
-	await upHolds(db.db);
-	await upSessions(db.db);
+	await upSchema(db.db);
 }
 
 // A recording database with every migration run on it.
@@ -48,6 +43,15 @@ async function migrated(): Promise<Recording> {
 
 function sent(db: Recording, pattern: RegExp): boolean {
 	return db.queries.some((sql) => pattern.test(sql));
+}
+
+// Every table the migrations create, in name order. The scenario lists them all, so a new table that it does not name
+// fails it instead of going unseen.
+function createdTables(db: Recording): string[] {
+	return db.queries
+		.flatMap((query) => [...query.matchAll(/create table "([^"]+)"/g)])
+		.map((match) => match[1] ?? "")
+		.sort();
 }
 
 // Whether the migrations give the table the column: in its `create table`, or in an `alter table ... add column`.
@@ -62,7 +66,7 @@ describeFeature(
 	await loadFeature(specFile("flash/be/behaviours/db/migrations.feature")),
 	({ Scenario }) => {
 		Scenario(
-			"The migrations create the sales, purchases, reservations, products, users and sessions tables",
+			"The migrations create the sales, purchases, reservations, products, users, sessions and payments tables",
 			({ Given, When, Then }) => {
 				let db: Recording;
 
@@ -75,14 +79,9 @@ describeFeature(
 				});
 
 				Then(
-					"the sales, purchases, reservations, products, users and sessions tables exist",
+					"the sales, purchases, reservations, products, users, sessions and payments tables exist",
 					() => {
-						// `sales`, `purchases` and `reservations` are made by the second migration, the others by the third.
-						for (const table of TABLES) {
-							expect(sent(db, new RegExp(`create table "${table}"`))).toBe(
-								true,
-							);
-						}
+						expect(createdTables(db)).toEqual([...TABLES].sort());
 					},
 				);
 			},

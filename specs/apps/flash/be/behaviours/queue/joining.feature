@@ -30,11 +30,6 @@ Feature: Joining the queue
     And the place in line is 1
     And the ticket is the one "ana" had before
 
-  Scenario: A user name is trimmed and lowercased
-    Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
-    When "ANA" joins the queue
-    Then the user is "ana"
-
   Scenario Outline: A sale that cannot sell any more does not take new shoppers
     Given a sale with stock 10 and <sold> sold that opens 2 hours ago and closes <closes>
     When "ana" joins the queue

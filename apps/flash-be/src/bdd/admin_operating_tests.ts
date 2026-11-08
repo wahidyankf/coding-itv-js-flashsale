@@ -55,6 +55,16 @@ describeFeature(
 		);
 
 		Scenario(
+			"Shoppers no longer see a sale the operator removed",
+			steps.hidesRemovedSale,
+		);
+
+		ScenarioOutline(
+			"Changing or removing a sale that does not exist is refused",
+			steps.refusesUnknownSaleOutline,
+		);
+
+		Scenario(
 			"A sale with a purchase cannot be removed",
 			steps.refusesRemovalWithPurchase,
 		);

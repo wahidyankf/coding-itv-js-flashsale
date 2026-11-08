@@ -31,6 +31,14 @@ Feature: Sale status on the page
     Then the page shows the status "Ended"
     And the "Buy Now" button is disabled
 
+  Scenario: The page follows the sale when it opens
+    Given a sale with stock 10 and 3 sold that opens in 1 hour and closes in 2 hours
+    And "ana" is logged in
+    And a visitor has the page open
+    When the sale opens
+    Then the page shows the status "On sale"
+    And the "Buy Now" button is enabled
+
   Scenario: The page says so when no sale exists
     Given no sale exists
     When a visitor opens the page

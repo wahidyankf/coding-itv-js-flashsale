@@ -129,12 +129,32 @@ function liveUpdatesStop(world: WebWorld): ScenarioBinder {
 	};
 }
 
+// The page follows a sale that opens while it is shown: the status changes and the buying button is enabled.
+function followsToOpen(world: WebWorld): ScenarioBinder {
+	return ({ Given, And, When, Then }) => {
+		Given(
+			"a sale with stock 10 and 3 sold that opens in 1 hour and closes in 2 hours",
+			async () => openSale(world, 10, 3, "in 1 hour", "in 2 hours"),
+		);
+		And("{string} is logged in", isLoggedIn(world));
+		And("a visitor has the page open", visitorOpensPage(world));
+		When("the sale opens", async () => world.openSale());
+		Then("the page shows the status {string}", async (_ctx, label: string) =>
+			world.expectPageSays(`Status: ${label}`),
+		);
+		And('the "Buy Now" button is enabled', async () =>
+			world.expectButton("Buy Now", "enabled"),
+		);
+	};
+}
+
 // The steps of each scenario in the status feature, by the scenario's name in the layer's test file.
 export function bindSaleStatus(world: WebWorld) {
 	return {
 		showsSaleStatus: showsSaleStatus(world),
 		lastSaleOver: lastSaleOver(world),
 		followsToEnd: followsToEnd(world),
+		followsToOpen: followsToOpen(world),
 		noSale: noSale(world),
 		followsChanges: followsChanges(world),
 		cannotBeReached: cannotBeReached(world),

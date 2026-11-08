@@ -25,5 +25,10 @@ describeFeature(
 		);
 
 		Scenario("Expired holds are not rebuilt", steps.expiredNotRebuilt);
+
+		Scenario(
+			"A buyer cannot hold again after Redis lost its state",
+			steps.buyerRefusedAfterLoss,
+		);
 	},
 );

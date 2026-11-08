@@ -27,6 +27,8 @@ describeFeature(
 
 		Scenario("The page follows the sale to its end", steps.followsToEnd);
 
+		Scenario("The page follows the sale when it opens", steps.followsToOpen);
+
 		Scenario("The page says so when no sale exists", steps.noSale);
 
 		Scenario("The page follows the sale as it changes", steps.followsChanges);

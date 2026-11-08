@@ -70,6 +70,28 @@ Feature: Changing, removing and listing sales as an operator
     And that sale is not listed
     And that sale is kept and marked as deleted by the operator
 
+  Scenario: Shoppers no longer see a sale the operator removed
+    Given an operator is logged in
+    And a sale was created with stock 5, opening in 10 minutes for 60 minutes
+    When the operator removes that sale
+    And a client asks for that sale
+    Then the response status is 404
+    And the error is "sale_not_found"
+    And that sale is not the current sale
+
+  Scenario Outline: Changing or removing a sale that does not exist is refused
+    Given an operator is logged in
+    When the operator <request>
+    Then the response status is 404
+    And the error is "sale_not_found"
+
+    Examples:
+      | request                                                                     |
+      | changes the sale with id "00000000-0000-4000-8000-000000000000" to stock 8 |
+      | removes the sale with id "00000000-0000-4000-8000-000000000000"            |
+      | changes the sale with id "not-a-uuid" to stock 8                           |
+      | removes the sale with id "not-a-uuid"                                      |
+
   Scenario: A sale with a purchase cannot be removed
     Given an operator is logged in
     And a sale was created with stock 5, opened 10 minutes ago for 60 minutes

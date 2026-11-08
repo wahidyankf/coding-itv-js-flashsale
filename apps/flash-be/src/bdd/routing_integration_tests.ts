@@ -25,9 +25,12 @@ async function newApp(): Promise<FastifyInstance> {
 		() => db.destroy(),
 		() => redis.close(),
 	);
-	const app = buildApp(dependenciesFrom(db, redis, config), {
-		cookieSecure: false,
-	});
+	// The auth counter in Redis is shared by every file of the run, so the auth scenarios elsewhere fill it. The limit is
+	// high so these scenarios never meet it; the limit has its own scenarios.
+	const app = buildApp(
+		dependenciesFrom(db, redis, { ...config, authRateLimitPerIp: 100_000 }),
+		{ cookieSecure: false },
+	);
 	cleanups.push(() => app.close());
 	return app;
 }

@@ -9,7 +9,7 @@ import { PROBE_PATHS } from "@flash/flash-commons";
 import { createClient } from "redis";
 import { pipeSockets } from "./relay.js";
 import { pollUntil } from "./time.js";
-import { type RedisProxy, world } from "./world.js";
+import { type RedisProxy, type RunningApi, world } from "./world.js";
 
 // A connected client. Its type is taken from this function, so the steps get exactly what createClient returns.
 async function connect(url: string) {
@@ -50,6 +50,8 @@ const API_DEFAULTS: Record<string, string> = {
 	EVENTS_INTERVAL_MS: "100",
 	// The e2e API runs on plain HTTP, which cannot carry Secure cookies.
 	COOKIE_SECURE: "false",
+	// No drain window, unless a shutdown step sets one, so stopping each scenario's API does not wait for it.
+	SHUTDOWN_DRAIN_MS: "0",
 };
 
 // The environment of a child process: this process's own variables, without NODE_ENV, with `extra` on top.
@@ -122,17 +124,15 @@ async function freePort(): Promise<number> {
 	});
 }
 
-// Starts the private API on a free port, over this scenario's database and through its Redis proxy, and waits until
-// /health answers. Returns its URL. A running API is reused, so a step may call this as often as it needs.
-export async function startApi(): Promise<string> {
-	if (world.api) return world.api.url;
+// Starts one flash-be process on a free port, over this scenario's database and the Redis at `redisUrl`, and waits until
+// /health answers.
+async function spawnApi(redisUrl: string): Promise<RunningApi> {
 	const port = await freePort();
-	world.redisProxy = await startRedisProxy(E2E_REDIS_URL);
 	const child = spawn(process.execPath, [path.join(DIST, "main.js")], {
 		env: childEnv({
 			...API_DEFAULTS,
 			DATABASE_URL: world.databaseUrl,
-			REDIS_URL: world.redisProxy.url,
+			REDIS_URL: redisUrl,
 			FLASH_BE_PORT: String(port),
 			FLASH_BE_HOST: "127.0.0.1",
 			...world.apiEnv,
@@ -141,7 +141,6 @@ export async function startApi(): Promise<string> {
 	});
 	const url = `http://127.0.0.1:${port}`;
 	const api = { url, process: child, log: "" };
-	world.api = api;
 	// The log is where the mock payment records a refund. Reading it also keeps the pipe from filling up.
 	child.stdout?.on("data", (chunk: Buffer) => {
 		api.log += chunk.toString();
@@ -166,17 +165,41 @@ export async function startApi(): Promise<string> {
 			failure: "flash-be did not answer /health in time",
 		},
 	);
-	return url;
+	return api;
 }
 
-// Stops the scenario's API and waits for it to exit, then closes its Redis proxy. Does nothing when no API runs.
-export async function stopApi(): Promise<void> {
-	const api = world.api;
+// Starts the private API through the scenario's Redis proxy. Returns its URL. A running API is reused, so a step may call
+// this as often as it needs.
+export async function startApi(): Promise<string> {
+	if (world.api) return world.api.url;
+	world.redisProxy = await startRedisProxy(E2E_REDIS_URL);
+	world.api = await spawnApi(world.redisProxy.url);
+	return world.api.url;
+}
+
+// Starts a second flash-be process beside the first, on its own port, over the same database and Redis, as a second server
+// behind a load balancer. Returns its URL. A running one is reused.
+export async function startSecondApi(): Promise<string> {
+	await startApi();
+	if (world.secondApi) return world.secondApi.url;
+	world.secondApi = await spawnApi(E2E_REDIS_URL);
+	return world.secondApi.url;
+}
+
+// Stops one API process and waits for it to exit. Does nothing when it has exited already.
+async function stopProcess(api: RunningApi | undefined): Promise<void> {
 	if (api && api.process.exitCode === null) {
 		const exited = new Promise((resolve) => api.process.once("exit", resolve));
 		api.process.kill("SIGTERM");
 		await exited;
 	}
+}
+
+// Stops the scenario's APIs, the second one too, and waits for them to exit, then closes the Redis proxy. Does nothing when
+// no API runs.
+export async function stopApi(): Promise<void> {
+	await stopProcess(world.secondApi);
+	await stopProcess(world.api);
 	await world.redisProxy?.close();
 }
 

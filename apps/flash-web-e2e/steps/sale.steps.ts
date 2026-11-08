@@ -1,13 +1,18 @@
 // Steps for the sale as the page sees it: how the sale is planned (stock, sold items, window), the settings a scenario changes
-// (the queue, the hold, the rate limit, the payment, the end), and the time that passes. Binds the sale scenarios of
+// (the queue, the hold, the rate limit, the payment, the start and the end, the loss of the line), and the time that passes. Binds the sale scenarios of
 // flash-web: sale/status.feature, sale/buying.feature and sale/checking.feature. The shoppers are in shopper.steps.ts.
 
 import { MS_PER_SECOND } from "@flash/flash-commons";
 import { createBdd } from "playwright-bdd";
 import {
 	ensureDatabase,
+	query,
 	setSold,
 } from "../../flash-be-e2e/steps/support/database.js";
+import {
+	E2E_REDIS_URL,
+	withRedis,
+} from "../../flash-be-e2e/steps/support/processes.js";
 import {
 	currentSaleId,
 	setApiEnv,
@@ -78,6 +83,20 @@ When(
 
 When("the sale ends", async ({ request: _request }) => {
 	await reviseSale({ closes: new Date(Date.now() - MS_PER_SECOND) });
+});
+
+// The sale's start comes while the page is open. An operator cannot move a start into the past, so the step writes the
+// table, as time passing would.
+When("the sale opens", async ({ request: _request }) => {
+	await query(
+		"update sales set starts_at = now() - interval '1 second' where id = $1",
+		[currentSaleId()],
+	);
+});
+
+// Redis loses the line, as a restart without its data does.
+When("the queue is lost", async ({ request: _request }) => {
+	await withRedis(E2E_REDIS_URL, (redis) => redis.flushDb());
 });
 
 When(/^(\d+) seconds pass$/, async ({ page }, seconds: string) => {

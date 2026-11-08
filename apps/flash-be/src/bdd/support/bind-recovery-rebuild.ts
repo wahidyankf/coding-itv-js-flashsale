@@ -4,7 +4,9 @@ import { expect } from "vitest";
 import { responseOf } from "./response.js";
 import {
 	admitUser,
+	confirmUser,
 	holdSecondsIs,
+	OPEN_SALE,
 	openSale,
 	reserveUser,
 	type ShopLayer,
@@ -108,11 +110,38 @@ function expiredNotRebuilt(layer: ShopLayer): ScenarioBinder {
 	};
 }
 
+function buyerRefusedAfterLoss(layer: ShopLayer): ScenarioBinder {
+	return ({ Given, And, When, Then }) => {
+		const world = layer.newWorld();
+
+		Given(OPEN_SALE, async () =>
+			openSale(world, layer.now, { stock: 10, sold: 0 }),
+		);
+
+		And("{string} has been admitted", admitUser(world));
+
+		And("{string} has reserved an item", reserveUser(world));
+
+		And("{string} has confirmed the purchase", confirmUser(world));
+
+		And("the reservation state of the sale is lost from Redis", async () => {
+			await world.loseReservationState();
+		});
+
+		When("{string} reserves an item", reserveUser(world));
+
+		Then("the response status is {int}", statusIs(world));
+
+		And("the error is {string}", errorIs(world));
+	};
+}
+
 // The steps of each scenario in the rebuild feature, by the scenario's name in the feature's own words.
 export function bindRecoveryRebuild(layer: ShopLayer) {
 	return {
 		survivesLoss: survivesLoss(layer),
 		sameHoldAfterLoss: sameHoldAfterLoss(layer),
 		expiredNotRebuilt: expiredNotRebuilt(layer),
+		buyerRefusedAfterLoss: buyerRefusedAfterLoss(layer),
 	};
 }

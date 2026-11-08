@@ -30,5 +30,12 @@ describeFeature(
 			"A shopper whose place was lost is told to join again",
 			steps.placeLost,
 		);
+
+		Scenario("An admission that is not used in time ends", steps.admissionEnds);
+
+		Scenario(
+			"A shopper whose admission ended joins the line again",
+			steps.joinsAgainAfterAdmission,
+		);
 	},
 );

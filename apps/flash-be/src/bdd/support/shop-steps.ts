@@ -95,3 +95,43 @@ export function userLimitIs(world: ShopScenario) {
 		await world.setUserLimit(requests, seconds);
 	};
 }
+
+// "the reservation is a new one, not the one {string} had before": the reply holds a hold of its own.
+export function newHoldGiven(world: ShopScenario) {
+	return (_ctx: unknown, user: string) => {
+		const { reservationId } = responseOf(world).json();
+		expect(reservationId).toMatch(/^[0-9a-f-]{36}$/);
+		expect(reservationId).not.toBe(world.holds.get(user)?.reservationId);
+	};
+}
+
+// "the hold {string} had before is kept as a row marked deleted by {string}": the old hold was not overwritten.
+export function oldHoldKept(world: ShopScenario) {
+	return async (_ctx: unknown, user: string, by: string) => {
+		const before = world.holds.get(user)?.reservationId;
+		const rows = await world.holdRows();
+		expect(rows.find((row) => row.reservationId === before)).toEqual({
+			user,
+			reservationId: before,
+			deletedBy: by,
+			counts: false,
+		});
+	};
+}
+
+// "{string} has one hold that counts, the new one": the shopper's only row not marked deleted is the hold just given.
+export function oneHoldCounts(world: ShopScenario) {
+	return async (_ctx: unknown, user: string) => {
+		const rows = await world.holdRows();
+		expect(
+			rows.filter((row) => row.user === user && row.deletedBy === undefined),
+		).toEqual([
+			{
+				user,
+				reservationId: responseOf(world).json().reservationId,
+				deletedBy: undefined,
+				counts: true,
+			},
+		]);
+	};
+}

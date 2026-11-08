@@ -35,6 +35,11 @@ describeFeature(
 		);
 
 		Scenario(
+			"Reserving again without Redis after the hold expired keeps the old hold as a row marked deleted",
+			steps.reservesAgainAfterExpiryWithoutRedis,
+		);
+
+		Scenario(
 			"Many shoppers reserving at once without Redis never hold more than the stock",
 			steps.manyReserveWithoutRedis,
 		);

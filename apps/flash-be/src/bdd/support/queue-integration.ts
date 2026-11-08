@@ -11,11 +11,12 @@ import { expect } from "vitest";
 import { buildApp } from "../../adapters/inbound/http/app.js";
 import { DEFAULT_STREAM_OPTIONS } from "../../adapters/inbound/http/event-stream.js";
 import { createMemoryRateLimitStore } from "../../adapters/outbound/memory/memory-rate-limit-store.js";
-import { createMockPayment } from "../../adapters/outbound/payment/mock-payment.js";
+import type { MockPayment } from "../../adapters/outbound/payment/mock-payment.js";
 import {
 	createDb,
 	type Database,
 } from "../../adapters/outbound/postgres/database.js";
+import { createPostgresPaymentLedger } from "../../adapters/outbound/postgres/payment-ledger.js";
 import { createPurchaseRepository } from "../../adapters/outbound/postgres/purchase-repository.js";
 import { createReservationRepository } from "../../adapters/outbound/postgres/reservation-repository.js";
 import type { RedisClient } from "../../adapters/outbound/redis/redis-client.js";
@@ -39,8 +40,10 @@ import { createRateLimiter } from "../../application/rate-limiter.js";
 import type { ReservationService } from "../../application/reservation-service.js";
 import { createReservationService } from "../../application/reservation-service.js";
 import { dependenciesFrom, REBUILD_WAIT_MS } from "../../composition.js";
-import { config } from "../../config.js";
+import { type Config, config } from "../../config.js";
 import { normalizeUser } from "../../domain/user.js";
+import { holdRowsOf } from "./hold-rows.js";
+import { limitActions } from "./limit-actions.js";
 import { eventRequests } from "./queue-events.js";
 import {
 	limitRequests,
@@ -55,23 +58,29 @@ import {
 	placeholders,
 	type ShopScenario,
 } from "./queue-scenario.js";
-import { QUEUE_OPTIONS } from "./queue-world.js";
 import { insertPurchase, insertSale, loginAs } from "./seed.js";
 import type { ShopLayer } from "./shop-steps.js";
 import { switchable } from "./switchable.js";
+import { confirmOnBoth, setProvider, twoPayments } from "./two-instances.js";
 
 // The stores, services and switches the whole run shares. Each scenario reads them through `scenario()`.
 type IntegrationParts = {
 	redis: RedisClient;
 	redisState: { down: boolean };
 	cache: { ttlMs: number };
-	payment: ReturnType<typeof createMockPayment>;
+	payment: MockPayment;
+	// The payments of both instances, which a provider setting changes together.
+	payments: MockPayment[];
 	limits: RateLimits;
+	// The run's copy of the server settings. The queue reads its admission time from it, so a scenario can shorten it.
+	settings: Config;
 	writes: { broken: boolean };
 	closedDb: Kysely<Database>;
 	base: Dependencies;
 	queueStore: QueueStore;
 	app: FastifyInstance;
+	// A second instance of the API, with its own payment over the same ledger.
+	secondApp: FastifyInstance;
 };
 
 // The parts a run shares: the real dependencies over Redis (flaky on a switch), a second Postgres handle that cannot
@@ -85,7 +94,8 @@ function integrationParts(
 	const flaky = switchable(redis, () => redisState.down);
 	// The cache time starts at zero, so a scenario only meets the cache when it asks for it.
 	const cache = { ttlMs: 0 };
-	const base = dependenciesFrom(db, flaky, config, systemClock, cache);
+	const settings: Config = { ...config };
+	const base = dependenciesFrom(db, flaky, settings, systemClock, cache);
 
 	// A second database handle that points at a port nobody listens on. Saving through it fails the way an
 	// unreachable Postgres does, while the rest of the app keeps its working connection.
@@ -117,15 +127,17 @@ function integrationParts(
 			random: Math.random,
 		},
 	});
-	// Latency and declines are zero until a scenario asks for them, so the default 2 percent never decides a result.
-	const payment = createMockPayment({ latencyMs: 0, failureRate: 0 });
-	const purchases: PurchaseService = createPurchaseService(
-		createPurchaseRepository(db),
-		payment,
-		gate,
-		base.sales,
-		systemClock,
-	);
+	// Latency and declines are zero until a scenario asks for them, so the default 2 percent never decides a result. The
+	// second payment is a second instance's, over the same ledger in Postgres.
+	const [payment, secondPayment] = twoPayments(createPostgresPaymentLedger(db));
+	const purchasesWith = (pay: MockPayment): PurchaseService =>
+		createPurchaseService(
+			createPurchaseRepository(db),
+			pay,
+			gate,
+			base.sales,
+			systemClock,
+		);
 	const limits: RateLimits = { ...LIMITS_OUT_OF_REACH };
 	const rateLimiter: RateLimiter = createRateLimiter(
 		createRedisRateLimitStore(flaky),
@@ -133,26 +145,31 @@ function integrationParts(
 		systemClock,
 		limits,
 	);
-	const app = buildApp(
-		{ ...base, reservations, purchases, rateLimiter },
-		// Streams read often in tests, so a change shows within a few milliseconds.
-		{
-			cookieSecure: false,
-			events: { ...DEFAULT_STREAM_OPTIONS, intervalMs: 20 },
-		},
-	);
+	const appWith = (pay: MockPayment) =>
+		buildApp(
+			{ ...base, reservations, purchases: purchasesWith(pay), rateLimiter },
+			// Streams read often in tests, so a change shows within a few milliseconds.
+			{
+				cookieSecure: false,
+				events: { ...DEFAULT_STREAM_OPTIONS, intervalMs: 20 },
+			},
+		);
+	const app = appWith(payment);
 	return {
 		redis,
 		redisState,
 		cache,
 		payment,
+		payments: [payment, secondPayment],
 		limits,
+		settings,
 		writes,
 		closedDb,
 		base,
 		// The test scaffolding admits shoppers straight in Redis, whether or not the app can reach it.
 		queueStore: createRedisQueueStore(redis),
 		app,
+		secondApp: appWith(secondPayment),
 	};
 }
 
@@ -181,6 +198,9 @@ function saleRowActions(
 				.where("id", "=", current().saleId)
 				.execute();
 		},
+		async setAdmissionSeconds(seconds: number) {
+			parts.settings.admissionTtlSeconds = seconds;
+		},
 		async setHoldSeconds(seconds: number) {
 			await db
 				.updateTable("sales")
@@ -192,6 +212,13 @@ function saleRowActions(
 			await db
 				.updateTable("sales")
 				.set({ sold })
+				.where("id", "=", current().saleId)
+				.execute();
+		},
+		async endSale() {
+			await db
+				.updateTable("sales")
+				.set({ ends_at: new Date(Date.now() - MS_PER_SECOND) })
 				.where("id", "=", current().saleId)
 				.execute();
 		},
@@ -209,7 +236,7 @@ function saleRowActions(
 				current().saleId,
 				ADMIT_EVERYONE_WAITING,
 				new Date(),
-				QUEUE_OPTIONS.admissionTtlSeconds,
+				parts.settings.admissionTtlSeconds,
 			);
 		},
 		async admitMany(users: string[]) {
@@ -218,7 +245,7 @@ function saleRowActions(
 				current().saleId,
 				ADMIT_EVERYONE_WAITING,
 				new Date(),
-				QUEUE_OPTIONS.admissionTtlSeconds,
+				parts.settings.admissionTtlSeconds,
 			);
 		},
 		async loseQueue() {
@@ -259,19 +286,22 @@ function timeAndPaymentActions(
 			await sleep(seconds * MS_PER_SECOND);
 		},
 		async setPaymentDeclines() {
-			parts.payment.settings.failureRate = 1;
+			setProvider(parts.payments, { failureRate: 1 });
 		},
 		async setPaymentDuration(seconds: number) {
-			parts.payment.settings.latencyMs = seconds * MS_PER_SECOND;
+			setProvider(parts.payments, { latencyMs: seconds * MS_PER_SECOND });
 		},
-		async wasRefunded(user: string) {
+		async setPaymentAccepts() {
+			setProvider(parts.payments, { failureRate: 0 });
+		},
+		async paymentOf(user: string) {
 			const id = current().holds.get(user)?.reservationId;
-			return parts.payment.refunded.includes(`mock-${id}`);
+			return id === undefined ? undefined : await parts.payment.statusOf(id);
 		},
 	};
 }
 
-// Faults and limits: Redis stops answering, the writes break, and the limits and the cache move.
+// Faults and the cache: Redis stops answering, the writes break, and the cache time moves. The limits are in limit-actions.ts.
 function faultActions(parts: IntegrationParts) {
 	return {
 		async breakWrites() {
@@ -285,14 +315,6 @@ function faultActions(parts: IntegrationParts) {
 		},
 		async fixRedis() {
 			parts.redisState.down = false;
-		},
-		async setUserLimit(requests: number, seconds: number) {
-			parts.limits.perUser = requests;
-			parts.limits.windowSeconds = seconds;
-		},
-		async setAddressLimit(requests: number, seconds: number) {
-			parts.limits.perIp = requests;
-			parts.limits.windowSeconds = seconds;
 		},
 		async setSaleCache(ms: number) {
 			parts.cache.ttlMs = ms;
@@ -326,6 +348,10 @@ function integrationScenario(
 		...saleRowActions(db, parts, () => scenario),
 		...timeAndPaymentActions(parts, () => scenario),
 		...faultActions(parts),
+		...limitActions(parts.limits),
+		holdRows: () => holdRowsOf(db, scenario.saleId),
+		confirmOnTwoInstances: (user) =>
+			confirmOnBoth([parts.app, parts.secondApp], scenario, user),
 	};
 	Object.assign(
 		scenario,
@@ -346,17 +372,19 @@ export async function openQueueIntegration() {
 	const parts = integrationParts(db, redis);
 	return {
 		db,
-		// Puts the payment back to "instant and never declined", and the limits out of reach, before a scenario.
+		// Puts the payment back to "instant and never declined", the limits out of reach, and the admission time to the
+		// server's, before a scenario.
 		resetSettings() {
-			parts.payment.settings.latencyMs = 0;
-			parts.payment.settings.failureRate = 0;
+			setProvider(parts.payments, { latencyMs: 0, failureRate: 0 });
 			Object.assign(parts.limits, LIMITS_OUT_OF_REACH);
 			parts.cache.ttlMs = 0;
 			parts.redisState.down = false;
+			parts.settings.admissionTtlSeconds = config.admissionTtlSeconds;
 		},
 		scenario: (): ShopScenario => integrationScenario(db, parts),
 		async close() {
 			await parts.app.close();
+			await parts.secondApp.close();
 			await redis.close();
 			await db.destroy();
 			await parts.closedDb.destroy();

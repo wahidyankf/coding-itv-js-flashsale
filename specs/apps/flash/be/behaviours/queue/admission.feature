@@ -48,3 +48,22 @@ Feature: Admission from the queue
     When "ana" checks the queue with their ticket
     Then the response status is 404
     And the error is "not_in_queue"
+
+  Scenario: An admission that is not used in time ends
+    Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
+    And an admission lasts 1 second
+    And "ana" has been admitted
+    When 2 seconds pass
+    And "ana" reserves an item
+    Then the response status is 403
+    And the error is "not_admitted"
+
+  Scenario: A shopper whose admission ended joins the line again
+    Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
+    And an admission lasts 1 second
+    And "ana" has been admitted
+    And 2 seconds pass
+    When "ana" joins the queue
+    Then the response status is 201
+    And a ticket is issued
+    And the place in line is 1

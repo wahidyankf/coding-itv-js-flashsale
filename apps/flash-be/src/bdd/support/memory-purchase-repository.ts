@@ -56,14 +56,20 @@ export function memoryPurchaseRepository(
 			return reservations.get(`${saleId}:${user}`);
 		},
 
+		// No await between the checks and the writes, so two commits run one at a time, as the sale lock makes them in
+		// Postgres.
 		async commit(input) {
-			const same = await repository.findByReservation(input.reservationId);
+			const same = repository.purchases.find(
+				(purchase) => purchase.reservationId === input.reservationId,
+			);
 			if (same) {
 				return { kind: "purchased", purchase: same, created: false };
 			}
-			if (await repository.findByUser(input.saleId, input.user)) {
-				return { kind: "already_purchased" };
-			}
+			const bought = repository.purchases.some(
+				(purchase) =>
+					purchase.saleId === input.saleId && purchase.user === input.user,
+			);
+			if (bought) return { kind: "already_purchased" };
 			const sale = sales.find((candidate) => candidate.id === input.saleId);
 			if (!sale || sale.sold >= sale.stock) return { kind: "sold_out" };
 			sale.sold += 1;

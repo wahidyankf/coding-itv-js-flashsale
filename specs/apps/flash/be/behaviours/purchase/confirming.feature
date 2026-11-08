@@ -87,7 +87,30 @@ Feature: Confirming a purchase
     Then the response status is 409
     And the error is "sold_out"
     And the payment of "ana" is refunded
+    And the payment of "ana" was charged once and refunded once
     And "ana" has no purchase
+
+  Scenario: Two confirmations of one hold on two instances charge once
+    Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
+    And the payment provider takes 1 second
+    And "ana" has been admitted
+    And "ana" has reserved an item
+    When "ana" confirms the purchase on two instances at the same time
+    Then both confirmations answer with the same purchase
+    And the payment of "ana" is charged once
+    And 9 items remain
+
+  Scenario: A shopper who is declined and tries again is charged once
+    Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
+    And the payment provider declines every payment
+    And "ana" has been admitted
+    And "ana" has reserved an item
+    And "ana" has tried to confirm the purchase and was declined
+    And the payment provider accepts every payment
+    When "ana" confirms the purchase
+    Then the response status is 201
+    And the payment of "ana" is charged on the second attempt
+    And 9 items remain
 
   Scenario: Many buyers confirming at once sell exactly the stock
     Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
@@ -97,3 +120,29 @@ Feature: Confirming a purchase
     Then 10 purchases are made
     And 0 items remain
     And the sale status is "sold_out"
+
+  Scenario: A confirmation that names no reservation is refused
+    Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
+    When "ana" confirms the purchase with an empty body
+    Then the response status is 400
+    And the error is "invalid_reservation"
+
+  Scenario: A hold cannot be paid for once the sale has ended
+    Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
+    And "ana" has been admitted
+    And "ana" has reserved an item
+    And the sale has ended
+    When "ana" confirms the purchase
+    Then the response status is 409
+    And the error is "sale_ended"
+    And 10 items remain
+
+  Scenario: A buyer who confirms another reservation is told they already bought
+    Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
+    And "ana" has been admitted
+    And "ana" has reserved an item
+    And "ana" has confirmed the purchase
+    When "ana" confirms the purchase with the reservation id "00000000-0000-4000-8000-000000000000"
+    Then the response status is 409
+    And the error is "already_purchased"
+    And 9 items remain

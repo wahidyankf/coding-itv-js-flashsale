@@ -88,3 +88,14 @@ Feature: Buying the item
     And 3 seconds pass
     Then the page says "Your hold has ended. Press Buy Now to try again."
     And the "Confirm purchase" button is disabled
+
+  Scenario: A waiting shopper whose place is lost is told to join again
+    Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
+    And the queue admits shoppers slowly
+    And 5 shoppers are ahead in the queue
+    And "ana" is logged in
+    And a visitor has the page open
+    When she presses Buy Now
+    Then the page says "You are in the queue. Your place: 6."
+    When the queue is lost
+    Then the page says "Your place was lost. Press Buy Now to join again."

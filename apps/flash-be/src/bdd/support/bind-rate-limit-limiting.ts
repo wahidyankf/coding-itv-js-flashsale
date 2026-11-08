@@ -144,6 +144,44 @@ function countStartsAgain(layer: ShopLayer): ScenarioBinder {
 	};
 }
 
+function loginsLimited(layer: ShopLayer): ScenarioBinder {
+	return ({ Given, And, When, Then }) => {
+		const world = layer.newWorld();
+
+		Given(
+			"the limit is {int} logins per address in each {int} seconds",
+			async (_ctx, requests: number, seconds: number) => {
+				await world.setLoginLimit(requests, seconds);
+			},
+		);
+
+		When(
+			"{string} tries to log in {int} times",
+			async (_ctx, user: string, times: number) => {
+				await world.repeat("log in", user, times);
+			},
+		);
+
+		Then("the first {int} requests are not limited", (_ctx, count: number) => {
+			const first = world.replies.slice(0, count);
+			expect(first.map((reply) => reply.statusCode)).not.toContain(429);
+		});
+
+		And("the response status is {int}", statusIs(world));
+
+		And("the error is {string}", errorIs(world));
+
+		And(
+			"a Retry-After header of at least {int} second is given",
+			(_ctx, seconds: number) => {
+				expect(
+					Number(responseOf(world).headers["retry-after"]),
+				).toBeGreaterThanOrEqual(seconds);
+			},
+		);
+	};
+}
+
 // The steps of each scenario in the rate limit feature, by the scenario's name in the feature's own words.
 export function bindRateLimitLimiting(layer: ShopLayer) {
 	return {
@@ -151,5 +189,6 @@ export function bindRateLimitLimiting(layer: ShopLayer) {
 		otherUserUnaffected: otherUserUnaffected(layer),
 		addressLimited: addressLimited(layer),
 		countStartsAgain: countStartsAgain(layer),
+		loginsLimited: loginsLimited(layer),
 	};
 }

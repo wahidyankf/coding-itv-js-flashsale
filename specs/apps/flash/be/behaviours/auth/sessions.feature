@@ -47,12 +47,14 @@ Feature: Logins of shoppers
     When the copy of the refresh token is used
     Then the response status is 401
     And the error is "invalid_refresh_token"
+    And the reply clears both cookies
     And the shopper is no longer logged in
 
   Scenario: A refresh without a refresh token is refused
     When someone who is not logged in refreshes the login
     Then the response status is 401
     And the error is "invalid_refresh_token"
+    And the reply clears both cookies
 
   Scenario: The refresh cookie is sent only to the auth paths
     Given "ana" has signed up with the password "a long password"
@@ -73,3 +75,36 @@ Feature: Logins of shoppers
       | POST   | /api/v1/sales/00000000-0000-4000-8000-000000000000/purchases              |
       | GET    | /api/v1/sales/00000000-0000-4000-8000-000000000000/purchases/me           |
       | GET    | /api/v1/auth/me                                                            |
+
+  Scenario: A login made on one instance is accepted by another
+    Given two instances of the API share one database and one Redis
+    And a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
+    And "ana" has signed up with the password "a long password" on the first instance
+    When the shopper asks who is logged in on the second instance
+    Then the response status is 200
+    And the account is "ana", a "shopper"
+    When the shopper joins the queue on the second instance
+    Then the response status is 201
+
+  Scenario: Logging out on one instance ends the login on every instance
+    Given two instances of the API share one database and one Redis
+    And "ana" has signed up with the password "a long password" on the first instance
+    And the shopper keeps a copy of the tokens
+    And the shopper has asked who is logged in on the second instance
+    When the shopper logs out on the first instance
+    And the copy of the access token is sent to the second instance
+    Then the response status is 401
+    And the error is "not_authenticated"
+
+  Scenario: A refresh on one instance is honoured by another
+    Given two instances of the API share one database and one Redis
+    And "ana" has signed up with the password "a long password" on the first instance
+    And the shopper keeps a copy of the tokens
+    When the shopper refreshes the login on the first instance
+    And the shopper asks who is logged in on the second instance
+    Then the response status is 200
+    And the account is "ana", a "shopper"
+    When the copy of the refresh token is used on the second instance
+    Then the response status is 401
+    And the error is "invalid_refresh_token"
+    And the shopper is no longer logged in on the second instance

@@ -43,13 +43,28 @@ describeFeature(
 		Scenario("An expired hold gives the item back", steps.expiredHoldGivesBack);
 
 		Scenario(
+			"A hold taken again after the last one expired keeps the old hold as a row marked deleted",
+			steps.takenAgainAfterExpiry,
+		);
+
+		Scenario(
 			"Many shoppers reserving at once never hold more than the stock",
 			steps.manyReserveAtOnce,
 		);
 
 		Scenario(
+			"Many shoppers reserving again at once after their holds expired never hold more than the stock",
+			steps.manyReserveAgainAfterExpiry,
+		);
+
+		Scenario(
 			"A failed write to Postgres gives the item back",
 			steps.writeFailureGivesBack,
+		);
+
+		Scenario(
+			"A shopper whose place was lost must join again before reserving",
+			steps.placeLostMustJoinAgain,
 		);
 	},
 );

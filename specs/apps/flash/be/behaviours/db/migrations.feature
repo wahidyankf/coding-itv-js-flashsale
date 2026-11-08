@@ -1,13 +1,13 @@
 Feature: Database migrations of the flash-be API
 
   As a developer
-  I want the schema built by ordered, hand-written migrations
+  I want the schema built by one hand-written migration
   So that every fresh database reaches the same schema, and the database itself refuses a sale it cannot honour
 
-  Scenario: The migrations create the sales, purchases, reservations, products, users and sessions tables
+  Scenario: The migrations create the sales, purchases, reservations, products, users, sessions and payments tables
     Given a database with no tables
     When the migrations run to the latest version
-    Then the sales, purchases, reservations, products, users and sessions tables exist
+    Then the sales, purchases, reservations, products, users, sessions and payments tables exist
 
   Scenario: Every table records who created, changed and deleted a row
     Given a database with no tables

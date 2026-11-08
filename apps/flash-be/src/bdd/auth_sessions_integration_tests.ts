@@ -54,5 +54,20 @@ describeFeature(
 			"The routes of a shopper need a login",
 			steps.routesNeedLogin,
 		);
+
+		Scenario(
+			"A login made on one instance is accepted by another",
+			steps.loginAcrossInstances,
+		);
+
+		Scenario(
+			"Logging out on one instance ends the login on every instance",
+			steps.logoutAcrossInstances,
+		);
+
+		Scenario(
+			"A refresh on one instance is honoured by another",
+			steps.refreshAcrossInstances,
+		);
 	},
 );

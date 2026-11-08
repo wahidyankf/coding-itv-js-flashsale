@@ -33,3 +33,13 @@ Feature: Rebuilding the reservation state
     When 2 seconds pass
     And "ben" reserves an item
     Then the response status is 201
+
+  Scenario: A buyer cannot hold again after Redis lost its state
+    Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
+    And "ana" has been admitted
+    And "ana" has reserved an item
+    And "ana" has confirmed the purchase
+    And the reservation state of the sale is lost from Redis
+    When "ana" reserves an item
+    Then the response status is 409
+    And the error is "already_purchased"

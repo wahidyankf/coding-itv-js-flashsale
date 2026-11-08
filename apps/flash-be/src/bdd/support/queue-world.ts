@@ -9,7 +9,10 @@ import { expect } from "vitest";
 import { buildApp } from "../../adapters/inbound/http/app.js";
 import { DEFAULT_STREAM_OPTIONS } from "../../adapters/inbound/http/event-stream.js";
 import { createMemoryRateLimitStore } from "../../adapters/outbound/memory/memory-rate-limit-store.js";
-import { createMockPayment } from "../../adapters/outbound/payment/mock-payment.js";
+import type {
+	createMockPayment,
+	MockPayment,
+} from "../../adapters/outbound/payment/mock-payment.js";
 import { admitCurrentSale } from "../../application/admission.js";
 import { createGuardedGate } from "../../application/guarded-gate.js";
 import type { Clock } from "../../application/ports/clock.js";
@@ -31,6 +34,7 @@ import type { Sale } from "../../domain/sale.js";
 import { normalizeUser } from "../../domain/user.js";
 import { healthyDeps } from "./deps.js";
 import { fakeRepository, fakeSale } from "./fake-sales.js";
+import { limitActions } from "./limit-actions.js";
 import { type MemoryAuth, memoryAuth } from "./memory-auth.js";
 import { type MemoryHoldGate, memoryHoldGate } from "./memory-hold-gate.js";
 import {
@@ -63,6 +67,8 @@ import {
 import { sharedCounter } from "./shared-counter.js";
 import type { ShopLayer } from "./shop-steps.js";
 import { switchable } from "./switchable.js";
+import { confirmOnBoth, setProvider, unitPayments } from "./two-instances.js";
+import { byClock } from "./unit-clock.js";
 import { usernameOf } from "./users.js";
 
 // The types a queue scenario is built from, re-exported so the unit layer's test file imports them from one place.
@@ -112,10 +118,15 @@ type UnitParts = {
 	payment: ReturnType<typeof createMockPayment>;
 	cache: { ttlMs: number };
 	limits: RateLimits;
+	// This scenario's copy of the queue settings, so a scenario that shortens the admission changes only its own.
+	queueOptions: typeof QUEUE_OPTIONS;
 	saleService: SaleService;
 	queue: QueueService;
 	reservations: ReservationService;
 	purchases: PurchaseService;
+	secondPurchases: PurchaseService;
+	// The payments of both instances, which a provider setting changes together.
+	payments: MockPayment[];
 	rateLimiter: RateLimiter;
 	auth: MemoryAuth;
 };
@@ -141,23 +152,15 @@ function unitParts(start: Date): UnitParts {
 	purchaseRepository = purchased;
 	// Time in memory: a payment that "takes 3 seconds" waits on a timer that only the clock can fire.
 	const timers: UnitParts["timers"] = [];
-	const payment = createMockPayment({
-		latencyMs: 0,
-		failureRate: 0,
-		sleep: (ms) =>
-			ms <= 0
-				? Promise.resolve()
-				: new Promise((resolve) => {
-						timers.push({ at: time.now.getTime() + ms, resolve });
-					}),
-	});
+	const [payment, secondPayment] = unitPayments(() => time.now, timers);
 	const cache = { ttlMs: 0 };
 	const saleService = createSaleService(fakeRepository(sales), clock, cache);
+	const queueOptions = { ...QUEUE_OPTIONS };
 	const queue = createQueueService(
 		switchable(store, isDown),
 		saleService,
 		clock,
-		QUEUE_OPTIONS,
+		queueOptions,
 	);
 	const reservations = createReservationService({
 		gate,
@@ -168,13 +171,9 @@ function unitParts(start: Date): UnitParts {
 		newId: randomUUID,
 		options: { rebuildWaitMs: 100, wait: async () => {}, random: () => 0.5 },
 	});
-	const purchases = createPurchaseService(
-		purchased,
-		payment,
-		gate,
-		saleService,
-		clock,
-	);
+	// A second instance of the API has its own payment, over the same ledger and the same stores.
+	const purchasesOver = (pay: MockPayment) =>
+		createPurchaseService(purchased, pay, gate, saleService, clock);
 	// Limits start far out of reach, so only the rate limit scenarios ever meet them.
 	const limits: RateLimits = { ...LIMITS_OUT_OF_REACH };
 	const rateLimiter = createRateLimiter(
@@ -198,10 +197,13 @@ function unitParts(start: Date): UnitParts {
 		payment,
 		cache,
 		limits,
+		queueOptions,
 		saleService,
 		queue,
 		reservations,
-		purchases,
+		purchases: purchasesOver(payment),
+		secondPurchases: purchasesOver(secondPayment),
+		payments: [payment, secondPayment],
 		rateLimiter,
 		auth,
 	};
@@ -243,11 +245,21 @@ function saleActions(parts: UnitParts, current: () => UnitQueueScenario) {
 		async setAdmitRate(perSecond: number) {
 			for (const sale of parts.sales) sale.admitPerSecond = perSecond;
 		},
+		async setAdmissionSeconds(seconds: number) {
+			parts.queueOptions.admissionTtlSeconds = seconds;
+		},
 		async setHoldSeconds(seconds: number) {
 			for (const sale of parts.sales) sale.holdSeconds = seconds;
 		},
 		async setSold(sold: number) {
 			for (const sale of parts.sales) sale.sold = sold;
+		},
+		async endSale() {
+			for (const sale of parts.sales) {
+				if (sale.id === current().saleId) {
+					sale.endsAt = new Date(parts.time.now.getTime() - MS_PER_SECOND);
+				}
+			}
 		},
 		async setSaleCache(ms: number) {
 			parts.cache.ttlMs = ms;
@@ -266,7 +278,7 @@ function saleActions(parts: UnitParts, current: () => UnitQueueScenario) {
 				current().saleId,
 				ADMIT_EVERYONE_WAITING,
 				parts.time.now,
-				QUEUE_OPTIONS.admissionTtlSeconds,
+				parts.queueOptions.admissionTtlSeconds,
 			);
 		},
 		async admitMany(users: string[]) {
@@ -275,7 +287,7 @@ function saleActions(parts: UnitParts, current: () => UnitQueueScenario) {
 				current().saleId,
 				ADMIT_EVERYONE_WAITING,
 				parts.time.now,
-				QUEUE_OPTIONS.admissionTtlSeconds,
+				parts.queueOptions.admissionTtlSeconds,
 			);
 		},
 		async loseQueue() {
@@ -317,19 +329,22 @@ function timeAndPaymentActions(
 			await settle();
 		},
 		async setPaymentDeclines() {
-			parts.payment.settings.failureRate = 1;
+			setProvider(parts.payments, { failureRate: 1 });
 		},
 		async setPaymentDuration(seconds: number) {
-			parts.payment.settings.latencyMs = seconds * MS_PER_SECOND;
+			setProvider(parts.payments, { latencyMs: seconds * MS_PER_SECOND });
 		},
-		async wasRefunded(user: string) {
+		async setPaymentAccepts() {
+			setProvider(parts.payments, { failureRate: 0 });
+		},
+		async paymentOf(user: string) {
 			const id = current().holds.get(user)?.reservationId;
-			return parts.payment.refunded.includes(`mock-${id}`);
+			return id === undefined ? undefined : await parts.payment.statusOf(id);
 		},
 	};
 }
 
-// Faults and limits: the stores stop answering, the writes break, and the limits move.
+// Faults: the stores stop answering and the writes break. The limits are in limit-actions.ts.
 function faultActions(parts: UnitParts) {
 	return {
 		async breakWrites() {
@@ -344,14 +359,6 @@ function faultActions(parts: UnitParts) {
 		async fixRedis() {
 			parts.redis.down = false;
 		},
-		async setUserLimit(requests: number, seconds: number) {
-			parts.limits.perUser = requests;
-			parts.limits.windowSeconds = seconds;
-		},
-		async setAddressLimit(requests: number, seconds: number) {
-			parts.limits.perIp = requests;
-			parts.limits.windowSeconds = seconds;
-		},
 	};
 }
 
@@ -360,6 +367,7 @@ function faultActions(parts: UnitParts) {
 export function queueWorld(start: Date): UnitQueueScenario {
 	const parts = unitParts(start);
 	const app = unitApp(parts);
+	let secondApp: FastifyInstance | undefined;
 	const scenario: UnitQueueScenario = {
 		app,
 		store: parts.store,
@@ -383,6 +391,13 @@ export function queueWorld(start: Date): UnitQueueScenario {
 		...saleActions(parts, () => scenario),
 		...timeAndPaymentActions(parts, () => scenario),
 		...faultActions(parts),
+		...limitActions(parts.limits),
+		holdRows: async () =>
+			parts.repository.holdRows(scenario.saleId, parts.time.now),
+		confirmOnTwoInstances: async (user) => {
+			secondApp ??= unitApp({ ...parts, purchases: parts.secondPurchases });
+			return byClock(confirmOnBoth([app, secondApp], scenario, user), scenario);
+		},
 	};
 	const requests = purchaseRequests(app, scenario);
 	// Starting a confirmation in memory means waiting until it is inside the payment, before the clock moves.
@@ -396,14 +411,7 @@ export function queueWorld(start: Date): UnitQueueScenario {
 	// Finishing a confirmation in memory means moving the clock until the payment is done.
 	const finish = requests.finishConfirm;
 	requests.finishConfirm = async () => {
-		let done = false;
-		const waiting = finish().then(() => {
-			done = true;
-		});
-		for (let step = 0; step < 30 && !done; step++) {
-			await scenario.advance(1);
-		}
-		await waiting;
+		await byClock(finish(), scenario);
 	};
 	Object.assign(
 		scenario,

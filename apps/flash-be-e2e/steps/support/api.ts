@@ -54,6 +54,8 @@ export const routes = {
 
 // What a request carries: values for the path placeholders, headers (an undefined one is left out), and a JSON body.
 export type Input = {
+	// The URL of the API instance to send to. Without it, the request goes to the scenario's private API.
+	base?: string;
 	params?: Record<string, string>;
 	headers?: Record<string, string | undefined>;
 	body?: unknown;
@@ -72,7 +74,7 @@ export async function build(route: Route, input: Input = {}) {
 	}
 	if (input.body !== undefined) headers["content-type"] = "application/json";
 	return {
-		url: `${await startApi()}${path}`,
+		url: `${input.base ?? (await startApi())}${path}`,
 		headers,
 		body: input.body === undefined ? null : JSON.stringify(input.body),
 	};

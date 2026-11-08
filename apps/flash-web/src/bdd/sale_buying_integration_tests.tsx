@@ -44,5 +44,10 @@ describeFeature(
 		Scenario("A declined payment keeps the hold", steps.declinedKeepsHold);
 
 		Scenario("A hold that runs out is shown as ended", steps.holdEnds);
+
+		Scenario(
+			"A waiting shopper whose place is lost is told to join again",
+			steps.placeLost,
+		);
 	},
 );

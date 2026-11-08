@@ -243,12 +243,121 @@ function refundsLatePayment(layer: ShopLayer): ScenarioBinder {
 		And("the error is {string}", errorIs(world));
 
 		And("the payment of {string} is refunded", async (_ctx, user: string) => {
-			expect(await world.wasRefunded(user)).toBe(true);
+			expect((await world.paymentOf(user))?.status).toBe("refunded");
 		});
+
+		And(
+			"the payment of {string} was charged once and refunded once",
+			async (_ctx, user: string) => {
+				expect(await world.paymentOf(user)).toEqual({
+					status: "refunded",
+					ref: expect.stringMatching(/^mock-/),
+					attempts: 1,
+				});
+			},
+		);
 
 		And("{string} has no purchase", async (_ctx, user: string) => {
 			expect((await world.outcome(user)).json().state).toBe("none");
 		});
+	};
+}
+
+function chargesOnceOnTwoInstances(layer: ShopLayer): ScenarioBinder {
+	return ({ Given, And, When, Then }) => {
+		const world = layer.newWorld();
+
+		Given(OPEN_SALE, async () =>
+			openSale(world, layer.now, { stock: 10, sold: 0 }),
+		);
+
+		// Both instances find no charge before either one settles, so the ledger alone decides who charges.
+		And(
+			"the payment provider takes {int} second",
+			async (_ctx, seconds: number) => {
+				await world.setPaymentDuration(seconds);
+			},
+		);
+
+		And("{string} has been admitted", admitUser(world));
+
+		And("{string} has reserved an item", reserveUser(world));
+
+		When(
+			"{string} confirms the purchase on two instances at the same time",
+			async (_ctx, user: string) => {
+				await world.confirmOnTwoInstances(user);
+			},
+		);
+
+		// One confirmation writes the purchase (201) and the other gets it back as a repeat (200), whichever instance is first.
+		Then("both confirmations answer with the same purchase", () => {
+			const [first, second] = world.replies;
+			expect(world.replies.map((reply) => reply.statusCode).sort()).toEqual([
+				200, 201,
+			]);
+			expect(first?.json().purchaseId).toEqual(expect.any(String));
+			expect(second?.json().purchaseId).toBe(first?.json().purchaseId);
+		});
+
+		And(
+			"the payment of {string} is charged once",
+			async (_ctx, user: string) => {
+				expect(await world.paymentOf(user)).toEqual({
+					status: "charged",
+					ref: expect.stringMatching(/^mock-/),
+					attempts: 1,
+				});
+			},
+		);
+
+		And("{int} items remain", itemsRemain(world));
+	};
+}
+
+function chargesOnceAfterDecline(layer: ShopLayer): ScenarioBinder {
+	return ({ Given, And, When, Then }) => {
+		const world = layer.newWorld();
+
+		Given(OPEN_SALE, async () =>
+			openSale(world, layer.now, { stock: 10, sold: 0 }),
+		);
+
+		And("the payment provider declines every payment", async () => {
+			await world.setPaymentDeclines();
+		});
+
+		And("{string} has been admitted", admitUser(world));
+
+		And("{string} has reserved an item", reserveUser(world));
+
+		And(
+			"{string} has tried to confirm the purchase and was declined",
+			async (_ctx, user: string) => {
+				expect((await world.confirm(user)).statusCode).toBe(402);
+			},
+		);
+
+		And("the payment provider accepts every payment", async () => {
+			await world.setPaymentAccepts();
+		});
+
+		When("{string} confirms the purchase", confirmUser(world));
+
+		Then("the response status is {int}", statusIs(world));
+
+		And(
+			"the payment of {string} is charged on the second attempt",
+			async (_ctx, user: string) => {
+				expect(await world.paymentOf(user)).toEqual({
+					status: "charged",
+					ref: expect.stringMatching(/^mock-/),
+					attempts: 2,
+				});
+			},
+		);
+
+		And("{int} items remain", itemsRemain(world));
 	};
 }
 
@@ -289,6 +398,84 @@ function sellsExactlyStock(layer: ShopLayer): ScenarioBinder {
 	};
 }
 
+function refusesEmptyBody(layer: ShopLayer): ScenarioBinder {
+	return ({ Given, When, Then, And }) => {
+		const world = layer.newWorld();
+
+		Given(OPEN_SALE, async () =>
+			openSale(world, layer.now, { stock: 10, sold: 0 }),
+		);
+
+		// The shopper holds nothing, so the request names no reservation: its body is {}.
+		When(
+			"{string} confirms the purchase with an empty body",
+			async (_ctx, user: string) => {
+				expect(world.holds.has(user)).toBe(false);
+				await world.confirm(user);
+			},
+		);
+
+		Then("the response status is {int}", statusIs(world));
+
+		And("the error is {string}", errorIs(world));
+	};
+}
+
+function refusesEndedSale(layer: ShopLayer): ScenarioBinder {
+	return ({ Given, And, When, Then }) => {
+		const world = layer.newWorld();
+
+		Given(OPEN_SALE, async () =>
+			openSale(world, layer.now, { stock: 10, sold: 0 }),
+		);
+
+		And("{string} has been admitted", admitUser(world));
+
+		And("{string} has reserved an item", reserveUser(world));
+
+		And("the sale has ended", async () => {
+			await world.endSale();
+		});
+
+		When("{string} confirms the purchase", confirmUser(world));
+
+		Then("the response status is {int}", statusIs(world));
+
+		And("the error is {string}", errorIs(world));
+
+		And("{int} items remain", itemsRemain(world));
+	};
+}
+
+function refusesSecondPurchase(layer: ShopLayer): ScenarioBinder {
+	return ({ Given, And, When, Then }) => {
+		const world = layer.newWorld();
+
+		Given(OPEN_SALE, async () =>
+			openSale(world, layer.now, { stock: 10, sold: 0 }),
+		);
+
+		And("{string} has been admitted", admitUser(world));
+
+		And("{string} has reserved an item", reserveUser(world));
+
+		And("{string} has confirmed the purchase", confirmUser(world));
+
+		When(
+			"{string} confirms the purchase with the reservation id {string}",
+			async (_ctx, user: string, reservationId: string) => {
+				await world.confirm(user, { reservationId });
+			},
+		);
+
+		Then("the response status is {int}", statusIs(world));
+
+		And("the error is {string}", errorIs(world));
+
+		And("{int} items remain", itemsRemain(world));
+	};
+}
+
 // The steps of each scenario in the confirming feature, by the scenario's name in the feature's own words.
 export function bindPurchaseConfirming(layer: ShopLayer) {
 	return {
@@ -301,6 +488,11 @@ export function bindPurchaseConfirming(layer: ShopLayer) {
 		refusesExpiredHold: refusesExpiredHold(layer),
 		keepsHoldOnDecline: keepsHoldOnDecline(layer),
 		refundsLatePayment: refundsLatePayment(layer),
+		chargesOnceOnTwoInstances: chargesOnceOnTwoInstances(layer),
+		chargesOnceAfterDecline: chargesOnceAfterDecline(layer),
 		sellsExactlyStock: sellsExactlyStock(layer),
+		refusesEmptyBody: refusesEmptyBody(layer),
+		refusesEndedSale: refusesEndedSale(layer),
+		refusesSecondPurchase: refusesSecondPurchase(layer),
 	};
 }

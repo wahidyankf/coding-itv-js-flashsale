@@ -2,6 +2,7 @@
 // memory (queue-world.ts) and the integration layer over Postgres and Redis (queue-integration.ts). The step bindings
 // import these types, so the names stay the same.
 
+import type { LedgerEntry } from "../../adapters/outbound/payment/payment-ledger.js";
 import type { RateLimits } from "../../application/rate-limiter.js";
 import type { Sale } from "../../domain/sale.js";
 import type { Response } from "./response.js";
@@ -32,6 +33,8 @@ export type QueueScenario = {
 	login: (user: string) => Promise<string>;
 	addSale: (overrides: SaleOverrides) => Promise<string>;
 	setAdmitRate: (perSecond: number) => Promise<void>;
+	// How long an admission lasts from now on. A server reads it from ADMISSION_TTL_SECONDS; a scenario shortens it.
+	setAdmissionSeconds: (seconds: number) => Promise<void>;
 	join: (user: string, saleId?: string) => Promise<Response>;
 	check: (user: string, ticket?: string) => Promise<Response>;
 	admit: (saleId?: string) => Promise<void>;
@@ -40,6 +43,15 @@ export type QueueScenario = {
 
 // How many shoppers one admission call lets in: more than any queue in a scenario, so "everyone waiting" is admitted.
 export const ADMIT_EVERYONE_WAITING = 1000;
+
+// One hold row of the sale as the store keeps it. `deletedBy` names who marked it deleted, and `counts` is true while it is
+// live and not yet expired, so a scenario can see that a hold taken again never overwrote the old one.
+export type HoldRow = {
+	user: string;
+	reservationId: string;
+	deletedBy: string | undefined;
+	counts: boolean;
+};
 
 // The same, for reserving. A scenario that reserves also joins and admits shoppers, so it extends the queue scenario.
 export type ShopScenario = QueueScenario & {
@@ -53,6 +65,8 @@ export type ShopScenario = QueueScenario & {
 		options?: { ticket?: string; saleId?: string },
 	) => Promise<Response>;
 	reserveAll: (users: string[]) => Promise<Response[]>;
+	// Every hold row of the scenario's sale, the ones marked deleted too.
+	holdRows: () => Promise<HoldRow[]>;
 	// Time passes: the unit clock moves; other layers really wait.
 	advance: (seconds: number) => Promise<void>;
 	loseReservationState: () => Promise<void>;
@@ -73,10 +87,16 @@ export type ShopScenario = QueueScenario & {
 	setPaymentDuration: (seconds: number) => Promise<void>;
 	// Another app instance sells the last item to this user, with no call through this app.
 	sellLastItemTo: (user: string) => Promise<void>;
-	wasRefunded: (user: string) => Promise<boolean>;
+	// The ledger entry of the payment for the shopper's first hold, if it was ever charged or declined.
+	paymentOf: (user: string) => Promise<LedgerEntry | undefined>;
+	setPaymentAccepts: () => Promise<void>;
+	// The shopper confirms their hold on two instances of the API at once, each with its own payment over one ledger.
+	confirmOnTwoInstances: (user: string) => Promise<Response[]>;
 	// The sale read cache: its time to live, and a change the cache does not see.
 	setSaleCache: (ms: number) => Promise<void>;
 	setSold: (sold: number) => Promise<void>;
+	// The sale's window closes now, as if its end had come while the scenario ran.
+	endSale: () => Promise<void>;
 	readSale: () => Promise<Response>;
 	readCurrentSale: () => Promise<Response>;
 	// Live updates: a watcher per stream, and the sale opening while a shopper is already waiting.
@@ -90,6 +110,10 @@ export type ShopScenario = QueueScenario & {
 	fixRedis: () => Promise<void>;
 	setUserLimit: (requests: number, seconds: number) => Promise<void>;
 	setAddressLimit: (requests: number, seconds: number) => Promise<void>;
+	// The limit of the auth routes, counted by address alone.
+	setLoginLimit: (requests: number, seconds: number) => Promise<void>;
+	// One login with a wrong password, from the scenario's own address, so its count meets no other scenario's.
+	tryLogin: (user: string) => Promise<Response>;
 	// Sends the same kind of write request several times, one after the other.
 	repeat: (kind: string, user: string, times: number) => Promise<Response[]>;
 	joinMany: (count: number) => Promise<Response[]>;
@@ -107,6 +131,7 @@ export function placeholders() {
 	return {
 		join: notWired,
 		check: notWired,
+		tryLogin: notWired,
 		reserve: notWired,
 		reserveAll: notWired,
 		repeat: notWired,

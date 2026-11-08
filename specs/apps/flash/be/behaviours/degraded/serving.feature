@@ -30,6 +30,19 @@ Feature: Serving while Redis is down
     Then the response status is 200
     And the reservation is the one "ana" had before
 
+  Scenario: Reserving again without Redis after the hold expired keeps the old hold as a row marked deleted
+    Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
+    And the hold time of the sale is 1 second
+    And Redis is down
+    And "ana" has joined the queue
+    And "ana" has reserved an item
+    When 2 seconds pass
+    And "ana" reserves an item
+    Then the response status is 201
+    And the reservation is a new one, not the one "ana" had before
+    And the hold "ana" had before is kept as a row marked deleted by "ana"
+    And "ana" has one hold that counts, the new one
+
   Scenario: Many shoppers reserving at once without Redis never hold more than the stock
     Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
     And Redis is down

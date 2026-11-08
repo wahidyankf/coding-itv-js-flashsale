@@ -5,9 +5,14 @@ import { expect } from "vitest";
 import { type Response, responseOf } from "./response.js";
 import {
 	holdEndsIn,
+	holdSecondsIs,
 	itemsRemain,
+	newHoldGiven,
 	OPEN_SALE,
+	oldHoldKept,
+	oneHoldCounts,
 	openSale,
+	reserveUser,
 	type ShopLayer,
 	secondsPass,
 	userLimitIs,
@@ -109,6 +114,48 @@ function reservesAgainWithoutRedis(layer: ShopLayer): ScenarioBinder {
 				expect(responseOf(world).json()).toEqual(world.holds.get(user));
 			},
 		);
+	};
+}
+
+function reservesAgainAfterExpiryWithoutRedis(
+	layer: ShopLayer,
+): ScenarioBinder {
+	return ({ Given, And, When, Then }) => {
+		const world = layer.newWorld();
+
+		Given(OPEN_SALE, async () =>
+			openSale(world, layer.now, { stock: 10, sold: 0 }),
+		);
+
+		And("the hold time of the sale is {int} second", holdSecondsIs(world));
+
+		And("Redis is down", async () => {
+			await world.breakRedis();
+		});
+
+		And('"ana" has joined the queue', async () => {
+			await world.join("ana");
+		});
+
+		And("{string} has reserved an item", reserveUser(world));
+
+		When("{int} seconds pass", secondsPass(world));
+
+		And("{string} reserves an item", reserveUser(world));
+
+		Then("the response status is {int}", statusIs(world));
+
+		And(
+			"the reservation is a new one, not the one {string} had before",
+			newHoldGiven(world),
+		);
+
+		And(
+			"the hold {string} had before is kept as a row marked deleted by {string}",
+			oldHoldKept(world),
+		);
+
+		And("{string} has one hold that counts, the new one", oneHoldCounts(world));
 	};
 }
 
@@ -376,6 +423,8 @@ export function bindDegradedServing(layer: ShopLayer) {
 		joinsWithoutRedis: joinsWithoutRedis(layer),
 		reservesWithoutRedis: reservesWithoutRedis(layer),
 		reservesAgainWithoutRedis: reservesAgainWithoutRedis(layer),
+		reservesAgainAfterExpiryWithoutRedis:
+			reservesAgainAfterExpiryWithoutRedis(layer),
 		manyReserveWithoutRedis: manyReserveWithoutRedis(layer),
 		paysForHoldBeforeOutage: paysForHoldBeforeOutage(layer),
 		paysWithoutSlowdown: paysWithoutSlowdown(layer),

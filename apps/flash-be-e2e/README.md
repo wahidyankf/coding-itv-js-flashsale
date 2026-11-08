@@ -12,7 +12,7 @@ steps/
   world.steps.ts     the After hook
   support/           everything steps share; a step never imports another step file
     world.ts           the state of the running scenario, and currentSaleId() for the sale it made
-    processes.ts       the API process and the Redis proxy
+    processes.ts       the API process, a second API process over the same stores (startSecondApi), and the Redis proxy
     database.ts        the scratch database, migrations, seed and queries, and setSold/sellOut
     cleanup.ts         the teardown of a scenario
     api.ts, views.ts   the routes and request builder; the reply bodies as the steps read them

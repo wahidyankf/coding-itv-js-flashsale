@@ -40,3 +40,11 @@ Feature: Rate limiting
     When 2 seconds pass
     And "ana" joins the queue
     Then the response status is 200
+
+  Scenario: Logins from one address are limited
+    Given the limit is 3 logins per address in each 60 seconds
+    When "ana" tries to log in 4 times
+    Then the first 3 requests are not limited
+    And the response status is 429
+    And the error is "rate_limited"
+    And a Retry-After header of at least 1 second is given

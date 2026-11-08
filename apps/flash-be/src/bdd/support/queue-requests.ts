@@ -1,5 +1,6 @@
 // The requests every layer sends the same way: the queue, the reserve, the purchase, the public sale reads and the
 // limit scenarios. Each one reads the sale the scenario is on when the request is sent, and records the reply.
+import { randomInt } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import type {
 	QueueScenario,
@@ -16,9 +17,24 @@ export const ticketHeader = (
 ): Record<string, string> =>
 	ticket === undefined ? {} : { "x-queue-ticket": ticket };
 
+// An address of the scenario's own. The rate counters of the integration layer live in the shared Redis, so a scenario
+// that counts by address must not share its address with the scenarios before it.
+const scenarioAddress = () =>
+	`10.${randomInt(256)}.${randomInt(256)}.${randomInt(1, 255)}`;
+
 // The requests every layer sends the same way. `saleId` is read when the request is sent.
 export function queueRequests(app: FastifyInstance, scenario: QueueScenario) {
+	const address = scenarioAddress();
 	return {
+		async tryLogin(user: string): Promise<Response> {
+			scenario.response = await app.inject({
+				method: "POST",
+				url: "/api/v1/auth/login",
+				remoteAddress: address,
+				payload: { username: user, password: "not the password" },
+			});
+			return scenario.response;
+		},
 		async join(user: string, saleId = scenario.saleId): Promise<Response> {
 			const reply = await app.inject({
 				method: "POST",
@@ -166,6 +182,7 @@ export function limitRequests(scenario: ShopScenario) {
 		if (kind === "confirm a purchase") {
 			return scenario.confirm(user, { reservationId: "not-an-id" });
 		}
+		if (kind === "log in") return scenario.tryLogin(user);
 		throw new Error(`unknown request "${kind}"`);
 	};
 	return {

@@ -101,13 +101,19 @@ function changeBody(change: RegExpExecArray) {
 	};
 }
 
-// One request, written the way the scenarios say it, against the sale made last.
+// A phrase may name its sale by id ("the sale with id "..."") instead of "that sale", the one made last.
+const NAMED_SALE = /the sale with id "([^"]+)"/;
+
+// One request, written the way the scenarios say it, against the sale made last or the sale the phrase names.
 function operate(
 	scene: Scene,
-	phrase: string,
+	said: string,
 	sender: Sender,
 ): Promise<Response> {
-	const url = `/api/v1/admin/sales/${scene.memory.lastSaleId}`;
+	const named = NAMED_SALE.exec(said);
+	const saleId = named?.[1] ?? scene.memory.lastSaleId;
+	const phrase = said.replace(NAMED_SALE, "that sale");
+	const url = `/api/v1/admin/sales/${saleId}`;
 	const change = CHANGE_PHRASE.exec(phrase);
 	if (change) return send(scene, "PATCH", url, sender, changeBody(change));
 	const move = MOVE_PHRASE.exec(phrase);
@@ -125,7 +131,7 @@ function operate(
 	if (phrase === "lists the sales") {
 		return send(scene, "GET", "/api/v1/admin/sales", sender);
 	}
-	throw new Error(`the operator cannot ${phrase}`);
+	throw new Error(`the operator cannot ${said}`);
 }
 
 // One scenario of an operator: the logins, the sales created so far, and the last reply. "That sale" is the one created

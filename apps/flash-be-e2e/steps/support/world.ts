@@ -15,6 +15,9 @@ export type RedisProxy = {
 	close: () => Promise<void>;
 };
 
+// A flash-be process a scenario started: its URL, its child process and what it printed.
+export type RunningApi = { url: string; process: ChildProcess; log: string };
+
 // What the shoppers of a scenario hold: their tickets, the order they joined in, their holds and purchases, and the answer
 // to each request of a burst. See shoppers.ts for the calls that fill them.
 export type ShopperState = {
@@ -26,6 +29,7 @@ export type ShopperState = {
 		status: number;
 		error?: string | undefined;
 		retryAfter?: string | undefined;
+		purchaseId?: string | undefined;
 	}>;
 };
 
@@ -54,7 +58,9 @@ export const world: {
 	// the apiEnv setter below, which retires a running API.
 	apiEnv?: Record<string, string>;
 	// The private API that processes.ts started: its URL, its child process and what it printed.
-	api?: { url: string; process: ChildProcess; log: string };
+	api?: RunningApi;
+	// A second API process over the same database and Redis, for the scenarios of more than one instance.
+	secondApi?: RunningApi;
 	// The Redis proxy the private API reaches Redis through, so a scenario can cut and restore the connection.
 	redisProxy?: RedisProxy;
 	// A confirmation that a step started and does not wait for, so another step can let it finish.
@@ -79,6 +85,8 @@ Object.defineProperty(world, "apiEnv", {
 		if (!running || !changed) return;
 		delete world.api;
 		running.process.kill("SIGTERM");
+		world.secondApi?.process.kill("SIGTERM");
+		delete world.secondApi;
 		const proxy = world.redisProxy;
 		delete world.redisProxy;
 		void proxy?.close();

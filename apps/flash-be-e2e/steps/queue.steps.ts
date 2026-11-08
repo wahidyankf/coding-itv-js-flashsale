@@ -1,5 +1,5 @@
-// Steps for the queue: joining it, the ticket and place a shopper gets, the admission the API runs on its own timer, and the
-// loss of the queue from Redis. Binds queue/joining.feature and queue/admission.feature. The join and check calls are in
+// Steps for the queue: joining it, the ticket and place a shopper gets, the admission the API runs on its own timer and how
+// long it lasts, and the loss of the queue from Redis. Binds queue/joining.feature and queue/admission.feature. The join and check calls are in
 // support/shoppers.ts, because other features use them too.
 
 import { sleep } from "@flash/flash-commons/timers";
@@ -18,7 +18,7 @@ import {
 	ticketOf,
 } from "./support/shoppers.js";
 import { relativeTime } from "./support/time.js";
-import { currentSaleId } from "./support/world.js";
+import { currentSaleId, setApiEnv } from "./support/world.js";
 
 const { Given, When, Then } = createBdd();
 
@@ -41,6 +41,14 @@ Given(
 		await patchSale(request, currentSaleId(), {
 			admitPerSecond: Number(rate),
 		});
+	},
+);
+
+// The admission time is a setting of the server, read at start, so the private API restarts with it.
+Given(
+	/^an admission lasts (\d+) seconds?$/,
+	async ({ request: _request }, seconds: string) => {
+		setApiEnv({ ADMISSION_TTL_SECONDS: seconds });
 	},
 );
 

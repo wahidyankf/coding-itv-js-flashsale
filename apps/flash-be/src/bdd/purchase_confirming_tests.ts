@@ -46,8 +46,33 @@ describeFeature(
 		);
 
 		Scenario(
+			"Two confirmations of one hold on two instances charge once",
+			steps.chargesOnceOnTwoInstances,
+		);
+
+		Scenario(
+			"A shopper who is declined and tries again is charged once",
+			steps.chargesOnceAfterDecline,
+		);
+
+		Scenario(
 			"Many buyers confirming at once sell exactly the stock",
 			steps.sellsExactlyStock,
+		);
+
+		Scenario(
+			"A confirmation that names no reservation is refused",
+			steps.refusesEmptyBody,
+		);
+
+		Scenario(
+			"A hold cannot be paid for once the sale has ended",
+			steps.refusesEndedSale,
+		);
+
+		Scenario(
+			"A buyer who confirms another reservation is told they already bought",
+			steps.refusesSecondPurchase,
 		);
 	},
 );

@@ -23,6 +23,7 @@ const TABLES = [
 	"products",
 	"users",
 	"sessions",
+	"payments",
 ];
 const AUDIT_COLUMNS = [
 	"created_at",
@@ -66,6 +67,16 @@ async function exists(db: Kysely<Database>, table: string): Promise<boolean> {
 	return result.rows[0]?.name === table;
 }
 
+// Every table of the schema except the migrator's own, in name order. The scenario lists them all, so a new table that
+// it does not name fails it instead of going unseen.
+async function tablesOf(db: Kysely<Database>): Promise<string[]> {
+	const result = await sql<{ name: string }>`
+		select table_name as name from information_schema.tables
+		where table_schema = 'public' and table_name not like 'kysely_migration%'
+		order by table_name`.execute(db);
+	return result.rows.map((row) => row.name);
+}
+
 // The message of the error an attempt raises, or "" when it succeeds, so a scenario checks which constraint refused it.
 async function refusalOf(attempt: () => Promise<unknown>): Promise<string> {
 	try {
@@ -85,7 +96,7 @@ describeFeature(
 	await loadFeature(specFile("flash/be/behaviours/db/migrations.feature")),
 	({ Scenario }) => {
 		Scenario(
-			"The migrations create the sales, purchases, reservations, products, users and sessions tables",
+			"The migrations create the sales, purchases, reservations, products, users, sessions and payments tables",
 			({ Given, When, Then }) => {
 				let db: Kysely<Database>;
 
@@ -98,11 +109,12 @@ describeFeature(
 				});
 
 				Then(
-					"the sales, purchases, reservations, products, users and sessions tables exist",
+					"the sales, purchases, reservations, products, users, sessions and payments tables exist",
 					async () => {
 						for (const table of TABLES) {
 							expect(await exists(db, table)).toBe(true);
 						}
+						expect(await tablesOf(db)).toEqual([...TABLES].sort());
 					},
 				);
 			},

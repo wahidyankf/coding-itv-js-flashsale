@@ -1,20 +1,28 @@
-// The reservation rows in memory for the unit layer (test support). The decision is the domain's, as the SQL adapter asks
-// it; the rows and the failed write when Postgres is down are what this double adds.
+// The reservation rows in memory for the unit layer (test support). The decision and the write rule are the domain's, as
+// the SQL adapter asks them; the rows, the rows marked deleted and the failed write when Postgres is down are what this
+// double adds.
 import { attemptAsync } from "@flash/typekit";
 import type { ReservationRepository } from "../../application/ports/reservation-repository.js";
 import {
 	decideReservation,
 	type HoldSnapshot,
+	holdWriteOf,
 	type Reservation,
 } from "../../domain/reservation.js";
 import { isLive } from "../../domain/time.js";
 import type { Username } from "../../domain/user.js";
+import type { HoldRow } from "./queue-scenario.js";
 
 // The reservation store of the unit layer. `broken` makes a save fail, as an unreachable Postgres does.
 export type MemoryReservationRepository = ReservationRepository & {
 	// While broken, saving a reservation fails, as when Postgres is unreachable.
 	broken: boolean;
+	// The live row of each shopper and sale, by `saleId:user`.
 	rows: Map<string, Reservation>;
+	// The rows marked deleted, with who marked them, as Postgres keeps them.
+	removed: Array<Reservation & { deletedBy: Username }>;
+	// Every row of the sale, live and removed, as a scenario reads them at `now`.
+	holdRows: (saleId: string, now: Date) => HoldRow[];
 };
 
 // The reservation rows in memory, for unit tests.
@@ -24,6 +32,25 @@ export function memoryReservationRepository(
 	const repository: MemoryReservationRepository = {
 		broken: false,
 		rows: new Map(),
+		removed: [],
+
+		holdRows(saleId, now) {
+			const ofSale = (row: Reservation) => row.saleId === saleId;
+			return [
+				...[...repository.rows.values()].filter(ofSale).map((row) => ({
+					user: row.user,
+					reservationId: row.reservationId,
+					deletedBy: undefined,
+					counts: isLive(row, now),
+				})),
+				...repository.removed.filter(ofSale).map((row) => ({
+					user: row.user,
+					reservationId: row.reservationId,
+					deletedBy: row.deletedBy,
+					counts: false,
+				})),
+			];
+		},
 
 		async hasPurchase(saleId, user) {
 			return buyersOf(saleId).includes(user);
@@ -31,7 +58,7 @@ export function memoryReservationRepository(
 
 		async save(row) {
 			if (repository.broken) throw new Error("postgres is unreachable");
-			repository.rows.set(`${row.saleId}:${row.user}`, row);
+			write(row);
 		},
 
 		// The same decision as the SQL: the domain's rule over the sold items and the live holds of the others.
@@ -58,7 +85,7 @@ export function memoryReservationRepository(
 				request,
 			);
 			if (decision.kind === "reserved") {
-				repository.rows.set(`${request.saleId}:${request.user}`, {
+				write({
 					saleId: request.saleId,
 					user: request.user,
 					reservationId: request.reservationId,
@@ -81,6 +108,19 @@ export function memoryReservationRepository(
 			};
 			await restore(snapshot);
 		},
+	};
+	// The domain's write rule, as the SQL follows it: another hold moves the live row to the removed rows, marked deleted
+	// by the shopper whose new hold replaces it.
+	const write = (row: Reservation) => {
+		const key = `${row.saleId}:${row.user}`;
+		const live = repository.rows.get(key);
+		if (
+			live &&
+			holdWriteOf(live.reservationId, row.reservationId) === "replace"
+		) {
+			repository.removed.push({ ...live, deletedBy: row.user });
+		}
+		repository.rows.set(key, row);
 	};
 	return repository;
 }

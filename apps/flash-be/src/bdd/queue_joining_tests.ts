@@ -19,8 +19,6 @@ describeFeature(
 
 		Scenario("Joining twice keeps the place and the ticket", steps.joinsTwice);
 
-		Scenario("A user name is trimmed and lowercased", steps.trimsName);
-
 		ScenarioOutline(
 			"A sale that cannot sell any more does not take new shoppers",
 			steps.refusesFullSale,

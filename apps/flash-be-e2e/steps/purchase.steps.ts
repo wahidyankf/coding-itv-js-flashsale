@@ -1,5 +1,6 @@
 // Steps for the purchase: confirming a hold, what the confirmation answers (a purchase id, a refusal, a time), what a shopper's
-// outcome is (purchased, still holding, or none), the payment (declined, slow, refunded), and an item that another instance sold.
+// outcome is (purchased, still holding, or none), the payment (declined, slow, charged once, refunded, as the ledger holds
+// it), and an item that another instance sold.
 // Binds purchase/confirming.feature and purchase/outcome.feature. The hold itself is in
 // reservation.steps.ts, and the calls every step uses are in support/shoppers.ts.
 
@@ -46,7 +47,7 @@ Given(
 );
 
 Given(
-	/^the payment provider takes (\d+) seconds$/,
+	/^the payment provider takes (\d+) seconds?$/,
 	async ({ request: _request }, seconds: string) => {
 		setApiEnv({ PAYMENT_LATENCY_MS: String(Number(seconds) * MS_PER_SECOND) });
 	},
@@ -109,6 +110,28 @@ When(
 	},
 );
 
+// A body that names no reservation at all, which a client with nothing held might send.
+When(
+	/^"([^"]+)" confirms the purchase with an empty body$/,
+	async ({ request }, user: string) => {
+		setResponse(
+			await send(request, routes.confirm, {
+				params: { saleId: currentSaleId() },
+				headers: { cookie: await shopperCookie(request, user) },
+				body: {},
+			}),
+		);
+	},
+);
+
+// The sale's end comes while the shopper still holds an item: its window is closed in the scenario's database.
+Given("the sale has ended", async ({ request: _request }) => {
+	await query(
+		"update sales set ends_at = now() - interval '1 second' where id = $1",
+		[currentSaleId()],
+	);
+});
+
 // Starts a confirmation and does not wait for it, so a later step can let another purchase go first.
 When(
 	/^"([^"]+)" starts to confirm the purchase$/,
@@ -152,15 +175,12 @@ When(
 	},
 );
 
-When(
-	/^a client asks for the outcome of "([^"]+)"$/,
-	async ({ request }, user: string) => {
-		await outcome(request, user);
-	},
-);
+When(/^"([^"]+)" asks for the outcome$/, async ({ request }, user: string) => {
+	await outcome(request, user);
+});
 
 When(
-	/^a client asks for the outcome of "([^"]+)" in the sale with id "([^"]+)"$/,
+	/^"([^"]+)" asks for the outcome in the sale with id "([^"]+)"$/,
 	async ({ request }, user: string, saleId: string) => {
 		await outcome(request, user, saleId);
 	},
@@ -205,16 +225,109 @@ Then(
 	},
 );
 
-// The refund is written to the API's log by the mock payment. The log is read until the line appears, for up to 3 seconds.
+// The mock payment's ledger row of the shopper's first hold, as the scenario's database holds it (decision 009).
+async function paymentOf(user: string) {
+	const rows = await query<{ status: string; ref: string; attempts: number }>(
+		"select status, ref, attempts from payments where reservation_id = $1",
+		[holdOf(user)?.reservationId],
+	);
+	return rows[0];
+}
+
+// The refund is written to the ledger by the mock payment. The row is read until it says so, for up to 3 seconds.
 Then(
 	/^the payment of "([^"]+)" is refunded$/,
 	async ({ request: _request }, user: string) => {
-		const line = `payment refunded: mock-${holdOf(user)?.reservationId}`;
-		await pollUntil(async () => world.api?.log.includes(line) ?? false, {
-			withinMs: 3000,
-			everyMs: 50,
-			failure: `no refund was written for ${user}`,
+		await pollUntil(
+			async () => (await paymentOf(user))?.status === "refunded",
+			{
+				withinMs: 3000,
+				everyMs: 50,
+				failure: `no refund was written for ${user}`,
+			},
+		);
+	},
+);
+
+Then(
+	/^the payment of "([^"]+)" was charged once and refunded once$/,
+	async ({ request: _request }, user: string) => {
+		expect(await paymentOf(user)).toEqual({
+			status: "refunded",
+			ref: expect.stringMatching(/^mock-/),
+			attempts: 1,
 		});
-		expect(world.api?.log).toContain(line);
+	},
+);
+
+Then(
+	/^the payment of "([^"]+)" is charged once$/,
+	async ({ request: _request }, user: string) => {
+		expect(await paymentOf(user)).toEqual({
+			status: "charged",
+			ref: expect.stringMatching(/^mock-/),
+			attempts: 1,
+		});
+	},
+);
+
+Then(
+	/^the payment of "([^"]+)" is charged on the second attempt$/,
+	async ({ request: _request }, user: string) => {
+		expect(await paymentOf(user)).toEqual({
+			status: "charged",
+			ref: expect.stringMatching(/^mock-/),
+			attempts: 2,
+		});
+	},
+);
+
+// The new setting starts a new API process over the same database, so the retry runs on another instance than the
+// decline did, and finds the decline in the shared ledger.
+Given(
+	"the payment provider accepts every payment",
+	async ({ request: _request }) => {
+		setApiEnv({ PAYMENT_FAILURE_RATE: "0" });
+	},
+);
+
+Given(
+	/^"([^"]+)" has tried to confirm the purchase and was declined$/,
+	async ({ request }, user: string) => {
+		await confirm(request, user);
+		expect(currentResponse().status()).toBe(402);
+	},
+);
+
+// This layer runs one API process, so both confirmations reach the same instance at once. The proof across two
+// instances is the integration binding, where two mock payments share one ledger in Postgres.
+When(
+	/^"([^"]+)" confirms the purchase on two instances at the same time$/,
+	async ({ request }, user: string) => {
+		const replies = await Promise.all([
+			postConfirm(request, user),
+			postConfirm(request, user),
+		]);
+		shoppers().replies = await Promise.all(
+			replies.map(async (reply) => ({
+				status: reply.status(),
+				purchaseId: (await bodyOf(routes.confirm, reply))?.purchaseId,
+			})),
+		);
+	},
+);
+
+// One confirmation writes the purchase (201) and the other gets it back as a repeat (200), whichever is first.
+Then(
+	"both confirmations answer with the same purchase",
+	async ({ request: _request }) => {
+		const [first, second] = shoppers().replies;
+		expect(
+			shoppers()
+				.replies.map((reply) => reply.status)
+				.sort(),
+		).toEqual([200, 201]);
+		expect(first?.purchaseId).toEqual(expect.any(String));
+		expect(second?.purchaseId).toBe(first?.purchaseId);
 	},
 );

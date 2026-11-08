@@ -112,6 +112,28 @@ function logsIn(newWorld: () => AuthWorld): ScenarioBinder {
 	};
 }
 
+function loginStampsRow(newWorld: () => AuthWorld): ScenarioBinder {
+	return ({ Given, When, Then, And }) => {
+		const world = newWorld();
+
+		Given(SIGNED_UP, signedUp(world));
+		When(LOG_IN, async (_ctx, name: string, password: string) => {
+			await world.logIn(name, password);
+		});
+		Then("the response status is {int}", statusIs(world));
+		And(
+			"the stored row of {string} was last changed by {string}, at the time of the login",
+			async (_ctx, name: string, by: string) => {
+				const row = await world.userRow(name);
+				const author = await world.userRow(by);
+				expect(row?.updatedBy).toBe(author?.id);
+				expect(row?.updatedAt).toBeInstanceOf(Date);
+				expect(row?.updatedAt).toEqual(row?.lastLoginAt);
+			},
+		);
+	};
+}
+
 function refusesWrongLogin(newWorld: () => AuthWorld): OutlineBinder {
 	return ({ Given, When, Then, And }, examples) => {
 		const world = newWorld();
@@ -162,6 +184,7 @@ export function bindAuthAccounts(newWorld: () => AuthWorld) {
 		refusesUnusable: refusesUnusable(newWorld),
 		nameTaken: nameTaken(newWorld),
 		logsIn: logsIn(newWorld),
+		loginStampsRow: loginStampsRow(newWorld),
 		refusesWrongLogin: refusesWrongLogin(newWorld),
 		hashesOnly: hashesOnly(newWorld),
 	};
