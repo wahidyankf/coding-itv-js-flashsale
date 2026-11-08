@@ -128,7 +128,7 @@ reservations: createReservationService({
 
 **7. Scenarios plug in memory adapters.** The unit layer of the behaviour scenarios wires the same production services
 over memory copies of the ports, from `src/bdd/support/memory-*.ts`. `switchable` lets a scenario say "Redis is down"
-([`queue-world.ts`](../../../apps/flash-be/src/bdd/support/queue-world.ts)):
+([`unit-parts.ts`](../../../apps/flash-be/src/bdd/support/unit-parts.ts)):
 
 ```ts
 const memoryGate = memoryHoldGate(clock);

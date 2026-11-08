@@ -151,14 +151,16 @@ The scenarios it ran, and the trimmed summary:
 A shopper joining the queue gets a ticket and is admitted at once
 A shopper reserves an item
 Reserving again without Redis returns the same hold
+Reserving again without Redis after the hold expired keeps the old hold as a row marked deleted
 Many shoppers reserving at once without Redis never hold more than the stock
 A shopper pays for a hold taken before Redis went down
 Paying while Redis is down is not slowed down
+A buyer who has bought cannot reserve again while Redis is down
 Requests are still limited
 A hold taken while Redis was down is counted when it comes back with its old data
 A hold taken while Redis was down survives when it comes back with no data
  Test Files  1 passed (1)
-      Tests  75 passed (75)
+      Tests  94 passed (94)
 ```
 
 The real test of this design is the `chaos` load profile in

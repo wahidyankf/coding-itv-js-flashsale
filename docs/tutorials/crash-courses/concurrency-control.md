@@ -118,7 +118,7 @@ Trimmed output:
  ✓ ... Scenario: Many shoppers reserving at once never hold more than the stock > Then 10 reservations are granted
  ✓ ... Scenario: Many shoppers reserving at once never hold more than the stock > And 20 shoppers are told the item is sold out
  Test Files  2 passed (2)
-      Tests  151 passed (151)
+      Tests  236 passed (236)
 ```
 
 The unit layer uses the memory copies of the ports; the integration binding of the same scenarios runs them against

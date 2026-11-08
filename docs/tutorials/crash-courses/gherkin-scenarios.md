@@ -117,7 +117,7 @@ npm run bdd:check
 ```
 
 ```text
-behaviour coverage: 250/250 (100%)
+behaviour coverage: 269/269 (100%)
 ```
 
 The list of scenarios and their layers is in `generated-reports/behaviour-status.md`. Then run one scenario at the

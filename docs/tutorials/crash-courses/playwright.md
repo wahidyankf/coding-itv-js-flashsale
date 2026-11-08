@@ -144,8 +144,8 @@ The output, trimmed:
 Listing tests:
   auth/accounts.feature.spec.js:6:3 › Accounts of shoppers › A new shopper signs up and is logged in
   queue/joining.feature.spec.js:25:3 › Joining the queue › Joining twice keeps the place and the ticket
-  queue/joining.feature.spec.js:43:5 › Joining the queue › A sale that cannot sell any more does not take new shoppers › Example #1
-Total: 188 tests in 21 files
+  queue/joining.feature.spec.js:37:5 › Joining the queue › A sale that cannot sell any more does not take new shoppers › Example #1
+Total: 199 tests in 21 files
 ```
 
 Open `.features-gen/queue/joining.feature.spec.js` to see each Gherkin line turned into a call such as
