@@ -10,7 +10,6 @@ import {
 	liveHoldCount,
 	statusOf,
 	ticketOf,
-	usable,
 } from "./fake-state";
 
 // The first refusal that applies to a hold, or undefined when the shopper may take one.
@@ -22,7 +21,6 @@ function reserveRefusal(
 	const wait = limited(state, user);
 	if (wait) return wait;
 	if (!state.sale) return refuse("sale_not_found");
-	if (!usable(user)) return refuse("invalid_user");
 	const status = statusOf(state);
 	if (status === "upcoming") return refuse("sale_not_started");
 	if (status === "ended") return refuse("sale_ended");

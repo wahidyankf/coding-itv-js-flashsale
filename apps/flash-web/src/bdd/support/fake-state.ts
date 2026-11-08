@@ -1,7 +1,6 @@
 // What the fake flash-be remembers: the sale and its stock, the holds, the queue, the accounts and their sessions, and the
 // knobs a scenario turns. The route handlers in the other fake-* files read and change it, and the rules they all read
 // (the status of the sale, a shopper's place, the live holds) are here. Test support only.
-import { cleanUser } from "../../auth/messages";
 import type { Place, SaleStatus, SaleView } from "../../sale/types";
 import { ERROR_STATUS, errorPayload, type Reply, reply } from "./fake-http";
 
@@ -140,9 +139,6 @@ export const isoOf = (at: number) => new Date(at).toISOString();
 
 // The queue ticket flash-be would give this shopper.
 export const ticketOf = (user: string) => `ticket-${user}`;
-
-// Whether flash-be would accept this user name at all.
-export const usable = (user: string) => cleanUser(user) !== undefined;
 
 // Counts a write from this user. Returns the 429 reply when the user is over the limit, and nothing otherwise.
 export function limited(state: FakeState, user: string): Reply | undefined {

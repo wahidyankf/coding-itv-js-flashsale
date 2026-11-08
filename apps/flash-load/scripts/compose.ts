@@ -6,7 +6,7 @@ import path from "node:path";
 
 const APP_ROOT = path.resolve(import.meta.dirname, "..");
 // The compose file of the load stack. Every docker compose call names it.
-export const COMPOSE_FILE = path.join(APP_ROOT, "compose.yaml");
+const COMPOSE_FILE = path.join(APP_ROOT, "compose.yaml");
 // Where the reports go. compose.yaml mounts the same folder into the k6 container as /reports.
 export const REPORTS_DIR = path.resolve(
 	APP_ROOT,

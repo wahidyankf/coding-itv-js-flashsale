@@ -20,7 +20,7 @@ import {
 } from "./behaviour-scenarios.mjs";
 
 // Each owner maps one spec folder to the binding folders that must implement it.
-export const OWNERS = [
+const OWNERS = [
 	{
 		name: "flash-be",
 		spec: "specs/apps/flash/be",

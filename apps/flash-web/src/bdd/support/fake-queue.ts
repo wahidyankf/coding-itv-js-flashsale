@@ -8,7 +8,6 @@ import {
 	placeOf,
 	statusOf,
 	ticketOf,
-	usable,
 } from "./fake-state";
 
 // Joins the line. A shopper who is already in it gets the same place back, with 200 rather than 201.
@@ -16,7 +15,6 @@ export function join(state: FakeState, user: string): Reply {
 	const wait = limited(state, user);
 	if (wait) return wait;
 	if (!state.sale) return refuse("sale_not_found");
-	if (!usable(user)) return refuse("invalid_user");
 	const status = statusOf(state);
 	if (status === "ended") return refuse("sale_ended");
 	if (status === "sold_out") return refuse("sold_out");

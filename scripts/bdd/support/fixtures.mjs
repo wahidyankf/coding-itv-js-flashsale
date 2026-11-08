@@ -22,7 +22,7 @@ export const PATHS = {
 };
 
 // A feature with one scenario. Most corpora start from it, so a test changes one part of it.
-export const LIVENESS = [
+const LIVENESS = [
 	"Feature: Liveness",
 	"",
 	"  Scenario: Liveness returns ok",

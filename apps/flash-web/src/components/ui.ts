@@ -6,10 +6,10 @@
 export const CARD =
 	"rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-slate-800 dark:bg-slate-900";
 // The outline a focused control shows, so keyboard users can see where they are.
-export const FOCUS =
+const FOCUS =
 	"focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 dark:focus-visible:outline-sky-400";
 // The base of every button: size, shape, text, and the focus outline.
-export const BUTTON = `inline-flex h-11 items-center justify-center gap-2 rounded-lg px-4 text-base font-medium motion-safe:transition-colors disabled:cursor-not-allowed ${FOCUS}`;
+const BUTTON = `inline-flex h-11 items-center justify-center gap-2 rounded-lg px-4 text-base font-medium motion-safe:transition-colors disabled:cursor-not-allowed ${FOCUS}`;
 // The main action: a filled button. Disabled looks grey, and the words still say what it is.
 export const PRIMARY = `${BUTTON} bg-sky-700 text-white hover:bg-sky-800 disabled:bg-slate-200 disabled:text-slate-500 disabled:hover:bg-slate-200 dark:bg-sky-500 dark:text-slate-950 dark:hover:bg-sky-400 dark:disabled:bg-slate-800 dark:disabled:text-slate-500 dark:disabled:hover:bg-slate-800`;
 // The outline colours of a secondary control, without the button's size, so a tab can keep its own size.

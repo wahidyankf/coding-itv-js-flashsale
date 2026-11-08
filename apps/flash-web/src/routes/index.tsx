@@ -12,7 +12,7 @@ import { SalePage } from "../sale-page";
 export type HomeData = { status: BackendStatus; sale: SaleLoad };
 
 // Runs on the server only. process.env is read here, never in the browser bundle.
-export async function homeDataHandler(): Promise<HomeData> {
+async function homeDataHandler(): Promise<HomeData> {
 	const [status, sale] = await Promise.all([
 		loadBackendStatus(process.env),
 		loadSale(process.env),

@@ -14,10 +14,7 @@ import { operatorWorld } from "./operating.js";
 import { insertProduct, insertPurchase, loginAs } from "./seed.js";
 
 // One scenario over the real database and the app built on it. A bought item is a purchase row and one more sold.
-export function integrationOperatingWorld(
-	db: Kysely<Database>,
-	app: FastifyInstance,
-) {
+function integrationOperatingWorld(db: Kysely<Database>, app: FastifyInstance) {
 	return operatorWorld({
 		app: () => app,
 		now: () => new Date(),
