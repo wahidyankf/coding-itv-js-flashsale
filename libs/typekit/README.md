@@ -61,7 +61,7 @@ source (`src/*_tests.ts`), with no Gherkin.
 ## Commands
 
 ```bash
-npx nx build typekit           # tsc to dist/
+npx nx build typekit           # empties dist/, then tsc into it
 npx nx test:quick typekit      # typecheck + lint + unit tests
 npx nx test:coverage typekit   # unit tests with the 99% floor
 ```

@@ -115,7 +115,8 @@ no `default`, so a new state fails Biome's `useExhaustiveSwitchCases` until its 
 
 ## Try it here
 
-Typecheck one library. Nx builds `typekit` first, because `flash-commons` imports its `dist`:
+Typecheck one library. Nx builds `typekit` first, because `flash-commons` imports its `dist`. A build empties `dist`
+before `tsc` writes it, so a file whose source was removed can never be imported from an old output:
 
 ```bash
 npx nx typecheck flash-commons --output-style=static
@@ -125,7 +126,7 @@ Trimmed output:
 
 ```text
 > nx run typekit:build
-> tsc -p tsconfig.build.json
+> node --input-type=module -e "import{rmSync}from'node:fs';rmSync('dist',{recursive:true,force:true})" && tsc -p tsconfig.build.json
 
 > nx run flash-commons:typecheck
 > tsc --noEmit -p tsconfig.json
