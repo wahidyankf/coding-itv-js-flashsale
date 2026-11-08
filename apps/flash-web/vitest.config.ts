@@ -8,7 +8,7 @@ export default defineConfig({
 	test: {
 		name: "unit",
 		environment: "jsdom",
-		// Unit tests sit next to the source as *_tests.ts(x).
+		// The integration files need the dev stack, so they run only in their own config.
 		include: ["src/**/*_tests.{ts,tsx}"],
 		exclude: ["node_modules", ".output", "src/**/*_integration_tests.{ts,tsx}"],
 		// Report only. Unit tests alone do not reach 99%; the 99% gate is on the combined run.

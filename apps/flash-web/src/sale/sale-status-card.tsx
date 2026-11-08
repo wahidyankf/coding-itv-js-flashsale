@@ -1,4 +1,4 @@
-// The card with what the shopper sees about the sale itself: its name, status, window and stock. It only shows; the
+// Part of the sale page. The card with what the shopper sees about the sale itself: its name, status, window and stock. It only shows; the
 // buying card next to it holds the buttons. The status is always written out, so colour is never the only signal.
 import { SaleTime } from "../components/sale-time";
 import { CARD, MUTED_TEXT, STRONG_TEXT, TONE } from "../components/ui";

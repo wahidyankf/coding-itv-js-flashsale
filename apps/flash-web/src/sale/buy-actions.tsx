@@ -1,6 +1,5 @@
-// The buying card for a shopper who is logged in: Buy Now, Check my status, Confirm purchase, and the sentence that says
-// what is happening, and the Purchase ID once a purchase is confirmed. The state comes in as props, and the buttons only
-// report presses. Each button's spinner marks the request it started, so the shopper can see which one is working.
+// Browser only, part of the sale page. The buying card for a logged-in shopper: its buttons and the status sentence. The state comes in as props, and the
+// buttons only report presses. A spinner marks the button whose request is running, so the shopper sees which one works.
 import type { FormEvent } from "react";
 import { Spinner } from "../components/spinner";
 import {
@@ -35,7 +34,7 @@ export type BuyActionsProps = {
 	onConfirm: () => void;
 };
 
-// The buying card's buttons and the status sentence. The buttons only report presses; the page decides what happens.
+// Lays out the buying card. The rules come from shopper-state.ts, so this file only shows them.
 export function BuyActions({
 	phase,
 	saleStatus,

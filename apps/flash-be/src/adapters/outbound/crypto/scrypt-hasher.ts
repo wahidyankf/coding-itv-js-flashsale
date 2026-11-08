@@ -13,8 +13,8 @@ const scryptAsync = promisify<string, Buffer, number, Buffer>(scrypt);
 const derive = (password: string, salt: Buffer): Promise<Buffer> =>
 	scryptAsync(password, salt, KEY_BYTES);
 
-// The hasher the app uses. `hash` salts and derives a new text. `verify` derives the key again and compares the two keys
-// in constant time, so the answer does not leak through timing.
+// Hashes passwords and checks them. `verify` derives the key again and compares it in constant time, so the answer does
+// not leak through timing.
 export function createScryptHasher(): PasswordHasher {
 	return {
 		async hash(password) {

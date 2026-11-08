@@ -1,13 +1,12 @@
-// Kind: a plain port (no suffix). It writes Postgres rows, so the suffix rule would call it a repository; the name stays
-// because SaleRepository already names the reads. What an operator does to the sales, kept in Postgres. Each write
-// checks and writes in one step, so two operators cannot both pass a check that only one of them can satisfy.
+// Kind: a plain port (no suffix). Application layer. It writes Postgres rows, but is named as a port, since
+// SaleRepository already names the reads. Each write checks and writes in one step, so two operators cannot both win a
+// check that only one can pass.
 import type { Result } from "@flash/typekit";
 import type { Sale } from "../../domain/sale.js";
 import type { ChangeSaleError, NewSale } from "../../domain/sale-window.js";
 import type { UserId } from "../../domain/user.js";
 
-// Why a change to a sale is refused: the change is invalid or the sale is locked, or the sale is not there, or its window
-// overlaps another sale.
+// Why a change is refused: the change is invalid or locked, the sale is missing, or its window overlaps another sale.
 export type UpdateSaleError =
 	| ChangeSaleError
 	| "sale_not_found"
@@ -34,6 +33,6 @@ export type SaleAdmin = {
 	) => Promise<Result<Sale, UpdateSaleError>>;
 	// Marks the sale and the holds on it as deleted, unless someone bought an item. Nothing is erased.
 	remove: (id: string, actor: UserId) => Promise<Result<true, RemoveSaleError>>;
-	// Every sale, the one that opens last first.
+	// Every sale, latest start first.
 	list: () => Promise<Sale[]>;
 };

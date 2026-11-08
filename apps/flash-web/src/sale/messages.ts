@@ -1,4 +1,4 @@
-// The words of the sale: the status labels and notes, every sentence and button label of the sale page, and the error
+// Browser and server, part of the sale feature. The words of the sale: the status labels and notes, every sentence and button label of the sale page, and the error
 // codes that are about a sale or a purchase. The account's words are in auth/messages.ts.
 import type { SaleStatus } from "./types";
 

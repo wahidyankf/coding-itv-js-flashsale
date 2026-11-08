@@ -65,10 +65,8 @@ export const world: {
 	streams?: Array<() => void>;
 } = {};
 
-// The settings of the private API. The API reads them once, when it starts, so a change after it started would do nothing.
-// Setting a different value therefore stops the running API as a side effect (and closes its Redis proxy); the next
-// request starts a new one with the new settings. The database is the scenario's own, so nothing the first one wrote is
-// lost. Setting the same value again keeps the API running, so a web server pointed at it is not disturbed.
+// The settings of the private API. The API reads them only at start, so a different value stops it, and the next request starts a new one on the same database.
+// The same value again keeps it running, so a web server pointed at it is not disturbed.
 let apiEnvValue: Record<string, string> | undefined;
 Object.defineProperty(world, "apiEnv", {
 	enumerable: true,

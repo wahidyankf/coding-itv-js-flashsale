@@ -61,7 +61,7 @@ async function dropAuditColumns(
 
 // Creates users and products, adds the audit columns to the sale tables, and links every row to a user.
 export async function up(db: Kysely<unknown>): Promise<void> {
-	// users. `created_by` points at users, so the first two rows are their own authors.
+	// users. `created_by` points at users, so the system row is its own author.
 	await db.schema
 		.createTable("users")
 		.addColumn("id", "uuid", (col) =>
@@ -175,7 +175,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 
 // Puts the text user ids and the schema of migration 0002 back. Rows that were deleted are dropped here, and only here.
 export async function down(db: Kysely<unknown>): Promise<void> {
-	// An older schema has no history, so rows that were deleted are dropped here, and only here.
+	// An older schema keeps no deleted rows, so they are removed before the columns go.
 	await sql`delete from reservations where deleted_at is not null`.execute(db);
 	await sql`delete from purchases where deleted_at is not null`.execute(db);
 	await sql`delete from sales where deleted_at is not null and not exists

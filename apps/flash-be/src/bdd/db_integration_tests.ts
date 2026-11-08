@@ -163,7 +163,7 @@ describeFeature(
 							.execute();
 						expect(rows.map((row) => row.username)).toEqual([system]);
 						expect(system).toBe(SYSTEM_USERNAME);
-						// The system is its own author.
+						// The system user is made before any user exists, so it names itself as author.
 						expect(rows[0]?.created_by).toBe(rows[0]?.id);
 						// The stand-in operator of the first migration is kept as a row marked deleted by the system.
 						const retired = await db
@@ -193,7 +193,7 @@ describeFeature(
 					},
 				);
 
-				// The old schema has no `product_id` and keeps the user as text, so this is SQL.
+				// The old schema has no `product_id` and stores the user as text, so this step writes raw SQL.
 				And(
 					"that database holds a sale named {string} with a hold and a purchase by {string}",
 					async (_ctx, name: string, user: string) => {

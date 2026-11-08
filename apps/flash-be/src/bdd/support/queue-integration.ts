@@ -195,7 +195,7 @@ function saleRowActions(
 				.where("id", "=", current().saleId)
 				.execute();
 		},
-		// With no sale named, it is the tick the server runs: for the sale shoppers are shown now.
+		// With no sale named, admit the sale the admission timer picks now, the same rule as GET /sales/current.
 		async admit(saleId?: string) {
 			if (saleId === undefined) {
 				await admitCurrentSale(parts.base.sales, parts.base.queue);
@@ -249,7 +249,7 @@ function saleRowActions(
 	};
 }
 
-// Time and payment: the wait is real here, and the payment's latency and declines are set in the database of the app.
+// Time and payment: the wait is real here, and the payment's latency and declines are set on the payment the app uses.
 function timeAndPaymentActions(
 	parts: IntegrationParts,
 	current: () => ShopScenario,
@@ -364,8 +364,8 @@ export async function openQueueIntegration() {
 	};
 }
 
-// How far a hold's end may sit from the test's own clock over the real stores: the app and the test share one clock, but
-// each reads it a few milliseconds apart.
+// How far a hold's end may differ from the test's clock. The app and the test read the same wall clock a few milliseconds
+// apart.
 const HOLD_END_TOLERANCE_MS = 5000;
 
 // The integration layer's ShopLayer over the run's real stores: sales are timed from the wall clock when the layer is

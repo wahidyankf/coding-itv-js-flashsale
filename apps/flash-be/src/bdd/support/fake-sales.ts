@@ -29,7 +29,6 @@ export function fakeSale(overrides: Partial<Sale>): Sale {
 // as the database does, so a cache never sees a later change to a stored row.
 export function fakeRepository(sales: Sale[]): SaleRepository {
 	return {
-		// Copies, as a database does: a cache must not see later changes to the stored row.
 		findById: async (id) => {
 			const found = sales.find((sale) => sale.id === id);
 			return found && { ...found };

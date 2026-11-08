@@ -11,8 +11,7 @@ import { memoryAuth } from "./memory-auth.js";
 // Past the 15 minutes of an access token.
 const PAST_ACCESS_MS = 16 * MS_PER_MINUTE;
 
-// One scenario in memory: accounts and logins in memory, and a clock the scenario moves. The app is kept in `apps`, so
-// the file can close it after the run.
+// One scenario in memory: its accounts, logins and clock. The app goes into `apps`, so the test file can close it.
 export function unitAuthWorld(apps: FastifyInstance[]) {
 	let now = new Date("2026-06-01T12:00:00Z");
 	const auth = memoryAuth(() => now, createScryptHasher());

@@ -25,7 +25,7 @@ const CLEAN: RunFacts = {
 const JUDGED = PROFILES.full;
 const NOT_JUDGED = PROFILES.chaos;
 
-// The row of one check. A missing row is a test that asks for something the verdict does not say.
+// The row for one check. A missing row throws, so a renamed check cannot pass unnoticed.
 function rowOf(rows: Row[], check: string): Row {
 	const found = rows.find((row) => row.check === check);
 	if (!found) throw new Error(`no row named "${check}"`);

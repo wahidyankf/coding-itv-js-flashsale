@@ -108,7 +108,7 @@ function stubApi(
 	};
 }
 
-// Renders the page and waits for the answer to "who am I", which comes after the first paint.
+// Renders the page inside act, so the effects and the first answers settle before a test checks the page.
 async function show(
 	load: Parameters<typeof SalePage>[0]["load"],
 	api: WebApi,

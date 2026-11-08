@@ -1,8 +1,5 @@
-// A Server-Sent Events reader built on fetch, for the sale's two live streams. The browser's EventSource cannot send a
-// header, and the queue ticket travels in one, so the page reads the stream itself. The same code runs in the browser
-// and in tests. A failed connection is retried with exponential backoff and full jitter, through @flash/flash-commons.
-// Decision: docs/explanation/decisions/008-server-sent-events.md (why the streams are read this way).
-// Decision: docs/explanation/decisions/017-retry-backoff-jitter.md (why every outage has a max attempt count).
+// Browser only, part of the sale feature. Reads the sale's two live streams with fetch, since EventSource cannot send the queue ticket header.
+// Failed connections retry with exponential backoff and full jitter. Decisions: docs/explanation/decisions/008-server-sent-events.md and docs/explanation/decisions/017-retry-backoff-jitter.md.
 import {
 	backoffDelayMs,
 	HTTP_STATUS,
@@ -92,10 +89,8 @@ async function readFrames(
 	}
 }
 
-// One connection: asks for the stream. A refusal (401, 404) is Err "refused". Any other failure, and a stream that ends
-// or breaks before it delivered a used frame, is Err "failed". A stream that delivered one is Ok, whether it then ends or
-// breaks. A keep-alive is not a frame, and neither is a frame the listener drops: flash-be sends the first event on
-// connect, so a stream that carries none the page can use is not healthy, and it must not reset the count.
+// One connection. A refusal (401, 404) is Err "refused". A stream that gave a used frame is Ok, even if it then ends or
+// breaks. Anything else is Err "failed", so a stream the page cannot read still gives up.
 async function connectOnce(
 	fetcher: typeof fetch,
 	url: string,
@@ -128,11 +123,9 @@ async function connectOnce(
 	return received.frame ? new Ok(undefined) : new Err("failed");
 }
 
-// The watcher keeps a stream open until it is stopped. Each outage gets up to `maxAttempts` tries, waiting a jittered
-// backoff between them. A try that delivers a frame the listener used starts a fresh count after a short wait. A try
-// that ends or breaks with no such frame is a failure, so a server that keeps accepting and closing, or that sends only
-// frames the page cannot read, still reaches the give-up. When the last try of an outage fails, the watcher stops and
-// tells the subscription. A refusal stops it at once.
+// Keeps a stream open until it is stopped. An outage gets up to `maxAttempts` tries, with jittered backoff between them.
+// A try that gave a used frame starts a new count. A try with no used frame is a failure, so a server that keeps
+// closing the stream still gives up. A refusal stops at once.
 export function createWatcher(options: WatchOptions = {}): Watcher {
 	const policy = options.policy ?? LIVE_POLICY;
 	const wait = options.sleep ?? sleep;
@@ -156,7 +149,7 @@ export function createWatcher(options: WatchOptions = {}): Watcher {
 				);
 				if (controller.signal.aborted) return;
 				if (outcome.isOk()) {
-					// The stream delivered frames and then ended. It is opened again after a short wait, counting from the first attempt.
+					// The stream gave frames and then ended, so open it again after a short wait.
 					await wait(backoffDelayMs(0, policy, random));
 					continue;
 				}

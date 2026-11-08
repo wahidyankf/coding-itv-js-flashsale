@@ -3,9 +3,8 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-// The hexagon: the domain knows nothing, the application knows the domain, and adapters know both but never each
-// other. Only the entry points (main, composition, migrate, seed-sale) wire adapters to ports. Test file: it reads the
-// source and checks the layers, so it is the one place that scans imports.
+// The hexagon the tests check: the domain knows nothing, the application knows the domain, and adapters know both but
+// never each other. Only the entry points (main, composition, migrate, seed-sale) wire adapters to ports.
 const SRC = import.meta.dirname;
 
 type Layer =
@@ -37,7 +36,7 @@ function layerOf(file: string): Layer {
 type Import = { from: string; target: string; typeOnly: boolean };
 
 // The three ways a module is named in source: `import ... from "x"` and `export ... from "x"`, the bare `import "x"`, and
-// the dynamic `import("x")`. Each one loads the module, so each one is checked.
+// the dynamic `import("x")`. Each one names a module, so each one is checked.
 const FROM_CLAUSE = /\b(?:import|export)(\s+type)?\b[^;"]*?\bfrom\s+"([^"]+)"/g;
 const BARE_IMPORT = /\bimport\s+"([^"]+)"/g;
 const DYNAMIC_IMPORT = /\bimport\(\s*"([^"]+)"\s*\)/g;

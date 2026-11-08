@@ -1,16 +1,14 @@
-// The web server's proxy: the browser's requests under /api are checked here, then passed on to flash-be, and the answer
-// is streamed back. Only the routes the browser needs get through, each with its one method, and a POST must come from
-// this site. The address of flash-be is read here, on the server, and never reaches the page.
+// Server only. The web server's proxy. It checks browser requests under /api, passes them to flash-be, and streams the answer back.
+// Only the routes the browser needs get through, each with one method. A POST must come from this site, and the address of flash-be stays on the server.
 // Decision: docs/explanation/decisions/006-browser-talks-to-web-server-only.md.
 import { HTTP_STATUS, isUuid } from "@flash/flash-commons";
 import { attempt, attemptAsync } from "@flash/typekit";
 import { RETRY_AFTER_HEADER, TICKET_HEADER } from "./api";
 import { buildConfig } from "./config";
 
-// The routes the browser may reach, each with its one method. Anything else is not the browser's. In particular the
-// operator routes (`GET /admin/sales`, `POST /admin/sales`, `PATCH` and `DELETE /admin/sales/:saleId`) are not here, and
-// `/sales/current` comes first so it is not taken for a sale. A shopper's own routes end in `/me`: who they are comes from
-// the login cookie, never from the address.
+// The routes the browser may reach, each with its one method. Operator routes are left out on purpose.
+// `/sales/current` comes before the sale pattern, which would otherwise match it. A shopper's own routes end in `/me`:
+// who they are comes from the login cookie, not the address.
 const ALLOWED: Array<[method: string, path: RegExp]> = [
 	["POST", /^\/auth\/(?:register|login|refresh|logout)$/],
 	["GET", /^\/auth\/me$/],
@@ -62,7 +60,8 @@ const decode = (value: string | undefined) =>
 				err: () => "",
 			});
 
-// `path` is what follows `/api`, such as `/sales/current`.
+// Says whether the browser may reach a route. A route not in `ALLOWED` is refused, so a new route stays closed until it
+// is listed. `path` is what follows `/api`, such as `/sales/current`.
 export function isAllowed(method: string, path: string): boolean {
 	for (const [allowed, pattern] of ALLOWED) {
 		if (allowed !== method) continue;
@@ -74,16 +73,15 @@ export function isAllowed(method: string, path: string): boolean {
 	return false;
 }
 
-// The refresh cookie is set for `/auth` by flash-be, but the browser reaches that route as `/api/auth`, and would never
-// send a cookie of another path. So the path moves under `/api`.
+// flash-be sets the refresh cookie for `/auth`, but the browser calls `/api/auth` and would never send that cookie back.
+// So the cookie path moves under `/api`.
 const BACKEND_AUTH_PATH = /;\s*Path=\/auth(?=;|$)/i;
 const rewritePath = (cookie: string) =>
 	cookie.replace(BACKEND_AUTH_PATH, "; Path=/api/auth");
 
-// A cookie only helps an attacker's page when the browser sends it from another site. `SameSite=Lax` already stops that
-// for a POST, and this is the second lock: the page that sends a POST must come from this very host. A browser sends
-// `Origin` on every POST, or else `Sec-Fetch-Site`. A caller that sends neither is not a browser, and has no cookie of the
-// shopper to misuse.
+// Stops a POST from another site that would use the shopper's cookies. `SameSite=Lax` is the first lock; this is the
+// second. A browser sends `Origin` on every POST, or else `Sec-Fetch-Site`. A caller with neither is not a browser, and
+// holds no cookie to misuse.
 export function isCrossSite(request: Request): boolean {
 	const origin = request.headers.get("origin");
 	if (origin !== null) {
@@ -105,7 +103,7 @@ function refuse(code: keyof typeof REFUSALS): Response {
 	return Response.json({ errorCode: code, errorMessage: message }, { status });
 }
 
-// A new header set with only the named headers that `source` has. A name that is missing is left out.
+// Copies only the named headers, so no other header passes between the browser and flash-be.
 function pick(source: Headers, names: readonly string[]): Headers {
 	const picked = new Headers();
 	for (const name of names) {
@@ -115,7 +113,8 @@ function pick(source: Headers, names: readonly string[]): Headers {
 	return picked;
 }
 
-// Passes a browser request under /api on to flash-be and streams the answer back.
+// The proxy's one entry point. Streams flash-be's answer back with only the allowed headers. A failed call becomes a
+// 502 reply, so the shopper never sees a crash.
 export async function proxyToBackend(
 	request: Request,
 	env: NodeJS.ProcessEnv,

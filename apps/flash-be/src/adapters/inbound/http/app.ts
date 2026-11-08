@@ -11,8 +11,7 @@ import { ERROR_STATUS, type ErrorCode, errorPayload } from "./errors.js";
 import { DEFAULT_STREAM_OPTIONS, type StreamOptions } from "./event-stream.js";
 import { registerRoutes } from "./routes/index.js";
 
-// Builds the HTTP app over the given dependencies, without listening. The entry point or a test sets every option: whether
-// to log, whether to trust a proxy's address, the stream pacing, and whether cookies need HTTPS.
+// Builds the app without listening, so a test can run it without a port. The entry point or a test sets the options.
 export function buildApp(
 	deps: Dependencies,
 	options: {

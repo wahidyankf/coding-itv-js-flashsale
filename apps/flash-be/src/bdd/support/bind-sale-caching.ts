@@ -29,7 +29,7 @@ function remainingIs(world: ShopScenario) {
 	};
 }
 
-// "the sold count changes to {int}": another instance sells, behind the cache.
+// "the sold count changes to {int}": another instance sells, and this app's cache does not see it yet.
 function soldCountIs(world: ShopScenario) {
 	return async (_ctx: unknown, sold: number) => {
 		await world.setSold(sold);

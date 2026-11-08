@@ -1,4 +1,4 @@
-// The browser's calls for the account: who am I, sign up, log in, and log out. Each one goes to the web server, which
+// Browser only, part of the account feature. The browser's calls for the account: who am I, sign up, log in, and log out. Each one goes to the web server, which
 // passes it on to flash-be and carries the cookies. The page gets this client, so a test can give it a fake.
 import { object } from "@flash/flash-commons";
 import { type ApiResult, callApi, jsonPost } from "../api";

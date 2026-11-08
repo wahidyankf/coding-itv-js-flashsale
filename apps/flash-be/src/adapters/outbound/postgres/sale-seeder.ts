@@ -32,7 +32,7 @@ async function productNamed(
 }
 
 // Creates the sale and returns its id and its product. The ids are made here, so the insert needs no returned row. A sale
-// that names no product gets the product of its name.
+// with no product id uses the product of its name.
 export async function seedSale(
 	db: Kysely<Database>,
 	input: NewSale,

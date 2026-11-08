@@ -1,6 +1,5 @@
-// The reply to the last request a scenario sent. The request steps set it and the Then steps read it, so a step never
-// has to pass a response along. cleanup.ts clears it after each scenario, and both e2e apps run that cleanup, so a Then
-// never reads the reply of an earlier scenario. A Then that reads a reply must follow a When that sent one.
+// The reply to the last request a scenario sent, so a step never passes a response along. The When steps set it and the Then steps read it.
+// cleanup.ts clears it after each scenario, so a Then never reads an earlier scenario's reply. A Then that reads a reply must follow a When that sent one.
 
 import type { APIResponse } from "@playwright/test";
 

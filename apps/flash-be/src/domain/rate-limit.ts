@@ -8,13 +8,13 @@ export type RateLimitVerdict =
 	| { limited: false }
 	| { limited: true; retryAfterSeconds: number };
 
-// One counted window: the hits so far, the time left in the window, and the limit those hits are held to.
+// One window's hits, the time left in it, and its limit. `verdictOf` checks each window.
 export type CountedWindow = { count: number; resetInMs: number; limit: number };
 
 // A client told to retry is never told to retry at once: the wait is at least one second.
 const MIN_RETRY_AFTER_SECONDS = 1;
 
-// The seconds a refused client is told to wait: the time left in the window, rounded up, and never under the minimum.
+// Retry-After counts whole seconds, so the time left is rounded up, and never goes under the minimum.
 export function retryAfterSecondsOf(resetInMs: number): number {
 	return Math.max(
 		Math.ceil(resetInMs / MS_PER_SECOND),
@@ -22,13 +22,12 @@ export function retryAfterSecondsOf(resetInMs: number): number {
 	);
 }
 
-// Whether a window is over its limit: its hits are more than the limit allows.
+// A window is over only when its hits pass the limit, so the limit itself is still allowed.
 export function isOverLimit(window: { count: number; limit: number }): boolean {
 	return window.count > window.limit;
 }
 
-// The verdict of one check over its windows. The check is refused when any window is over its limit, and the client
-// waits for the longest of the windows that are over. Otherwise the request goes on.
+// The verdict of one check. It refuses when any window is over, and the client waits for the longest of those.
 export function verdictOf(windows: readonly CountedWindow[]): RateLimitVerdict {
 	const over = windows.filter(isOverLimit);
 	if (over.length === 0) return { limited: false };

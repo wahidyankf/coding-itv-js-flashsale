@@ -22,7 +22,7 @@ export function registerHealthRoutes(
 		handler: async () => ({ status: "ok" as const }),
 	});
 
-	// Readiness: Postgres and Redis both answer. The checks are built once, and the reply carries them either way.
+	// Readiness: Postgres and Redis both answer. Both checks run even when one fails, so the reply shows each store.
 	app.route({
 		method: "GET",
 		url: "/ready",

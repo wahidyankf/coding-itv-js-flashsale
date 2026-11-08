@@ -1,7 +1,6 @@
-// Who a user is, as the rules see it. The domain has two names for a user, and the types say which one a value holds.
-// A username is the name a person logs in with: it is what the queue, the holds and the purchases are keyed on. A user
-// id is the id of the user's row: sessions, the audit columns and the operator who acted all hold one. Both are text,
-// and each is branded, so one cannot be passed where the other is meant. Domain layer: no I/O.
+// Who a user is, as the rules see it. A username is the name a person logs in with; the queue, holds and purchases are
+// keyed on it. A user id is the id of the user's row, held by sessions and the audit columns. Both are branded text, so
+// one cannot pass for the other. Domain layer: no I/O.
 
 // The name a shopper or an operator logs in with. `normalizeUser` makes one from typed text, and `storedUsername` from a
 // name a row holds. No other code makes one.
@@ -12,8 +11,8 @@ export type UserId = string & { readonly __brand: "UserId" };
 
 const USERNAME_PATTERN = /^[a-z0-9][a-z0-9._@+-]{0,63}$/;
 
-// The usable form of a typed name: trimmed and lowercased, so "Ana " and "ana" are one person. `undefined` when the text
-// is not a usable name. The edge decodes the text first; this rule is the only one that says what a name may be.
+// Trims and lowercases typed text, so "Ana " and "ana" are one person. Returns `undefined` for an unusable name.
+// This is the only rule for what a name may be; the edge only decodes the text.
 export function normalizeUser(raw: string): Username | undefined {
 	const user = raw.trim().toLowerCase();
 	return USERNAME_PATTERN.test(user) ? (user as Username) : undefined;

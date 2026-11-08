@@ -1,4 +1,4 @@
-// The browser's calls for the sale: the queue, the hold, the purchase and the outcome, plus the two live streams. The page
+// Browser only, part of the sale feature. The browser's calls for the sale: the queue, the hold, the purchase and the outcome, plus the two live streams. The page
 // gets this client, so a test can give it a fake. The calls go to the web server, which passes the sale routes on.
 import type { Decoder } from "@flash/flash-commons";
 import { type ApiResult, callApi, jsonPost, TICKET_HEADER } from "../api";

@@ -11,7 +11,6 @@ import {
 
 // The requests a routing scenario makes. Each layer builds the app it sends them to.
 export type RoutingWorld = {
-	// A request with no body.
 	get: (url: string) => Promise<Response>;
 	// A request whose body is sent as JSON, exactly as the text given.
 	post: (url: string, body: string) => Promise<Response>;

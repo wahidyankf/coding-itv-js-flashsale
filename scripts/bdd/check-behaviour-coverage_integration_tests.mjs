@@ -1,3 +1,4 @@
+// Integration tests of the behaviour checker. Each test runs the checker as its own process on a temp corpus.
 import { spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";

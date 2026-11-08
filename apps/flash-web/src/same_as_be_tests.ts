@@ -11,10 +11,9 @@ import { TICKET_HEADER } from "./api";
 import { cleanPassword, cleanUser } from "./auth/messages";
 import { proxyToBackend } from "./proxy";
 
-// The two apps share @flash/typekit and @flash/flash-commons, but not flash-be's domain. flash-web still copies its
-// user name and password rules, the queue-ticket header name and the proxy's error replies. Each copy
-// is used by flash-web alone, so the rule of three keeps it here (docs/explanation/decisions/016-dry-rule-of-three.md).
-// These tests are the guard: when flash-be changes one of them, the copy here must change too.
+// flash-web copies a few flash-be rules: the user name and password checks, the queue-ticket header and the proxy's error
+// replies. Each copy is used only by flash-web (docs/explanation/decisions/016-dry-rule-of-three.md).
+// These tests are the guard: when flash-be changes one, the copy here must change too.
 describe("what flash-web copies from flash-be", () => {
 	it.each([
 		"ana",

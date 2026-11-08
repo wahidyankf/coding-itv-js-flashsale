@@ -1,5 +1,5 @@
-// Making and changing a sale: the rules an operator's input must meet, and the rules for a sale that already exists.
-// The window is absolute here; the seed command turns minutes into one.
+// Domain layer. Making and changing a sale: the rules an operator's input must meet, and the rules for a sale that
+// already exists. The window is absolute here; the seed command turns minutes into one.
 import { Err, Ok, type Result } from "@flash/typekit";
 import { isUuid, type Sale } from "./sale.js";
 
@@ -15,8 +15,8 @@ export type NewSale = {
 	admitPerSecond: number;
 };
 
-// The defaults for what an operator or the seed command leaves out. The length of the window is the seed command's only:
-// an operator gives both ends of the window.
+// Defaults for what an operator or the seed command leaves out. Only the seed command has a default window length:
+// an operator always gives both ends.
 export const DEFAULT_SALE_NAME = "Flash sale";
 // How long a hold lasts, in seconds, when the operator or the seed command leaves it out. A hold is what a shopper keeps
 // while they pay.
@@ -41,8 +41,8 @@ export type SaleDraft = {
 const positiveInteger = (value: number): boolean =>
 	Number.isSafeInteger(value) && value >= 1;
 
-// Whether a sale can run: a stock to sell, a window that opens before it closes, and a hold and an admission rate
-// that are whole and positive. Defaults fill what the operator left out.
+// Checks an operator's sale input: a stock, a window that opens before it closes, and a whole, positive hold and rate.
+// Defaults fill what was left out. A failed rule gives `invalid_sale`.
 export function newSaleFrom(draft: SaleDraft): Result<NewSale, "invalid_sale"> {
 	const name = (draft.name ?? DEFAULT_SALE_NAME).trim();
 	const startsAt = new Date(draft.startsAt);
@@ -90,8 +90,8 @@ export function newSale(
 	};
 }
 
-// What an operator sends to change a sale. A field that is left out stays as it is.
-// The product is chosen when the sale is made and never changes.
+// What an operator sends to change a sale. A field left out stays as it is.
+// The product never changes after the sale is made.
 export type SalePatch = {
 	[Field in Exclude<keyof SaleDraft, "productId">]?:
 		| SaleDraft[Field]
@@ -102,8 +102,7 @@ export type SalePatch = {
 // that has started keeps its start and cannot lose stock.
 export type ChangeSaleError = "invalid_sale" | "sale_locked";
 
-// The sale after a change, or why it cannot change. The same rules as a new sale apply to the result. On top of that,
-// a sale that is over is closed for good, and one that has started keeps its start and can only get more stock.
+// The changed sale, or the reason it is refused. A new sale's rules apply to the result as well.
 export function changeSaleFrom(
 	sale: Sale,
 	patch: SalePatch,
@@ -133,9 +132,8 @@ export function changeSaleFrom(
 
 type Window = { startsAt: Date; endsAt: Date };
 
-// Two windows overlap when each opens before the other closes. A sale that opens at the moment another one closes
-// does not overlap it. The database repeats this rule in `clashes` (sale-admin.ts); sale-rules_integration_tests checks
-// the two on the same windows.
+// Two windows overlap when each opens before the other closes, so a sale that opens as another closes does not overlap it.
+// The database repeats this in `clashes` (sale-admin.ts); sale-rules_integration_tests checks both on the same windows.
 export function overlaps(a: Window, b: Window): boolean {
 	return a.startsAt < b.endsAt && a.endsAt > b.startsAt;
 }

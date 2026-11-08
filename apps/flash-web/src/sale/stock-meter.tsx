@@ -1,4 +1,4 @@
-// The bar under the item count. It shows how much of the stock is still for sale. It is hidden from screen readers, because
+// Part of the sale page. The bar under the item count. It shows how much of the stock is still for sale. It is hidden from screen readers, because
 // the count next to it says the same thing.
 export function StockMeter({
 	remaining,

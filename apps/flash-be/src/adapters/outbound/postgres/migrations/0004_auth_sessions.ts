@@ -62,7 +62,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 	);
 	await sql`create index sessions_user on sessions (user_id)`.execute(db);
 
-	// The operator is now a real account with a login, so the stand-in that migration 0003 made is retired. A user is
+	// This migration makes the operator a real account, so the stand-in of migration 0003 is retired. A user is
 	// never erased: it is marked deleted by the system.
 	await sql`update users set deleted_at = now(), deleted_by = (select id from users where username = ${SYSTEM_USERNAME})
 		where username = ${OPERATOR_USERNAME}`.execute(db);

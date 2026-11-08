@@ -1,5 +1,5 @@
-// Opens the database for one command and closes it when the command's work ends, however the work ends. Entry point (the
-// outermost layer): the commands are the only place that opens a connection for a run that ends.
+// Opens the database for one command and closes it when the work ends, however it ends. Entry point (the outermost
+// layer): only the commands use it.
 import type { Kysely } from "kysely";
 import {
 	createDb,

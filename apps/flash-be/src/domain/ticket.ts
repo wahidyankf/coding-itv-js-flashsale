@@ -1,5 +1,5 @@
-// The queue ticket: proof that a shopper went through the queue for a sale. It is a signature, so any instance can make
-// and check it with the shared secret, and it needs no storage that a Redis restart could lose.
+// Domain layer: no I/O. The queue ticket: proof that a shopper went through the queue for a sale. It is a signature,
+// so any instance can make and check it with the shared secret, and it needs no storage that a Redis restart could lose.
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { Username } from "./user.js";
 

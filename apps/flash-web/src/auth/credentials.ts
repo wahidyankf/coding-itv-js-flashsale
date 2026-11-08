@@ -1,4 +1,4 @@
-// The checks the log in and sign up form makes before it sends anything. Pure, so a test can run the rules without
+// Browser only, part of the account feature. The checks the log in and sign up form makes before it sends anything. Pure, so a test can run the rules without
 // rendering the form. The server still has the last word on every check.
 import { Err, Ok, type Result } from "@flash/typekit";
 import { AUTH_TEXT, cleanPassword, cleanUser } from "./messages";

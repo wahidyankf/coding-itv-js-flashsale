@@ -1,8 +1,6 @@
-// Runs one load profile end to end. The phases, in order: start the stack and seed a sale, start the chaos timers and
-// the Postgres sampler, run k6, settle, collect what Postgres, Redis and k6 say, judge the run, and write the report.
-// Usage: node scripts/run.ts <smoke|full|chaos|burst|contention> [--keep] [--calm]
-// --keep leaves the stack running after the run. --calm runs the profile without its Redis timers, as a control.
-// The verdict comes from Postgres and Redis, not from what k6 says it did. k6 is compared with them.
+// Runs one load profile end to end: start the stack and seed a sale, start the chaos timers and the Postgres sampler, run k6, then judge and report.
+// Usage: node scripts/run.ts <smoke|full|chaos|burst|contention> [--keep] [--calm]. --keep leaves the stack running; --calm drops the Redis timers as a control.
+// The verdict comes from Postgres and Redis, not from what k6 says it did.
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { sleep } from "@flash/flash-commons/timers";

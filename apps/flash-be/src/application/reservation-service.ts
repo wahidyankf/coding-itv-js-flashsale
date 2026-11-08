@@ -1,7 +1,6 @@
-// The reserve use case (application layer): an admitted shopper asks for one item of a sale. The sale must be selling and
-// the queue must have admitted the shopper. Then the fast gate decides, and when the gate is down the reservation
-// repository decides alone. The ids, the random draws and the waits come in through the deps, so the service reads no
-// clock of its own and no randomness.
+// The reserve use case (application layer). The sale must be open and the queue must have admitted the shopper. The fast
+// gate decides; when it is down, the reservation repository decides alone. Ids, random draws and waits come in through
+// the deps, so the service reads no clock or randomness of its own.
 import {
 	type BackoffPolicy,
 	backoffDelayMs,
@@ -59,8 +58,7 @@ export type ReservationOptions = {
 // The rebuild lock outlives a normal rebuild, and expires by itself if the instance that holds it dies. Its length is a
 // fact of the rebuild, so it is named here rather than passed in.
 const REBUILD_LOCK_MS = 10_000;
-// A waiting request polls the rebuild with backoff (decision 017): the first wait is at most 25 ms, each later bound
-// doubles, and no bound passes 500 ms. Full jitter draws each wait below its bound.
+// A waiting request polls the gate with backoff and full jitter (decision 017), so waiters do not all retry at once.
 const REBUILD_POLL: BackoffPolicy = { baseMs: 25, capMs: 500 };
 // Tries are counted from one: the first try has no wait before it, so n tries mean n - 1 waits.
 const ONE_TRY = 1;
@@ -142,8 +140,7 @@ function replyFor(answer: Answer, user: Username): ReserveResult {
 	}
 }
 
-// What a rebuild of a sale's reservation state needs: the gate it rebuilds, the Postgres rows it rebuilds from, the clock,
-// the owner token of the lock, and how long a request waits for another instance to do it.
+// The parts a rebuild may use. Nothing else from the service reaches the rebuild.
 type RebuildDeps = Pick<
 	ReservationDeps,
 	"gate" | "repository" | "clock" | "newId"
@@ -183,7 +180,7 @@ async function ensureReady(
 	return polled.isOk();
 }
 
-// Wires the reserve use case. Every part comes in through the deps, so no default reads the clock, the randomness or a timer.
+// Wires the reserve use case. Its deps are the only inputs, so a test can replace any of them.
 export function createReservationService(
 	deps: ReservationDeps,
 ): ReservationService {

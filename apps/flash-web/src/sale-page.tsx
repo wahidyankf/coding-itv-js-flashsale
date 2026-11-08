@@ -1,6 +1,5 @@
-// The sale page: the sale card, the buying card and the account line, put together for a shopper. It is the one place the
-// sale and the account meet, so it sits in src/ and neither the sale nor the account folder imports the other. It also
-// passes the sentences for the error codes to the two hooks.
+// The sale page: the sale card, the buying card and the account line, for one shopper. It sits in src/ because it is the
+// one place the sale and the account meet. The page also passes the error sentences to the two hooks.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AccountBar } from "./auth/account-bar";
 import { AuthCard } from "./auth/auth-card";
@@ -43,7 +42,7 @@ function useLiveSale(
 }
 
 // The page for one load of the sale. `api` is given by tests; the browser builds its own. When a live stream gives up,
-// the page says so, so a shopper reloads rather than trusting words that no longer change.
+// the page says so, so the shopper reloads instead of trusting text that no longer updates.
 export function SalePage({ load, api }: { load: SaleLoad; api?: WebApi }) {
 	const web = useMemo(() => api ?? createWebApi(), [api]);
 	const [liveStopped, setLiveStopped] = useState(false);
@@ -87,8 +86,8 @@ export function SalePage({ load, api }: { load: SaleLoad; api?: WebApi }) {
 	);
 }
 
-// The part of the page that exists only when there is a sale to buy from. It asks who is logged in, and gives the right
-// card what the account is doing: a "checking" line, the login form, or the buying buttons.
+// Shown only when there is a sale to buy from. It asks who is logged in, then shows the card that fits: a "checking"
+// line, the login form, or the buying buttons.
 function SaleShop({
 	sale,
 	web,

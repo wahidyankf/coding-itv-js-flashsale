@@ -1,7 +1,6 @@
-// Entry point (the outermost layer, with main, migrate and seed-sale): the command that makes an operator. Sign-up can
-// only make shoppers, so the first operator comes from here. It checks the options before it opens the database, so a
-// bad option is reported as a usage error even when the database is down. Then it asks the auth use case to make the
-// account, with the system user as its author.
+// Entry point (the outermost layer): the command that makes an operator. Sign-up can only make shoppers, so the first
+// operator comes from here. The options are checked before the database opens, so a bad option is a usage error even
+// when the database is down.
 import { attemptAsync, Err, Ok, type Result } from "@flash/typekit";
 import { failureMessage } from "./adapters/inbound/cli/failure-message.js";
 import {

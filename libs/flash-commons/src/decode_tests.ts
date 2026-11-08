@@ -1,5 +1,4 @@
-// Unit tests for the decoder kit: each primitive on a good value and on the bad ones that matter, the object rules (a
-// missing field, a wrong field, an unknown extra key, an optional key), the tagged union and the path of a nested error.
+// Unit tests for the decoder kit: each primitive, the object rules (missing, wrong, extra and optional keys), the tagged union and the path of a nested error.
 import { Err, Ok } from "@flash/typekit";
 import { describe, expect, it } from "vitest";
 import {
@@ -25,7 +24,7 @@ const WHEN = "2026-06-01T12:00:00.000Z";
 // The error of a value that is wrong at the root, with the given phrase.
 const wrong = (expected: string): DecodeError => ({ path: "", expected });
 
-// The values that are not text, and not a number, and not an object: the ones a bad payload is likely to carry.
+// Values of the wrong type, the ones a bad payload is likely to carry.
 const NOT_TEXT = [1, null, undefined, { text: "a" }];
 const NOT_NUMBER = ["3", null, undefined, Number.NaN];
 

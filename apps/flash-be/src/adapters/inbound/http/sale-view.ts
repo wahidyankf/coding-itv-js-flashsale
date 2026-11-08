@@ -23,7 +23,7 @@ export type AdminSaleView = SaleView & {
 	admitPerSecond: number;
 };
 
-// The public view of a sale, with the status it has at the moment of the read.
+// The public view. The status is passed in, since it depends on the time of the read (`saleStatus`).
 export function describeSale(sale: Sale, status: SaleStatus): SaleView {
 	return {
 		id: sale.id,

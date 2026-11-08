@@ -1,11 +1,11 @@
+// The Vite config of flash-web: TanStack Start, Nitro for the Node server, React and Tailwind. Read by Vite when the app
+// runs or builds. The port is fixed, because the e2e and the demo open the page on it.
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import { nitro } from "nitro/vite";
 import { defineConfig } from "vite";
 
-// The Vite config of flash-web: TanStack Start, Nitro for the Node server, React and Tailwind. The port is fixed, because
-// the e2e and the demo open the page on it.
 // Order matters: tanstackStart() first, then nitro() for the Node server output, then the React plugin. Tailwind builds
 // the stylesheet from the classes in the components.
 export default defineConfig({

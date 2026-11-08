@@ -1,13 +1,13 @@
-// Logins as the rules see them: who a request is from, how long a login lasts, and what a password must be. The
-// cookies that carry a login are the HTTP adapter's concern, and the random tokens come from a TokenSource port; this
-// file only hashes a token and says what a value means.
+// Domain layer. Logins as the rules see them: who a request is from, how long a login lasts, and what a password must
+// be. The cookies that carry a login are the HTTP adapter's concern, and the random tokens come from a TokenSource port;
+// this file only hashes a token and says what a value means.
 import { createHash } from "node:crypto";
 import type { UserId, Username } from "./user.js";
 
 // Who a login may act as. Only an operator may manage sales; a shopper may queue, hold and buy.
 export type Role = "shopper" | "operator";
 
-// Who is making a request: the user row, the name the shopper typed, and what they may do.
+// Who makes a request: the user row, the username and the role. It comes from the session, never from the client.
 export type Principal = { userId: UserId; username: Username; role: Role };
 
 // Only an operator may manage sales. A shopper who is logged in is still a shopper.
@@ -32,8 +32,8 @@ export const PASSWORD_MIN_LENGTH = 8;
 // The longest password the rules accept. The HTTP and CLI edges refuse a longer one before the service hashes anything.
 export const PASSWORD_MAX_LENGTH = 128;
 
-// A password is any text of a usable length. The rules stay short on purpose; a long phrase beats a pattern. The edge
-// checks that the body holds text first, so this rule only reads the length.
+// Accepts any text of a usable length. The rules stay short on purpose: a long phrase beats a pattern.
+// The edge has already checked that the body is text.
 export function usablePassword(raw: string): string | undefined {
 	return raw.length >= PASSWORD_MIN_LENGTH && raw.length <= PASSWORD_MAX_LENGTH
 		? raw

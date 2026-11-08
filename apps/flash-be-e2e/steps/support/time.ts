@@ -1,10 +1,10 @@
-// Time for the e2e steps: the reading of phrases such as "in 2 hours" (re-exported from @flash/flash-commons, where the
-// reader is shared), the windows of a sale, the pauses, and the waits for the API to reach a state. The units come from
-// @flash/flash-commons, so every step says the same thing by "an hour". Both e2e apps use this file.
+// Time for the e2e steps: the reader of phrases such as "in 2 hours", the sale windows, the pauses and the waits for a state.
+// The units and the reader come from @flash/flash-commons, so every step means the same by "an hour". Both e2e apps use this file.
 import { MS_PER_MINUTE, retryAsync } from "@flash/flash-commons";
 import { sleep } from "@flash/flash-commons/timers";
 import { Err, Ok, type Result } from "@flash/typekit";
 
+// The phrase reader of flash-commons, so every step reads "in 2 hours" the same way.
 export { relativeTime } from "@flash/flash-commons";
 
 // The longest a poll waits between two checks. Backoff doubles the wait up to here, so a change is seen within a second.
@@ -35,10 +35,9 @@ function checksFor(window: number, everyMs: number): number {
 	return checks;
 }
 
-// Calls `check` until it returns true, or until `withinMs` has passed, and then throws `failure`. The first check runs at
-// once. Each later check waits a jittered backoff that starts at `everyMs` and doubles up to a second, so a slow state is
-// not hammered. The deadline is what stops the poll. The attempt count is sized from the mean wait, so in expectation the
-// attempts run out at the deadline and not before it. `everyMs` must be above 0, or the count would never grow.
+// Calls `check` until it returns true or `withinMs` has passed, then throws `failure`. The first check runs at once. Each later
+// check waits a jittered backoff from `everyMs`, so a slow state is not hammered. The deadline stops the poll.
+// `everyMs` must be above 0, or the attempt count would never grow.
 export async function pollUntil(
 	check: () => Promise<boolean>,
 	options: { withinMs: number; everyMs: number; failure: string },

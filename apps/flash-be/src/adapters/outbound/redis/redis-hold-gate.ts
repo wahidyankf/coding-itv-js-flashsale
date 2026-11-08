@@ -8,7 +8,7 @@ import type { RedisClient } from "./redis-client.js";
 import { saleKey } from "./redis-keys.js";
 import { arrayReply, UNREADABLE } from "./reply.js";
 
-// The first number that each reply of the scripts below carries, by name.
+// The code each script puts first in its reply. Names keep the bare numbers out of the reading code.
 const GATE_CODE = {
 	soldOut: 0,
 	reserved: 1,

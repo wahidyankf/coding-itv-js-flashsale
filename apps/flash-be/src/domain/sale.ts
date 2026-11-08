@@ -1,5 +1,5 @@
-// A sale as the rules see it: its window, its stock and what has been bought. Each function takes the sale and the
-// moment `now`, and returns a value. Services decide on the Sale with these functions, never on the public view.
+// A sale as the rules see it: its window, its stock and what has been bought. Domain layer: no I/O. Functions take the
+// sale, and the moment `now` where time matters. Services decide on the Sale, never on the public view.
 import { isUuid, MS_PER_SECOND } from "@flash/flash-commons";
 
 // The sale the rules judge: its window, its stock and what has sold. Services decide on this type; the public view is
@@ -19,7 +19,7 @@ export type Sale = {
 	admitPerSecond: number;
 };
 
-// Where a sale stands at one moment: not open yet, open with stock left, open with no stock left, or over.
+// A sale's state at one moment. Each switch over it lists every value, so a new state must be handled at each switch.
 export type SaleStatus = "upcoming" | "active" | "sold_out" | "ended";
 
 // The window decides first: after it closes the sale is ended, even if it sold out. Sold out only
@@ -30,10 +30,8 @@ export function saleStatus(sale: Sale, now: Date): SaleStatus {
 	return sale.sold >= sale.stock ? "sold_out" : "active";
 }
 
-// The sale shoppers are shown: the one whose window holds `now`, else the one that opens next, else none. A sale that
-// has ended is not current any more (it can still be read by its id). Windows never overlap, so at most one is running.
-// The database repeats this rule in `findCurrent` (sale-repository.ts); sale-rules_integration_tests checks both at the
-// same moments.
+// The sale shoppers are shown: the running one, else the next to open, else none. An ended sale is never current.
+// The database repeats this in `findCurrent`; sale-rules_integration_tests checks both at the same moments.
 export function pickCurrent(
 	sales: readonly Sale[],
 	now: Date,
@@ -51,10 +49,10 @@ export function remaining(sale: Sale): number {
 	return Math.max(sale.stock - sale.sold, 0);
 }
 
-// Why a shopper cannot hold an item now.
+// The reasons a hold is refused. Each one follows from the sale's status.
 export type ReserveBlock = "sale_not_started" | "sale_ended" | "sold_out";
 
-// Decided by the sale's status alone, so the reason needs no ticket.
+// It reads only the status, so no ticket is needed to give the reason.
 export function reserveBlock(status: SaleStatus): ReserveBlock | undefined {
 	switch (status) {
 		case "upcoming":
@@ -68,7 +66,7 @@ export function reserveBlock(status: SaleStatus): ReserveBlock | undefined {
 	}
 }
 
-// Why a shopper cannot join the queue now.
+// The reasons a shopper cannot join the queue.
 export type QueueBlock = "sale_ended" | "sold_out";
 
 // A shopper may queue before the sale opens, but not once it is over or sold out.
@@ -84,7 +82,7 @@ export function queueBlock(status: SaleStatus): QueueBlock | undefined {
 	}
 }
 
-// Why a shopper cannot pay for a hold now.
+// The reason a hold cannot be paid for. Only an ended sale refuses.
 export type ConfirmBlock = "sale_ended";
 
 // A hold can be paid for until the sale is over, even when it sold out: the holder already has the item.
@@ -102,7 +100,7 @@ export function confirmBlock(sale: Sale, now: Date): ConfirmBlock | undefined {
 // The fewest shoppers one admission tick lets in. A slow rate still moves the line, one shopper at a time.
 const MIN_ADMITTED_PER_TICK = 1;
 
-// How many shoppers one admission tick lets in, at the sale's rate.
+// How many shoppers one tick lets in, at the sale's rate. Never less than MIN_ADMITTED_PER_TICK.
 export function admissionsPerTick(sale: Sale, tickMs: number): number {
 	return Math.max(
 		MIN_ADMITTED_PER_TICK,

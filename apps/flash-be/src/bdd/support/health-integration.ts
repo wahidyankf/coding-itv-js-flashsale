@@ -48,7 +48,7 @@ export function openHealthIntegration(): {
 			clients ??= openClients();
 			return clients;
 		};
-		// An app over the scenario's clients as they stand now, so a step that swapped a client takes effect.
+		// An app over the scenario's clients at the time of the call, so a step that swapped a client takes effect.
 		const appWith = async (): Promise<FastifyInstance> => {
 			const { db, redis } = await live();
 			const app = buildApp(dependenciesFrom(db, redis, config), {

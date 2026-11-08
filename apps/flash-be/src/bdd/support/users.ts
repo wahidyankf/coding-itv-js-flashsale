@@ -1,10 +1,8 @@
-// Test support: the user name a test writes, as the rule makes it. A test writes "ana" and gets the `Username` that
-// `normalizeUser` makes from it, so the brand holds in the tests as it does in the app. Test support only: the app
-// never builds a name this way. It also gives the crowd of shopper names a scenario queues, the same names the e2e apps use.
+// Test support for user names. `usernameOf` applies the app's rule (`normalizeUser`), so tests and the app agree on a name.
+// `shopperNames` gives the crowd a queue scenario needs, with the names the e2e apps use. The app never calls these.
 import { normalizeUser, type Username } from "../../domain/user.js";
 
-// The name a test logs in, queues or buys with. It throws when the text is not a usable name, which a test never means
-// by it; a test of a name the rule refuses calls `normalizeUser` itself.
+// Throws for text the rule refuses. A test of a refused name calls `normalizeUser` itself.
 export function usernameOf(name: string): Username {
 	const user = normalizeUser(name);
 	if (user === undefined) {

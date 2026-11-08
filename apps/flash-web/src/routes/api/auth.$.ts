@@ -1,4 +1,4 @@
-// The web server's route for the account API. Every method goes to the proxy, which decides what passes.
+// Server only. The web server's route for the account API. Every method goes to the proxy, which decides what passes.
 import { createFileRoute } from "@tanstack/react-router";
 import { proxyToBackend } from "../../proxy";
 

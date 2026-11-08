@@ -6,8 +6,8 @@ import type { LocalRateLimitStore } from "../../../application/ports/rate-limit-
 // instances, but it still protects every instance.
 export function createMemoryRateLimitStore(): LocalRateLimitStore {
 	const windows = new Map<string, { count: number; endsAt: number }>();
-	// The next time the map is swept. A sweep walks every key, so it runs at most once per window, not on each hit: a flood
-	// of distinct keys then costs one pass per window, not one pass per hit.
+	// When the map is swept next. A sweep walks every key, so it runs at most once per window; otherwise a flood of new keys
+	// would cost a full pass per hit.
 	let nextSweepAt = Number.NEGATIVE_INFINITY;
 
 	return {

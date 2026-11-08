@@ -43,7 +43,7 @@ export function memoryHoldGate(clock: Clock): MemoryHoldGate {
 				expiresAt: new Date(own.expiresAt),
 			};
 		}
-		// Inclusive, as the Redis script counts holds from now on, so a hold ending this very millisecond still counts.
+		// Inclusive, as the Redis script is: a hold that ends this very millisecond still counts.
 		const live = [...state.holds.values()].filter(
 			(hold) => hold.expiresAt >= now,
 		).length;

@@ -165,7 +165,7 @@ Then("the copy of the access token is refused", async ({ request }) => {
 	expect((await currentResponse().json()).errorCode).toBe("not_authenticated");
 });
 
-// The 15 minutes pass: the row says so, and so does the cache of the API, which would otherwise answer for a minute.
+// The access token runs out: its row's expiry is set in the past, and the cached session is dropped, so the API cannot answer from its cache.
 When("the access token expires", async ({ request: _request }) => {
 	const token = jar().get("access_token")?.value ?? "";
 	await query(

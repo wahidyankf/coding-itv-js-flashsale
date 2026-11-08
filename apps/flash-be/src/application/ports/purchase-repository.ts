@@ -4,7 +4,7 @@ import type { Purchase } from "../../domain/purchase.js";
 import type { Reservation } from "../../domain/reservation.js";
 import type { Username } from "../../domain/user.js";
 
-// What a commit writes: the sale, the shopper, the hold that was paid for, and the payment's ref.
+// What a commit writes. The payment ref lets a refund name the charge.
 export type CommitInput = {
 	saleId: string;
 	user: Username;

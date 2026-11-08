@@ -1,4 +1,4 @@
-// The sale the server renders on the first visit. It runs on the web server only, asks flash-be for the current sale, and
+// Server only, part of the sale feature. It loads the sale the server renders on the first visit. It runs on the web server only, asks flash-be for the current sale, and
 // tells "no sale" apart from "could not read it", so the page can say which.
 import { callApi } from "../api";
 import { buildConfig } from "../config";

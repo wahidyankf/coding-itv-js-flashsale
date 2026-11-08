@@ -71,10 +71,10 @@ export type ShopScenario = QueueScenario & {
 	saleView: () => Promise<{ status: string; remaining: number }>;
 	setPaymentDeclines: () => Promise<void>;
 	setPaymentDuration: (seconds: number) => Promise<void>;
-	// Another instance sells the last item to this user, behind the back of the scenario.
+	// Another app instance sells the last item to this user, with no call through this app.
 	sellLastItemTo: (user: string) => Promise<void>;
 	wasRefunded: (user: string) => Promise<boolean>;
-	// The sale read cache: its time, a change behind its back, and the public reads.
+	// The sale read cache: its time to live, and a change the cache does not see.
 	setSaleCache: (ms: number) => Promise<void>;
 	setSold: (sold: number) => Promise<void>;
 	readSale: () => Promise<Response>;

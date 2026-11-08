@@ -43,8 +43,8 @@ import { createSaleService } from "./application/sale-service.js";
 import type { Config } from "./config.js";
 
 // How long a request waits for another instance to rebuild a sale's reservation state. Long enough for a rebuild of one
-// sale's holds, short enough that a shopper is not left hanging. The wait and the random draw of the polling are the
-// real timer and Math.random here; the application takes both in and never reads them itself.
+// sale's holds, short enough that a shopper is not left hanging. The real timer and Math.random are passed in here; the
+// application never reads them itself.
 export const REBUILD_WAIT_MS = 3000;
 
 // The settings the wiring reads, named as the configuration names them. They are picked from `Config`, so each name is
@@ -73,9 +73,9 @@ function rateLimitsFrom(settings: WiringSettings): RateLimits {
 	};
 }
 
-// Builds every service the HTTP adapter calls, with the adapter behind each port: Postgres for the records, Redis for
-// the fast state, the memory copies for the rate limit when Redis is down, and the mock payment. `clock` and `cache` are
-// passed by tests, so a scenario can fix the time or change the cache while the app runs.
+// Builds the services the HTTP adapter calls, each over its adapter: Postgres for records, Redis for fast state, memory
+// for the rate limit when Redis is down, and a mock payment. Tests pass `clock` and `cache`, so a scenario can fix the
+// time or change the cache while the app runs.
 export function dependenciesFrom(
 	db: Kysely<Database>,
 	redis: RedisClient,

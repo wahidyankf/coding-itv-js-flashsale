@@ -1,13 +1,9 @@
 // A failure is a value the caller must handle, never an exception it might miss.
 //
-// A fallible function returns Result<T, E>: Ok with its value, or Err with a named fault. The caller takes it apart
-// with match, or with isOk and isErr. map and mapErr change one side and pass the other side on unchanged.
-//
-// Both classes carry both type parameters, so every method has the same signature on Ok and on Err and can be called on
-// the union. They are frozen and their fields are readonly, so a write is a type error and, at run time, a TypeError.
-// The types live here. boundary.ts is the one place a throw becomes one, and index.ts is the public entry.
+// Both classes carry both type parameters, so every method has one signature on Ok and Err and works on the union.
+// They are frozen, so a write fails at run time. boundary.ts is the one place a throw becomes an Err.
 
-// The success side of a Result. It holds the value, and the value is reachable only after isOk or match narrows the union.
+// The success side of a Result. The value is reachable only after isOk or match narrows the union, so a caller cannot skip the check.
 export class Ok<out T, out E = never> {
 	readonly value: T;
 

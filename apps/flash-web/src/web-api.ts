@@ -1,6 +1,5 @@
-// The one set of clients the page uses: the sale, the account, and a way to hear that the login ended. They all share one
-// fetch that renews the login when it has gone. This is the app-wide wiring, so it sits in src/ and neither the sale nor
-// the account imports the other for it.
+// The one set of clients the page uses: sale, account, and a way to hear that the login ended. They share one fetch that
+// renews an expired login. It sits in src/, so neither the sale nor the account folder imports the other.
 import { HTTP_STATUS } from "@flash/flash-commons";
 import { attemptAsync } from "@flash/typekit";
 import { callApi, decodeRefusal, jsonPost, readBody } from "./api";
@@ -9,17 +8,17 @@ import { decodeAccount } from "./auth/types";
 import { createSaleClient, type SaleClient } from "./sale/client";
 import { createWatcher, type Watcher, type WatchOptions } from "./sale/sse";
 
-// Everything the page asks of the web server: the sale, the account, and a way to hear that the login ended.
+// The clients the page uses, in one object, so the login is renewed in one place.
 export type WebApi = {
 	sale: SaleClient;
 	auth: AuthClient;
-	// Calls `listener` when a request found the login gone and a refresh could not bring it back. Returns a way to stop.
+	// Runs `listener` when the login is gone and a refresh could not restore it. Returns a function that removes it.
 	onExpired: (listener: () => void) => () => void;
 };
 
-// Wraps a fetch so that a reply "not_authenticated" is tried once more after the refresh token has been traded for new
-// cookies. The access token lives 15 minutes, so a shopper who waits in the queue would otherwise be thrown out. Several
-// requests that fail together share one refresh, because the refresh token can be used only once.
+// Wraps a fetch to retry a `not_authenticated` reply once, after a refresh. The access token lasts 15 minutes, so a
+// shopper who waits in the queue would otherwise be logged out. Requests that fail together share one refresh, since a
+// refresh token works only once.
 export function withRefresh(
 	base: string,
 	fetcher: typeof fetch,
@@ -40,8 +39,8 @@ export function withRefresh(
 		});
 		return refreshing;
 	};
-	// Only a 401 whose body is a refusal that names `not_authenticated` means the login is gone; any other failure, and a
-	// body that does not decode, is passed back as it is.
+	// Only a 401 that names `not_authenticated` means the login is gone. Other failures, and a body that does not decode,
+	// pass back unchanged.
 	const isLoginLost = async (reply: Response): Promise<boolean> => {
 		if (reply.status !== HTTP_STATUS.unauthorized) return false;
 		const body = await attemptAsync(() => reply.clone().text(), Error);
@@ -58,9 +57,8 @@ export function withRefresh(
 	};
 }
 
-// The clients of the page, all sharing one fetch that renews the login. `base` is empty in the browser and a full address
-// in tests. The event streams use the same fetch, so a stream that finds the login gone renews it too. `live` sets the
-// retry of the streams (the policy, and the sleep and random source for tests); `watch` replaces the streams altogether.
+// The clients of the page, sharing one fetch that renews the login, so the event streams renew it too. `base` is empty in
+// the browser and a full address in tests. `live` sets the stream retry, and `watch` replaces the streams (both for tests).
 export function createWebApi(
 	base = "",
 	fetcher: typeof fetch = fetch,

@@ -44,7 +44,7 @@ function seedArgs(stock: number, startsIn: number, duration: number): string[] {
 	];
 }
 
-// Seeds a sale from the step's numbers, as the CLI does: the arguments are parsed, then the sale is written.
+// Uses the same parse-then-write path as the CLI, so the scenario tests what operators run.
 async function seedFrom(
 	scratch: Kysely<Database>,
 	stock: number,

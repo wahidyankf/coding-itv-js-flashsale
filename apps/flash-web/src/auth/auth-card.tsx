@@ -1,4 +1,4 @@
-// The log in and sign up form for a shopper who is not logged in. It keeps what is typed and what is shown, checks the
+// Browser only, part of the account feature, shown on the sale page. The log in and sign up form for a shopper who is not logged in. It keeps what is typed and what is shown, checks the
 // input, and asks `enter` to send it. The password stays in this component's state and is stored nowhere else.
 import { type FormEvent, useId, useState } from "react";
 import { Spinner } from "../components/spinner";

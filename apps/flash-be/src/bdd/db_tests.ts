@@ -11,7 +11,7 @@ import { SYSTEM_USERNAME } from "../domain/actors.js";
 import { specFile } from "./support/paths.js";
 import { recordingDb } from "./support/recording-db.js";
 
-// A recording database, as the scenarios hold it.
+// The recording database type the scenarios pass around.
 type Recording = ReturnType<typeof recordingDb>;
 
 const TABLES = [
@@ -129,8 +129,7 @@ describeFeature(
 					await runMigrations(db);
 				});
 
-				// Without a database, the unit proof is what the migrations send: the system is inserted as its own author, the
-				// stand-in operator is inserted and then marked deleted, and nothing else is a live user.
+				// Without a database, the proof is the SQL the migrations send, not the rows.
 				Then(
 					"the users table holds only the user {string}",
 					(_ctx, system: string) => {
@@ -172,7 +171,7 @@ describeFeature(
 					await upAuth(db.db);
 				});
 
-				// The unit proof: one product per sale from its name, one user per old user id, and the rows moved over.
+				// Without a database, the proof is the SQL that moves the old rows to the new tables.
 				Then("the sale belongs to a product named {string}", () => {
 					expect(
 						sent(

@@ -1,3 +1,4 @@
+// Tests of the lint rules in biome.json. Each test runs Biome on a sample and checks its exit status and output.
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";

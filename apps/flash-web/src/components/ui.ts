@@ -1,4 +1,4 @@
-// The look of the cards, buttons, fields and messages, shared by the sale and the login so they match. Each value is a
+// Shared UI piece: the look of the cards, buttons, fields and messages of the sale and the login, so they match. Each value is a
 // list of Tailwind classes; the components only name the look they want. Class names are written out in full here,
 // so Tailwind can find them.
 

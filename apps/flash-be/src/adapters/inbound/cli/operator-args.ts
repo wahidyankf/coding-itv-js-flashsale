@@ -10,7 +10,7 @@ import {
 } from "../../../domain/auth.js";
 import { normalizeUser, type Username } from "../../../domain/user.js";
 
-// The two options as typed. A flag that was not given is undefined.
+// The two options as typed. They are checked later, in `operatorInputOf`, so a missing flag stays undefined here.
 export type OperatorArgs = {
 	username: string | undefined;
 	password: string | undefined;
@@ -58,8 +58,8 @@ export function operatorInputOf(
 	return new Ok({ username, password });
 }
 
-// The words the command prints for each refusal. They are part of the command's contract (the demo script reads the
-// "already exists" line), so change them with care. `username` is the name of a taken refusal, already in its usable form.
+// The words the command prints for each refusal. They are part of the contract: the demo script reads the
+// "already exists" line, so change them with care. `username` is used only by `username_taken`, in its usable form.
 export function refusalMessage(
 	error: OperatorRefusal,
 	username: Username | undefined,

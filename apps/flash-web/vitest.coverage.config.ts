@@ -1,7 +1,7 @@
+// The combined coverage run of flash-web: unit and integration tests together, with the 99% floor.
+// Their executed lines are merged, so the thresholds apply to the full run, not to one layer alone.
 import { defineConfig } from "vitest/config";
 
-// Combined coverage: unit and integration tests run together, and their executed lines are merged.
-// Thresholds are enforced here, so they apply to the full run, not to one layer alone.
 export default defineConfig({
 	test: {
 		projects: ["./vitest.config.ts", "./vitest.integration.config.ts"],

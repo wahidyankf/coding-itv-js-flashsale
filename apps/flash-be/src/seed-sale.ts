@@ -17,7 +17,7 @@ async function seed(argv: string[]): Promise<Result<string, string>> {
 	const sale = await attemptAsync(
 		() =>
 			withDb(config.databaseUrl, async (db) =>
-				// The product and the sale are made together, by the system.
+				// The seed command has no operator, so the system user is the author.
 				createSaleSeedService(createSaleSeeder(db)).seed(
 					input.value,
 					await actorId(db, SYSTEM_USERNAME),

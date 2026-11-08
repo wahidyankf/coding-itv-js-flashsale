@@ -1,7 +1,5 @@
-// How the e2e steps call the private API of a scenario: the routes, the request builder, and how a reply is read. The paths
-// are written by hand, as AGENTS.md asks of the e2e apps; a route change must also update the list in
-// docs/how-to/change-an-endpoint.md.
-// Decision: docs/explanation/decisions/016-dry-rule-of-three.md (why the e2e apps write the paths themselves).
+// How the e2e steps call the private API: the routes, the request builder and the reply reader. The paths are written by hand, so a renamed route fails a test.
+// A route change also updates the list in docs/how-to/change-an-endpoint.md. Decision: docs/explanation/decisions/016-dry-rule-of-three.md (why the e2e apps write the paths themselves).
 
 import { FIRST_ERROR_STATUS } from "@flash/flash-commons";
 import type { APIRequestContext, APIResponse } from "@playwright/test";

@@ -1,6 +1,7 @@
+// Vitest config for the BDD checker's tests. They use the repo's *_tests naming, so the default include does not find them.
 import { defineConfig } from "vitest/config";
 
-// Tests for the BDD checker. They use the repo's *_tests naming, so the default include does not find them.
+// Runs the BDD checker's tests from this folder, in Node.
 export default defineConfig({
 	test: {
 		name: "bdd-check",

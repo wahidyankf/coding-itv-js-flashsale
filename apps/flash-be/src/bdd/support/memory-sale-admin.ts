@@ -6,7 +6,7 @@ import type { SaleAdmin } from "../../application/ports/sale-admin.js";
 import type { Sale } from "../../domain/sale.js";
 import { newSale, overlaps } from "../../domain/sale-window.js";
 
-// A sale store in memory, for scenarios that need no database. It changes the list a scenario also reads from.
+// A sale store in memory, for scenarios that need no database. The scenario reads the same list this store changes.
 // `products` maps a product id to its name: the products that exist, which a sale can name.
 export function memorySaleAdmin(
 	sales: Sale[],

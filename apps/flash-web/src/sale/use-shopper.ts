@@ -1,4 +1,4 @@
-// The shopper's buying state, as a hook. It makes the requests (join the queue, take the hold, pay, check) and runs the
+// Browser only, part of the sale feature. The shopper's buying state, as a hook. It makes the requests (join the queue, take the hold, pay, check) and runs the
 // effects (the countdown, the place stream, the stop when the login goes). The rules it applies live in shopper-state.ts.
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ApiFailure } from "../api";
@@ -14,7 +14,7 @@ import {
 } from "./shopper-state";
 import type { Place, SaleStatus } from "./types";
 
-// The countdown ticks this often, so the seconds on screen stay within a fraction of a second of the truth.
+// The countdown ticks this often, so the seconds on screen stay within a fraction of a second of the clock.
 const COUNTDOWN_MS = 250;
 
 // What the shopper hook needs: the sale, its status, the client, the login, and optionally the clock.
@@ -33,7 +33,7 @@ export type ShopperOptions = {
 };
 
 // The clock that the countdown reads. It moves only while an item is held. When the hold runs out, the shopper is told,
-// so the page never counts on an item that is gone.
+// so no countdown runs for an item that is gone.
 function useCountdown(
 	phase: Phase,
 	now: () => number,

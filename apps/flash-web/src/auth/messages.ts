@@ -1,4 +1,4 @@
-// The account's words and rules: the sentences of the log in and sign up form, the sentences for the account's errors,
+// Browser and server, part of the account feature. The account's words and rules: the sentences of the log in and sign up form, the sentences for the account's errors,
 // and the two checks the form makes on a user name and a password. The two checks copy flash-be, and
 // `same_as_be_tests.ts` fails when a copy drifts from it.
 

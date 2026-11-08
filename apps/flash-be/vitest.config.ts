@@ -1,10 +1,11 @@
+// Vitest config for the unit layer, run by `npm run test:unit`. Integration tests have their own config.
 import { defineConfig } from "vitest/config";
 
+// The unit layer's config, read by Vitest through `--config`.
 export default defineConfig({
 	test: {
 		name: "unit",
 		environment: "node",
-		// Unit tests sit next to the source as *_tests.ts.
 		include: ["src/**/*_tests.ts"],
 		exclude: ["node_modules", "dist", "src/**/*_integration_tests.ts"],
 		// Report only. Unit tests alone do not reach 99%; the 99% gate is on the combined run.

@@ -252,7 +252,7 @@ function saleActions(parts: UnitParts, current: () => UnitQueueScenario) {
 		async setSaleCache(ms: number) {
 			parts.cache.ttlMs = ms;
 		},
-		// With no sale named, it is the tick the server runs: for the sale shoppers are shown now.
+		// With no sale named, admit the sale the admission timer picks now, the same rule as GET /sales/current.
 		async admit(saleId?: string) {
 			if (saleId === undefined) {
 				await admitCurrentSale(parts.saleService, parts.queue);

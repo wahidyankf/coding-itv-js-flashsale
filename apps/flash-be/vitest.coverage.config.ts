@@ -1,6 +1,6 @@
+// Vitest config for the combined run, `npm run test:coverage`: unit and integration tests with the 99% gate.
 import { defineConfig } from "vitest/config";
 
-// Combined coverage: unit and integration tests run together, and their executed lines are merged.
 // Thresholds are enforced here, so they apply to the full run, not to one layer alone.
 export default defineConfig({
 	test: {

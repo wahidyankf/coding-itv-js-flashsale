@@ -25,7 +25,7 @@ export function createAccountRepository(
 					role: account.role,
 					created_by: account.createdBy ?? id,
 				})
-				// A user made before accounts existed has a name and no password; its name stays taken.
+				// A row with a name and no password still holds that name, so the name stays taken.
 				.onConflict((conflict) =>
 					conflict
 						.column("username")

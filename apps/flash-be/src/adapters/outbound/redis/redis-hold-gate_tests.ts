@@ -1,5 +1,5 @@
 // Unit tests for the Redis hold gate's reply reading, the arguments it sends, and its owner-checked rebuild lock. A fake
-// client stands in for Redis: the scripts run in Redis, so their end-to-end behaviour is in the integration tests.
+// client replaces Redis: the scripts run in Redis, so their end-to-end behaviour is in the integration tests.
 
 import { Err, Ok } from "@flash/typekit";
 import { describe, expect, it } from "vitest";

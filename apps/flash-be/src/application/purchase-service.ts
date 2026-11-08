@@ -54,12 +54,12 @@ export type PurchaseService = {
 		user: Username,
 		reservationId: string,
 	) => Promise<ConfirmResult>;
-	// "Did I get it?": a purchase, a live hold, or nothing.
+	// The shopper's state: a purchase, a live hold, or nothing.
 	outcome: (saleId: string, user: Username) => Promise<OutcomeResult>;
 };
 
-// The first check of a confirmation: the sale exists and the reservation id is well formed. The text is checked as an
-// id, because it arrives from a client and is only ever looked up. The edge has checked that it is text.
+// The first check of a confirmation: the sale exists and the reservation id is well formed. The id comes from a client,
+// so it is checked as an id here; the edge has already checked that the body is text.
 function wellFormed(
 	found: Sale | undefined,
 	reservationId: string,
@@ -106,10 +106,9 @@ export function createPurchaseService(
 		return isPurchaseOf(found.value, saleId, user) ? found.value : undefined;
 	}
 
-	// Charges the hold, then writes the purchase in the database. A declined charge ends here. A commit that finds the sale
-	// sold out, or the shopper already bought, refunds the charge. A commit that throws is looked up: a purchase found for
-	// the reservation is the answer, and the charge is kept, because the write landed. When no purchase is found, the charge
-	// is refunded and the failure goes on to the caller as before.
+	// Charges the hold, then commits the purchase. A declined charge ends here, and a refused commit refunds the charge.
+	// A commit that throws is looked up: if its purchase exists the charge stays, since the write landed; otherwise the
+	// charge is refunded and the error goes on.
 	async function chargeAndCommit(
 		saleId: string,
 		user: Username,

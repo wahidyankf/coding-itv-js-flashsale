@@ -1,7 +1,5 @@
-// Where a payload from flash-be did not decode: the reply or the stream event it came in, the field, and what that field
-// should have been. The page drops or refuses such a payload, so the shopper sees no sign of it; this report is for the
-// developer, and it goes to the console by default. It never carries the value, because a value may hold a user name,
-// a token or a whole body.
+// Browser and server. Reports a payload from flash-be that did not decode: where it came from, the field, and the type it should have had.
+// The shopper sees nothing, so this goes to the developer's console. It never carries the value, which may hold a user name or a token.
 // Decision: docs/explanation/decisions/018-decode-payloads-at-the-edge.md (why a payload is checked where it arrives).
 
 // One failed decode. `source` is the URL of a reply, or the URL of a stream and the event name of its frame.

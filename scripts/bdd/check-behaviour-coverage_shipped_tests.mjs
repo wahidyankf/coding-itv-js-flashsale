@@ -1,3 +1,4 @@
+// Tests of the behaviour checker as the repo ships it: a copy at scripts/bdd, with the default root and the exit code checked.
 import { spawnSync } from "node:child_process";
 import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";

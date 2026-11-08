@@ -5,11 +5,11 @@ import { HTTP_STATUS } from "@flash/flash-commons";
 import { attemptAsync } from "@flash/typekit";
 import type { FastifyReply, FastifyRequest } from "fastify";
 
-// A comment line, which a client skips.
+// SSE clients skip lines that start with a colon, so this keeps the connection alive without an event.
 const KEEP_ALIVE_FRAME = ": keep-alive\n\n";
 
-// How the stream is paced. The server sets the interval from the configuration; the heartbeat keeps its default. Tests set
-// both.
+// How often the stream reads, and how often it sends a keep-alive. main.ts sets the read interval from the config; the
+// heartbeat keeps its default.
 export type StreamOptions = {
 	// How often the source is read.
 	intervalMs: number;
@@ -21,21 +21,19 @@ export type StreamOptions = {
 // not repeated.
 export type StreamItem = { event: string; data: unknown };
 
-// The pacing a server uses when the configuration does not set it: one read a second, and a keep-alive every 15 seconds.
+// Pacing for when the configuration does not set it. Keep-alives come less often than reads, since they only stop idle timeouts.
 export const DEFAULT_STREAM_OPTIONS: StreamOptions = {
 	intervalMs: 1000,
 	heartbeatMs: 15_000,
 };
 
-// The text of one event as it goes on the wire: its name on one line and its JSON data on the next, then a blank line.
+// Writes one event in the SSE wire format. The blank line at the end tells the client the event is complete.
 export function formatEvent(item: StreamItem): string {
 	return `event: ${item.event}\ndata: ${JSON.stringify(item.data)}\n\n`;
 }
 
-// Turns the request into a Server-Sent Events stream. `read` is called every interval. It returns what to tell the client,
-// or nothing when there is nothing to tell this time (a sale that is gone). The client hears about it only when the
-// result changed. The loop stops when the client goes away. Callers check the request before this, so errors can still
-// be sent as normal JSON replies.
+// Streams what `read` returns to the client, once per interval, and only when it changed. Callers check the request
+// first: once the reply is hijacked, an error cannot be sent as a JSON reply.
 export function serveEvents(
 	request: FastifyRequest,
 	reply: FastifyReply,

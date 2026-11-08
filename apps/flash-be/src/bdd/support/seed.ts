@@ -82,8 +82,8 @@ export async function insertPurchase(
 		.execute();
 }
 
-// Logs a user in without a password, as the database would hold it, and returns the cookie header. The user is made
-// on the way, as a shopper unless the role says otherwise.
+// Makes a login with no password, for tests that need one, and returns its cookie header. A new user is a shopper
+// unless the role says otherwise.
 export async function loginAs(
 	db: Kysely<Database>,
 	username: string,
@@ -113,8 +113,8 @@ export async function loginAs(
 	return `${ACCESS_COOKIE}=${token}`;
 }
 
-// Empties the tables, so each scenario starts with no sale. Only tests do this: the product never erases a row. The two
-// users the migration made stay, and so does every table that nothing here refers to.
+// Empties the tables, so each scenario starts with no sale. Only tests do this, because product code never deletes a row.
+// The two users the migration made stay, and so does every table that nothing here refers to.
 export async function resetSales(db: Kysely<Database>): Promise<void> {
 	await sql`truncate table sessions, sales, purchases, reservations, products cascade`.execute(
 		db,

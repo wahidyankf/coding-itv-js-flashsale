@@ -1,5 +1,4 @@
-// Plain Vitest tests for the cookie jar the apps' tests keep, as a browser would: what a Set-Cookie line says, which cookies
-// a request sends, and the path rule of RFC 6265 section 5.1.4. The cookie names and paths below are the oracle values.
+// Plain Vitest tests for the cookie jar, which follows a browser's rules (RFC 6265 for paths). The cookie names and paths below are the expected values.
 import { describe, expect, it } from "vitest";
 import {
 	applySetCookies,

@@ -21,7 +21,7 @@ export async function openAuthIntegration() {
 		dependenciesFrom(db, redis, {
 			...config,
 			saleCacheMs: 0,
-			// Every scenario signs up from the same address, and the limit has its own scenarios.
+			// The limit is high so the scenarios, which sign up from one address, never hit it. The limit has its own scenarios.
 			authRateLimitPerIp: 100_000,
 		}),
 		{ cookieSecure: false },
@@ -31,7 +31,7 @@ export async function openAuthIntegration() {
 		newWorld: () =>
 			authWorld({
 				app: () => app,
-				// The 15 minutes pass: the row says so, and so must the cache, which would otherwise answer for up to a minute.
+				// The 15 minutes pass for the row and for the cache. The cache would otherwise answer for up to a minute.
 				expireAccess: async (accessToken) => {
 					const hash = hashToken(accessToken);
 					await sql`update sessions set access_expires_at = now() - interval '1 minute' where access_hash = ${hash}`.execute(

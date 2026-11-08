@@ -1,6 +1,5 @@
-// The report of one run: `<profile>.md` in generated-reports/load, with the same text printed to the console. It is the
-// verdict table, the chaos events, and the numbers that are shown for information and not judged. Part of the load runner
-// in scripts/; it is written after the facts are read and judged.
+// The report of one run: `<profile>.md` in generated-reports/load, printed to the console too. It shows the verdict table,
+// the chaos events and the numbers shown for information only. Part of the load runner in scripts/; it is written after the facts are judged.
 import { writeFileSync } from "node:fs";
 import type { Profile, ProfileName } from "../k6/profiles.ts";
 import type { K6Facts } from "./collect.ts";
@@ -24,7 +23,7 @@ export type ReportInput = {
 	samples: Sample[];
 };
 
-// Writes the report of a run to generated-reports/load and prints it.
+// Writes the report and prints the same text, so the file and the console show one result.
 export function writeReport(input: ReportInput): void {
 	const text = renderReport(input);
 	writeFileSync(reportPath(`${input.name}.md`), text);

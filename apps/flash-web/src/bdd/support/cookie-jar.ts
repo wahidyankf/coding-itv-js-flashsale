@@ -7,6 +7,7 @@ import {
 	type CookieJar as Jar,
 } from "@flash/flash-commons";
 
+// The jar a world holds. Named here so the worlds can pass it around without repeating its type.
 export type CookieJar = ReturnType<typeof createCookieJar>;
 
 // Keeps the browser's cookies the way a browser does, so a scenario sees what a shopper's browser would send.

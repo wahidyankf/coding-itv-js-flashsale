@@ -1,7 +1,6 @@
-// Steps that drive the web server from outside: the status of flash-be the web server is shown, the page a visitor opens and
-// what it says, and the plain requests a client sends to the web server. Binds home/app-router.feature,
-// home/backend-status.feature and health/liveness.feature, and the page steps the other flash-web features share. Its After
-// hook runs the shared cleanup, which clears the reply and the scenario's connections, so a scenario starts with neither.
+// Steps that drive the web server from outside: the status of flash-be, the page a visitor opens, and plain requests to the web server.
+// Binds home/app-router.feature, home/backend-status.feature and health/liveness.feature, and the page steps the other flash-web features share.
+// The After hook runs the shared cleanup, so each scenario starts with no reply and no connections.
 
 import type { Page } from "@playwright/test";
 import { expect } from "@playwright/test";

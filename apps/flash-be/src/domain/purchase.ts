@@ -1,4 +1,4 @@
-// A purchase is a hold that was paid for, and the "did I get it?" answer is a purchase, a live hold, or nothing.
+// A purchase is a hold that was paid for. The answer a shopper sees is a purchase, a live hold, or nothing.
 // Domain layer: no I/O. The rules say which hold may be paid for and what a shopper sees; the services ask them.
 import type { Reservation } from "./reservation.js";
 import { isLive } from "./time.js";
@@ -14,7 +14,7 @@ export type Purchase = {
 	purchasedAt: Date;
 };
 
-// Where a shopper stands in one sale: they bought, they hold an item, or neither.
+// What the shopper is shown for one sale. A purchase always wins over a hold.
 export type Outcome =
 	| { state: "purchased"; purchase: Purchase }
 	| { state: "holding"; reservationId: string; expiresAt: Date }
@@ -48,7 +48,7 @@ export function outcomeOf(
 	return { state: "none" };
 }
 
-// Why a hold cannot be paid for now. The hold must be the one this reservation id names, and it must still be live.
+// The reasons a hold cannot be paid for. The id must match the hold, and the hold must still be live.
 export type HoldRefusal = "reservation_not_found" | "hold_expired";
 
 // The reason a hold cannot be paid for, or nothing when it can. `hold` is the shopper's live-or-not hold in the sale;

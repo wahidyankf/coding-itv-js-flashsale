@@ -11,7 +11,6 @@ import type { AccountRepository } from "./ports/account-repository.js";
 import type { PasswordHasher } from "./ports/password-hasher.js";
 import type { SessionRepository } from "./ports/session-repository.js";
 
-// The branches of the auth service that no scenario of a shopper reaches by itself.
 const START = new Date("2026-06-01T12:00:00Z");
 const PASSWORD = "a long password";
 // The system user that makes the first operator. Only the id matters here, so any id will do.
@@ -200,8 +199,7 @@ describe("refreshing", () => {
 	});
 });
 
-// The decoy is the hash an unknown name is checked against. It is made when first needed, so a service that starts with no
-// unknown name pays for no hash and draws no token for one.
+// A service with no unknown login must not pay for a hash, or draw a token, when it starts.
 describe("the decoy hash of an unknown name", () => {
 	it("is made by the first login of an unknown name, not when the service starts", async () => {
 		let hashes = 0;

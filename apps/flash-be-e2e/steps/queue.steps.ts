@@ -74,8 +74,8 @@ Given("the queue is lost", async ({ request: _request }) => {
 	await withRedis(E2E_REDIS_URL, (redis) => redis.flushDb());
 });
 
-// The private API admits on its own timer. A sale that is open admits its first shopper within one tick, so wait for that.
-// A sale that is not open admits nobody, so wait out a tick and a half instead.
+// The private API admits on its own timer. An open sale is polled until it admits the first shopper.
+// A sale that is not open admits nobody, so the step waits 1.5 seconds instead.
 When("admission runs once", async ({ request }) => {
 	const sale = await bodyOf(routes.sale, await saleNow(request));
 	const first = shoppers().joined[0];

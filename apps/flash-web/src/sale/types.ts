@@ -1,7 +1,6 @@
-// The shapes flash-be sends for a sale and a purchase, as the JSON carries them, each with the decoder that checks it. Dates
-// are ISO strings. A decoder runs on every reply and every stream event before the page uses it (api.ts, client.ts and
-// load.ts), so a payload of the wrong shape never reaches the page. The app's own shapes (the page's first load, the API's
-// failure) live in load.ts and api.ts. It sits in the sale feature; the server load and the browser client both use it.
+// The shapes flash-be sends for a sale and a purchase, each with the decoder that checks it. Dates are ISO strings.
+// Each reply and stream event is decoded before the page uses it, so a wrong shape never reaches the page. The app's own
+// shapes are in load.ts and api.ts. It sits in the sale folder; the server load and the browser client both use it.
 import {
 	both,
 	type Decoder,
@@ -51,7 +50,7 @@ export type Place =
 	| { state: "waiting"; place: number }
 	| { state: "admitted" }
 	| { state: "absent" };
-// The three places, each told apart by its state.
+// The three places, each told apart by its `state` field.
 const decodePlace: Decoder<Place> = tagged("state", {
 	waiting: object({ state: literal("waiting"), place: integer }),
 	admitted: object({ state: literal("admitted") }),

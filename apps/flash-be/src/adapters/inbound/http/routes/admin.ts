@@ -18,7 +18,7 @@ export function registerAdminRoutes(
 	const { needOperator, limitAdmin } = createGuards(deps);
 	const guarded = [limitAdmin, needOperator];
 
-	// An operator creates a sale. The window must not overlap another sale.
+	// The admin service refuses a window that overlaps another sale (`sale_overlaps`).
 	app.route({
 		method: "POST",
 		url: "/admin/sales",
@@ -74,7 +74,7 @@ export function registerAdminRoutes(
 		},
 	});
 
-	// An operator removes a sale that nobody has bought from.
+	// A sale with a purchase is refused (`sale_has_purchases`), so only a sale nobody bought from is removed.
 	app.route<{ Params: SaleParams }>({
 		method: "DELETE",
 		url: "/admin/sales/:saleId",

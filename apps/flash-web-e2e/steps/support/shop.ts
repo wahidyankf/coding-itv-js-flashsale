@@ -1,7 +1,5 @@
-// The scenario's side of the web server: which flash-be the web server reaches (through the forwarder), the sale a scenario
-// plans for that flash-be, and the logins its shoppers and operator hold. The planned sale is made on the scenario's own
-// flash-be the first time the page needs the API, through the operator route. Steps that come after the plan may still
-// change it, so it is made late. Shoppers are logged in directly, as other clients would be.
+// The scenario's side of the web server: which flash-be it reaches, the sale the scenario plans, and the logins of its shoppers and operator.
+// The planned sale is made late, the first time the page needs the API, so steps after the plan can still change it. Shoppers log in directly, as other clients would.
 
 import { HTTP_STATUS, MS_PER_HOUR } from "@flash/flash-commons";
 import {
@@ -39,8 +37,7 @@ export const ADMISSION_POLL_MS = 100;
 // True when a step has already chosen where the web server's API address leads.
 const target: { chosen: boolean } = { chosen: false };
 
-// What a scenario said about its sale. The sale is made when the scenario's flash-be starts, so the steps that come after
-// it (a slow queue, a short hold) can still shape it, the way they shape the API's environment.
+// What a scenario says about its sale. The sale is made later, so steps after the plan (a slow queue, a short hold) can still shape it.
 type SalePlan = {
 	stock: number;
 	sold: number;

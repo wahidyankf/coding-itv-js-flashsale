@@ -1,11 +1,10 @@
-// The words a command prints for a failure it could not finish. Inbound CLI adapter: it turns an error into text for the
-// terminal and changes nothing else.
+// Turns a failure into the text a command prints. It is an inbound CLI adapter, so it only formats and changes nothing.
 //
-// A database connection failure can arrive as an AggregateError with an empty message (pg raises it when no address of
-// the database answers), so the operator would see an empty line. The reasons inside it are printed instead.
+// pg raises an AggregateError with an empty message when no database address answers. Printed as is, that would be a
+// blank line for the operator, so the reasons inside it are printed instead.
 
-// The text for a failure. A failure with a message keeps it; an aggregate with none names its reasons, or says the
-// database cannot be reached when it has none.
+// Returns the text to print for a failure. An empty message would be a blank line, so an aggregate with none names its
+// reasons.
 export function failureMessage(error: Error): string {
 	if (error.message !== "" || !(error instanceof AggregateError)) {
 		return error.message;

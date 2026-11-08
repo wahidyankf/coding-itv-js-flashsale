@@ -33,8 +33,8 @@ export type SaleAdminService = {
 		draft: SaleDraft,
 		actor: UserId,
 	) => Promise<Result<SaleWithStatus, CreateSaleError>>;
-	// A sale that has not started can change in every field. Once it has started it keeps its start and can only get more
-	// stock; a sale that is over cannot change (see `changeSaleFrom`).
+	// A sale that has not started can change in every field but the product. Once it has started, it keeps its start and
+	// can only gain stock. A sale that is over cannot change (see `changeSaleFrom`).
 	update: (
 		id: string,
 		patch: SalePatch,
@@ -42,7 +42,7 @@ export type SaleAdminService = {
 	) => Promise<Result<SaleWithStatus, UpdateSaleError>>;
 	// Removes a sale that nobody bought from.
 	remove: (id: string, actor: UserId) => Promise<Result<true, RemoveSaleError>>;
-	// Every sale, for the operator's list.
+	// Every sale, latest start first, for the operator's list.
 	list: () => Promise<SaleWithStatus[]>;
 };
 

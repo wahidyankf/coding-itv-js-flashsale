@@ -1,5 +1,5 @@
-// The line above the buying card that says who is logged in, with the way out. The page shows it only while a shopper is
-// logged in.
+// Browser only, part of the sale page. The line above the buying card that shows who is logged in, and a log-out button. The page shows it only while a
+// shopper is logged in.
 import { MUTED_TEXT, SECONDARY_BUTTON, STRONG_TEXT } from "../components/ui";
 import { AUTH_TEXT } from "./messages";
 

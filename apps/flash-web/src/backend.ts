@@ -1,4 +1,4 @@
-// Asks flash-be whether it is up. Server-side only; the page shows the answer as "ok" or "down".
+// Server only, used by the home route. Asks flash-be whether it is up; the page shows "ok" or "down".
 import { literal, object } from "@flash/flash-commons";
 import { callApi } from "./api";
 import { buildConfig } from "./config";
@@ -22,7 +22,7 @@ export async function fetchBackendHealth(
 	return asked.isOk() ? "ok" : "down";
 }
 
-// Reads the backend address from the given environment, then asks flash-be for its status.
+// The address comes from the environment, so each deploy can point at its own flash-be.
 export function loadBackendStatus(
 	env: NodeJS.ProcessEnv,
 	fetcher: typeof fetch = fetch,

@@ -12,8 +12,8 @@ export type QueuePlace =
 // bought is told so, because the queue can be lost and the purchase record is the proof.
 export type ReserveRefusal = "not_admitted" | "already_purchased";
 
-// Whether a shopper may reserve, given their place in the line (undefined when they are not in it) and whether they
-// already bought. Only an admitted place reserves. A shopper outside the line is refused, unless they bought.
+// The reason a shopper may not reserve, or nothing when they may. Only an admitted place reserves. A shopper outside
+// the line gets `already_purchased` if they bought.
 export function reserveRefusalOf(
 	place: QueuePlace | undefined,
 	bought: boolean,

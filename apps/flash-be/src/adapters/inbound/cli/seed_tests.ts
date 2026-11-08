@@ -9,7 +9,7 @@ const NOW = new Date("2026-06-01T12:00:00Z");
 const UNUSABLE_SALE =
 	"the sale is not usable: its name, window or holds are out of range";
 
-// A bad option is a value the command prints, not an exception: the parser says why and makes no sale.
+// A bad option is a message to print, not an exception: the parser says why and makes no sale.
 describe("parseSeedArgs", () => {
 	it("uses the defaults for everything but the stock", () => {
 		expect(parseSeedArgs(["--stock", "10"], NOW)).toEqual(

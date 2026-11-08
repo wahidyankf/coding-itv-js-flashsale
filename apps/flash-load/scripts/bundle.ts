@@ -11,7 +11,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // The bundled script. It is generated and ignored by Git.
 export const BUNDLE = path.join(root, "k6", ".bundle", "shop.js");
 
-// Writes BUNDLE from k6/shop.ts.
+// Rebuilds BUNDLE from k6/shop.ts before each k6 run, so a run never uses a stale copy.
 export async function bundleShop(): Promise<void> {
 	await build({
 		entryPoints: [path.join(root, "k6", "shop.ts")],

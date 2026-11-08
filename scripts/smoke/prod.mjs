@@ -1,6 +1,6 @@
-// Starts the production stack (compose.prod.yaml) under its own project name, with random secrets and free ports, and
-// walks one shopper through it: an operator (made with the create-operator command) logs in and creates a sale through
-// the API, the shopper signs up, joins, holds an item, pays and asks if they got it, all through the web server. Then the stack and its volumes are removed.
+// Smoke test of the production stack (compose.prod.yaml), under its own project name, with random secrets and free ports.
+// An operator, made with the create-operator command, makes a sale through the API. A shopper then buys through the web server.
+// At the end the stack and its volumes are removed.
 // Usage: npm run smoke:prod   (needs Docker; builds the images, so the first run takes a few minutes)
 import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -14,7 +14,7 @@ const API_INSTANCES = ["flash-be-1", "flash-be-2", "flash-be-3"];
 // The shopper checks the queue this often, this many times, before the run gives up.
 const ADMISSION_CHECK_MS = 500;
 const MAX_ADMISSION_CHECKS = 30;
-// A declined payment is tried again this many times in all.
+// A declined payment is tried up to this many times in total.
 const MAX_PAYMENT_ATTEMPTS = 5;
 const MINUTE_MS = 60_000;
 const TICKET_HEADER = "x-queue-ticket";

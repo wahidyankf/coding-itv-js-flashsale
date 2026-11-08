@@ -37,7 +37,7 @@ export type Config = {
 // The highest port number a TCP address can have.
 const MAX_PORT = 65535;
 
-// The default of each setting that has one. They are the values in .env.example and in the docs; a test holds them.
+// The default of each setting that has one. They are the values in .env.example and in the docs; a test checks them.
 const settingDefaults = {
 	admissionTickMs: 1000,
 	admissionTtlSeconds: 600,
@@ -59,7 +59,7 @@ function setting(env: NodeJS.ProcessEnv, name: string): string | undefined {
 
 // The readers of one environment. Each takes a setting by name, reads it, and refuses a value that breaks its rule.
 function readersOf(env: NodeJS.ProcessEnv) {
-	// A whole number that is at least `min`. The error says the rule, so a bad value says what it needed.
+	// A whole number that is at least `min`. The error names the rule, so the fix is clear.
 	const integerAtLeast = (
 		name: string,
 		fallback: number,

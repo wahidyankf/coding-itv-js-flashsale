@@ -34,9 +34,7 @@ const clientOf = (request: Pick<FastifyRequest, "headers" | "ip">) => ({
 	userAgent: cutUserAgent(request.headers["user-agent"]),
 });
 
-// The cookies of a session, written with the `secure` flag the configuration gives. `loginCookies` sets the access and
-// refresh pair with their lifetimes; `clearedCookies` sends the same names with a lifetime of zero, which the browser
-// drops.
+// Cookies for a login and for a logout. Clearing sends the same names with a zero lifetime, so the browser drops them.
 function cookieJarOf(secure: boolean) {
 	const pair = (
 		access: string,

@@ -1,7 +1,6 @@
-// Reads the options of the seed command (seed-sale.ts) as the CLI sees them: the text becomes a sale the domain accepts,
-// with the defaults the domain names. A bad option is a value the command prints, not an exception. It is an inbound
-// adapter, so it reads the command line and nothing of the database. The seed command checks no overlap with another
-// sale; only an operator's create does.
+// Reads the seed command's options (seed-sale.ts). This inbound adapter turns the text into a sale the domain accepts,
+// with the domain's defaults. A bad option is a message to print, not an exception. The seed does not check for an
+// overlap with another sale; only an operator's create does.
 
 import { parseArgs } from "node:util";
 import { MS_PER_MINUTE } from "@flash/flash-commons";
@@ -19,8 +18,8 @@ import {
 const UNUSABLE_SALE =
 	"the sale is not usable: its name, window or holds are out of range";
 
-// A whole number from a text option. A missing option takes its fallback when it has one; otherwise the text must be a
-// whole number at least `min`, and the refusal names that rule.
+// Options arrive as text, so each one is checked here, before the domain sees it. A missing option uses its fallback
+// when it has one.
 function integer(
 	option: string,
 	raw: string | undefined,
@@ -37,8 +36,7 @@ function integer(
 	return new Ok(value);
 }
 
-// Reads the seed command's options. The window is given in minutes, relative to now. Each refusal is the message the
-// command prints.
+// Turns the seed command's options into a sale, or into the message to print. The window is in minutes from `now`.
 export function parseSeedArgs(
 	argv: string[],
 	now: Date,

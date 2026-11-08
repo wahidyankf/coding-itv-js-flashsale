@@ -85,7 +85,7 @@ export function login(state: FakeState, body: Record<string, unknown>): Reply {
 	return reply(200, account(user), {}, cookiesOf(startSession(state, user)));
 }
 
-// Trades the refresh token for a new pair. The old one works no more. Showing it again ends the login, as flash-be does.
+// Trades the refresh token for a new pair. The old one no longer works. Showing it again ends the login, as flash-be does.
 export function refresh(state: FakeState, cookies: string | undefined): Reply {
 	const token = cookieValue(cookies, REFRESH_COOKIE);
 	const session = state.sessions.find(

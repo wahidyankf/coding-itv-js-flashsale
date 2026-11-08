@@ -1,4 +1,4 @@
-// Builds the router the app renders with, from the generated route tree.
+// Server and browser. TanStack Start builds the router the app renders with, from the generated route tree.
 import { createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
 

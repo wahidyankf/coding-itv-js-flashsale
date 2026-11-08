@@ -1,7 +1,6 @@
-// Guards: the checks a route runs before its handler. They say who is calling, whether the caller is an operator, and
-// whether the caller is over a rate limit, and they refuse with the same replies on every route. A guard that lets a
-// request through keeps the caller's login, and the handler reads it with `principalOf`, so no handler asks again.
-// Inbound HTTP adapter.
+// Guards: the checks a route runs before its handler. They find the caller, check for an operator, and apply the rate
+// limit, all with the same replies. A guard that passes keeps the login, which the handler reads with `principalOf`, so
+// no handler checks again. Inbound HTTP adapter.
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { Dependencies } from "../../../../application/dependencies.js";
 import type { Principal } from "../../../../domain/auth.js";
@@ -12,10 +11,10 @@ import { ERROR_STATUS, errorPayload } from "../errors.js";
 import { TICKET_HEADER } from "../headers.js";
 import { sendError } from "./reply.js";
 
-// The path parameter that every sale route has.
+// The `:saleId` path parameter, typed once for every sale route.
 export type SaleParams = { saleId: string };
 
-// The login of each request that a guard let through, keyed by the request object.
+// The login of each request a guard let through. A WeakMap drops each entry with its request.
 const principals = new WeakMap<object, Principal>();
 
 // The login a guard checked. A route with a guard always has one here, so there is no check for a missing one.
@@ -41,7 +40,7 @@ export const ticketOf = (
 	return typeof ticket === "string" ? ticket : undefined;
 };
 
-// The reply that tells a client over its limit to wait, or nothing when the verdict lets it on.
+// The reply that tells a client over its limit to wait, or nothing when the verdict lets it through.
 function refuseWhenLimited(
 	reply: FastifyReply,
 	verdict: RateLimitVerdict,
@@ -99,7 +98,7 @@ export function createGuards(deps: Dependencies) {
 		principals.set(request, who.value);
 	};
 
-	// The admin routes count by address only, and before anything is read, so a guess is counted too.
+	// The admin routes count by address only, and before anything is read, so a request with no login is counted too.
 	const limitAdmin = async (
 		request: Pick<FastifyRequest, "ip">,
 		reply: FastifyReply,

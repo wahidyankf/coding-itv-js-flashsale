@@ -1,4 +1,4 @@
-// A small ring that turns while something is loading. It says nothing to a screen reader: the words next to it (or the
+// Shared UI piece, used by the sale page and the login form. A small ring that turns while something is loading. It says nothing to a screen reader: the words next to it (or the
 // busy state of the region) carry the message. With reduced motion it stands still.
 export function Spinner() {
 	return (

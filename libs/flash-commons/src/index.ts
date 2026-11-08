@@ -1,8 +1,7 @@
 // The public surface of @flash/flash-commons. Each module is re-exported here, so a caller imports from one place.
 // Only the names below are public; a module's helpers stay private to it.
 
-// The cookie jar the apps' tests keep, as a browser keeps it: what a Set-Cookie line says, the Cookie header a request
-// sends, and the path rule of RFC 6265. A jar is a value; each function returns a new one.
+// The cookie jar the apps' tests use, so a test sends the cookies a browser would. A jar is a value; each function returns a new one.
 export {
 	applySetCookies,
 	type CookieJar,
@@ -37,7 +36,7 @@ export {
 	FIRST_SERVER_ERROR_STATUS,
 	HTTP_STATUS,
 } from "./http-status.js";
-// The reader of the scenarios' time phrases ("in 2 hours", "1 hour ago"), against a moment the caller picks.
+// Reads the scenarios' time phrases against a moment the caller picks, so every layer reads a phrase the same way.
 export { relativeTime } from "./relative-time.js";
 // Retry with backoff, a max attempt count and full jitter. Every retry in the apps follows this one rule, sync or async.
 export {

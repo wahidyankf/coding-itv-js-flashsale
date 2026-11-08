@@ -1,6 +1,5 @@
-// The payment provider of flash-be, which lives in the process: a mock with real retry and refund rules. Outbound adapter
-// for the Payment port. It stands in for a real provider, so the purchase flow can be run end to end without money. It
-// sits behind the Payment port, so the application never sees which provider runs.
+// A mock payment provider that runs in the process, with real retry and refund rules. Outbound adapter for the Payment
+// port, so the purchase flow runs end to end without money, and the application never sees the provider.
 import { sleep } from "@flash/flash-commons/timers";
 import { Err, Ok } from "@flash/typekit";
 import type {
@@ -8,8 +7,8 @@ import type {
 	PaymentResult,
 } from "../../../application/ports/payment.js";
 
-// How the mock behaves: how long a charge takes, how often it declines, and the seams a test uses to replace randomness,
-// waiting and logging.
+// Settings for the mock. The optional `random`, `sleep` and `log` are seams, so a test controls randomness, waiting and
+// logging.
 export type MockPaymentOptions = {
 	latencyMs: number;
 	// Share of charges that are declined, from 0 to 1.
@@ -26,10 +25,8 @@ export type MockPayment = Payment & {
 	settings: { latencyMs: number; failureRate: number };
 };
 
-// A payment provider that lives in the process. It waits `latencyMs`, then accepts or declines at random. A charge
-// is remembered by reservation id while it runs and after it succeeds, so a retry never charges twice. A declined
-// charge is forgotten, so the shopper can try again. A refund forgets the charge too: the money is back, so a retry of
-// the same reservation is a new charge, and the old success is not refunded a second time.
+// A payment provider in the process. A charge is remembered by reservation, so a retry never charges twice. A decline or
+// a refund forgets it, so a new try charges again.
 export function createMockPayment(options: MockPaymentOptions): MockPayment {
 	const random = options.random ?? Math.random;
 	const wait = options.sleep ?? sleep;

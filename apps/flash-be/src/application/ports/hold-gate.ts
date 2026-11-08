@@ -1,6 +1,4 @@
-// Kind: gate (the fast check that answers before Postgres is asked). The gate: the fast, shared answer to "who holds or
-// bought an item of this sale". Redis implements it. Postgres stays
-// the source of truth: when the gate loses its state, a rebuild copies Postgres back into it. Application layer, port.
+// Kind: gate (the fast check that answers before Postgres is asked). Application layer, port.
 import type { Result } from "@flash/typekit";
 import type {
 	GateAnswer,
@@ -11,6 +9,7 @@ import type { Username } from "../../domain/user.js";
 import type { UnreadableReply } from "./reply.js";
 
 // The fast state behind a port: Redis in production, a memory double in tests. Postgres stays the last word on the stock.
+// When the gate loses its state, a rebuild copies Postgres back into it.
 export type HoldGate = {
 	// Asks for a hold. The gate decides the stock and the one hold per shopper in one step, so two requests cannot both
 	// take the last item. An answer that cannot be read is a failure value, never a guess.
@@ -27,8 +26,8 @@ export type HoldGate = {
 	invalidate(saleId: string): Promise<void>;
 	// Replaces the state with the snapshot from Postgres, then marks it ready.
 	restore(saleId: string, snapshot: HoldSnapshot): Promise<void>;
-	// Only one instance rebuilds a sale at a time. True when this caller may rebuild, for `ms`, and it holds the lock under
-	// `owner`. The lock expires by itself, so an instance that dies while it holds the lock does not block the sale.
+	// Only one instance rebuilds a sale at a time. Returns true when this caller got the lock for `ms`, under `owner`.
+	// The lock expires by itself, so an instance that dies while holding it does not block the sale.
 	lockRebuild(saleId: string, ms: number, owner: string): Promise<boolean>;
 	// Releases the lock only when `owner` still holds it. A rebuild that ran past its lock time must not free the lock of
 	// the instance that took over.

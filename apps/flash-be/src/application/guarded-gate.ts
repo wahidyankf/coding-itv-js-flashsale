@@ -1,7 +1,6 @@
-// The hold gate with a memory of trouble (application layer). When a call to Redis fails, or its answer cannot be read,
+// The hold gate that remembers failures (application layer). When a call to Redis fails, or its answer cannot be read,
 // Postgres may have decided something Redis did not see: a hold taken without it, or a purchase it was not told about.
-// Such a sale is marked stale, and the next reservation on it first rebuilds Redis from Postgres. This is the choice of
-// decision 003 (selling without Redis).
+// Such a sale is marked stale, and the next reservation rebuilds it from Postgres first (decision 003).
 import { attemptAsync } from "@flash/typekit";
 import type { HoldGate } from "./ports/hold-gate.js";
 

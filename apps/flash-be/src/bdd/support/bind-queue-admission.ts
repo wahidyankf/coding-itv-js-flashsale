@@ -87,7 +87,7 @@ function admitsRunningSale(layer: ShopLayer): ScenarioBinder {
 		And(
 			"a later sale that opens in 2 hours and closes in 3 hours",
 			async () => {
-				// The scenario keeps talking about the running sale; the later one only has to exist.
+				// The scenario uses the running sale. The later one only has to exist.
 				const running = world.saleId;
 				await world.addSale({
 					startsAt: relativeTime("in 2 hours", layer.now),

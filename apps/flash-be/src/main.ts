@@ -22,7 +22,7 @@ const app = buildApp(deps, {
 	events: { ...DEFAULT_STREAM_OPTIONS, intervalMs: config.eventsIntervalMs },
 });
 
-// Admits the next shoppers of the current sale. Every instance runs this; the store lets one win each tick.
+// Runs on every instance, so the line still moves when one instance is down.
 const admitter = setInterval(async () => {
 	const ticked = await attemptAsync(
 		() => admitCurrentSale(deps.sales, deps.queue),

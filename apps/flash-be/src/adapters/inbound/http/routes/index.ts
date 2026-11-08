@@ -1,6 +1,5 @@
-// The HTTP routes, grouped by area, one file each. This file calls the areas in the order a shopper's visit follows:
-// health, the login, the sale, the queue, the hold, the purchase, and then the operator's routes. The paths, what each
-// route takes and the replies are in docs/reference/http-endpoints.md. Inbound HTTP adapter.
+// The HTTP routes, one file per area. The order follows a shopper's visit, ending with the operator's routes. The paths,
+// inputs and replies are in docs/reference/http-endpoints.md. Inbound HTTP adapter.
 import type { FastifyInstance } from "fastify";
 import type { Dependencies } from "../../../../application/dependencies.js";
 import type { StreamOptions } from "../event-stream.js";

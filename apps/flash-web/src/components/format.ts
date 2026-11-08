@@ -1,4 +1,4 @@
-// How a time of the sale is written. The server and the browser must write the same text for the first render, or React
+// Browser and server. How a time of the sale is written. The server and the browser must write the same text for the first render, or React
 // reports a mismatch, so the first text is fixed (English, UTC). The browser then swaps in the viewer's own time zone
 // and language.
 const UTC = new Intl.DateTimeFormat("en-GB", {
@@ -9,7 +9,7 @@ const UTC = new Intl.DateTimeFormat("en-GB", {
 
 const isDate = (date: Date) => !Number.isNaN(date.getTime());
 
-// A sale time in UTC: the same text on the server and in the browser.
+// The first text of a sale time. Server and browser write the same UTC text, so React sees no mismatch.
 export function formatUtc(iso: string): string {
 	const date = new Date(iso);
 	return isDate(date) ? `${UTC.format(date)} UTC` : iso;

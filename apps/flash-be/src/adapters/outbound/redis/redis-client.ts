@@ -4,11 +4,11 @@
 import { type BackoffPolicy, backoffDelayMs } from "@flash/flash-commons";
 import { createClient } from "redis";
 
-// The reconnect wait: full jitter under a bound that starts at 50 ms, doubles, and stops at 2 s.
+// How the reconnect wait grows: from a small base, doubling, up to a cap (decision 017).
 const RECONNECT_POLICY: BackoffPolicy = { baseMs: 50, capMs: 2000 };
 
-// The wait before reconnect try `retries` (0 for the first try after the drop). The jitter spreads a crowd of clients
-// out when Redis comes back, so they do not all reconnect in the same instant.
+// The wait before reconnect try `retries` (0 for the first try after the drop). Jitter spreads the clients out when
+// Redis returns, so they do not all reconnect at once.
 export function reconnectDelayMs(
 	retries: number,
 	random: () => number,
@@ -16,10 +16,9 @@ export function reconnectDelayMs(
 	return backoffDelayMs(retries, RECONNECT_POLICY, random);
 }
 
-// The strategy node-redis calls after the socket closes. It answers a wait for every cause, a socket timeout included:
-// the node-redis default answers `false` after a timeout and never reconnects, so the API would stay without Redis until
-// it restarted. There is no max attempt count, on purpose: the API must catch up when Redis returns (decision 003), and
-// a client that gave up would need a restart to serve from Redis again.
+// The strategy node-redis calls after the socket closes. It always answers with a wait. The node-redis default answers
+// `false` after a socket timeout, so the client would never reconnect. There is no max attempt count, on purpose: the
+// API must catch up when Redis returns (decision 003).
 export function reconnectStrategy(random: () => number) {
 	return (retries: number, _cause: Error): number =>
 		reconnectDelayMs(retries, random);

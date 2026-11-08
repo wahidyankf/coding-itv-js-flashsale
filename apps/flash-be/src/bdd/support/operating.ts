@@ -19,11 +19,11 @@ export type OperatingLayer = {
 	now: () => Date;
 	// A cookie header for a user who is logged in. The account is made the first time.
 	login: (username: string, role: Role) => Promise<string>;
-	// A shopper bought one item of the sale, behind the API (the layer has no shopper to do it).
+	// A shopper bought one item of the sale, without the API (the layer has no shopper to do it).
 	buyItem: (saleId: string) => Promise<void>;
 	// The sales that were not deleted.
 	salesCount: () => Promise<number>;
-	// A product that exists, made behind the API (there is no route for it), and the products the live sales sell.
+	// A product that exists, made without the API (there is no route for it), and the products the live sales sell.
 	makeProduct: (name: string) => Promise<string>;
 	productsOfSales: () => Promise<string[]>;
 	// The id of whoever deleted the sale, when its row is kept and marked deleted. Nothing when the row is not marked.
@@ -187,7 +187,6 @@ export function operatorWorld(layer: OperatingLayer) {
 		readSale: () =>
 			send(scene, "GET", `/sales/${scene.memory.lastSaleId}`, undefined),
 		readCurrentSale: () => send(scene, "GET", "/sales/current", undefined),
-		// The operator's list.
 		listSales: () => send(scene, "GET", "/admin/sales", "operator"),
 		get saleId() {
 			return scene.memory.lastSaleId;

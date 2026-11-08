@@ -4,7 +4,7 @@ import type { Result } from "@flash/typekit";
 import type { Principal, Role } from "../../domain/auth.js";
 import type { UserId, Username } from "../../domain/user.js";
 
-// A new account: its name, the hash of its password, its role, and the user who made it.
+// The data a new account is stored with. The password arrives already hashed, so the store never sees it.
 export type NewAccount = {
 	username: Username;
 	passwordHash: string;

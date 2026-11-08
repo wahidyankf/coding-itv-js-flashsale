@@ -18,7 +18,7 @@ const COOKIES =
 	"the reply sets an {string} cookie and a {string} cookie, both HttpOnly";
 const LOGGED_IN_AS = "the shopper is logged in as {string}";
 
-// The reply sets a cookie named for each of the two session tokens, HttpOnly and SameSite=Lax.
+// Both session cookies must be HttpOnly and SameSite=Lax, as the rules require.
 function cookies(world: AuthWorld) {
 	return (_ctx: unknown, access: string, refresh: string) => {
 		for (const name of [access, refresh]) {

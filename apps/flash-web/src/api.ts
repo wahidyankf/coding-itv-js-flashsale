@@ -1,6 +1,5 @@
-// What the web app knows about the HTTP API of flash-be: the header names, the failure a reply can carry, and `callApi`,
-// the one call that turns a reply into a `Result`. Every error of the API has the shape `{ errorCode, errorMessage }`,
-// plus `retryAfterSeconds` on a rate limit. Every reply is decoded before the page uses it.
+// Browser and server. The web app's view of flash-be's HTTP API: header names, the failure type and `callApi`. The page and its clients
+// use it. Every API error is `{ errorCode, errorMessage }`, plus `retryAfterSeconds` on a rate limit.
 import {
 	type DecodeError,
 	type Decoder,
@@ -19,7 +18,7 @@ export const RETRY_AFTER_HEADER = "retry-after";
 // The type of a JSON body, as the API expects it on every POST.
 export const JSON_CONTENT_TYPE = "application/json";
 
-// `errorCode` is a code of the API, or `network` or `unexpected`, which only this app makes up.
+// `errorCode` is a code of the API, or `network` or `unexpected`, which only this app sets.
 export type ApiFailure = {
 	errorCode: string;
 	errorMessage: string;
@@ -38,8 +37,8 @@ const UNEXPECTED: ApiFailure = {
 	errorMessage: "The server sent a reply that this app cannot read.",
 };
 
-// The body of every refusal. The wait is whole seconds, as the API counts them; the header that carries it wins (see
-// `retryAfter`). A body with a field of the wrong type is a reply this app cannot read, not a refusal it can show.
+// The body of every refusal. The wait is in whole seconds. The header wins over this field (see `retryAfter`).
+// A body with a field of the wrong type is a reply this app cannot read, so it is not shown as a refusal.
 export const decodeRefusal = object({
 	errorCode: text,
 	errorMessage: text,
@@ -58,8 +57,8 @@ export function jsonPost(
 	};
 }
 
-// Reads the text of a body as JSON, then checks the value with the decoder. A text that is not JSON gives a SyntaxError;
-// a value that does not decode gives a DecodeError that names the field.
+// The one place a body is parsed, so a bad body becomes a value and never a throw. A text that is not JSON gives a
+// SyntaxError; a value that does not decode gives a DecodeError that names the field.
 export function readBody<T>(
 	body: string,
 	decode: Decoder<T>,
@@ -88,10 +87,8 @@ function reportUnreadable(
 	report({ source, path: error.path, expected: error.expected });
 }
 
-// One request. A 2xx reply is the `T` the caller names only when `decode` accepts its body; a reply that does not decode is
-// "unexpected", the same as a reply that is not JSON, so the page never shows a value of the wrong shape. A refusal is read
-// with `decodeRefusal`, and one that does not decode is "unexpected" too. Each such body is passed once to `report`, with
-// the URL and the field, so a developer can see what was wrong; the shopper sees only "unexpected".
+// One request, read into a `Result`. A body that does not decode becomes "unexpected", so the page never shows a value of
+// the wrong shape. Each such body goes once to `report`, with the URL and the field, so a developer can see the fault.
 export async function callApi<T>(
 	fetcher: typeof fetch,
 	url: string,

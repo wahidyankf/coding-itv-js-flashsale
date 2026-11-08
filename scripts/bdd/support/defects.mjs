@@ -1,4 +1,4 @@
-// The corpora behind the checker's bindings. Every layer builds its corpora here, so a rule is
+// The corpora the checker's tests use. Every layer builds its corpora here, so a rule is
 // defined once and run through unit, integration and e2e. Keys match the names in the feature.
 import {
 	E2E_OUTLINE,
@@ -101,6 +101,7 @@ const INTEGRATION_EXEMPT_BOUND = [
 	"",
 ].join("\n");
 
+// A feature with one outline, for the outline corpora.
 export const OUTLINE_FEATURE = [
 	"Feature: Liveness",
 	"",

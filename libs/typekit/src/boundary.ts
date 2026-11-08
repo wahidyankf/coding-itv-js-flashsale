@@ -1,9 +1,5 @@
-// The one place typekit catches an exception, so product code writes no catch of its own.
-//
-// attempt and attemptAsync turn a call that may throw into a Result. The failures to catch are named at the call site as
-// error classes. Only a thrown value that is an instance of one of them becomes Err, and the fault is that value itself.
-// Anything else is thrown on unchanged. There is no default guard and no catch-all, so naming none is a type error and,
-// at run time, a TypeError. It sits between the callers and the Result type in result.ts.
+// The one place typekit catches an exception, so product code needs no catch clause of its own.
+// Only the error classes a caller names become Err. Any other exception is rethrown, so a bug is never hidden as a failure.
 
 import { Err, Ok, type Result } from "./result.js";
 

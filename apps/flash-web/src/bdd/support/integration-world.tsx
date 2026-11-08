@@ -213,7 +213,7 @@ function browserFetchOf(h: Harness): typeof fetch {
 	};
 }
 
-// The page helpers. Each waits for the page, since the answers arrive over real HTTP.
+// Helpers that act on the page. Clicks wait for the button to appear, since answers arrive over real HTTP.
 const fill = (label: RegExp, value: string) =>
 	fireEvent.change(screen.getByLabelText(label), { target: { value } });
 // The page answers "who am I" after it is shown, so a button may need a moment to appear.
@@ -319,7 +319,7 @@ function pageOf(h: Harness, browserFetch: typeof fetch, backendHttp: Server) {
 		pressBuyNow: () => click("Buy Now"),
 		pressCheck: () => click("Check my status"),
 		async pressConfirm() {
-			// The button is enabled once the hold is shown, which can take a moment after the click before it.
+			// The button turns enabled only after the hold shows, which can take a moment after the click.
 			await waitFor(() => {
 				const button = screen.getByRole("button", {
 					name: "Confirm purchase",
@@ -364,7 +364,7 @@ function expectationsOf(h: Harness) {
 				}
 			}, WAIT);
 		},
-		// The page has already said what it shows next (a step before this one waits for it), so the text is read as it is.
+		// An earlier step already waited for the page, so the text is read once, as it is.
 		async expectPageNotSays(text: string) {
 			if (document.body.textContent?.includes(text)) {
 				throw new Error(`the page still says "${text}"`);

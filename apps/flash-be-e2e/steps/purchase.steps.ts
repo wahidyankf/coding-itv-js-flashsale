@@ -1,6 +1,6 @@
 // Steps for the purchase: confirming a hold, what the confirmation answers (a purchase id, a refusal, a time), what a shopper's
-// outcome is (purchased, still holding, or none), the payment (declined, slow, refunded), and an item another instance sold
-// behind the API's back. Binds purchase/confirming.feature and purchase/outcome.feature. The hold itself is in
+// outcome is (purchased, still holding, or none), the payment (declined, slow, refunded), and an item that another instance sold.
+// Binds purchase/confirming.feature and purchase/outcome.feature. The hold itself is in
 // reservation.steps.ts, and the calls every step uses are in support/shoppers.ts.
 
 import { MS_PER_SECOND } from "@flash/flash-commons";
@@ -122,8 +122,8 @@ When("the confirmation finishes", async ({ request: _request }) => {
 	setResponse(await world.pendingConfirm);
 });
 
-// Another instance sells the last item while this payment is still running. It is written to Postgres behind the API
-// and Redis on purpose: a shopper going through the routes would wait as long as the slow payment of this scenario.
+// Another instance sells the last item while this payment is still running. It is written to Postgres and Redis directly, not through the API:
+// a shopper going through the routes would wait for this scenario's slow payment.
 When(
 	/^"([^"]+)" buys the last item$/,
 	async ({ request: _request }, user: string) => {

@@ -1,7 +1,6 @@
-// The request bodies of the HTTP API, decoded at the edge. A route decodes its body with one decoder from this file, and a
-// refusal is answered with the code of its field (`refusalCode`). A use case takes the typed values, never the raw body.
-// The rules a value must meet (a usable name, a usable password) are the domain's, and the decoders call them here.
-// Inbound HTTP adapter. Decision: docs/explanation/decisions/018-decode-payloads-at-the-edge.md.
+// The request bodies of the HTTP API, decoded at the edge, so a use case gets typed values and never the raw body. A
+// refusal is answered with the code of its field (`refusalCode`). The rules a value must meet belong to the domain; the
+// decoders call them. Inbound HTTP adapter. Decision: docs/explanation/decisions/018-decode-payloads-at-the-edge.md.
 import {
 	type DecodeError,
 	type Decoder,
@@ -29,19 +28,19 @@ const newPassword: Decoder<string> = refine(
 	`a password of ${PASSWORD_MIN_LENGTH} to ${PASSWORD_MAX_LENGTH} characters`,
 );
 
-// The body of a sign-up. The name is checked before the password, as the API has always answered: `object` stops at the
-// first field that is refused.
+// The body of a sign-up. The name is checked first, and `object` stops at the first refused field, so a reply names one
+// field.
 export const signUpBody = object({ username: userName, password: newPassword });
 
 // The body of a login. A name the rule refuses is refused as a wrong login, not as a bad name, so a reply never says
 // which part was wrong. The password is only read as text: any wrong password is a wrong login.
 export const loginBody = object({ username: userName, password: text });
 
-// The body of a purchase. The id is read as text here; its shape is checked after the sale is found, as it always was.
+// The body of a purchase. The id is read as text here, and its shape is checked after the sale is found.
 export const reservationBody = object({ reservationId: text });
 
-// The body of a new sale. The types are checked here; the window, the stock and the rates are the domain's rules, and
-// the dates stay text so the domain reads them as it always has.
+// The body of a new sale. Types are checked here; the window, stock and rates are domain rules. Dates stay text, because
+// the domain parses them.
 export const saleDraftBody = object({
 	productId: optional(text),
 	name: optional(text),
@@ -72,8 +71,7 @@ const SIGN_UP_FIELDS = {
 export const signUpRefusal = (error: DecodeError): ErrorCode =>
 	refusalCode(error, SIGN_UP_FIELDS, "invalid_user");
 
-// The code a refused body answers with. The first part of the error's path names the field, and that field's code is
-// used when `fields` has one. Any other refusal, such as a body that is not an object, gets the code of the whole body.
+// The code a refused body answers with: the field's own code when `fields` has one, else the code of the whole body.
 export function refusalCode(
 	error: DecodeError,
 	fields: Partial<Record<string, ErrorCode>>,

@@ -16,7 +16,7 @@ const COPY = "the shopper keeps a copy of the tokens";
 const COPY_REFUSED = "the copy of the access token is refused";
 const LOGGED_IN_AS = "the shopper is logged in as {string}";
 
-// The reply sets a cookie named for each of the two session tokens, each HttpOnly.
+// Both session cookies must be HttpOnly, so page scripts cannot read them.
 function cookies(world: AuthWorld) {
 	return (_ctx: unknown, access: string, refresh: string) => {
 		for (const name of [access, refresh]) {
@@ -27,7 +27,6 @@ function cookies(world: AuthWorld) {
 	};
 }
 
-// The account the reply shows: its name and its role.
 function account(world: AuthWorld) {
 	return (_ctx: unknown, name: string, role: string) => {
 		expect(responseOf(world).json()).toEqual({ username: name, role });

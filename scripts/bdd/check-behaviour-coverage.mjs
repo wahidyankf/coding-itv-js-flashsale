@@ -1,9 +1,6 @@
 #!/usr/bin/env node
-// Static check of the Gherkin corpus under specs/ against its bindings.
-// It fails when a scenario is not bound at a layer it must be bound at, or when an exemption is invalid.
-// Bindings are read from source text, so the check is fast and needs no database or browser.
-// The parts live beside this file: behaviour-scenarios (the Gherkin), behaviour-exemptions, behaviour-bindings,
-// behaviour-files and behaviour-report. This file runs them in order and writes the report.
+// Static check of the Gherkin corpus under specs/ against its bindings. It fails when a scenario is not bound where it must be, or an exemption is invalid.
+// Bindings are read from source text, so no database or browser is needed. The behaviour-*.mjs files beside it are its parts; this file runs them in order.
 import { realpathSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";

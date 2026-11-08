@@ -1,5 +1,5 @@
-// A short in-process cache in front of the sale reads. It only ever answers reads for shoppers' pages; the rules that
-// decide a write always read the sale fresh (see sale-service).
+// A short in-process cache in front of the sale reads (application layer). It only answers reads for shoppers' pages;
+// the rules that decide a write always read the sale fresh (see sale-service).
 import type { Sale } from "../domain/sale.js";
 import type { Clock } from "./ports/clock.js";
 import type { SaleRepository } from "./ports/sale-repository.js";
@@ -10,9 +10,8 @@ export type SaleCacheSettings = { ttlMs: number };
 
 type Entry = { sale: Sale; expiresAt: number };
 
-// Keeps what the repository returned for `ttlMs`, so a crowd that watches the sale costs one read per interval and
-// not one per shopper. Only reads go through it. A sale that is not found is not kept, so a sale created a moment
-// later shows at once. A read that is already running is shared by the callers that arrive meanwhile.
+// Keeps what the repository returned for `ttlMs`, so a crowd of shoppers costs one read per interval, not one per shopper.
+// A missing sale is not kept, so a sale created a moment later shows at once.
 export function createCachedSaleRepository(
 	inner: SaleRepository,
 	settings: SaleCacheSettings,

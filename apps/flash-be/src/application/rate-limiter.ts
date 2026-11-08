@@ -1,6 +1,6 @@
-// The rate limit use case (application layer): how many write requests one shopper, one address, or one login address may
-// make in a window. The counts live in a shared store (Redis). When it fails, a local store counts instead, so an outage
-// never switches the limit off. The rules that judge a count are the domain's (domain/rate-limit).
+// The rate limit use case (application layer): how many write requests a shopper or an address may make in one window.
+// The counts live in a shared store (Redis). When it fails, a local store counts instead, so an outage never switches the
+// limit off. The rules that judge a count are the domain's (domain/rate-limit).
 
 import { MS_PER_SECOND } from "@flash/flash-commons";
 import { attemptAsync } from "@flash/typekit";
@@ -12,7 +12,7 @@ import type {
 	RateLimitStore,
 } from "./ports/rate-limit-store.js";
 
-// The limits from configuration, with one window for all of them. A test copies and changes them in place to reach a limit.
+// The limits from configuration, with one window for all of them. A test passes its own values to reach a limit.
 export type RateLimits = {
 	windowSeconds: number;
 	// Requests per shopper, per sale, in one window.

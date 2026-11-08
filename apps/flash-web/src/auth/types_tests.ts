@@ -1,5 +1,4 @@
-// Unit tests for the account's decoder: the account as flash-be sends it, and the bad ones (a role that is not one of the
-// two, a name that is empty, a missing field).
+// Unit tests for the account decoder: a valid account decodes, and each bad field is refused.
 import { Err, Ok } from "@flash/typekit";
 import { describe, expect, it } from "vitest";
 import { decodeAccount } from "./types";

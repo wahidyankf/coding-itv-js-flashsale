@@ -91,7 +91,7 @@ When(
 );
 
 // The operator moves the start of a sale that has not opened. The private API admits on its own timer, so the shopper is
-// admitted within a tick.
+// admitted within one admission tick.
 When("the sale opens", async ({ request }) => {
 	await patchSale(request, currentSaleId(), {
 		startsAt: new Date(Date.now() - MS_PER_HOUR).toISOString(),

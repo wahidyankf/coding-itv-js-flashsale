@@ -6,7 +6,7 @@ import { createBdd } from "playwright-bdd";
 
 const { Given, When, Then } = createBdd();
 
-// The visitor fills the form as a person would, in the form that is asked for.
+// Fills in the form as a person would, so the step checks the real page.
 When(
 	/^the visitor (logs in|signs up) as "([^"]*)" with the password "([^"]*)"$/,
 	async ({ page }, action: string, user: string, password: string) => {

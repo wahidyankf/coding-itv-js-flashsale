@@ -23,8 +23,8 @@ async function answered(
 	return result.value;
 }
 
-// A rebuild must also bring back the buyers, not only the holds. No scenario buys yet at this layer, so this test
-// writes a purchase row directly and rebuilds a real Redis from it.
+// A rebuild must also bring back the buyers, not only the holds. No scenario reaches a purchase at this layer, so this
+// test writes a purchase row directly and rebuilds a real Redis from it.
 const db = createDb(config.databaseUrl);
 const redis = await createRedis(config.redisUrl);
 

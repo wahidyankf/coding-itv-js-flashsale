@@ -15,7 +15,7 @@ export function liveUserByName(db: Kysely<Database>, username: string) {
 		.where(live("users"));
 }
 
-// The user as the rest of the code knows them: the id, the name and the role, and nothing else.
+// Only the id, the name and the role leave the database layer, so a password hash never goes further.
 export function toPrincipal(
 	row: Pick<Selectable<Database["users"]>, "id" | "username" | "role">,
 ): Principal {
@@ -26,10 +26,7 @@ export function toPrincipal(
 	};
 }
 
-// The id of the live user with this name. A user who is logged in has a row from the sign-up, so this is one read. The
-// insert is a fallback for a name that has no row yet (a hold written for a name that never signed up, as the rebuild
-// and some tests do); that row has no password, so it cannot log in. A race between two first requests is settled by the
-// unique index on live names.
+// The id of the live user with this name, made if there is none. A new row has no password, so it cannot log in.
 export async function ensureUser(
 	db: Kysely<Database>,
 	username: string,

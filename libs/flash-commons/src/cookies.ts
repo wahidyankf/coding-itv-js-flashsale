@@ -1,6 +1,5 @@
-// The cookie jar the apps' tests keep, as a browser keeps it: what a Set-Cookie line says, which cookies a request sends,
-// and the path rule of RFC 6265 section 5.1.4. Pure: a jar is a value, and each function returns a new one.
-// It keeps one cookie per name, as the test copies did, and it reads Max-Age but not Expires (no app sends Expires).
+// The cookie jar the apps' tests use, so a test sends the cookies a browser would. Pure: a jar is a value, and each function returns a new one.
+// It keeps one cookie per name and reads Max-Age, not Expires, because no app sends Expires.
 
 // One Set-Cookie line, read. `path` is absent when the line names no path, or names one that does not start with "/".
 // `expired` is true when the line empties the cookie (Max-Age of zero or less), so a client forgets it.
@@ -12,7 +11,7 @@ export type SetCookie = {
 	expired: boolean;
 };
 
-// What the jar keeps of one cookie: its value, and the path it is sent to.
+// The path is kept so the jar sends a cookie only to the requests it belongs to.
 export type StoredCookie = { value: string; path: string };
 
 // The cookies a client holds, by name.
@@ -23,7 +22,7 @@ export type CookieJar = Map<string, StoredCookie>;
 const DEFAULT_PATH = "/";
 // A Max-Age of zero or less makes the cookie expire at once (RFC 6265 section 5.2.2 and 5.3).
 const EXPIRED_AGE = 0;
-// The text a Max-Age value must be: a whole number, optionally negative.
+// A Max-Age must be a whole number. Without this test, an empty value would read as zero and expire the cookie.
 const WHOLE_NUMBER = /^-?\d+$/;
 
 // One attribute of a Set-Cookie line, split at its first equals sign. The name is lower case, since attribute names are
@@ -37,7 +36,7 @@ function attributeOf(attribute: string): [name: string, value: string] {
 	];
 }
 
-// Reads one Set-Cookie line: the name and value before the first `;`, then the attributes after it.
+// Reads one Set-Cookie line into fields, so the jar and the tests read a reply the same way.
 export function parseSetCookie(line: string): SetCookie {
 	const [pair = "", ...attributes] = line.split(";").map((part) => part.trim());
 	const at = pair.indexOf("=");
@@ -59,9 +58,8 @@ export function parseSetCookie(line: string): SetCookie {
 	};
 }
 
-// Whether a cookie set for `cookiePath` is sent with a request to `requestPath` (RFC 6265 section 5.1.4): the paths are
-// equal, or the cookie path is a prefix of the request path that ends at a "/". So "/auth" matches "/auth" and "/auth/me",
-// and not "/authx"; "/" matches every path. The request path has no query string.
+// Whether a cookie set for `cookiePath` is sent with a request to `requestPath` (RFC 6265 section 5.1.4). `/auth` matches `/auth` and `/auth/me`, not `/authx`.
+// The request path has no query string.
 export function pathMatches(cookiePath: string, requestPath: string): boolean {
 	if (requestPath === cookiePath) return true;
 	if (!requestPath.startsWith(cookiePath)) return false;
@@ -70,8 +68,7 @@ export function pathMatches(cookiePath: string, requestPath: string): boolean {
 	);
 }
 
-// The jar after a reply's Set-Cookie lines: each line keeps its cookie, and an expired one is forgotten. A line with no
-// name is ignored, as a browser ignores it. The jar given is not changed, so a copy kept before a reply stays as it was.
+// Returns the jar after a reply's Set-Cookie lines, as a browser keeps them. The jar given is not changed, so a copy kept before the reply stays as it was.
 export function applySetCookies(
 	jar: CookieJar,
 	setCookies: readonly string[],

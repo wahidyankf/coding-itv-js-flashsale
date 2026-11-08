@@ -1,3 +1,4 @@
+// Unit tests of the behaviour checker. Each test calls the checker in-process on a temp corpus.
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";

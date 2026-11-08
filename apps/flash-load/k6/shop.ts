@@ -25,7 +25,7 @@ const SALE_ID = __ENV.SALE_ID ?? "";
 // The path of the sale. Every request for the sale starts with it.
 const SALE_PATH = `/sales/${SALE_ID}`;
 
-// The API, as the shopper meets it. A refusal is `{ errorCode, errorMessage }` with the status that goes with it.
+// The names the API uses for the queue ticket and the login. They are written here, not imported, so a renamed header fails this test.
 const TICKET_HEADER = "x-queue-ticket";
 const ACCESS_COOKIE = "access_token";
 // The state the queue gives a shopper once they may buy.
@@ -39,7 +39,7 @@ const BYTE_BITS = 8;
 const MAX_JOIN_RETRIES = 3;
 // The place is checked this many times, a second or two apart, before the shopper stops waiting.
 const MAX_POLLS = 90;
-// A declined payment is tried this many times in all.
+// A declined payment is tried up to this many times in total.
 const MAX_PAYMENT_ATTEMPTS = 3;
 // The tries of a join: the first one, then the retries.
 const JOIN_TRIES = 1 + MAX_JOIN_RETRIES;
@@ -47,11 +47,8 @@ const JOIN_BASE_MS = 2_000;
 const JOIN_CAP_MS = 8_000;
 const PAYMENT_BASE_MS = 600;
 const PAYMENT_CAP_MS = 2_400;
-// The waits between retries are exponential with full jitter (flash-commons `retry`), so a crowd of refused shoppers
-// does not come back in step. Full jitter draws each wait from zero up to its bound, so the mean is half the bound. The
-// bases were doubled from the first version, when the mean of the first join wait was half a second. Now it is about a
-// second, as the old fixed pause was, and the mean of the first payment wait is about 0.3 s. The caps keep a shopper
-// from stalling: a join waits at most 8 seconds, a declined payment at most 2.4.
+// Refused shoppers wait with exponential backoff and full jitter (flash-commons `retry`), so they do not all come back at once.
+// The caps keep a shopper from stalling for long.
 const JOIN_BACKOFF = { baseMs: JOIN_BASE_MS, capMs: JOIN_CAP_MS };
 const PAYMENT_BACKOFF = { baseMs: PAYMENT_BASE_MS, capMs: PAYMENT_CAP_MS };
 // The share of buyers who press confirm a second time.
@@ -65,7 +62,7 @@ const LATECOMER_MAX_VUS = 200;
 const LAPSE_MARGIN_SECONDS = 2;
 // How many joins one hammering shopper sends.
 const HAMMER_REQUESTS = 60;
-// A pause is a fixed time plus a random part, in seconds, so shoppers do not move in step.
+// A pause is a fixed time plus a random part, in seconds, so shoppers do not move together.
 type Pause = { min: number; spread: number };
 const POLL_PAUSE: Pause = { min: 1, spread: 1 };
 const THINK_BEFORE_PAYING: Pause = { min: 0.2, spread: 0.8 };
@@ -160,7 +157,7 @@ function errorOf(answer: Answer): string | undefined {
 		: undefined;
 }
 
-// Every shopper has one password, which no account of this stack protects anything with.
+// All shoppers share one password. The accounts exist only in this test stack, so the password guards nothing.
 const PASSWORD = "load-test-password";
 
 // One request. The shopper's address goes in X-Forwarded-For, which the API trusts behind the proxy, so each shopper is
@@ -256,8 +253,7 @@ function saleIsOver(ip: string): boolean {
 	return sale?.status === "sold_out" || sale?.status === "ended";
 }
 
-// Waits to be let in. The page does the same by following the place stream. The shopper also reads the sale, because
-// the queue stops admitting when the sale is over or sold out, and a shopper who is not admitted then stops waiting.
+// Waits to be let in, as the page does by following the place stream. It also reads the sale: a sale that is over or sold out admits nobody, so the wait must end.
 // Returns true when the shopper is admitted.
 function waitForAdmission(me: Visit, joinedState: string): boolean {
 	let state = joinedState;
@@ -307,7 +303,7 @@ function buy(
 	});
 }
 
-// Confirms the purchase. A declined payment (402) is tried again, with backoff, up to MAX_PAYMENT_ATTEMPTS in all.
+// Confirms the purchase. A declined payment (402) is tried again, with backoff, up to MAX_PAYMENT_ATTEMPTS in total.
 // Returns the last reply. Only a declined payment is sent again.
 function payForItem(me: Visit, reservationId: string | undefined): Answer {
 	const confirm = (): Result<Answer, Answer> => {

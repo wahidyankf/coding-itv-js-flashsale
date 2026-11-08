@@ -6,7 +6,7 @@ import type { Sale } from "../../../domain/sale.js";
 import type { Database } from "./database.js";
 import { live } from "./queries.js";
 
-// A sale row, as the domain knows a sale. The column names are the database's; the fields are the domain's.
+// Turns a sale row into the domain's `Sale`, so no column name leaves the adapter.
 export function toSale(row: Selectable<Database["sales"]>): Sale {
 	return {
 		id: row.id,

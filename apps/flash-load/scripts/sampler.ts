@@ -4,8 +4,7 @@
 import { spawn } from "node:child_process";
 import { composeArgs, psqlArgs } from "./compose.ts";
 
-// One reading of the Postgres sessions: how many wait on a lock, how many are active, and how many sit idle in a
-// transaction.
+// One reading of the Postgres sessions, taken while k6 runs. The report keeps the worst value of each count.
 export type Sample = { locked: number; active: number; idle: number };
 
 // A running sampler. stop() ends the asking and returns every sample, so the report can show how the database behaved.

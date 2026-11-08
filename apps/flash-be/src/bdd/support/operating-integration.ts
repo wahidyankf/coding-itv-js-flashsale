@@ -30,7 +30,7 @@ export function integrationOperatingWorld(
 				.where("id", "=", saleId)
 				.execute();
 		},
-		// Rows marked deleted are not sales any more.
+		// Count only live rows: a removed sale stays in the table, marked deleted.
 		salesCount: async () =>
 			(
 				await db

@@ -1,6 +1,5 @@
-// Kind: repository (a record kept in Postgres, which survives a Redis outage). The logins that are open. Only hashes of
-// tokens come in and out, so a copy of the table cannot be used to log in. Redis may cache an answer from here (see
-// redis-session-cache), but Postgres has the last word. Application layer, port.
+// Kind: repository (a record kept in Postgres, which survives a Redis outage). The logins that are open. Redis may cache
+// an answer from here (see redis-session-cache), but Postgres has the last word. Application layer, port.
 import type { Principal } from "../../domain/auth.js";
 import type { UserId } from "../../domain/user.js";
 
@@ -10,7 +9,7 @@ export type ClientInfo = {
 	userAgent?: string | undefined;
 };
 
-// A new login: who it is for, and the hashes and end times of its two tokens.
+// A new login. It holds the hashes of its two tokens, never the tokens.
 export type NewSession = ClientInfo & {
 	userId: UserId;
 	accessHash: string;
@@ -39,9 +38,9 @@ export type SessionRepository = {
 		accessHash: string,
 		now: Date,
 	) => Promise<{ principal: Principal; expiresAt: Date } | undefined>;
-	// Swaps in a new pair when the refresh token is the current one of an open session. The same token used a second time
-	// ends the session, because only a copy of it can come back. There is no principal then, and when the token is unknown
-	// or expired. `ended` lists the access hashes that stopped working, so a cache can forget them.
+	// Swaps in a new pair for the current refresh token of an open session. A token used a second time ends the session,
+	// because only a copy of it can come back. No principal means the token is unknown, expired or reused. `ended` lists
+	// the access hashes that stopped working, so a cache can forget them.
 	rotate: (rotation: Rotation) => Promise<{
 		principal: Principal | undefined;
 		ended: string[];

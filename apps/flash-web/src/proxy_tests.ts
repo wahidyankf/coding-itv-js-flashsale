@@ -40,7 +40,7 @@ describe("isAllowed", () => {
 		["GET", `/sales/${ID}/purchases/me/extra`],
 		["GET", "/sales/not-a-sale-id"],
 		["GET", "/sales/%E0%A4%A"],
-		// Who the shopper is comes from the cookie, so a name in the address is not a route any more.
+		// The shopper comes from the cookie, so a name in the address is not a route.
 		["GET", `/sales/${ID}/queue/ana`],
 		["GET", `/sales/${ID}/queue/ana/events`],
 		["GET", `/sales/${ID}/purchases/ana`],

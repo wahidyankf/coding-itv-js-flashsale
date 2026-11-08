@@ -23,7 +23,6 @@ export type AuthLayer = {
 
 type Jar = CookieJar;
 
-// The cookies of a reply, one per `set-cookie` header.
 const setCookiesOf = (reply: Response): string[] => {
 	const header = reply.headers["set-cookie"];
 	return header === undefined ? [] : [header].flat().map(String);
@@ -77,7 +76,7 @@ export function authWorld(layer: AuthLayer) {
 		keepCopy: () => {
 			copy = new Map(jar);
 		},
-		// Someone who is not logged in: an empty jar.
+		// No cookies, so the reply is the one a visitor who is not logged in gets.
 		anonymous: (method: "GET" | "POST", url: string) =>
 			send(method, url, { from: new Map() }),
 		// The copy of the tokens from before, sent as a thief would send it. What the reply sets does not reach the jar.

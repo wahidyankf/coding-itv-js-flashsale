@@ -26,7 +26,7 @@ import {
 import { ensureUser } from "./users.js";
 
 // Saves or renews the hold of one user. A shopper has at most one live hold in a sale; a renewal keeps the row and
-// records who renewed it. Only live rows count, so the conflict names the same partial index.
+// records who renewed it. Only live rows count, which matches the partial unique index the conflict uses.
 async function upsertHold(
 	db: Kysely<Database>,
 	hold: {
@@ -127,10 +127,9 @@ async function shopperStateOf(
 	};
 }
 
-// The Postgres fallback, under the sale's row lock. The steps run in this order, and the order is the rule: the lock
-// first, then the rebuild check, then the purchase and the own hold, then the count of the others only when those give
-// no answer, and only then the write. A sale that is gone answers `sale_not_found`, so a removal during a request is a
-// value, not a failure.
+// The Postgres fallback, under the sale's row lock. The order of the steps is the rule: lock, rebuild check, purchase and
+// own hold, then the count of the others, then the write. A removed sale answers `sale_not_found` as a value, not a
+// failure.
 async function reserveUnderLock(
 	trx: Kysely<Database>,
 	request: ReserveRequest,
@@ -143,7 +142,7 @@ async function reserveUnderLock(
 	if (ready.isOk() && ready.value) return { kind: "gate_ready" };
 
 	const userId = await ensureUser(trx, request.user);
-	// The purchase and the own hold answer most repeats without a count of the other holds.
+	// The purchase and the own hold often answer without counting the other holds.
 	const early = earlyReservationAnswer(
 		await shopperStateOf(trx, request, userId),
 		request,

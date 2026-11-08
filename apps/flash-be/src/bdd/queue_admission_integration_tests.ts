@@ -18,7 +18,8 @@ const steps = bindQueueAdmission(integrationShopLayer(real.scenario));
 describeFeature(
 	await loadFeature(specFile("flash/be/behaviours/queue/admission.feature")),
 	({ Scenario, BeforeEachScenario }) => {
-		// The server admits the sale shoppers are shown, so sales left by an earlier scenario must not be there.
+		// The server admits shoppers to the sale it shows now. A sale left by an earlier scenario could be that
+		// sale, so the sales are cleared first.
 		BeforeEachScenario(async () => {
 			await resetSales(real.db);
 		});

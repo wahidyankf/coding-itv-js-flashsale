@@ -9,7 +9,7 @@ import {
 
 const ROLES = ["shopper", "operator"] as const;
 
-// The signed-in account as flash-be sends it: a user name and a role. The page shows it; the tokens stay in cookies it cannot read.
+// The signed-in account as flash-be sends it: a user name and a role. The page never sees the tokens.
 export type Account = { username: string; role: (typeof ROLES)[number] };
 // Checks an account reply before the page uses it. An unknown role is refused, so the page never acts on one.
 export const decodeAccount: Decoder<Account> = object({

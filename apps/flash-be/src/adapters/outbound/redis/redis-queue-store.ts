@@ -15,7 +15,7 @@ import { arrayReply, UNREADABLE } from "./reply.js";
 // counter). ARGV: user, now. Replies {code, value}: 0 a new place, 1 already waiting, 2 admitted, see the codes below.
 // One script means no other command runs between the check and the add, so a shopper is never both waiting and admitted.
 // The arrival number comes from a counter, so shoppers who join in the same millisecond keep their order. An admission
-// counts while its end is after now, so a lapsed one no longer keeps the shopper out of the line.
+// counts while its end is after now, so an admission that has ended no longer keeps the shopper out of the line.
 const JOIN = `
 local admitted = redis.call('ZSCORE', KEYS[2], ARGV[1])
 if admitted and tonumber(admitted) > tonumber(ARGV[2]) then return {2, 0} end
@@ -48,7 +48,7 @@ end
 return users
 `;
 
-// The codes the scripts answer with, by name. A place is the number that goes with a waiting code.
+// The codes the scripts answer with, by name. The number after a code is the place for `newPlace` and `waiting`.
 const CODE = { newPlace: 0, waiting: 1, admitted: 2, absent: 3 } as const;
 
 // A `[code, value]` reply, read as numbers. Anything else is not a reply the scripts write.

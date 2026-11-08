@@ -1,5 +1,5 @@
-// The auth steps both account features bind the same way: a shopper who has signed up, and the login a shopper is seen
-// with. They are bodies over the auth world the layer makes, so the wording stays in each feature's own binding.
+// The auth steps both account features bind the same way: a shopper who has signed up, and who the shopper is logged in as.
+// They are bodies over the auth world the layer makes, so the wording stays in each feature's own binding.
 import { expect } from "vitest";
 import type { AuthWorld } from "./auth-world.js";
 

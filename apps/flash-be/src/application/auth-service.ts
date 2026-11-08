@@ -1,6 +1,6 @@
-// The accounts and logins use case: sign-up, login, refresh, logout, who a request is from, and the operator check. The
-// rules (password length, token lifetimes, who may manage sales) are in the domain. The stores, the hasher, the clock
-// and the token source are ports, so this service names no database.
+// The accounts and logins use case (application layer): sign-up, login, refresh, logout, who a request is from, and the
+// operator check. The rules (password length, token lifetimes, who may manage sales) are in the domain.
+// The stores, the hasher, the clock and the token source are ports, so this service names no database.
 
 import { MS_PER_SECOND } from "@flash/flash-commons";
 import { Err, Ok, type Result } from "@flash/typekit";

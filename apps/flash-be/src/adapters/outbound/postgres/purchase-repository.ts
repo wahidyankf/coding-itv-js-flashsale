@@ -21,10 +21,10 @@ import {
 } from "./queries.js";
 import { ensureUser } from "./users.js";
 
-// A row with the name of its user, as the domain knows the user.
+// A row joined with its user's name, which the queries add.
 type Named<Row> = Selectable<Row> & { username: string };
 
-// A purchase row, as the domain knows it.
+// Turns a purchase row into the domain's `Purchase`, so no column name leaves this file.
 function toPurchase(row: Named<Database["purchases"]>): Purchase {
 	return {
 		id: row.id,
@@ -36,7 +36,7 @@ function toPurchase(row: Named<Database["purchases"]>): Purchase {
 	};
 }
 
-// A hold row, as the domain knows it.
+// Turns a hold row into the domain's `Reservation`, so no column name leaves this file.
 function toReservation(row: Named<Database["reservations"]>): Reservation {
 	return {
 		saleId: row.sale_id,
@@ -136,7 +136,7 @@ async function spendHold(
 }
 
 // Turns a hold into a purchase in one transaction. The sale row is locked first, so the checks and the writes of two
-// confirmations for one sale take turns. The steps run in this order, and the order is the rule.
+// confirmations for one sale run one at a time. The steps run in this order, and the order is the rule.
 async function commitPurchase(
 	db: Kysely<Database>,
 	input: CommitInput,
@@ -150,12 +150,12 @@ async function commitPurchase(
 
 		// The buyer is their own author in every row this purchase writes.
 		const userId = await ensureUser(trx, input.user);
-		// The one-item rule. The partial unique index on purchases (one live row per shopper and sale) is the wall behind
+		// The one-item rule. The partial unique index on purchases (one live row per shopper and sale) is a backstop behind
 		// this check, so a second purchase cannot be written even if the check is ever skipped.
 		if (await livePurchaseOf(trx, input.saleId, input.user)) {
 			return { kind: "already_purchased" };
 		}
-		// The stock wall. The sold count is updated only while items remain.
+		// The stock check. The sold count is updated only while items remain.
 		if (!(await takeItem(trx, input.saleId, userId))) {
 			return { kind: "sold_out" };
 		}

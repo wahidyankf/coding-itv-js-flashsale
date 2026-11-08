@@ -1,4 +1,4 @@
-// Steps for the cache of sale reads: how long the API keeps a sale, a change made behind its back, and the Cache-Control
+// Steps for the cache of sale reads: how long the API keeps a sale, a change another instance makes, and the Cache-Control
 // header it sends. Binds sale/caching.feature. The request and reply steps are in be.steps.ts.
 
 import { MS_PER_SECOND } from "@flash/flash-commons";
@@ -34,7 +34,7 @@ Given("a client has asked for the current sale", async ({ request }) => {
 	setResponse(reply);
 });
 
-// Changes the row behind the API's back, the way another instance would.
+// Changes the row directly, as another instance would.
 When(
 	/^the sold count changes to (\d+)$/,
 	async ({ request: _request }, sold: string) => {

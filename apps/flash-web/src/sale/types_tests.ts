@@ -1,5 +1,4 @@
-// Unit tests for the sale's decoders: each view as flash-be sends it, and the bad payloads that matter (a missing field, a
-// wrong type, a status or a place that is not one of the named ones, a date or an id that is not one).
+// Unit tests for the sale decoders: each view decodes as flash-be sends it, and each bad field is refused.
 import { Err, Ok } from "@flash/typekit";
 import { describe, expect, it } from "vitest";
 import {

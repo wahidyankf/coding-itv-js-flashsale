@@ -1,4 +1,4 @@
-// Settings the web server reads from its environment. Read on the server only, so the browser never sees them.
+// Server only. Settings the web server reads from its environment, used by the proxy and the server loaders. The browser never sees them.
 export type Config = {
 	backendUrl: string;
 };

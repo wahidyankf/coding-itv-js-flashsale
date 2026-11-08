@@ -1,7 +1,5 @@
-// What a run reads once k6 has finished: what Postgres says about the sale, what Redis lists, and what the k6 summary
-// says. The verdict compares these facts with each other; this file does no judging. It also counts the requests each
-// API instance logged, so the report shows whether the instances shared the work.
-// Part of the load runner in scripts/: the one place a run reads Postgres, Redis and the k6 summary once k6 has finished.
+// What a run reads once k6 has finished: Postgres, Redis and the k6 summary. This file does no judging; the verdict compares the facts.
+// It also counts the requests each API instance logged, so the report shows whether the instances shared the work. Part of the load runner in scripts/.
 import { readFileSync } from "node:fs";
 import type { ProfileName } from "../k6/profiles.ts";
 import {
@@ -13,7 +11,7 @@ import {
 	reportPath,
 } from "./compose.ts";
 
-// The API instances in compose.yaml.
+// The API instances in compose.yaml. Keep this count equal to the flash-be instances in that file.
 const INSTANCE_COUNT = 3;
 // The log line the API writes for each request it receives.
 const REQUEST_LOG_LINE = '"incoming request"';

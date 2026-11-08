@@ -16,9 +16,8 @@ import { dbNow, live, lockLiveSale } from "./queries.js";
 import { toSale } from "./sale-repository.js";
 import { seedSale } from "./sale-seeder.js";
 
-// The number that every create and every change of a sale window takes, one at a time, so two writes of windows take
-// turns. (It is named for the windows, because changes take it as well as creates.) The lock is held until the
-// transaction ends.
+// The lock that every create and every window change takes, so those writes run one at a time. It is held until the
+// transaction ends. The name says windows, though changes take it too.
 const SALE_WINDOW_LOCK = 7_204_001;
 
 // Takes the sale-window lock for this transaction.
@@ -176,8 +175,8 @@ async function markSaleDeleted(
 		.execute();
 }
 
-// Removes a sale that nobody bought from. A purchase takes the same row lock first (see the purchase repository), so none
-// can slip in before the delete.
+// Marks a sale as removed, if no one bought from it. A purchase takes the same row lock first (see the purchase
+// repository), so no purchase can get in before the delete.
 function removeSale(
 	db: Kysely<Database>,
 	id: string,
@@ -194,7 +193,7 @@ function removeSale(
 		});
 }
 
-// Every live sale, the one that opens last first.
+// Every live sale, with the latest start first.
 async function listSales(db: Kysely<Database>): Promise<Sale[]> {
 	const rows = await db
 		.selectFrom("sales")
@@ -205,8 +204,8 @@ async function listSales(db: Kysely<Database>): Promise<Sale[]> {
 	return rows.map(toSale);
 }
 
-// The operator's sale writes over Postgres. Each write runs in one transaction under the sale-window lock, so its check and
-// its write cannot be split.
+// The operator's sale writes over Postgres. A create or a change runs in one transaction under the sale-window lock, so
+// its check and write cannot be split. A removal locks the sale row instead.
 export function createPostgresSaleAdmin(db: Kysely<Database>): SaleAdmin {
 	return {
 		create: (input, actor) => createSale(db, input, actor),

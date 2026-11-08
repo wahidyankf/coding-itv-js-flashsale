@@ -1,7 +1,5 @@
-// The shared pieces of the Postgres adapters (outbound Postgres adapter): the live-row condition every read adds, the
-// database clock for the audit columns, and the queries that the purchase and the reservation repositories share. Each
-// shared query names the rows it leaves out, so the repositories cannot disagree about what "live" means, and a rebuild
-// snapshot matches the live checks.
+// Shared pieces of the Postgres adapters: the live-row condition, the database clock, and the queries that the purchase
+// and reservation repositories share. Sharing them keeps the repositories in step on what "live" means. Outbound adapter.
 import { type Kysely, sql } from "kysely";
 import type { Database } from "./database.js";
 

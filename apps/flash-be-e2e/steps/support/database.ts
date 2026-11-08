@@ -82,8 +82,7 @@ export function query<T>(sql: string, params: unknown[] = []): Promise<T[]> {
 	return runSql<T>(world.databaseUrl, sql, params);
 }
 
-// Sets the sold count of a sale with SQL, as another instance of the API would write it. For a count no route can reach
-// in a scenario, such as a sale that changed behind the API's back.
+// Sets the sold count of a sale with SQL, as another instance of the API would write it. Use it only for a count no route can reach.
 export async function setSold(saleId: string, sold: number): Promise<void> {
 	await query("update sales set sold = $1 where id = $2", [sold, saleId]);
 }

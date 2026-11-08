@@ -1,4 +1,4 @@
-// The hook that knows who is logged in. The page renders before the browser's cookie is known, so it starts "checking"
+// Browser only, part of the account feature. The hook that knows who is logged in. The page renders before the browser's cookie is known, so it starts "checking"
 // and asks the server. It also sets the state when a log in, a sign up or a log out finishes, and when the login is
 // found gone for good.
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -65,8 +65,8 @@ export function useAccount(
 		[auth, describeError],
 	);
 
-	// The cookies are cleared by the server. Even if the call fails, the page stops acting as logged in: the next request
-	// would find out, and a shopper who pressed "Log out" expects to be out.
+	// The server clears the cookies. The page stops acting as logged in even if the call fails, because a shopper who
+	// pressed "Log out" expects to be out.
 	const leave = useCallback(async () => {
 		await auth.logout();
 		setState({ kind: "anonymous" });

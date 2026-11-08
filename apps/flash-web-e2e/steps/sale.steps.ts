@@ -38,7 +38,7 @@ Given("the sale cannot be reached", async ({ request: _request }) => {
 	await cutWebServerOff();
 });
 
-// A slow line: one user a second, and a pause of five seconds between admissions, so five users go in at a time.
+// A slow line: the queue admits one shopper a second, and its timer runs every five seconds, so five shoppers go in at a time.
 Given("the queue admits shoppers slowly", async ({ request: _request }) => {
 	setApiEnv({ ADMISSION_TICK_MS: "5000" });
 	await reviseSale({ admitPerSecond: 1 });
@@ -68,7 +68,7 @@ Given(
 	},
 );
 
-// Another flash-be instance sells behind this one's back. No route sets the sold count, so it is written to the table.
+// Another flash-be instance sells items. No route sets the sold count, so the step writes it to the table.
 When(
 	/^the sold count changes to (\d+)$/,
 	async ({ request: _request }, sold: string) => {

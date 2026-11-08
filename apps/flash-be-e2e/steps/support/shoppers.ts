@@ -119,7 +119,7 @@ export function pollUntilAdmitted(
 	return pollUntil(async () => (await readState()) === "admitted", options);
 }
 
-// The admission runs on the API's own timer, so a shopper who joined is admitted within a tick or two. Waits until every
+// The admission runs on the API's own timer, so a shopper who joined is admitted within one or two admission ticks. Waits until every
 // shopper is admitted, and fails the step when one is still waiting after the time limit.
 export async function waitUntilAdmitted(
 	request: APIRequestContext,
@@ -154,8 +154,7 @@ export async function postConfirm(
 	});
 }
 
-// Confirms the purchase and keeps the answer. The time it took is recorded for the speed scenarios, and a purchase the
-// shopper does not have yet is kept.
+// Confirms the purchase and keeps the answer. It keeps the purchase too, unless the shopper already has one, and records the time for the speed scenarios.
 export async function confirm(
 	request: APIRequestContext,
 	user: string,

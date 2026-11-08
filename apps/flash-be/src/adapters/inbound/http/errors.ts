@@ -7,7 +7,7 @@ import {
 	PASSWORD_MIN_LENGTH,
 } from "../../../domain/auth.js";
 
-// Every error code of the API and the HTTP status that answers it. A code has one status everywhere.
+// The HTTP status for each error code. Keeping one status per code keeps every reply for a code consistent.
 export const ERROR_STATUS = {
 	invalid_user: HTTP_STATUS.badRequest,
 	invalid_reservation: HTTP_STATUS.badRequest,
@@ -40,10 +40,10 @@ export const ERROR_STATUS = {
 	unavailable: HTTP_STATUS.serviceUnavailable,
 } as const;
 
-// Every error code the API can answer with. Adding a code means adding it to ERROR_STATUS and ERROR_MESSAGE.
+// The codes a reply can carry. `ERROR_STATUS` sets them, and `ERROR_MESSAGE` must have each one, or typecheck fails.
 export type ErrorCode = keyof typeof ERROR_STATUS;
 
-// One sentence for each error code, for a developer reading a reply or a log. `internal` says nothing of the cause.
+// The `errorMessage` sent for each code. `internal` never names the cause, so a server fault does not leak detail.
 const ERROR_MESSAGE = {
 	invalid_user: "The user id is missing or not valid.",
 	invalid_reservation: "The reservation id is missing or not valid.",

@@ -15,11 +15,9 @@ export type ReservationRepository = {
 	hasPurchase(saleId: string, user: Username): Promise<boolean>;
 	// Writes the hold. One row per shopper and sale: a new hold replaces an expired one.
 	save(reservation: Reservation): Promise<void>;
-	// Decides a reservation when the gate is down. The name says which store it does without: the docs call this
-	// "serving without Redis", and the name keeps that case visible at the call site. It reads the state the decision
-	// needs under the sale's row lock, and the decision is the domain's (`decideReservation`). `gateReady` is asked under
-	// that same lock, so a rebuild cannot slip in between: if the gate is ready again, nothing is written and the caller
-	// uses the gate.
+	// Decides a reservation when the gate is down, under the sale's row lock. `gateReady` is asked under that same lock, so
+	// a rebuild cannot slip in between; if the gate is ready, nothing is written. The rule is `decideReservation` in the
+	// domain. The name says Redis is skipped; the docs call this "serving without Redis".
 	reserveWithoutGate(
 		request: ReserveRequest,
 		gateReady: () => Promise<boolean>,

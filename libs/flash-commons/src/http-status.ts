@@ -1,8 +1,7 @@
-// The standard HTTP status numbers, by name, and the two lowest statuses of an error. Every app reads them from here, so
-// `404` is written once. These are HTTP's numbers, not this project's contract: which error code answers with which status
-// stays in flash-be, and the e2e and k6 oracles write the contract's codes themselves. Part of the pure main entry.
+// The standard HTTP status numbers by name, and the two lowest error statuses, so `404` is written once.
+// These are HTTP's numbers, not this project's contract: flash-be maps error codes to statuses, and the e2e and k6 tests write those codes themselves. Part of the pure main entry.
 
-// The status numbers the apps act on, by name.
+// Status numbers by name. The compiler checks each name, so a typo cannot pass as a status.
 export const HTTP_STATUS = {
 	ok: 200,
 	created: 201,

@@ -52,7 +52,7 @@ describe("refusalMessage", () => {
 	});
 });
 
-// A bad flag is a value the command prints, not an exception: the parser answers with the usage error.
+// A bad flag is a message to print, not an exception: the parser answers with the usage error.
 describe("parseOperatorArgs", () => {
 	it("reads both flags, with a space or with =", () => {
 		expect(

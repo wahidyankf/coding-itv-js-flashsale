@@ -58,7 +58,7 @@ export type FakeState = {
 	admitted: Set<string>;
 	writes: Map<string, number>;
 	settings: Settings;
-	// Accounts by name. The name is the user in everything else.
+	// Accounts, keyed by user name.
 	accounts: Map<string, { password: string; role: "shopper" }>;
 	sessions: Session[];
 	requests: number;

@@ -1,6 +1,5 @@
-// The addresses a local run uses when no environment variable sets them. They match compose.dev.yaml. The configuration
-// reads them when a variable is absent, and the integration test setup reads the same ones, so the local database and
-// Redis have one address in the code. Local use only: production must set the URLs.
+// Outside the hexagon. The addresses a local run uses when no environment variable sets them. They match
+// compose.dev.yaml. config.ts and the integration tests read the same ones. Local use only: production must set the URLs.
 export const localDefaults = {
 	host: "::",
 	port: "8080",

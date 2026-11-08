@@ -1,17 +1,17 @@
 // The cookies of a login, as HTTP carries them. The domain says how long a login lasts; this file says how a cookie
 // is written and read. The access cookie goes with every request, the refresh cookie only to the auth routes.
 
-// The name of the cookie that holds the access token. It is short and goes with every request.
+// The access token's cookie. The browser sends it with every request.
 export const ACCESS_COOKIE = "access_token";
-// The name of the cookie that holds the refresh token. It lives longer, and is replaced each time it is used.
+// The refresh token's cookie. The token is used once, then replaced.
 export const REFRESH_COOKIE = "refresh_token";
-// The only path the refresh cookie is sent to, so it travels to the auth routes and nowhere else.
+// The only path the refresh cookie is sent to, so the token reaches the auth routes alone.
 export const REFRESH_COOKIE_PATH = "/auth";
 
 // A user agent is text from the client, so only this much of it is kept for the record of a login.
 const MAX_USER_AGENT_LENGTH = 200;
 
-// The value of one cookie in a `Cookie` header, or nothing.
+// Reads one cookie from a `Cookie` header. An empty value counts as missing.
 export function cookieValue(
 	header: string | undefined,
 	name: string,
@@ -27,15 +27,15 @@ export function cookieValue(
 	return undefined;
 }
 
-// How a `Set-Cookie` value is written: its lifetime, the path it is sent to, and whether it needs HTTPS.
+// The settings for one login cookie. `secure` comes from `COOKIE_SECURE`, which defaults to on in production.
 export type CookieOptions = {
 	maxAgeSeconds: number;
 	path: string;
 	secure: boolean;
 };
 
-// A `Set-Cookie` value. The script of a page cannot read it (HttpOnly), and another site cannot make the browser send
-// it with a POST (SameSite=Lax).
+// Builds a `Set-Cookie` value. HttpOnly keeps page scripts from reading it, and SameSite=Lax stops other sites from
+// sending it on a POST.
 export function setCookie(
 	name: string,
 	value: string,
@@ -51,7 +51,7 @@ export function setCookie(
 	].join("; ");
 }
 
-// The user agent kept for the record of a login: the start of the text, or nothing when the client sent no text.
+// The user agent for a login record: at most `MAX_USER_AGENT_LENGTH` characters, or nothing when it is not text.
 export function cutUserAgent(raw: unknown): string | undefined {
 	return typeof raw === "string"
 		? raw.slice(0, MAX_USER_AGENT_LENGTH)

@@ -1,7 +1,6 @@
 // The steps that several web bindings share: the visitor's page actions and checks, the sale they open, and the types
-// every binding uses. Specs/apps/flash/web/behaviours/{account/login, proxy/api, sale/buying, sale/checking, sale/status}
-// bind these, at the unit and the integration layer. A binding says the wording of its step and takes the body from here,
-// so a body reads the same wherever it is used. Test support only.
+// every binding uses. The bindings at the unit and integration layers say each step's wording, and take its body from
+// here, so a body reads the same wherever it is used. Test support only.
 import type { StepTest } from "@amiceli/vitest-cucumber";
 import { openSale } from "./open-sale";
 import type { WebWorld } from "./web-world";

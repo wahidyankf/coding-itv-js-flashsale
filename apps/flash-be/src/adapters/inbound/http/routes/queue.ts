@@ -32,7 +32,7 @@ export function registerQueueRoutes(
 ): void {
 	const { needSession, limit } = createGuards(deps);
 
-	// The waiting queue. A ticket proves the shopper joined; it is sent back in the reply body.
+	// Joins the shopper to the queue. The ticket in the reply proves the join, and later reads check it.
 	app.route<{ Params: SaleParams }>({
 		method: "POST",
 		url: "/sales/:saleId/queue",
@@ -41,7 +41,7 @@ export function registerQueueRoutes(
 			sendResult(
 				reply,
 				await deps.queue.join(request.params.saleId, shopperOf(request)),
-				// The ticket sits between the user and the place in the reply, as it always has been written.
+				// The ticket sits between the user and the place, which keeps the key order of the reply.
 				({ created, user, ticket, place }) =>
 					createdOrOk(reply, created).send({ userId: user, ticket, ...place }),
 			),
@@ -65,7 +65,7 @@ export function registerQueueRoutes(
 			),
 	});
 
-	// The place of the shopper who is logged in, pushed when it changes. The ticket is checked once, when the stream opens.
+	// Pushes the shopper's place when it changes. The first check runs before the stream opens, so a bad ticket gets a normal reply.
 	app.route<{ Params: SaleParams }>({
 		method: "GET",
 		url: "/sales/:saleId/queue/me/events",
