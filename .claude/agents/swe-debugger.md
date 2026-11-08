@@ -22,7 +22,7 @@ module boundary or a design choice goes to `swe-architect`.
 ## Standards
 
 Read [`AGENTS.md`](../../AGENTS.md) before the first change. It names the checks (`npx nx test:quick <app>`, `npx nx test:coverage <app>`,
-`npm run lint`, `npm run docs:check`, `npm run bdd:check`, `npm run lint:rules:test`) and the rules a repair must keep.
+`npm run lint`, `npm run docs:check`, `npm run bdd:check`, `npm run lint:rules:test`, `npm run build:script:test`) and the rules a repair must keep.
 Integration and coverage runs need the dev stack (`npx nx db:up flash-be`). Activate the checkout with Serena's
 `activate_project` before semantic work.
 

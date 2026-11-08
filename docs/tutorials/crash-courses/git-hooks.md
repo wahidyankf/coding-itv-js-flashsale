@@ -45,7 +45,7 @@ It only formats code and JSON. It does not lint, and it does not touch Markdown.
 
 ### pre-push: the full gate, in order
 
-[`.husky/pre-push`](../../../.husky/pre-push) runs seven checks, the cheap ones first and the slow ones last. The list
+[`.husky/pre-push`](../../../.husky/pre-push) runs eight checks, the cheap ones first and the slow ones last. The list
 is in [the pre-push hook](../../reference/test-layers-and-coverage.md#pre-push-hook).
 
 The first five need no Docker. The last two use `nx affected --base=origin/main`, so they run only for the projects

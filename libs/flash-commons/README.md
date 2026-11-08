@@ -161,7 +161,7 @@ refuses it in the domain and the application, which take their waits as argument
 ## Commands
 
 ```bash
-npx nx build flash-commons           # empties dist/, then tsc into it
+npx nx build flash-commons           # tsc to dist/, then remove what this run did not write
 npx nx test:quick flash-commons      # typecheck + lint + unit tests
 npx nx test:coverage flash-commons   # unit tests with the 99% floor
 ```

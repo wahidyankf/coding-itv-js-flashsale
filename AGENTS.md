@@ -48,7 +48,7 @@ Flash sale monorepo with five apps in [`apps/`](apps) and two libraries in [`lib
   workspaces with one [`package-lock.json`](package-lock.json).
 - Nx runs commands only. Do not add Nx plugins (`@nx/*`, `nx-*`) or run `nx init`. Define every target in the app's
   `project.json` with `"executor": "nx:run-commands"`.
-- `libs/typekit` and `libs/flash-commons` are built to `dist`, which each build empties first (`npx nx build typekit`, `npx nx build flash-commons`). The Nx targets of the apps that use them build them first, and the
+- `libs/typekit` and `libs/flash-commons` are built to `dist` (`npx nx build typekit`, `npx nx build flash-commons`). Their build and that of `flash-be` run [`scripts/compile/build-dist.mjs`](scripts/compile/build-dist.mjs): `tsc` writes `dist` in place, then every file in `dist` that this run did not write is removed, so a deleted source never keeps running from an old output and `dist` is never empty while another build reads it. The Nx targets of the apps that use them build them first, and the
   Dockerfiles build them too. Each has `build`, `typecheck`, `lint`, `test:unit`, `test:coverage` and `test:quick`, each with a `:watch` variant where one exists, and needs no Docker.
 - Run targets with `npx nx <target> <app>`. Every app has `typecheck`, `lint`, `test:quick`, and `test:quick:watch`.
   - `flash-be` and `flash-web` also have `test:unit` and `test:integration`.
@@ -106,7 +106,7 @@ Flash sale monorepo with five apps in [`apps/`](apps) and two libraries in [`lib
 - Docs are checked by RHINO, which reads the policy in [`repo-config.yml`](repo-config.yml). Run `npm run docs:install` once per machine,
   then `npm run docs:check`. The version and digests are pinned in [`scripts/install-rhino.sh`](scripts/install-rhino.sh); bump them together.
 - The pre-push hook runs, in order, `npm run lint` (Biome check of the whole repo, warnings fail), `npm run docs:check`,
-  `bdd:check:test`, `lint:rules:test`, `bdd:check` (the behaviour coverage check), then
+  `bdd:check:test`, `lint:rules:test`, `build:script:test` (the tests of the build script), `bdd:check` (the behaviour coverage check), then
   `nx affected -t test:quick` (typecheck, lint, unit tests) and `nx affected -t test:coverage` (the 99% floor) against
   `origin/main`. `test:coverage` starts the dev stack itself, so Docker must run. Do not skip hooks with `--no-verify`
   unless the user asks.

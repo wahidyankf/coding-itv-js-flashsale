@@ -10,6 +10,8 @@ COPY apps/flash-web/package.json apps/flash-web/
 COPY apps/flash-web-e2e/package.json apps/flash-web-e2e/
 COPY apps/flash-load/package.json apps/flash-load/
 RUN npm ci --ignore-scripts
+# The build script of every package that compiles to dist.
+COPY scripts/compile scripts/compile
 COPY libs/typekit libs/typekit
 RUN npm run build -w @flash/typekit
 # flash-commons is built on top of typekit, and flash-be imports its dist.

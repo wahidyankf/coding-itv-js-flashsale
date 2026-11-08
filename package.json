@@ -13,6 +13,7 @@
 		"bdd:check": "node scripts/bdd/check-behaviour-coverage.mjs",
 		"bdd:check:test": "vitest run --config scripts/bdd/vitest.config.mjs",
 		"lint:rules:test": "vitest run --config scripts/lint/vitest.config.mjs",
+		"build:script:test": "vitest run --config scripts/compile/vitest.config.mjs",
 		"docker:dev:up": "docker compose -f compose.dev.yaml up -d --wait",
 		"docker:dev:down": "docker compose -f compose.dev.yaml down",
 		"docker:prod:up": "docker compose -f compose.prod.yaml up -d --build --wait",

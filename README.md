@@ -357,6 +357,7 @@ npx nx test:coverage <app>     # unit + integration, 99% floor; starts the dev s
 npx nx test:quick typekit      # a library: typecheck + lint + unit tests (no Docker)
 npx nx test:quick flash-commons # the other library, the same way
 npm run lint:rules:test        # the lint rules: no catch, exhaustive switches
+npm run build:script:test      # the build script: tsc, then remove outputs this run did not write
 npm run bdd:check              # every scenario is bound at the layers it needs
 npm run lint                   # Biome check of the whole repo: format, lint, imports
 npm run docs:install           # once: fetch the docs checker

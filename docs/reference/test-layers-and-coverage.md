@@ -105,10 +105,11 @@ Each tag needs the comment described in [how-to: add a behaviour](../how-to/add-
 2. `npm run docs:check` (RHINO: links, heading structure, README indexes, Mermaid diagrams)
 3. `npm run bdd:check:test` (the behaviour check's own tests)
 4. `npm run lint:rules:test` (the lint rules for product code, run on sample code)
-5. `npm run bdd:check` (the behaviour check)
-6. `npx nx affected -t test:quick --base=origin/main`
-7. `npx nx affected -t test:coverage --base=origin/main` (unit and integration, the 99% floor)
+5. `npm run build:script:test` (the tests of the build script in [`scripts/compile/`](../../scripts/compile))
+6. `npm run bdd:check` (the behaviour check)
+7. `npx nx affected -t test:quick --base=origin/main`
+8. `npx nx affected -t test:coverage --base=origin/main` (unit and integration, the 99% floor)
 
-It stops at the first check that fails. Steps 1 to 5 look at the whole repository; steps 6 and 7 run only for the
-projects the change touches, and step 7 needs Docker. End-to-end tests are not in the hook: run them yourself before you
+It stops at the first check that fails. Steps 1 to 6 look at the whole repository; steps 7 and 8 run only for the
+projects the change touches, and step 8 needs Docker. End-to-end tests are not in the hook: run them yourself before you
 finish a change.
