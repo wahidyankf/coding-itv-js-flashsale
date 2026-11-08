@@ -16,9 +16,10 @@ server passes it on, with the login cookies. This page gives the reasons and wha
   DELETE) are not on the list. A sale id must be a UUID, or the answer is `404 not_found`. The server also sends on only
   the headers the API needs (the `cookie` header among them). It writes `X-Forwarded-For` itself, from the caller's
   socket address, and never copies the one the browser sent, so the API's rate limit counts each shopper by their own
-  address. It also gives each request a new `X-Request-Id`, sends it to the API and returns it on the reply, so one
-  request can be traced through the logs. The browser and the API use the same paths, so the path
-  and the cookies pass unchanged. A POST from another origin is refused with `403 cross_site`.
+  address. If a request comes with no socket address, the server logs one warning line, once per process, because every
+  shopper would then share one rate limit. It also gives each request a new `X-Request-Id`, sends it to the API and
+  returns it on the reply, so one request can be traced through the logs. The browser and the API use the same paths,
+  so the path and the cookies pass unchanged. A POST from another origin is refused with `403 cross_site`.
 
 ```mermaid
 flowchart LR
@@ -46,7 +47,8 @@ flowchart LR
 ## What it costs
 
 Each request has one more hop. The server streams the answer back as it arrives, so event streams are not buffered and
-a stream closes upstream when the browser leaves. When the web server stops, it ends each stream itself, so a
+a stream closes upstream when the browser leaves. A browser that leaves before the API answers is not logged as an
+unreachable API. When the web server stops, it ends each stream itself, so a
 restart cuts none and the page opens its streams again. The extra hop shows up in latency, not in correctness. The web server
 is stateless, so more copies can run behind a load balancer.
 

@@ -42,6 +42,8 @@ src/
                      <feature>_integration_tests.tsx names the scenarios; bdd/support holds the worlds, the fake backend,
                      one bind-<feature>.ts per feature that both layers run, and the shared steps (web-steps.ts)
   same_as_be_tests.ts  fails when a rule copied from flash-be drifts (user name, password, ticket header, two replies)
+  proxy_integration_tests.ts  serves the proxy through srvx, the server of the built app, and checks the caller's
+                     address reaches the API
 ```
 
 `sale/` and `auth/` never import each other. What both need lives directly in [`src/`](src).

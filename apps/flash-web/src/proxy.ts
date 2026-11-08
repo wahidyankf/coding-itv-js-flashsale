@@ -106,6 +106,26 @@ function logUnreachable(requestId: string, request: Request, cause: Error) {
 	);
 }
 
+// Whether this process has warned about a request with no caller address. Once is enough to show the cause; one line per
+// request would bury the log.
+let warnedNoAddress = false;
+
+// One JSON warning line, the first time a request comes without the caller's address, as it would if a new version of the
+// Node server stopped putting `ip` on the request. The API then sees no X-Forwarded-For and puts every shopper in one
+// rate-limit bucket, which nothing else would show. Like `logUnreachable`, it holds no header value.
+function warnNoAddressOnce(requestId: string, request: Request) {
+	if (warnedNoAddress) return;
+	warnedNoAddress = true;
+	console.warn(
+		JSON.stringify({
+			msg: "a request has no caller address: every shopper shares one rate limit",
+			requestId,
+			method: request.method,
+			path: new URL(request.url).pathname,
+		}),
+	);
+}
+
 // Copies only the named headers, so no other header passes between the browser and flash-be.
 function pick(source: Headers, names: readonly string[]): Headers {
 	const picked = new Headers();
@@ -127,7 +147,7 @@ function callerAddress(request: Request): string | undefined {
 
 // The proxy's one entry point. Streams flash-be's answer back with only the allowed headers. Every reply carries the
 // request id the API was told. A failed call is logged with that id and becomes a 502 reply, so the shopper never sees a
-// crash.
+// crash; a call that failed because the browser left is not logged.
 export async function proxyToBackend(
 	request: Request,
 	env: NodeJS.ProcessEnv,
@@ -143,7 +163,8 @@ export async function proxyToBackend(
 	const headers = pick(request.headers, SENT);
 	headers.set(REQUEST_ID, requestId);
 	const address = callerAddress(request);
-	if (address !== undefined) headers.set(FORWARDED_FOR, address);
+	if (address === undefined) warnNoAddressOnce(requestId, request);
+	else headers.set(FORWARDED_FOR, address);
 
 	const answered = await attemptAsync(async (): Promise<Response> => {
 		const upstream = await fetcher(`${buildConfig(env).backendUrl}${path}`, {
@@ -166,6 +187,10 @@ export async function proxyToBackend(
 		});
 	}, Error);
 	if (answered.isOk()) return answered.value;
-	logUnreachable(requestId, request, answered.error);
+	// A browser that left before the API answered aborts the call through `request.signal`. The API is fine, so nothing is
+	// logged, and the reply below is never read.
+	if (!request.signal.aborted) {
+		logUnreachable(requestId, request, answered.error);
+	}
 	return refuse("backend_unavailable", requestId);
 }

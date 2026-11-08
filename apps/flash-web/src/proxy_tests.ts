@@ -1,5 +1,6 @@
 // Unit tests for the proxy: which routes pass, which POSTs are refused as cross-site, which headers and cookies move, the
-// request id, the line logged when the API cannot be reached, and an event stream that ends when the server stops.
+// request id, the line logged when the API cannot be reached, the warning for a request with no caller address, a browser
+// that leaves early, and an event stream that ends when the server stops.
 import { isUuid } from "@flash/flash-commons";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { isAllowed, isCrossSite, proxyToBackend } from "./proxy";
@@ -495,5 +496,77 @@ describe("an event stream from the API", () => {
 		proxiedStreams.endAll();
 		expect((await pending)?.done).toBe(true);
 		expect(cancelled).toBe(true);
+	});
+});
+
+describe("a request with no caller address", () => {
+	// The warning is given once per process, so each test loads a fresh copy of the proxy.
+	const freshProxy = async () => {
+		vi.resetModules();
+		return import("./proxy");
+	};
+
+	it("warns once, in one JSON line with the request id and no header value, that every shopper now shares one limit", async () => {
+		const { proxyToBackend: fresh } = await freshProxy();
+		const warned = vi
+			.spyOn(console, "warn")
+			.mockImplementation(() => undefined);
+		const fetcher = vi.fn<typeof fetch>(async () => new Response("{}"));
+		const browser = () =>
+			new Request("http://web.test/api/v1/auth/me?x=1", {
+				headers: { cookie: "access_token=secret-cookie" },
+			});
+		const reply = await fresh(browser(), ENV, fetcher);
+		await fresh(browser(), ENV, fetcher);
+		expect(warned).toHaveBeenCalledTimes(1);
+		const line = String(warned.mock.calls[0]?.[0]);
+		expect(JSON.parse(line)).toEqual({
+			msg: "a request has no caller address: every shopper shares one rate limit",
+			requestId: reply.headers.get("x-request-id"),
+			method: "GET",
+			path: "/api/v1/auth/me",
+		});
+		expect(line).not.toContain("secret");
+	});
+
+	it("does not warn when the request has the caller's address", async () => {
+		const { proxyToBackend: fresh } = await freshProxy();
+		const warned = vi
+			.spyOn(console, "warn")
+			.mockImplementation(() => undefined);
+		await fresh(
+			Object.assign(new Request("http://web.test/api/v1/auth/me"), {
+				ip: "198.51.100.4",
+			}),
+			ENV,
+			vi.fn<typeof fetch>(async () => new Response("{}")),
+		);
+		expect(warned).not.toHaveBeenCalled();
+	});
+});
+
+describe("a browser that leaves before the API answers", () => {
+	it("is not logged as an API that cannot be reached", async () => {
+		const logged = vi
+			.spyOn(console, "error")
+			.mockImplementation(() => undefined);
+		const browser = new AbortController();
+		// Like fetch: it waits for the API, and fails as soon as its signal is aborted.
+		const waiting: typeof fetch = (_url, init) =>
+			new Promise((_resolve, reject) => {
+				init?.signal?.addEventListener("abort", () =>
+					reject(init.signal?.reason),
+				);
+			});
+		const pending = proxyToBackend(
+			new Request("http://web.test/api/v1/sales/current", {
+				signal: browser.signal,
+			}),
+			ENV,
+			waiting,
+		);
+		browser.abort();
+		await pending;
+		expect(logged).not.toHaveBeenCalled();
 	});
 });
