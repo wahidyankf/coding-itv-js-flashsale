@@ -200,6 +200,34 @@ describe("a sale removed while a request runs", () => {
 			await db2.destroy();
 		}
 	});
+	// The gate granted the hold, but the operator removed the sale before the hold reached Postgres. A removed sale takes
+	// its holds with it, so the save writes no live hold for it.
+	it("writes no live hold when the hold is saved after its sale was removed", async () => {
+		const now = new Date();
+		const saleId = await insertSale(db, {
+			stock: 2,
+			startsAt: new Date(now.getTime() - 3_600_000),
+			endsAt: new Date(now.getTime() + 3_600_000),
+		});
+		await db
+			.updateTable("sales")
+			.set({ deleted_at: sql<Date>`now()` })
+			.where("id", "=", saleId)
+			.execute();
+		await createReservationRepository(db).save({
+			saleId,
+			user: usernameOf(`late-${crypto.randomUUID()}`),
+			reservationId: crypto.randomUUID(),
+			expiresAt: new Date(now.getTime() + 60_000),
+		});
+		const rows = await db
+			.selectFrom("reservations")
+			.select("id")
+			.where("sale_id", "=", saleId)
+			.where("deleted_at", "is", null)
+			.execute();
+		expect(rows).toEqual([]);
+	});
 });
 
 describe("the rebuild leaves out removed users, as the live checks do", () => {

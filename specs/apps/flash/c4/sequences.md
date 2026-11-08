@@ -163,8 +163,9 @@ Postgres. The purchase is one transaction, in this order.
 
 ```sql
 -- save the hold: one transaction, locking sale, then user, then hold, as the fallback without Redis does.
--- $3 is the id of the user row, made first if the shopper has none.
-SELECT "id" FROM "sales" WHERE "id" = $2 FOR KEY SHARE;
+-- $3 is the id of the user row, made first if the shopper has none. A removed sale returns no row and ends the save
+-- with no write.
+SELECT "id" FROM "sales" WHERE "id" = $2 AND "deleted_at" IS NULL FOR KEY SHARE;
 SELECT "id" FROM "users" WHERE "id" = $3 FOR NO KEY UPDATE;
 -- read after the lock, in its own statement, so it sees a hold another save just committed
 SELECT "id", "expires_at" FROM "reservations"

@@ -1,5 +1,6 @@
 // Integration test for committing a purchase over the dev Postgres: the same reservation gives the same purchase, a shopper
 // buys once, the stock is never oversold, and a charge refunded before the commit writes nothing.
+import { sql } from "kysely";
 import { afterAll, describe, expect, it } from "vitest";
 import { insertSale } from "../../../bdd/support/seed.js";
 import { usernameOf } from "../../../bdd/support/users.js";
@@ -97,5 +98,31 @@ describe("committing a purchase", () => {
 		expect(await repository.findByReservation(request.reservationId)).toBe(
 			undefined,
 		);
+	});
+
+	// The refund holds the ledger row and gives the charge back while the commit starts. The commit must wait for the
+	// refund to finish and then see the charge as refunded, not read the row as it was before.
+	it("waits for a refund that holds the charge, and then refuses the purchase", async () => {
+		const saleId = await sale(3);
+		const request = await input(saleId, "ana");
+		let locked: () => void = () => {};
+		const holding = new Promise<void>((resolve) => {
+			locked = resolve;
+		});
+		const refund = db.transaction().execute(async (trx) => {
+			await sql`select ref from payments where ref = ${request.paymentRef} for update`.execute(
+				trx,
+			);
+			await sql`update payments set status = 'refunded' where ref = ${request.paymentRef}`.execute(
+				trx,
+			);
+			locked();
+			await sql`select pg_sleep(0.3)`.execute(trx);
+		});
+		await holding;
+		const committed = await repository.commit(request);
+		await refund;
+		expect(committed).toEqual({ kind: "charge_refunded" });
+		expect(await soldOf(saleId)).toBe(0);
 	});
 });

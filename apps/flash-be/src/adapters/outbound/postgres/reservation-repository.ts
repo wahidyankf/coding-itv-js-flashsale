@@ -36,14 +36,20 @@ type HoldInput = {
 
 // Takes the sale row in share mode before anything else a save does, so shoppers do not wait for each other, and a
 // removal or a purchase, which lock the row for update, cannot change the shopper's holds under the write. The Postgres
-// fallback takes the same row first (for update), so the two paths never wait on each other in a circle.
-async function shareSale(trx: Kysely<Database>, saleId: string): Promise<void> {
-	await trx
+// fallback takes the same row first (for update), so the two paths never wait on each other in a circle. False when the
+// sale is removed: its holds went with it, so there is nothing to write.
+async function shareLiveSale(
+	trx: Kysely<Database>,
+	saleId: string,
+): Promise<boolean> {
+	const row = await trx
 		.selectFrom("sales")
 		.select("id")
 		.where("id", "=", saleId)
+		.where(live("sales"))
 		.forKeyShare()
-		.execute();
+		.executeTakeFirst();
+	return row !== undefined;
 }
 
 // Locks the shopper's row, so two writes of one shopper's hold run one at a time. The live hold is read after this, in
@@ -133,13 +139,13 @@ async function writeHold(
 }
 
 // Writes the hold a reservation asks for, as the shopper's one live hold in the sale, in one transaction. The sale row is
-// taken first and the user second, in the order the fallback takes them.
+// taken first and the user second, in the order the fallback takes them. A removed sale gets no hold.
 async function saveHold(
 	db: Kysely<Database>,
 	reservation: Reservation,
 ): Promise<void> {
 	await db.transaction().execute(async (trx) => {
-		await shareSale(trx, reservation.saleId);
+		if (!(await shareLiveSale(trx, reservation.saleId))) return;
 		const userId = await ensureUser(trx, reservation.user);
 		await writeHold(trx, {
 			id: reservation.reservationId,
