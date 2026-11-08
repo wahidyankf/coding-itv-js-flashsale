@@ -6,7 +6,7 @@
 # The format is kulala.nvim (https://github.com/wahidyankf/kulala.nvim). A request named with `# @name` keeps its
 # reply: send "the current sale", "join the queue" and "hold one item" before the requests that use them. The Shared
 # block attaches kulala's cookie jar to every request, and the web server passes the cookies on. It refuses a POST
-# whose Origin is another site.
+# whose Origin is another site. Every reply carries a new x-request-id header, which the web server also sends to the API.
 
 ### Shared
 # @attach-cookie-jar
@@ -65,7 +65,7 @@ GET {{web}}/api/v1/sales/{{current.response.body.$.id}}/purchases/me
 # @curl-max-time 5
 GET {{web}}/api/v1/sales/{{current.response.body.$.id}}/events
 
-### Live place in the queue (closes after 5 seconds here)
+### Live place in the queue (state absent when the place is lost; closes after 5 seconds here)
 # @accept chunked
 # @curl-max-time 5
 GET {{web}}/api/v1/sales/{{current.response.body.$.id}}/queue/me/events

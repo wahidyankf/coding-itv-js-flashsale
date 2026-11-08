@@ -8,7 +8,8 @@
 # reply, and later requests read the sale id, the ticket and the reservation id from it: send "the current sale",
 # "join the queue" and "hold one item" before the requests that use them. The Shared block attaches kulala's cookie jar
 # to every request, so a login is kept like in a browser. The API runs with COOKIE_SECURE=false locally, so the cookies
-# work over plain HTTP.
+# work over plain HTTP. Every reply carries an x-request-id header; find its log lines with `npm run prod:trace -- <id>`
+# (docs/how-to/trace-a-request.md).
 
 ### Shared
 # @attach-cookie-jar
@@ -21,7 +22,7 @@
 ### Liveness (no dependencies, always 200)
 GET {{backend}}/health
 
-### Readiness (Postgres and Redis; 503 when one fails)
+### Readiness (Postgres and Redis; 503 when one fails, and 503 "stopping" while the API shuts down)
 GET {{backend}}/ready
 
 ###############################################################################
@@ -105,7 +106,7 @@ POST {{backend}}/api/v1/sales/{{current.response.body.$.id}}/queue
 GET {{backend}}/api/v1/sales/{{current.response.body.$.id}}/queue/me
 x-queue-ticket: {{join.response.body.$.ticket}}
 
-### Live place in the queue (Server-Sent Events: event: place; curl closes it after 5 seconds here)
+### Live place in the queue (Server-Sent Events: event: place, state absent when the place is lost; curl closes it after 5 s)
 # @accept chunked
 # @curl-max-time 5
 GET {{backend}}/api/v1/sales/{{current.response.body.$.id}}/queue/me/events
@@ -120,7 +121,7 @@ x-queue-ticket: {{join.response.body.$.ticket}}
 POST {{backend}}/api/v1/sales/{{current.response.body.$.id}}/reservations
 x-queue-ticket: {{join.response.body.$.ticket}}
 
-### Pay for the held item (201, or 200 with the same purchase when sent again; 402 payment_failed keeps the hold)
+### Pay for the held item (201, or 200 with the same purchase when sent again; 402 payment_failed keeps the hold and a retry charges again)
 POST {{backend}}/api/v1/sales/{{current.response.body.$.id}}/purchases
 Content-Type: application/json
 
