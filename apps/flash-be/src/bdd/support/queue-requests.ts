@@ -1,12 +1,15 @@
 // The requests every layer sends the same way: the queue, the reserve, the purchase, the public sale reads and the
 // limit scenarios. Each one reads the sale the scenario is on when the request is sent, and records the reply.
+
 import { randomInt } from "node:crypto";
+import { API_PATHS } from "@flash/flash-commons";
 import type { FastifyInstance } from "fastify";
 import type {
 	QueueScenario,
 	Response,
 	ShopScenario,
 } from "./queue-scenario.js";
+import { salePath } from "./sale-path.js";
 
 // The key a shopper has in the scenario's maps: the name as the server normalizes it.
 export const shopperKey = (user: string): string => user.trim().toLowerCase();
@@ -29,7 +32,7 @@ export function queueRequests(app: FastifyInstance, scenario: QueueScenario) {
 		async tryLogin(user: string): Promise<Response> {
 			scenario.response = await app.inject({
 				method: "POST",
-				url: "/api/v1/auth/login",
+				url: API_PATHS.authLogin,
 				remoteAddress: address,
 				payload: { username: user, password: "not the password" },
 			});
@@ -38,7 +41,7 @@ export function queueRequests(app: FastifyInstance, scenario: QueueScenario) {
 		async join(user: string, saleId = scenario.saleId): Promise<Response> {
 			const reply = await app.inject({
 				method: "POST",
-				url: `/api/v1/sales/${saleId}/queue`,
+				url: salePath("queue", saleId),
 				headers: { cookie: await scenario.login(user) },
 			});
 			scenario.response = reply;
@@ -52,7 +55,7 @@ export function queueRequests(app: FastifyInstance, scenario: QueueScenario) {
 		async check(user: string, ticket?: string): Promise<Response> {
 			scenario.response = await app.inject({
 				method: "GET",
-				url: `/api/v1/sales/${scenario.saleId}/queue/me`,
+				url: salePath("queueMe", scenario.saleId),
 				headers: {
 					cookie: await scenario.login(user),
 					...ticketHeader(ticket),
@@ -73,7 +76,7 @@ export function reserveRequests(app: FastifyInstance, scenario: ShopScenario) {
 		const ticket = options.ticket ?? scenario.tickets.get(key);
 		const reply = await app.inject({
 			method: "POST",
-			url: `/api/v1/sales/${options.saleId ?? scenario.saleId}/reservations`,
+			url: salePath("reservations", options.saleId ?? scenario.saleId),
 			headers: {
 				cookie: await scenario.login(user),
 				...ticketHeader(ticket),
@@ -108,7 +111,7 @@ export function purchaseRequests(app: FastifyInstance, scenario: ShopScenario) {
 			options.reservationId ?? scenario.holds.get(owner)?.reservationId;
 		const reply = await app.inject({
 			method: "POST",
-			url: `/api/v1/sales/${options.saleId ?? scenario.saleId}/purchases`,
+			url: salePath("purchases", options.saleId ?? scenario.saleId),
 			headers: { cookie: await scenario.login(user) },
 			payload: { reservationId },
 		});
@@ -139,7 +142,7 @@ export function purchaseRequests(app: FastifyInstance, scenario: ShopScenario) {
 		async outcome(user: string, saleId = scenario.saleId) {
 			scenario.response = await app.inject({
 				method: "GET",
-				url: `/api/v1/sales/${saleId}/purchases/me`,
+				url: salePath("purchaseMe", saleId),
 				headers: { cookie: await scenario.login(user) },
 			});
 			return scenario.response;
@@ -147,7 +150,7 @@ export function purchaseRequests(app: FastifyInstance, scenario: ShopScenario) {
 		async saleView() {
 			const reply = await app.inject({
 				method: "GET",
-				url: `/api/v1/sales/${scenario.saleId}`,
+				url: salePath("sale", scenario.saleId),
 			});
 			return reply.json();
 		},
@@ -160,14 +163,14 @@ export function saleRequests(app: FastifyInstance, scenario: ShopScenario) {
 		async readSale() {
 			scenario.response = await app.inject({
 				method: "GET",
-				url: `/api/v1/sales/${scenario.saleId}`,
+				url: salePath("sale", scenario.saleId),
 			});
 			return scenario.response;
 		},
 		async readCurrentSale() {
 			scenario.response = await app.inject({
 				method: "GET",
-				url: "/api/v1/sales/current",
+				url: API_PATHS.saleCurrent,
 			});
 			return scenario.response;
 		},

@@ -15,6 +15,11 @@ scan:
     - worktrees
     - local-tmp
     - generated-reports
+    # Test output that Playwright and Vitest write, ignored by git.
+    - test-results
+    - playwright-report
+    - coverage
+    - .features-gen
 
 policies:
   markdown:

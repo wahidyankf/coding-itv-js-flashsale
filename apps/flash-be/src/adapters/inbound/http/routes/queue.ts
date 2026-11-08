@@ -6,7 +6,7 @@ import type { FastifyInstance } from "fastify";
 import type { Dependencies } from "../../../../application/dependencies.js";
 import type { QueuePlace } from "../../../../domain/queue.js";
 import type { Username } from "../../../../domain/user.js";
-import { type StreamOptions, serveEvents } from "../event-stream.js";
+import { type StreamContext, serveEvents } from "../event-stream.js";
 import {
 	createGuards,
 	type SaleParams,
@@ -28,7 +28,7 @@ type PlaceEvent = { event: "place"; data: ReturnType<typeof placeBody> };
 export function registerQueueRoutes(
 	app: FastifyInstance,
 	deps: Dependencies,
-	stream: StreamOptions,
+	stream: StreamContext,
 ): void {
 	const { needSession, limit } = createGuards(deps);
 

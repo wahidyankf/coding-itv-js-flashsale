@@ -1,5 +1,6 @@
 // The steps of specs/apps/flash/be/behaviours/auth/sessions.feature, as both layers bind them. Each scenario gets the auth
 // world its layer makes; the titles stay in the layer's test file, where the behaviour checker reads them.
+import { API_PATHS } from "@flash/flash-commons";
 import { expect } from "vitest";
 import { loggedInAs, signedUp } from "./auth-steps.js";
 import type { AuthWorld } from "./auth-world.js";
@@ -165,7 +166,7 @@ function refreshWithoutToken(newWorld: () => AuthWorld): ScenarioBinder {
 		const world = newWorld();
 
 		When("someone who is not logged in refreshes the login", async () => {
-			await world.anonymous("POST", "/api/v1/auth/refresh");
+			await world.anonymous("POST", API_PATHS.authRefresh);
 		});
 		Then("the response status is {int}", statusIs(world));
 		And("the error is {string}", errorIs(world));

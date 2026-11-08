@@ -2,7 +2,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildConfig, describeConfig } from "./config.js";
+import { buildConfig, configFields } from "./config.js";
 import { localDefaults } from "./local-defaults.js";
 
 // How the environment becomes a Config is a detail of the code, so it is checked here and not with scenarios.
@@ -29,6 +29,15 @@ describe("local defaults", () => {
 		expect(config.trustProxy).toBe(false);
 		expect(config.saleCacheMs).toBe(1000);
 		expect(config.eventsIntervalMs).toBe(1000);
+	});
+
+	it("log at the info level", () => {
+		expect(config.logLevel).toBe("info");
+	});
+
+	it("set the drain window and the time limit of a shutdown", () => {
+		expect(config.shutdownDrainMs).toBe(2000);
+		expect(config.shutdownTimeoutMs).toBe(10_000);
 	});
 });
 
@@ -76,6 +85,9 @@ describe("values from the environment", () => {
 			EVENTS_INTERVAL_MS: "250",
 			ADMISSION_TICK_MS: "100",
 			ADMISSION_TTL_SECONDS: "30",
+			SHUTDOWN_DRAIN_MS: "0",
+			SHUTDOWN_TIMEOUT_MS: "5000",
+			LOG_LEVEL: "debug",
 		});
 		expect(config).toMatchObject({
 			paymentLatencyMs: 0,
@@ -87,6 +99,9 @@ describe("values from the environment", () => {
 			eventsIntervalMs: 250,
 			admissionTickMs: 100,
 			admissionTtlSeconds: 30,
+			shutdownDrainMs: 0,
+			shutdownTimeoutMs: 5000,
+			logLevel: "debug",
 		});
 	});
 });
@@ -113,24 +128,69 @@ describe("invalid values", () => {
 		["EVENTS_INTERVAL_MS", "0", "must be a positive integer"],
 		["EVENTS_INTERVAL_MS", "abc", "must be a positive integer"],
 		["EVENTS_INTERVAL_MS", "-5", "must be a positive integer"],
+		["SHUTDOWN_DRAIN_MS", "-1", "must be zero or a positive integer"],
+		["SHUTDOWN_DRAIN_MS", "soon", "must be zero or a positive integer"],
+		["SHUTDOWN_TIMEOUT_MS", "0", "must be a positive integer"],
+		[
+			"LOG_LEVEL",
+			"verbose",
+			"must be one of fatal, error, warn, info, debug, trace, silent",
+		],
+		[
+			"LOG_LEVEL",
+			"INFO",
+			"must be one of fatal, error, warn, info, debug, trace, silent",
+		],
 	])("refuses %s=%s", (name, value, rule) => {
 		expect(() => buildConfig({ [name]: value })).toThrow(`${name} ${rule}`);
 	});
 });
 
-// The startup line is read by the e2e suite. It must show host and port and never a password.
-it("describeConfig shows host and port without credentials", () => {
-	const line = describeConfig(
+// Every level pino knows is accepted, and nothing else, so a typo cannot silence the log.
+it.each(["fatal", "error", "warn", "info", "debug", "trace", "silent"])(
+	"accepts LOG_LEVEL=%s",
+	(level) => {
+		expect(buildConfig({ LOG_LEVEL: level }).logLevel).toBe(level);
+	},
+);
+
+// A time limit that the drain window alone uses up would fail every shutdown, so it is refused at start.
+it("refuses a shutdown time limit that is not longer than the drain window", () => {
+	expect(() =>
+		buildConfig({ SHUTDOWN_DRAIN_MS: "3000", SHUTDOWN_TIMEOUT_MS: "3000" }),
+	).toThrow("SHUTDOWN_TIMEOUT_MS must be greater than SHUTDOWN_DRAIN_MS");
+});
+
+// The startup log line. It must show host and port and never a password or the ticket secret.
+it("configFields shows host and port without credentials", () => {
+	const fields = configFields(
 		buildConfig({
 			FLASH_BE_PORT: "9000",
 			DATABASE_URL: "postgres://u:secret@db:5432/x",
-			REDIS_URL: "redis://cache:6379",
+			REDIS_URL: "redis://:secret@cache:6379",
+			TICKET_SECRET: "ticket-secret-value",
 		}),
 	);
-	expect(line).toBe(
-		"flash-be config: port=9000 database=db:5432 redis=cache:6379 payment=150ms/0.02 limit=30/600/10s cache=1000ms events=1000ms proxy=false secureCookies=false",
-	);
-	expect(line).not.toContain("secret");
+	expect(fields).toEqual({
+		port: 9000,
+		database: "db:5432",
+		redis: "cache:6379",
+		paymentLatencyMs: 150,
+		paymentFailureRate: 0.02,
+		rateLimitPerUser: 30,
+		rateLimitPerIp: 600,
+		rateLimitWindowSeconds: 10,
+		saleCacheMs: 1000,
+		eventsIntervalMs: 1000,
+		trustProxy: false,
+		cookieSecure: false,
+		shutdownDrainMs: 2000,
+		shutdownTimeoutMs: 10000,
+		logLevel: "info",
+	});
+	const text = JSON.stringify(fields);
+	expect(text).not.toContain("secret");
+	expect(text).not.toContain("u:");
 });
 
 it("reads TRUST_PROXY as a true or false flag", () => {
@@ -192,8 +252,8 @@ describe("the cookies of a login", () => {
 		);
 	});
 
-	it("shows in the one line of the config", () => {
-		expect(describeConfig(buildConfig({}))).toContain("secureCookies=false");
+	it("shows in the startup log line", () => {
+		expect(configFields(buildConfig({})).cookieSecure).toBe(false);
 	});
 });
 

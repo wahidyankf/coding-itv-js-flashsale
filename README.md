@@ -87,7 +87,8 @@ flowchart LR
 1. **Join the queue.** The shopper presses Buy Now. The API puts them in the waiting queue and returns a ticket.
 2. **Hold an item.** An admitted shopper reserves. A Redis script counts the stock, the holds and the buyers in one
    step and takes one item for a limited time. The hold is also written to Postgres.
-3. **Pay.** The shopper confirms. The payment is charged once, however often the request is repeated. A short Postgres
+3. **Pay.** The shopper confirms. The payment is charged once, however often the request is repeated and on whichever
+   API instance it lands: the mock keeps a ledger in Postgres. A short Postgres
    transaction raises `sold` only while `sold < stock` and inserts the purchase, which is unique per shopper.
 4. **Ask "did I get it".** One call returns the purchase, a live hold, or nothing.
 
@@ -212,7 +213,7 @@ Each row is a choice a reviewer may question, with what it buys and what it cost
 | Serving without Redis ([003](docs/explanation/decisions/003-keep-selling-without-redis.md))                          | Redis down means the queue lets every shopper in at once, reserve runs on Postgres under a row lock, and `/ready` reports 503. Redis is rebuilt from Postgres when it returns | The Postgres path is slower under load                                                    |
 | Sale read cache of one second, with Server-Sent Events ([008](docs/explanation/decisions/008-server-sent-events.md)) | Many readers cost one database read a second, and the page gets each change over one open HTTP stream. Writes never use the cache                                             | The page can be a second old                                                              |
 | Rate limit per user and per address ([how](docs/explanation/rate-limiting.md))                                       | A flood gets `429` with `Retry-After`, not a slow server                                                                                                                      | Shoppers behind one address share a limit                                                 |
-| In-process mock payment ([009](docs/explanation/decisions/009-in-process-mock-payment.md))                           | The flow, the refund and the retry rules are real; no provider is needed                                                                                                      | It proves nothing about a real provider                                                   |
+| In-process mock payment ([009](docs/explanation/decisions/009-in-process-mock-payment.md))                           | The flow, the refund and the retry rules are real, and a ledger in Postgres charges a hold once across instances; no provider is needed                                       | It proves nothing about a real provider                                                   |
 | Accounts and cookie sessions ([007](docs/explanation/decisions/007-accounts-and-cookie-sessions.md))                 | Sign-up with a password (scrypt), an access and a refresh cookie, only token hashes stored, roles `shopper` and `operator` ([how](docs/explanation/authentication.md))        | No password reset, e-mail check or two-factor step                                        |
 | The browser talks to the web server only ([006](docs/explanation/decisions/006-browser-talks-to-web-server-only.md)) | The API needs no CORS and no public address, and an allow-list keeps the operator routes away from the browser                                                                | One more hop for every sale call                                                          |
 | A hexagon in the API only ([004](docs/explanation/decisions/004-hexagon-in-the-api-only.md))                         | The sale rules are tested without Postgres or Redis, and a unit test fails on a wrong import                                                                                  | More files than a flat API; the page stays plain React                                    |
@@ -326,6 +327,8 @@ npm run prod:create-operator -- --username=ops --password='<a long password>'
 npm run prod:seed-sale -- --stock=5 --duration-minutes=60
 curl localhost:8080/ready      # Postgres and Redis ok
 open localhost:3000            # the sale page (macOS; elsewhere open it in a browser)
+npm run prod:logs              # follow the logs of every service
+npm run prod:trace -- <id>     # one request by its x-request-id, through nginx, flash-web and the API
 npm run docker:prod:down       # stop the stack (volumes are kept)
 ```
 
@@ -337,6 +340,11 @@ and 3000; Postgres, Redis and the instances are not. The stack reads `POSTGRES_*
 [`.env.example`](.env.example) sets it to `false`, so a stack started from a copy of that file sends the cookies over plain HTTP. Set
 it to `true` behind TLS. `npm run smoke:prod` builds the stack under its own name and walks one shopper through it (see
 [the smoke test](docs/how-to/smoke-test-the-production-stack.md)).
+
+Every reply carries an `x-request-id`, and every log line of that request holds it, so one request can be found in the
+logs of each service ([read the logs and trace a request](docs/how-to/trace-a-request.md)). An instance that is asked to
+stop answers `503` on `/ready`, finishes the requests in flight, ends its event streams and exits
+([stopping](docs/explanation/liveness-and-readiness.md#stopping)).
 
 ## Tests
 
@@ -357,8 +365,8 @@ npx nx test:quick typekit      # a library: typecheck + lint + unit tests (no Do
 npx nx test:quick flash-commons # the other library, the same way
 npm run lint:rules:test        # the lint rules: no catch, exhaustive switches
 npm run build:script:test      # the build script: tsc, then remove outputs this run did not write
-npm run bdd:check              # every scenario is bound at the layers it needs
 npm run trace:script:test      # the log tracer of prod:trace
+npm run bdd:check              # every scenario is bound at the layers it needs
 npm run lint                   # Biome check of the whole repo: format, lint, imports
 npm run docs:install           # once: fetch the docs checker
 npm run docs:check             # links, structure and diagrams in the docs

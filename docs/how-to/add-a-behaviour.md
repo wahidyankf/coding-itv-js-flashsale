@@ -37,7 +37,7 @@ Add it to a feature file under [`specs/apps/flash/be/behaviours/`](../../specs/a
 folder's `README.md`:
 
 ```markdown
-- [shutdown.feature](shutdown.feature) - what the API does when it is asked to stop.
+- [version.feature](version.feature) - what the API says about the version it runs.
 ```
 
 Every `.feature` file must be linked from the `README.md` next to it. The check fails without the link.
@@ -49,9 +49,9 @@ feature file, such as [`health_tests.ts`](../../apps/flash-be/src/bdd/health_tes
 
 ```ts
 describeFeature(
-	await loadFeature(specFile("flash/be/behaviours/health/shutdown.feature")),
+	await loadFeature(specFile("flash/be/behaviours/health/version.feature")),
 	({ Scenario }) => {
-		Scenario("The API stops when asked", ({ Given, When, Then }) => {
+		Scenario("The API reports the version it runs", ({ Given, When, Then }) => {
 			// Steps go here.
 		});
 	},
@@ -115,7 +115,7 @@ If a layer cannot prove the scenario, tag it and write the comment directly abov
 ```gherkin
 # Exemption(e2e): <why this layer cannot prove it>; alternative-proof: flash-be:integration / <scenario name>
 @e2e-exempt
-Scenario: The API stops when asked
+Scenario: The API reports the version it runs
 ```
 
 The alternative proof must name a scenario that is bound at a different layer. The unit layer cannot be exempt.

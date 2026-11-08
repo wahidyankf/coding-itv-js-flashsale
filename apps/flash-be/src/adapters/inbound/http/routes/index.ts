@@ -2,7 +2,7 @@
 // inputs and replies are in docs/reference/http-endpoints.md. Inbound HTTP adapter.
 import type { FastifyInstance } from "fastify";
 import type { Dependencies } from "../../../../application/dependencies.js";
-import type { StreamOptions } from "../event-stream.js";
+import type { StreamContext } from "../event-stream.js";
 import { registerAdminRoutes } from "./admin.js";
 import { registerAuthRoutes } from "./auth.js";
 import { registerHealthRoutes } from "./health.js";
@@ -11,16 +11,17 @@ import { registerQueueRoutes } from "./queue.js";
 import { registerReservationRoutes } from "./reservations.js";
 import { registerSaleRoutes } from "./sales.js";
 
-// Registers every route on `app`. `stream` paces the event streams. `cookies.secure` says whether the login cookies may
-// only travel over HTTPS; off behind plain HTTP, where a browser would not send them back.
+// Registers every route on `app`. `stream` paces the event streams and holds the open ones. `edge.secure` says whether the
+// login cookies may only travel over HTTPS; off behind plain HTTP, where a browser would not send them back.
+// `edge.isStopping` turns readiness to 503 once the process was asked to stop.
 export function registerRoutes(
 	app: FastifyInstance,
 	deps: Dependencies,
-	stream: StreamOptions,
-	cookies: { secure: boolean },
+	stream: StreamContext,
+	edge: { secure: boolean; isStopping: () => boolean },
 ): void {
-	registerHealthRoutes(app, deps);
-	registerAuthRoutes(app, deps, cookies);
+	registerHealthRoutes(app, deps, edge.isStopping);
+	registerAuthRoutes(app, deps, { secure: edge.secure });
 	registerSaleRoutes(app, deps, stream);
 	registerQueueRoutes(app, deps, stream);
 	registerReservationRoutes(app, deps);

@@ -4,6 +4,7 @@
 import { HTTP_STATUS } from "@flash/flash-commons";
 import { attemptAsync } from "@flash/typekit";
 import type { FastifyReply, FastifyRequest } from "fastify";
+import { REQUEST_ID_HEADER } from "./headers.js";
 
 // SSE clients skip lines that start with a colon, so this keeps the connection alive without an event.
 const KEEP_ALIVE_FRAME = ": keep-alive\n\n";
@@ -16,6 +17,39 @@ export type StreamOptions = {
 	// A comment line is sent when nothing else was, so proxies do not close an idle connection.
 	heartbeatMs: number;
 };
+
+// The streams that are open now. The app ends each one when it closes, so a stream never holds a stopping server open
+// and its client reconnects, with its own backoff, to an instance that is still running.
+export type OpenStreams = {
+	// Records a stream by the function that ends it. Returns the function that forgets it, for a client that left. Once
+	// endAll ran, a new stream is ended at once: a reconnect on a kept-alive connection must not hold the close open.
+	add: (end: () => void) => () => void;
+	// Ends every stream that is still open, and every stream added after it.
+	endAll: () => void;
+};
+
+// What a route hands to serveEvents: the pacing, and the open streams the stream joins.
+export type StreamContext = StreamOptions & { open: OpenStreams };
+
+// A new, empty set of open streams. Each app has its own.
+export function createOpenStreams(): OpenStreams {
+	const ends = new Set<() => void>();
+	let ended = false;
+	return {
+		add: (end) => {
+			if (ended) {
+				end();
+				return () => {};
+			}
+			ends.add(end);
+			return () => ends.delete(end);
+		},
+		endAll: () => {
+			ended = true;
+			for (const end of [...ends]) end();
+		},
+	};
+}
 
 // One thing to tell the client. `data` is sent as JSON and compared with the last one, so an unchanged state is
 // not repeated.
@@ -32,13 +66,14 @@ export function formatEvent(item: StreamItem): string {
 	return `event: ${item.event}\ndata: ${JSON.stringify(item.data)}\n\n`;
 }
 
-// Streams what `read` returns to the client, once per interval, and only when it changed. Callers check the request
+// Streams what `read` returns to the client, once per interval, and only when it changed, until the client leaves or the
+// app closes and ends it through `options.open`. Callers check the request
 // first: once the reply is hijacked, an error cannot be sent as a JSON reply.
 export function serveEvents(
 	request: FastifyRequest,
 	reply: FastifyReply,
 	read: () => Promise<StreamItem | undefined>,
-	options: StreamOptions,
+	options: StreamContext,
 	log: (error: unknown) => void,
 ): void {
 	reply.hijack();
@@ -49,6 +84,8 @@ export function serveEvents(
 		connection: "keep-alive",
 		// Tells nginx not to buffer the stream.
 		"x-accel-buffering": "no",
+		// A hijacked reply skips the hooks, so the stream names its request here.
+		[REQUEST_ID_HEADER]: request.id,
 	});
 
 	let closed = false;
@@ -59,8 +96,9 @@ export function serveEvents(
 	const tick = async (): Promise<void> => {
 		const sent = await attemptAsync(async () => {
 			const item = await read();
-			// Nothing to tell: no event and no keep-alive. The next interval asks again.
-			if (item === undefined) return;
+			// Nothing to tell: no event and no keep-alive. The next interval asks again. A stream that ended during the
+			// read is not written to again.
+			if (item === undefined || closed) return;
 			const key = JSON.stringify(item);
 			if (key !== last) {
 				last = key;
@@ -76,9 +114,18 @@ export function serveEvents(
 		if (!closed) timer = setTimeout(tick, options.intervalMs);
 	};
 
-	request.raw.on("close", () => {
+	const stop = (): void => {
 		closed = true;
 		clearTimeout(timer);
+	};
+	const forget = options.open.add(() => {
+		stop();
+		raw.end();
 	});
-	void tick();
+	request.raw.on("close", () => {
+		stop();
+		forget();
+	});
+	// A stream the app ended as it was added is not read at all.
+	if (!closed) void tick();
 }

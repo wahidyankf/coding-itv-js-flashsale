@@ -32,7 +32,8 @@ from the page. If the interval had to drop to tens of milliseconds, pub/sub woul
 
 The ticket and the sale are checked once, when the stream opens, so a mistake gets a normal JSON error. After that a
 failed read is logged and skipped, and the next interval tries again. When the client leaves, the loop stops. When the
-server closes, it drops open streams so it does not wait for them.
+server stops, it ends every open stream cleanly after its drain window (see
+[liveness and readiness](liveness-and-readiness.md#stopping)), so the browser reconnects to another instance.
 
 ## What the browser sees
 

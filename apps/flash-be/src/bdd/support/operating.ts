@@ -1,11 +1,13 @@
 // The operator's steps for the scenarios: the requests an operator sends (create, change, move, remove, list) and the
 // logins they send them with. The unit and the integration layer each supply an OperatingLayer, so the same steps
 // run in both.
-import { MS_PER_MINUTE } from "@flash/flash-commons";
+
+import { API_PATHS, MS_PER_MINUTE } from "@flash/flash-commons";
 import type { FastifyInstance } from "fastify";
 import type { Role } from "../../domain/auth.js";
 import { type Method, sendRequest } from "./http.js";
 import type { Response } from "./response.js";
+import { salePath } from "./sale-path.js";
 
 // The reply type the operator steps read, re-exported so a caller of this world needs no second import.
 export type { Response };
@@ -84,7 +86,7 @@ function windowAt(now: Date, startsInMinutes: number, minutes: number) {
 
 // The operator creates a sale, and the scene remembers its id when the API made it.
 async function create(scene: Scene, sale: SaleInput, sender: Sender) {
-	const reply = await send(scene, "POST", "/api/v1/admin/sales", sender, {
+	const reply = await send(scene, "POST", API_PATHS.adminSales, sender, {
 		stock: sale.stock,
 		...windowAt(scene.layer.now(), sale.startsInMinutes, sale.minutes),
 		...(sale.productId === undefined ? {} : { productId: sale.productId }),
@@ -113,7 +115,7 @@ function operate(
 	const named = NAMED_SALE.exec(said);
 	const saleId = named?.[1] ?? scene.memory.lastSaleId;
 	const phrase = said.replace(NAMED_SALE, "that sale");
-	const url = `/api/v1/admin/sales/${saleId}`;
+	const url = salePath("adminSale", saleId);
 	const change = CHANGE_PHRASE.exec(phrase);
 	if (change) return send(scene, "PATCH", url, sender, changeBody(change));
 	const move = MOVE_PHRASE.exec(phrase);
@@ -129,7 +131,7 @@ function operate(
 	}
 	if (phrase === "removes that sale") return send(scene, "DELETE", url, sender);
 	if (phrase === "lists the sales") {
-		return send(scene, "GET", "/api/v1/admin/sales", sender);
+		return send(scene, "GET", API_PATHS.adminSales, sender);
 	}
 	throw new Error(`the operator cannot ${said}`);
 }
@@ -191,10 +193,9 @@ export function operatorWorld(layer: OperatingLayer) {
 		operate: (phrase: string, sender: Sender) => operate(scene, phrase, sender),
 		// The public read of that sale, as a shopper sees it.
 		readSale: () =>
-			send(scene, "GET", `/api/v1/sales/${scene.memory.lastSaleId}`, undefined),
-		readCurrentSale: () =>
-			send(scene, "GET", "/api/v1/sales/current", undefined),
-		listSales: () => send(scene, "GET", "/api/v1/admin/sales", "operator"),
+			send(scene, "GET", salePath("sale", scene.memory.lastSaleId), undefined),
+		readCurrentSale: () => send(scene, "GET", API_PATHS.saleCurrent, undefined),
+		listSales: () => send(scene, "GET", API_PATHS.adminSales, "operator"),
 		get saleId() {
 			return scene.memory.lastSaleId;
 		},

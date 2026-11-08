@@ -1,8 +1,10 @@
 // The Server-Sent Events streams of a queue scenario: the sale's stream and a shopper's place stream. A stream needs a
 // real socket, so the app listens on a free port the first time a scenario opens one.
+
 import type { FastifyInstance } from "fastify";
 import { shopperKey, ticketHeader } from "./queue-requests.js";
 import type { EventWatcher, ShopScenario } from "./queue-scenario.js";
+import { salePath } from "./sale-path.js";
 
 const origins = new WeakMap<FastifyInstance, string>();
 
@@ -77,10 +79,10 @@ export function eventRequests(app: FastifyInstance, scenario: ShopScenario) {
 	};
 	return {
 		watchSale: (saleId = scenario.saleId) =>
-			watch(`/api/v1/sales/${saleId}/events`),
+			watch(salePath("saleEvents", saleId)),
 		watchPlace: async (user: string, ticket?: string) => {
 			const given = ticket ?? scenario.tickets.get(shopperKey(user));
-			return watch(`/api/v1/sales/${scenario.saleId}/queue/me/events`, {
+			return watch(salePath("queueMeEvents", scenario.saleId), {
 				cookie: await scenario.login(user),
 				...ticketHeader(given),
 			});

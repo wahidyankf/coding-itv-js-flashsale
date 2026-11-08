@@ -5,7 +5,7 @@ import { API_PATHS, HTTP_STATUS, MS_PER_SECOND } from "@flash/flash-commons";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import type { Dependencies } from "../../../../application/dependencies.js";
 import type { SaleWithStatus } from "../../../../application/sale-service.js";
-import { type StreamOptions, serveEvents } from "../event-stream.js";
+import { type StreamContext, serveEvents } from "../event-stream.js";
 import { describeSale, type SaleView } from "../sale-view.js";
 import type { SaleParams } from "./guards.js";
 import { sendError } from "./reply.js";
@@ -18,7 +18,7 @@ type SaleEvent = { event: "sale"; data: SaleView };
 export function registerSaleRoutes(
 	app: FastifyInstance,
 	deps: Dependencies,
-	stream: StreamOptions,
+	stream: StreamContext,
 ): void {
 	// Public sale reads may be kept for the cache time. Zero means no cache header at all. The time is read from the cache
 	// the composition set, so the header and the reads agree.

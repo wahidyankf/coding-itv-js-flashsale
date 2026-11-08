@@ -11,6 +11,7 @@ import { createMockPayment } from "./adapters/outbound/payment/mock-payment.js";
 import { createAccountRepository } from "./adapters/outbound/postgres/account-repository.js";
 import type { Database } from "./adapters/outbound/postgres/database.js";
 import { checkDatabase } from "./adapters/outbound/postgres/health.js";
+import { withRebuildLog } from "./adapters/outbound/postgres/logged-rebuild.js";
 import { createPostgresPaymentLedger } from "./adapters/outbound/postgres/payment-ledger.js";
 import { createPurchaseRepository } from "./adapters/outbound/postgres/purchase-repository.js";
 import { createReservationRepository } from "./adapters/outbound/postgres/reservation-repository.js";
@@ -31,6 +32,7 @@ import {
 import type { Dependencies } from "./application/dependencies.js";
 import { createGuardedGate } from "./application/guarded-gate.js";
 import type { Clock } from "./application/ports/clock.js";
+import { type Logger, silentLogger } from "./application/ports/logger.js";
 import { createPurchaseService } from "./application/purchase-service.js";
 import { createQueueService } from "./application/queue-service.js";
 import {
@@ -62,7 +64,11 @@ export type WiringSettings = Pick<
 	| "rateLimitPerIp"
 	| "authRateLimitPerIp"
 	| "saleCacheMs"
->;
+> & {
+	// Where the events an operator acts on go (a gate rebuild, a refund). main.ts passes the server's log; nothing is
+	// logged when it is left out.
+	log?: Logger;
+};
 
 // The rate limits in the shape the rate limiter takes. Only the names change; the values are the same.
 function rateLimitsFrom(settings: WiringSettings): RateLimits {
@@ -84,6 +90,7 @@ export function dependenciesFrom(
 	clock: Clock = systemClock,
 	cache: SaleCacheSettings = { ttlMs: settings.saleCacheMs },
 ): Dependencies {
+	const log = settings.log ?? silentLogger;
 	const sales = createSaleService(createSaleRepository(db), clock, cache);
 	const gate = createGuardedGate(createRedisHoldGate(redis));
 	const queue = createQueueService(
@@ -109,7 +116,7 @@ export function dependenciesFrom(
 		queue,
 		reservations: createReservationService({
 			gate,
-			repository: createReservationRepository(db),
+			repository: withRebuildLog(createReservationRepository(db), log),
 			sales,
 			queue,
 			clock,
@@ -126,7 +133,8 @@ export function dependenciesFrom(
 				ledger: createPostgresPaymentLedger(db),
 				latencyMs: settings.paymentLatencyMs,
 				failureRate: settings.paymentFailureRate,
-				log: console.log,
+				// A refund follows a purchase that lost the race for the last item; the line names the charge it gave back.
+				log: (message) => log.info({}, message),
 			}),
 			gate,
 			sales,

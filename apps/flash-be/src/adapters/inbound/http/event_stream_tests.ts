@@ -10,6 +10,7 @@ import { usernameOf } from "../../../bdd/support/users.js";
 import { userIdOf } from "../../../domain/user.js";
 import { buildApp } from "./app.js";
 import {
+	createOpenStreams,
 	DEFAULT_STREAM_OPTIONS,
 	formatEvent,
 	serveEvents,
@@ -64,13 +65,20 @@ async function readUntil(
 	return seen;
 }
 
-// A reply and a request with only the parts `serveEvents` touches. Each write and the close listener are recorded.
+// A reply and a request with only the parts `serveEvents` touches. Each write, the end and the close listener are recorded.
 function streamDouble() {
 	const written: string[] = [];
+	const state = { ended: false };
 	let onClose: () => void = () => {};
 	const reply = {
 		hijack: () => {},
-		raw: { writeHead: () => {}, write: (text: string) => written.push(text) },
+		raw: {
+			writeHead: () => {},
+			write: (text: string) => written.push(text),
+			end: () => {
+				state.ended = true;
+			},
+		},
 	} as unknown as FastifyReply;
 	const request = {
 		raw: {
@@ -79,8 +87,37 @@ function streamDouble() {
 			},
 		},
 	} as unknown as FastifyRequest;
-	return { written, reply, request, close: () => onClose() };
+	return { written, state, reply, request, close: () => onClose() };
 }
+
+describe("createOpenStreams", () => {
+	it("ends a stream at once when it is added after every stream was ended", () => {
+		const open = createOpenStreams();
+		open.endAll();
+		let ended = 0;
+		const forget = open.add(() => {
+			ended++;
+		});
+		// The client leaving later forgets nothing and ends nothing again.
+		forget();
+		open.endAll();
+		expect(ended).toBe(1);
+	});
+
+	it("ends the streams that are open, once each", () => {
+		const open = createOpenStreams();
+		let ended = 0;
+		const forget = open.add(() => {
+			ended++;
+		});
+		open.add(() => {
+			ended++;
+		});
+		forget();
+		open.endAll();
+		expect(ended).toBe(1);
+	});
+});
 
 describe("serveEvents", () => {
 	it("sends nothing, not even a keep-alive, and logs nothing when the read has nothing to tell", async () => {
@@ -90,13 +127,35 @@ describe("serveEvents", () => {
 			stream.request,
 			stream.reply,
 			async () => undefined,
-			{ intervalMs: 1000, heartbeatMs: 0 },
+			{ intervalMs: 1000, heartbeatMs: 0, open: createOpenStreams() },
 			(error) => logged.push(error),
 		);
 		await new Promise((resolve) => setTimeout(resolve, 5));
 		stream.close();
 		expect(stream.written).toEqual([]);
 		expect(logged).toEqual([]);
+	});
+
+	// A reconnect on a kept-alive connection can arrive after the app ended its streams. It must not hold the close open.
+	it("ends a stream that opens after the app ended its streams, without reading", async () => {
+		const stream = streamDouble();
+		const open = createOpenStreams();
+		open.endAll();
+		let reads = 0;
+		serveEvents(
+			stream.request,
+			stream.reply,
+			async () => {
+				reads++;
+				return { event: "sale", data: {} };
+			},
+			{ intervalMs: 1, heartbeatMs: 0, open },
+			() => {},
+		);
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		expect(stream.state.ended).toBe(true);
+		expect(reads).toBe(0);
+		expect(stream.written).toEqual([]);
 	});
 });
 

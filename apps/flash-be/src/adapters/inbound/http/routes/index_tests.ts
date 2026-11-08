@@ -3,7 +3,7 @@
 import Fastify from "fastify";
 import { describe, expect, it } from "vitest";
 import { healthyDeps } from "../../../../bdd/support/deps.js";
-import { DEFAULT_STREAM_OPTIONS } from "../event-stream.js";
+import { createOpenStreams, DEFAULT_STREAM_OPTIONS } from "../event-stream.js";
 import { registerRoutes } from "./index.js";
 
 // Every path the app serves, as written: the API under /api/v1 and the two probes at the root.
@@ -36,7 +36,12 @@ function registeredPaths(): string[] {
 	app.addHook("onRoute", (route) => {
 		paths.add(route.url);
 	});
-	registerRoutes(app, healthyDeps, DEFAULT_STREAM_OPTIONS, { secure: false });
+	registerRoutes(
+		app,
+		healthyDeps,
+		{ ...DEFAULT_STREAM_OPTIONS, open: createOpenStreams() },
+		{ secure: false, isStopping: () => false },
+	);
 	return [...paths].sort();
 }
 

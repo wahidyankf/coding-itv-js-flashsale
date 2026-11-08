@@ -8,7 +8,7 @@ import {
 	type ServerResponse,
 } from "node:http";
 import type { AddressInfo } from "node:net";
-import { MS_PER_SECOND } from "@flash/flash-commons";
+import { API_PATHS, MS_PER_SECOND } from "@flash/flash-commons";
 import { sleep } from "@flash/flash-commons/timers";
 import {
 	cleanup,
@@ -253,7 +253,7 @@ function setupOf(h: Harness, browserFetch: typeof fetch) {
 		},
 		async loggedIn(user: string) {
 			await browserFetch(
-				`${h.webUrl}/api/v1/auth/register`,
+				`${h.webUrl}${API_PATHS.authRegister}`,
 				jsonPost(JSON.stringify({ username: user, password: PASSWORD })),
 			);
 		},

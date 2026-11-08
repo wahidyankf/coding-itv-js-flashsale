@@ -13,5 +13,6 @@ Short guides for one task each. They assume you have run the project once (see t
 - [seed-a-sale.md](seed-a-sale.md) - create a sale with a stock and a window, read it back, and change, list or remove sales as an operator.
 - [run-the-load-test.md](run-the-load-test.md) - run the load test and read its result.
 - [smoke-test-the-production-stack.md](smoke-test-the-production-stack.md) - build the production stack, walk one shopper through it, and remove it.
+- [trace-a-request.md](trace-a-request.md) - read the logs of the stack and follow one request by its id through the web server, nginx and the API.
 - [change-an-endpoint.md](change-an-endpoint.md) - change a route and every place that calls it.
 - [handle-failures-with-result.md](handle-failures-with-result.md) - wrap a throwing call with `attempt`, return a `Result`, chain steps and close a switch.

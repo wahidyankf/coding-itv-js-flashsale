@@ -4,3 +4,7 @@
 
 // The header that carries the queue ticket. A ticket is sent in it, and nowhere else.
 export const TICKET_HEADER = "x-queue-ticket";
+
+// The header that names one request across flash-web, nginx and the API. The API keeps a caller's id only when it is a
+// UUID, makes one otherwise, logs it as `reqId`, and sends it back on every reply, so a shopper can quote it.
+export const REQUEST_ID_HEADER = "x-request-id";

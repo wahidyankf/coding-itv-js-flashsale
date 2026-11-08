@@ -1,5 +1,6 @@
 // Steps for the event streams: a client watches the sale or a shopper's place, and the events that come next (a sale's
-// status and items left, a place in line). Binds events/streaming.feature. A stream a scenario opens is closed in cleanup.
+// status and items left, a place in line). Binds events/streaming.feature, and the stream that ends in health/shutdown.feature.
+// A stream a scenario opens is closed in cleanup.
 
 import { MS_PER_HOUR } from "@flash/flash-commons";
 import type { APIRequestContext } from "@playwright/test";
@@ -140,3 +141,8 @@ Then(
 		);
 	},
 );
+
+// The API ends the stream when it stops, so the client reconnects elsewhere. No event comes before the end.
+Then("the event stream ends", async ({ request: _request }) => {
+	await expect(currentStream().next()).rejects.toThrow("the stream ended");
+});

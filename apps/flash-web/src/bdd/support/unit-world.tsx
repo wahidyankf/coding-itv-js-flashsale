@@ -2,7 +2,7 @@
 // the loader are the real code. flash-be is the fake backend, called as a function, and time is fake, so a scenario can
 // move it. The unit scenarios run here under Vitest. Test support only.
 
-import { MS_PER_SECOND } from "@flash/flash-commons";
+import { API_PATHS, MS_PER_SECOND } from "@flash/flash-commons";
 import {
 	act,
 	cleanup,
@@ -205,7 +205,7 @@ function setupOf(h: Harness, webFetch: typeof fetch) {
 		},
 		async loggedIn(user: string) {
 			await webFetch(
-				"/api/v1/auth/register",
+				API_PATHS.authRegister,
 				jsonPost(JSON.stringify({ username: user, password: PASSWORD })),
 			);
 		},

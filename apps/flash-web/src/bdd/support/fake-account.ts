@@ -3,6 +3,7 @@
 // support only.
 
 import {
+	AUTH_BASE_PATH,
 	MS_PER_HOUR,
 	MS_PER_MINUTE,
 	MS_PER_SECOND,
@@ -23,11 +24,11 @@ const cookie = (name: string, value: string, path: string, maxAgeMs: number) =>
 	`${name}=${value}; Path=${path}; Max-Age=${Math.floor(maxAgeMs / MS_PER_SECOND)}; HttpOnly; SameSite=Lax`;
 const cookiesOf = (session: Session) => [
 	cookie(ACCESS_COOKIE, session.access, "/", ACCESS_TTL_MS),
-	cookie(REFRESH_COOKIE, session.refresh, "/api/v1/auth", REFRESH_TTL_MS),
+	cookie(REFRESH_COOKIE, session.refresh, AUTH_BASE_PATH, REFRESH_TTL_MS),
 ];
 const clearedCookies = () => [
 	cookie(ACCESS_COOKIE, "", "/", 0),
-	cookie(REFRESH_COOKIE, "", "/api/v1/auth", 0),
+	cookie(REFRESH_COOKIE, "", AUTH_BASE_PATH, 0),
 ];
 const cookieValue = (header: string | undefined, name: string) =>
 	(header ?? "")

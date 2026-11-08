@@ -35,17 +35,34 @@ calls one `register...Routes` per area, and each route is declared with `app.rou
 
 ```ts
 const app = Fastify({
-	logger: options.logger ?? false,
+	...(options.logger === undefined
+		? { logger: false }
+		: { loggerInstance: options.logger }),
+	// The header is read in requestIdOf, not by Fastify, which would take any value it holds.
+	requestIdHeader: false,
+	genReqId: requestIdOf,
 	trustProxy: options.trustProxy ?? false,
-	// Open event streams must not keep the server from closing.
-	forceCloseConnections: true,
+	// A close drops only idle connections and waits for the requests in flight.
+	forceCloseConnections: "idle",
+	// A request that still reaches a closing server is answered as usual, so every error keeps the API's body.
+	return503OnClosing: false,
 });
+const isStopping = options.isStopping ?? (() => false);
+const open = createOpenStreams();
 answerErrors(app);
+closeGracefully(app, isStopping, open.endAll);
 
-registerRoutes(app, deps, options.events ?? DEFAULT_STREAM_OPTIONS, {
-	secure: options.cookieSecure,
-});
+registerRoutes(
+	app,
+	deps,
+	{ ...(options.events ?? DEFAULT_STREAM_OPTIONS), open },
+	{ secure: options.cookieSecure, isStopping },
+);
 ```
+
+The logger comes from `createLogger` in the same file, which sets the level and hides the cookie and authorization
+headers. `main.ts` makes it first, so the `flash-be config` line is written before Redis connects, and passes the same
+instance in.
 
 `answerErrors` sets `setNotFoundHandler` and `setErrorHandler`, so every error has the body `{ errorCode, errorMessage }`.
 An error that Fastify raises with a `4xx` `statusCode` becomes `invalid_request`; anything else is `internal`, logged, and
@@ -167,8 +184,12 @@ Each of these tests sends a login with `app.inject` and reads the `set-cookie` h
 
 ## Traps to avoid
 
-- **Open streams keep the server open.** By default `app.close()` closes only idle connections, and an event stream is
-  never idle. `forceCloseConnections: true` in [`app.ts`](../../../apps/flash-be/src/adapters/inbound/http/app.ts) closes them too.
+- **Open streams keep the server open.** `app.close()` waits for every connection that is not idle, and an event stream
+  is never idle. `forceCloseConnections: true` would cut it, and every request in flight with it. So
+  [`app.ts`](../../../apps/flash-be/src/adapters/inbound/http/app.ts) closes only idle connections (`"idle"`) and ends
+  the open streams itself in a `preClose` hook.
+- **`requestIdHeader` trusts the header as sent.** Fastify uses a set header's raw value without calling `genReqId`, so
+  junk would reach the logs. `app.ts` turns it off and reads the header inside `genReqId`, keeping only a UUID.
 - **`preValidation` runs after the body is parsed.** A guard that must run before the body is read goes in `onRequest`,
   as the admin and auth routes do.
 - **After `reply.hijack()`, Fastify sends nothing.** An error after that point cannot be a JSON reply. So a stream route

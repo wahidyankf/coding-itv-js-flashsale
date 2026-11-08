@@ -1,8 +1,9 @@
 // Binds specs/apps/flash/web/behaviours/proxy/api.feature at both the unit and the integration layer: the steps of each
 // scenario, over the layer's world. Each scenario keeps the reply of its own last request, so no reply carries from one
 // scenario to the next. The layer names the scenarios in its own test file, where the behaviour checker reads the titles.
-import { isUuid } from "@flash/flash-commons";
+import { API_PATHS, isUuid } from "@flash/flash-commons";
 import { expect } from "vitest";
+import { fillSaleId } from "../../api-paths";
 import {
 	isLoggedIn,
 	type OutlineBinder,
@@ -106,7 +107,7 @@ function writePassedOn(world: WebWorld): ScenarioBinder {
 		When("a client joins the queue through the web server", async () => {
 			last.answer = await world.send(
 				"POST",
-				`/api/v1/sales/${world.saleId}/queue`,
+				fillSaleId(API_PATHS.queue, world.saleId),
 				{},
 			);
 		});
@@ -128,7 +129,7 @@ function anonymousRefused(world: WebWorld): ScenarioBinder {
 		When("a client joins the queue through the web server", async () => {
 			last.answer = await world.send(
 				"POST",
-				`/api/v1/sales/${world.saleId}/queue`,
+				fillSaleId(API_PATHS.queue, world.saleId),
 				{},
 			);
 		});
@@ -144,7 +145,7 @@ function signUpSetsCookies(world: WebWorld): ScenarioBinder {
 		When(
 			"a client signs up through the web server as {string}",
 			async (_ctx, name: string) => {
-				last.answer = await world.send("POST", "/api/v1/auth/register", {
+				last.answer = await world.send("POST", API_PATHS.authRegister, {
 					username: name,
 					password: "a long password",
 				});

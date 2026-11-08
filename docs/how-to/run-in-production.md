@@ -98,15 +98,23 @@ npm run docker:prod:up
 
 The images are built again and `flash-be-migrate` runs before the new API instances start. The data stays in the volumes.
 
+The schema is one migration, `0001_schema`, and a change to the schema edits that file. A database that ran it already
+does not get the change, and one built from another set of migration files makes `flash-be-migrate` fail with
+`corrupted migrations`, so the API instances do not start. This stack has no data migration path: save what you need,
+delete the volumes with `docker compose -f compose.prod.yaml down -v` (it cannot be undone), and start again.
+
 ## Watch it
 
 ```bash
-docker compose -f compose.prod.yaml logs -f flash-be-1   # one instance; leave out the name for every service
-curl localhost:8080/health                               # the process answers
-curl localhost:8080/ready                                # Postgres and Redis answer; 503 when Redis is down
+npm run prod:logs -- flash-be-1          # follow one instance; leave out the name for every service
+npm run prod:trace -- <x-request-id>     # every line of nginx, flash-web and the API that holds one request id
+curl localhost:8080/health               # the process answers
+curl localhost:8080/ready                # Postgres and Redis answer; 503 when Redis is down or the API is stopping
 ```
 
-The API logs one JSON line for each request and each reply.
+The API logs one JSON line for each request and each reply, with the request id as `reqId`, plus a line for each event
+an operator acts on. `LOG_LEVEL` sets how much. Every reply carries the id in `x-request-id`. How to read the lines and
+follow one request is in [read the logs and trace a request](trace-a-request.md).
 
 When Redis is down, `/ready` answers `503` but the sale goes on, slower, on Postgres alone (see
 [serving without Redis](../explanation/serving-without-redis.md) and [liveness and readiness](../explanation/liveness-and-readiness.md)).
@@ -116,6 +124,12 @@ When Redis is down, `/ready` answers `503` but the sale goes on, slower, on Post
 ```bash
 npm run docker:prod:down   # stops and removes the containers; the volumes and the data stay
 ```
+
+Each API instance stops gracefully: `/ready` answers `503`, it keeps answering for `SHUTDOWN_DRAIN_MS` (2000), then it
+ends its event streams, finishes the requests in flight, closes Redis and Postgres, and exits. It gives up after
+`SHUTDOWN_TIMEOUT_MS` (10000). Docker waits `stop_grace_period` (15 s for the API, 10 s for `flash-web`) before it kills
+a container, so the API's own limit comes first. `flash-web` ends its proxied event streams at once on a stop signal and exits in about a second; the page opens
+its streams again on a running instance. The same happens when an update replaces an instance.
 
 To delete the data as well, run `docker compose -f compose.prod.yaml down -v`. It cannot be undone.
 

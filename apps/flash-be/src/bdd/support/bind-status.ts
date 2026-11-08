@@ -1,8 +1,11 @@
 // The steps of specs/apps/flash/be/behaviours/sale/status.feature, as both layers bind them. A layer adds sales to its store
 // and the steps read the app's replies over it. A sale's window is a phrase, read against the layer's own clock. The titles
 // stay in the layer's test file, where the behaviour checker reads them.
+
+import { API_PATHS } from "@flash/flash-commons";
 import { expect } from "vitest";
 import { type ReplyBox, type Response, responseOf } from "./response.js";
+import { salePath } from "./sale-path.js";
 import {
 	errorIs,
 	type OutlineBinder,
@@ -41,7 +44,7 @@ function namedSale(world: SaleWorld, ids: Map<string, string>) {
 // The reply to GET /api/v1/sales/current, kept where the steps read it.
 function askCurrent(world: SaleWorld, last: ReplyBox) {
 	return async () => {
-		last.response = await world.get("/api/v1/sales/current");
+		last.response = await world.get(API_PATHS.saleCurrent);
 	};
 }
 
@@ -63,7 +66,7 @@ function reportsStatus(newWorld: () => SaleWorld): OutlineBinder {
 			},
 		);
 		When("a client asks for that sale", async () => {
-			last.response = await world.get(`/api/v1/sales/${saleId}`);
+			last.response = await world.get(salePath("sale", saleId));
 		});
 		Then("the response status is {int}", statusIs(last));
 		And('the sale status is "<status>"', () => {
@@ -108,7 +111,7 @@ function overKeepsId(newWorld: () => SaleWorld): ScenarioBinder {
 		And(
 			"the sale named {string} has the status {string} when read by its id",
 			async (_ctx, name: string, status: string) => {
-				const read = await world.get(`/api/v1/sales/${ids.get(name)}`);
+				const read = await world.get(salePath("sale", String(ids.get(name))));
 				expect(read.json().status).toBe(status);
 			},
 		);
@@ -134,7 +137,7 @@ function unknownSale(newWorld: () => SaleWorld): OutlineBinder {
 
 		Given("no sale exists", () => world.noSales());
 		When('a client asks for the sale with id "<id>"', async () => {
-			last.response = await world.get(`/api/v1/sales/${examples.id}`);
+			last.response = await world.get(salePath("sale", String(examples.id)));
 		});
 		Then("the response status is {int}", statusIs(last));
 		And("the error is {string}", errorIs(last));

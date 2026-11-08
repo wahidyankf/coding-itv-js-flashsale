@@ -1,6 +1,8 @@
 // The shopper's side of the accounts scenarios: a cookie jar that keeps cookies the way a browser does, and the requests
 // a shopper sends. Each layer supplies its app, how an access token ends, and what the stores hold.
+
 import {
+	API_PATHS,
 	applySetCookies,
 	type CookieJar,
 	cookieHeader,
@@ -8,6 +10,7 @@ import {
 import type { FastifyInstance } from "fastify";
 import { sendRequest } from "./http.js";
 import type { Response } from "./response.js";
+import { salePath } from "./sale-path.js";
 
 // The reply type the auth steps read, re-exported so a caller of this world needs no second import.
 export type { Response };
@@ -91,20 +94,20 @@ export function authWorld(layer: AuthLayer) {
 		},
 		pathOf: (name: string) => jar.get(name)?.path,
 		signUp: (username: unknown, password: unknown) =>
-			send("POST", "/api/v1/auth/register", {
+			send("POST", API_PATHS.authRegister, {
 				payload: { username, password },
 			}),
 		logIn: (username: unknown, password: unknown) =>
-			send("POST", "/api/v1/auth/login", { payload: { username, password } }),
-		me: (on?: Instance) => send("GET", "/api/v1/auth/me", { on }),
-		logOut: (on?: Instance) => send("POST", "/api/v1/auth/logout", { on }),
-		refresh: (on?: Instance) => send("POST", "/api/v1/auth/refresh", { on }),
+			send("POST", API_PATHS.authLogin, { payload: { username, password } }),
+		me: (on?: Instance) => send("GET", API_PATHS.authMe, { on }),
+		logOut: (on?: Instance) => send("POST", API_PATHS.authLogout, { on }),
+		refresh: (on?: Instance) => send("POST", API_PATHS.authRefresh, { on }),
 		async openSale() {
 			saleId = await layer.openSale();
 		},
 		// A shopper's write: joining the queue of the sale the scenario opened.
 		joinQueue: (on?: Instance) =>
-			send("POST", `/api/v1/sales/${saleId}/queue`, { on }),
+			send("POST", salePath("queue", saleId), { on }),
 		keepCopy: () => {
 			copy = new Map(jar);
 		},
@@ -113,9 +116,9 @@ export function authWorld(layer: AuthLayer) {
 			send(method, url, { from: new Map() }),
 		// The copy of the tokens from before, sent as a thief would send it. What the reply sets does not reach the jar.
 		meWithCopy: (on?: Instance) =>
-			send("GET", "/api/v1/auth/me", { from: copy, record: false, on }),
+			send("GET", API_PATHS.authMe, { from: copy, record: false, on }),
 		refreshWithCopy: (on?: Instance) =>
-			send("POST", "/api/v1/auth/refresh", { from: copy, record: false, on }),
+			send("POST", API_PATHS.authRefresh, { from: copy, record: false, on }),
 		expireAccess: () => layer.expireAccess(cookieValueOf(jar, "access_token")),
 		stored: layer.stored,
 		userRow: layer.userRow,

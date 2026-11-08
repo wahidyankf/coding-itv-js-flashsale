@@ -18,7 +18,7 @@ code, for a developer. A `500` never says what failed; the cause goes to the log
 | Method | Path                                    | Checks             | Notes                                                       |
 | ------ | --------------------------------------- | ------------------ | ----------------------------------------------------------- |
 | GET    | `/health`                               | none; no I/O       | always `200`                                                |
-| GET    | `/ready`                                | Postgres and Redis | `200`, or `503` when a check fails                          |
+| GET    | `/ready`                                | Postgres and Redis | `200`, or `503` when a check fails or the API is stopping   |
 | GET    | `/api/v1/sales/current`                 | Postgres           | `404` `sale_not_found` when no sale is running or ahead     |
 | GET    | `/api/v1/sales/:saleId`                 | Postgres           | `404` `sale_not_found` for an unknown or malformed id       |
 | GET    | `/api/v1/sales/:saleId/events`          | Postgres           | event stream of the sale (see Live updates)                 |
@@ -49,7 +49,7 @@ All bodies are JSON. Dates are ISO strings.
 | Route                                                                                                       | Success body                                                                                                                                 |
 | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET /health`                                                                                               | `{ "status": "ok" }`                                                                                                                         |
-| `GET /ready`                                                                                                | `{ "status": "ok" \| "unavailable", "checks": { "database": "ok" \| "error", "redis": "ok" \| "error" } }`                                   |
+| `GET /ready`                                                                                                | `{ "status": "ok" \| "unavailable" \| "stopping", "checks": { "database": "ok" \| "error", "redis": "ok" \| "error" } }`                     |
 | `GET /api/v1/sales/current`, `GET /api/v1/sales/:saleId`                                                    | `{ "id", "productId", "name", "status", "startsAt", "endsAt", "stock", "remaining" }` (a `SaleView`)                                         |
 | `POST /api/v1/sales/:saleId/queue`                                                                          | `{ "userId", "ticket", "state": "waiting", "place" }` or `{ "userId", "ticket", "state": "admitted" }`                                       |
 | `GET /api/v1/sales/:saleId/queue/me`                                                                        | `{ "userId", "state": "waiting", "place" }` or `{ "userId", "state": "admitted" }`; a lost place is `404` `not_in_queue`                     |
@@ -68,7 +68,8 @@ missing or wrong field with `400` and the code of that field (`invalid_user`, `i
 body it cannot read with `401` `invalid_credentials`, so it never says which part was wrong. A purchase body without a
 string `reservationId` is `400` `invalid_reservation`, after the rate limit and the login check. The ticket goes in the `x-queue-ticket` header.
 
-`/ready` returns `503` when a check fails. Each failing check is `"error"`, and `status` is `"unavailable"`. For
+`/ready` returns `503` when a check fails, and then each failing check is `"error"` and `status` is `"unavailable"`.
+It also returns `503`, with `status` `"stopping"` and the checks as they are, once the API has been asked to stop. For
 example, with Postgres stopped:
 
 ```json
@@ -229,7 +230,8 @@ Shoppers join a queue before they can reserve. The queue admits them in order, a
 `state` is `waiting` (with `place`, counted from 1) or `admitted`. An admission stays valid for
 `ADMISSION_TTL_SECONDS` (600 by default).
 
-Joining again returns the same place and the same ticket.
+Joining again returns the same place and the same ticket while the place or the admission is live. Once an admission
+ends, reserving answers `403` `not_admitted`, and joining again gives a new place at the back of the line.
 
 | Status | `errorCode`         | When                                                                                    |
 | ------ | ------------------- | --------------------------------------------------------------------------------------- |
@@ -274,24 +276,25 @@ A sale that is not selling answers before the ticket is checked. The scenarios a
 `POST /api/v1/sales/:saleId/purchases` pays for the held item of the shopper who is logged in. The body holds the reservation id
 from the reservation reply: `{ "reservationId" }`.
 
-The reservation id is the idempotency key. Sending the same request again returns `200` with the same purchase, and the
+The reservation id is the idempotency key. Sending the same request again, or a second request that races the first
+(on the same or another instance), returns `200` with the same purchase, and the
 shopper is charged once.
 
 `purchaseId` is the id of the purchase row. flash-web shows it to the shopper as the **Purchase ID**, the number to keep.
 The payment reference stays in the database for refunds and is not in any reply.
 
-| Status | `errorCode`             | When                                                                                              |
-| ------ | ----------------------- | ------------------------------------------------------------------------------------------------- |
-| `400`  | `invalid_reservation`   | the reservation id is missing or is not an id                                                     |
-| `401`  | `not_authenticated`     | there is no login                                                                                 |
-| `402`  | `payment_failed`        | the payment provider declined; the hold stays, so the shopper can try again until it ends         |
-| `404`  | `sale_not_found`        | the sale id is unknown or malformed                                                               |
-| `404`  | `reservation_not_found` | no hold of this user has this id (also for somebody else's reservation id)                        |
-| `409`  | `hold_expired`          | the hold ended before the payment started                                                         |
-| `409`  | `already_purchased`     | the user already bought an item in this sale                                                      |
-| `409`  | `sale_ended`            | the window has closed                                                                             |
-| `409`  | `sold_out`              | the hold ended during the payment and the last item went to someone else; the payment is refunded |
-| `429`  | `rate_limited`          | too many requests from this user or this address (see Rate limits)                                |
+| Status | `errorCode`             | When                                                                                                                                      |
+| ------ | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `400`  | `invalid_reservation`   | the reservation id is missing or is not an id                                                                                             |
+| `401`  | `not_authenticated`     | there is no login                                                                                                                         |
+| `402`  | `payment_failed`        | the payment provider declined, or the charge was given back before the commit; the hold stays, so the shopper can try again until it ends |
+| `404`  | `sale_not_found`        | the sale id is unknown or malformed                                                                                                       |
+| `404`  | `reservation_not_found` | no hold of this user has this id (also for somebody else's reservation id)                                                                |
+| `409`  | `hold_expired`          | the hold ended before the payment started                                                                                                 |
+| `409`  | `already_purchased`     | the user already bought an item in this sale                                                                                              |
+| `409`  | `sale_ended`            | the window has closed                                                                                                                     |
+| `409`  | `sold_out`              | the hold ended during the payment and the last item went to someone else; the payment is refunded                                         |
+| `429`  | `rate_limited`          | too many requests from this user or this address (see Rate limits)                                                                        |
 
 `GET /api/v1/sales/:saleId/purchases/me` answers "did I get it?" for the shopper who is logged in (`401` `not_authenticated`
 without a login). `state` is one of:
@@ -441,7 +444,13 @@ the API stops at start-up when `DATABASE_URL`, `REDIS_URL` or `TICKET_SECRET` is
 `PAYMENT_FAILURE_RATE` (0.02) tune the mock payment provider. The `RATE_LIMIT_*` and `TRUST_PROXY` variables tune the
 rate limits. `SALE_CACHE_MS` (1000) sets the sale read cache. `EVENTS_INTERVAL_MS` (1000) sets how often an event stream reads. `AUTH_RATE_LIMIT_PER_IP` (20) limits the `/api/v1/auth`
 routes per address. `COOKIE_SECURE` (`true` in production) puts `Secure` on the login cookies; set it to `false` only to try the
-stack over plain HTTP.
+stack over plain HTTP. `SHUTDOWN_DRAIN_MS` (2000) is how long the API keeps answering after a stop signal, and
+`SHUTDOWN_TIMEOUT_MS` (10000, more than the drain) is when it gives up and exits with `1`. `LOG_LEVEL` (`info`) is one of
+`fatal`, `error`, `warn`, `info`, `debug`, `trace` and `silent`; anything else stops the API at start-up.
+
+Every reply of `flash-be` carries an `x-request-id` header. A request that sends a UUID in `x-request-id` keeps it;
+any other value is replaced by a new UUID. The same id is the `reqId` of every log line of that request (see
+[read the logs and trace a request](../how-to/trace-a-request.md)).
 
 ## Manual requests
 

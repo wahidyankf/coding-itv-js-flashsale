@@ -3,6 +3,20 @@
 // setting takes its default; a wrong one stops the start with a message that names it. The variables are in .env.example.
 import { localDefaults } from "./local-defaults.js";
 
+// The levels pino knows, from the most to the least severe. `silent` writes nothing.
+export const LOG_LEVELS = [
+	"fatal",
+	"error",
+	"warn",
+	"info",
+	"debug",
+	"trace",
+	"silent",
+] as const;
+
+// How much the server writes to its log: the lines at this level and the more severe ones.
+export type LogLevel = (typeof LOG_LEVELS)[number];
+
 // The settings of the server, each named after the environment variable that sets it.
 export type Config = {
 	// The address and port the HTTP server listens on.
@@ -32,6 +46,12 @@ export type Config = {
 	trustProxy: boolean;
 	// Whether the login cookies are sent over HTTPS only. On in production; turn it off only for plain HTTP.
 	cookieSecure: boolean;
+	// After a stop signal: how long the server keeps answering while readiness says 503, and the longest the whole
+	// shutdown may take before the process exits with a failure. See shutdown.ts.
+	shutdownDrainMs: number;
+	shutdownTimeoutMs: number;
+	// How much the server logs. `info` keeps one line per request and the events an operator acts on.
+	logLevel: LogLevel;
 };
 
 // The highest port number a TCP address can have.
@@ -49,6 +69,10 @@ const settingDefaults = {
 	authRateLimitPerIp: 20,
 	saleCacheMs: 1000,
 	eventsIntervalMs: 1000,
+	// Long enough for a monitor that checks /ready every second to see the 503, and for kept-alive connections to close.
+	shutdownDrainMs: 2000,
+	// The drain window, the requests in flight and the closing of the stores, well before Docker's kill.
+	shutdownTimeoutMs: 10_000,
 } as const;
 
 // The text of a setting, or undefined when it is not set. An empty variable counts as not set, so it takes the default.
@@ -93,14 +117,51 @@ function readersOf(env: NodeJS.ProcessEnv) {
 		return value === "true";
 	};
 
-	return { integerAtLeast, fraction, flag };
+	// One word from a fixed list. The error lists the words, so the fix is clear.
+	const oneOf = <const T extends string>(
+		name: string,
+		words: readonly T[],
+		fallback: T,
+	): T => {
+		const value = setting(env, name) ?? fallback;
+		const word = words.find((candidate) => candidate === value);
+		if (word === undefined) {
+			throw new Error(`${name} must be one of ${words.join(", ")}`);
+		}
+		return word;
+	};
+
+	return { integerAtLeast, fraction, flag, oneOf };
+}
+
+// The drain window and the time limit of a shutdown. A limit that the drain window alone uses up would fail every
+// shutdown, so it is refused.
+function shutdownSettings(
+	integerAtLeast: ReturnType<typeof readersOf>["integerAtLeast"],
+): Pick<Config, "shutdownDrainMs" | "shutdownTimeoutMs"> {
+	const shutdownDrainMs = integerAtLeast(
+		"SHUTDOWN_DRAIN_MS",
+		settingDefaults.shutdownDrainMs,
+		0,
+	);
+	const shutdownTimeoutMs = integerAtLeast(
+		"SHUTDOWN_TIMEOUT_MS",
+		settingDefaults.shutdownTimeoutMs,
+		1,
+	);
+	if (shutdownTimeoutMs <= shutdownDrainMs) {
+		throw new Error(
+			"SHUTDOWN_TIMEOUT_MS must be greater than SHUTDOWN_DRAIN_MS",
+		);
+	}
+	return { shutdownDrainMs, shutdownTimeoutMs };
 }
 
 // Reads every setting from the environment. Local defaults match compose.dev.yaml. In production the URLs and the ticket
 // secret must come from the environment, so a missing one stops the start.
 export function buildConfig(env: NodeJS.ProcessEnv): Config {
 	const isProduction = env.NODE_ENV === "production";
-	const { integerAtLeast, fraction, flag } = readersOf(env);
+	const { integerAtLeast, fraction, flag, oneOf } = readersOf(env);
 
 	const withDefault = (name: string, fallback: string): string => {
 		const value = env[name];
@@ -171,28 +232,35 @@ export function buildConfig(env: NodeJS.ProcessEnv): Config {
 		),
 		trustProxy: flag("TRUST_PROXY", false),
 		cookieSecure: flag("COOKIE_SECURE", isProduction),
+		...shutdownSettings(integerAtLeast),
+		logLevel: oneOf("LOG_LEVEL", LOG_LEVELS, "info"),
 	};
 }
 
-// The startup line: the settings that matter for a run, with the host and port of each address only. Credentials stay
-// out of the log.
-export function describeConfig(config: Config): string {
+// The fields of the startup log line: the settings that matter for a run, with the host and port of each address only.
+// Credentials and the ticket secret stay out of the log.
+export function configFields(config: Config) {
 	const endpoint = (url: string): string => {
 		const parsed = new URL(url);
 		return `${parsed.hostname}:${parsed.port}`;
 	};
-	const parts = [
-		`port=${config.port}`,
-		`database=${endpoint(config.databaseUrl)}`,
-		`redis=${endpoint(config.redisUrl)}`,
-		`payment=${config.paymentLatencyMs}ms/${config.paymentFailureRate}`,
-		`limit=${config.rateLimitPerUser}/${config.rateLimitPerIp}/${config.rateLimitWindowSeconds}s`,
-		`cache=${config.saleCacheMs}ms`,
-		`events=${config.eventsIntervalMs}ms`,
-		`proxy=${config.trustProxy}`,
-		`secureCookies=${config.cookieSecure}`,
-	];
-	return `flash-be config: ${parts.join(" ")}`;
+	return {
+		port: config.port,
+		database: endpoint(config.databaseUrl),
+		redis: endpoint(config.redisUrl),
+		paymentLatencyMs: config.paymentLatencyMs,
+		paymentFailureRate: config.paymentFailureRate,
+		rateLimitPerUser: config.rateLimitPerUser,
+		rateLimitPerIp: config.rateLimitPerIp,
+		rateLimitWindowSeconds: config.rateLimitWindowSeconds,
+		saleCacheMs: config.saleCacheMs,
+		eventsIntervalMs: config.eventsIntervalMs,
+		trustProxy: config.trustProxy,
+		cookieSecure: config.cookieSecure,
+		shutdownDrainMs: config.shutdownDrainMs,
+		shutdownTimeoutMs: config.shutdownTimeoutMs,
+		logLevel: config.logLevel,
+	};
 }
 
 // The settings of this process, read once when the module loads. The entry points and the integration tests use it.

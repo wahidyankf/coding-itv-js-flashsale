@@ -15,25 +15,30 @@ src/
                          ticket.ts, auth.ts (password and token rules), user.ts (Username, UserId), actors.ts (the `$system` user that acts when no person does), rate-limit.ts, time.ts
   application/           one service per use case (sale, queue, reservation, purchase, auth, rate limit, admin, seed),
                          and the steps they share (admission, guarded-gate, sale-cache)
-    ports/               the stores and services a use case needs, named in the words of the sale
+    ports/               the stores and services a use case needs, named in the words of the sale; logger.ts, the
+                         log lines a use case or an adapter writes
   adapters/
-    inbound/http/        app.ts (Fastify), errors.ts (error codes, statuses, sentences), headers.ts, cookies.ts,
+    inbound/http/        app.ts (Fastify, the log and the request id), errors.ts (error codes, statuses, sentences),
+                         headers.ts (with the request id header), cookies.ts,
                          sale-view.ts (the sale as a reply shows it), event-stream.ts
       routes/            one file per area: auth, health, sales, queue, reservations, purchases, admin, each with
                          its paths from API_PATHS in @flash/flash-commons; index.ts registers them all, and
                          index_tests.ts writes the whole route table out; guards.ts, reply.ts and bodies.ts are shared by them
     inbound/cli/         the options of the seed-sale and create-operator commands, and the text a failed command prints
-    outbound/postgres/   the repositories, the shared queries, health.ts (the /ready check), and migrations/
-                         (hand-written, one file per group of tables, in the order they refer to each other)
+    outbound/postgres/   the repositories, the shared queries, health.ts (the /ready check), the payment ledger,
+                         logged-rebuild.ts (logs each rebuild of a gate), and migrations/ (one hand-written file)
     outbound/redis/      the hold gate, the queue, the rate limit counters and the session cache, as single scripts;
-                         redis-client.ts (the one connection), redis-keys.ts (the key names), redis-health.ts
-                         (the /ready check), reply.ts (reading a script's reply)
+                         redis-client.ts (the one connection, a warning when the first connect fails, and the lines
+                         when it is lost and back), redis-keys.ts (the key names), redis-health.ts (the /ready check),
+                         reply.ts (reading a script's reply)
     outbound/crypto/     scrypt password hashes and random tokens
-    outbound/payment/    the in-process mock payment
-    outbound/memory/     the rate limit store used when Redis is down
+    outbound/payment/    the in-process mock payment and the contract of its ledger
+    outbound/memory/     the rate limit store used when Redis is down, and the memory payment ledger
     outbound/system/     the clock
   composition.ts         the one place that picks an adapter for each port
   config.ts              the config, read once from process.env; local-defaults.ts holds the local addresses
+  startup.ts             the first steps of the server: the config line, then the Redis connect
+  shutdown.ts            the graceful stop: readiness 503, the drain window, then close HTTP, Redis and Postgres
   main.ts, migrate.ts, seed-sale.ts, create-operator.ts   the entry points; with-db.ts opens and closes the database
                          for one command
   bdd/                   the Gherkin bindings of specs/apps/flash/be: <area>_tests.ts (unit) and
@@ -55,7 +60,7 @@ SaleSeeder, SaleAdmin). `SaleAdmin` writes sale rows, but `SaleRepository` alrea
 | a store or outside service   | a port in [`application/ports/`](src/application/ports), an adapter in [`adapters/outbound/`](src/adapters/outbound)                                            | a memory copy in `bdd/support/memory-*.ts`, the wiring in [`composition.ts`](src/composition.ts)                                                                                                                                                                                                                         |
 | a route                      | its path in `API_PATHS` ([`api-paths.ts`](../../libs/flash-commons/src/api-paths.ts) in flash-commons), the handler in `adapters/inbound/http/routes/<area>.ts` | the literal tables in [`api-paths_tests.ts`](../../libs/flash-commons/src/api-paths_tests.ts) and [`routes/index_tests.ts`](src/adapters/inbound/http/routes/index_tests.ts), [HTTP endpoints](../../docs/reference/http-endpoints.md), the `.http` files, every caller ([how](../../docs/how-to/change-an-endpoint.md)) |
 | an error code                | `ERROR_STATUS` and `ERROR_MESSAGE` in [`adapters/inbound/http/errors.ts`](src/adapters/inbound/http/errors.ts)                                                  | the error type of the service that answers it; its text in `flash-web`                                                                                                                                                                                                                                                   |
-| a table or a column          | a new file in [`adapters/outbound/postgres/migrations/`](src/adapters/outbound/postgres/migrations)                                                             | the `Database` type in [`database.ts`](src/adapters/outbound/postgres/database.ts); the six audit columns on a new table                                                                                                                                                                                                 |
+| a table or a column          | the one migration, [`0001_schema.ts`](src/adapters/outbound/postgres/migrations/0001_schema.ts); a database built before the change needs `npm run demo:reset`  | the `Database` type in [`database.ts`](src/adapters/outbound/postgres/database.ts); the six audit columns on a new table                                                                                                                                                                                                 |
 | a setting                    | [`config.ts`](src/config.ts)                                                                                                                                    | [`.env.example`](../../.env.example)                                                                                                                                                                                                                                                                                     |
 | a retry                      | `retryAsync` from `@flash/flash-commons`, with a max attempt count                                                                                              | [decision 017](../../docs/explanation/decisions/017-retry-backoff-jitter.md)                                                                                                                                                                                                                                             |
 | a value used 3 or more times | one named constant or function in the layer that owns it                                                                                                        | `libs/flash-commons` when other apps use it in 3+ places too ([rule](../../docs/explanation/decisions/016-dry-rule-of-three.md))                                                                                                                                                                                         |
