@@ -15,9 +15,10 @@ send a shape the other side does not expect.
 ## Decision
 
 - `@flash/flash-commons` holds a decoder kit: a `Decoder<T>` takes `unknown` and returns a `Result` with the value or a
-  `DecodeError` that names the path and what was expected. It has only what the apps use: text, integers, ISO dates (kept as
-  text), UUIDs, fixed values (`literal`, `oneOf`), `optional`, `object`, `tagged` for a union told apart by one field
-  (`state`), and `both` for a reply that joins two shapes. There is no `array` yet, because no payload has a list it reads. Extra keys are ignored, so a new field in a reply breaks nothing.
+  `DecodeError` that names the path and what was expected. It has only what the apps use: text (`text`, `nonEmptyText`), integers
+  (`integer`, `nonNegativeInteger`), ISO dates (kept as text), UUIDs, fixed values (`literal`, `oneOf`), `refine` for an
+  extra rule on a decoded value, `optional`, `object`, `tagged` for a union told apart by one field (`state`), and `both`
+  for a reply that joins two shapes. There is no `array`, because no payload has a list it reads. Extra keys are ignored, so a new field in a reply breaks nothing.
 - Each app writes its own shapes next to the types they build. `flash-web` decodes every reply in `callApi` and every
   stream event; a reply that does not decode is the same "unexpected" failure as a reply that is not JSON, and the
   shopper reads the general "try again" sentence. A stream event that does not decode is dropped, and it does not count
@@ -31,7 +32,7 @@ send a shape the other side does not expect.
   for about a dozen shapes, it throws or needs a wrapper to give a `Result`, and Zod is large in the browser bundle.
 - **Hand-written guards in each app.** No shared code, but the same checks (text, integer, enum) would be written many
   times in two apps, which breaks the rule of three ([016](016-dry-rule-of-three.md)).
-- **No validation of replies.** The two apps ship together, which was the reason before. It leaves a corrupted reply
+- **No validation of replies.** The two apps ship together, so this looks safe. But it leaves a corrupted reply
   free to break the page in ways no test shows.
 
 ## Consequences

@@ -11,11 +11,10 @@ makes them retry in step and hit a recovering server together. A retry that neve
 
 ## Decision
 
-- The wait before a retry is `random() * min(cap, base * 2^attempt)` (full jitter, the AWS "Exponential Backoff And
-  Jitter" scheme). It stops after a max attempt count. The code is `retry`, `retryAsync` and `backoffDelayMs` in `@flash/flash-commons`; `retry` is the sync one for k6.
-- **The page's reconnect** to a stream: base 1 s, cap 30 s, 8 attempts in a row, reset when a stream opens. After that the page says live updates stopped and asks the shopper to reload.
+- The wait before a retry is `random() * min(cap, base * 2^attempt)` (the "full jitter" scheme). It stops after a max attempt count. The code is `retry`, `retryAsync` and `backoffDelayMs` in `@flash/flash-commons`; `retry` is the sync one for k6.
+- **The page's reconnect** to a stream: base 1 s, cap 30 s, 8 attempts in a row, reset when a stream delivers a frame the page uses. After that the page says live updates stopped and asks the shopper to reload.
 - **`flash-be` waiting for another instance's Redis rebuild** uses backoff with a max attempt count, inside its overall wait.
-- **k6** join on `429` and pay on `402` keep their max counts, with backoff. **The e2e poll-until-ready helper** uses it with each call's deadline.
+- **k6** retries a join on `429` and a payment on `402` with backoff and a max count. **The e2e poll-until-ready helper** uses it with each call's deadline.
 - **Exception: the Redis client's reconnect** uses the same backoff and jitter (base 50 ms, cap 2 s) but has no max attempt count. It also reconnects after a socket timeout, which the node-redis default never does.
 
 ## Alternatives considered

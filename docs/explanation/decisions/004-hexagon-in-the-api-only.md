@@ -12,7 +12,7 @@ stores and many rules. `flash-web` has no store and no sale rules. It shows the 
 ## Decision
 
 - `flash-be` has `domain` (no I/O), `application` (use cases and `ports/`), and `adapters` (inbound HTTP and CLI,
-  outbound Postgres, Redis, payment, clock). Only [`composition.ts`](../../../apps/flash-be/src/composition.ts) and the entry points pick an adapter for a port.
+  outbound Postgres, Redis, memory, crypto, payment, clock). Only [`composition.ts`](../../../apps/flash-be/src/composition.ts) and the entry points pick an adapter for a port.
 - [`architecture_tests.ts`](../../../apps/flash-be/src/architecture_tests.ts) reads every import and fails on a wrong one, so the pre-push hook keeps the split.
 - `flash-web` keeps routes, components and hooks, with one client for the API. It has no ports layer.
 

@@ -55,7 +55,7 @@ step, is in its [behaviour scenarios](../../specs/apps/flash/web/behaviours/READ
 ## What the page checks itself
 
 Names are checked in the page with the same pattern the API uses, so a bad name never leaves the browser. The web app
-keeps its own copy of that rule and of the `not_found` reply; [`same_as_be_tests.ts`](../../apps/flash-web/src/same_as_be_tests.ts) fails if a copy drifts from
+keeps its own copy of the user name and password rules, the ticket header and the `not_found` reply; [`same_as_be_tests.ts`](../../apps/flash-web/src/same_as_be_tests.ts) fails if a copy drifts from
 `flash-be`. The sale id rule is not copied: both apps take `isUuid` from `@flash/flash-commons`.
 
 ## Related

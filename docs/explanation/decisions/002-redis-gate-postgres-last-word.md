@@ -19,7 +19,7 @@ for the last items in the same moment. The rule must hold even if the fast path 
 ## Alternatives considered
 
 - **A Postgres row lock only.** It is correct and simple. But every reserve then waits in line on the one sale row. The
-  script keeps a rush off that row. The repository has no load run of this design with Redis up, so this reason comes from the design, not from a measurement.
+  script keeps a rush off that row. No load run has measured a Postgres-only design, so this reason is a design argument, not a measurement.
 - **Redis only.** Fast, but a restart loses it, and nothing catches a bug in the script.
 - **Optimistic locking (a version column and retries).** Under hundreds of requests for a few items most attempts fail
   and retry, so the load on the one row grows with the contention.

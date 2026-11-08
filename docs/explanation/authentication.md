@@ -34,7 +34,8 @@ sequenceDiagram
 - The **access token** is short (15 minutes) because it goes with every request and a copy of it is worth little for long.
   It is checked against a Redis cache first (`session:<hash>`, kept for at most one minute and never past the token's end) and against Postgres on a miss.
 - The **refresh token** is long (7 days) and only goes to `/api/v1/auth`, so it travels in far fewer requests. Each use replaces
-  it. A token that was already replaced is a sign of a copy, so the whole session ends, and the real owner logs in again.
+  it, and the token it replaced is kept as the previous one. If that previous token comes back, it is a sign of a copy,
+  so the whole session ends, and the real owner logs in again. An older token is refused.
   A week without a visit also ends the login; every use starts a new week.
 - Both are random (32 bytes). Only the SHA-256 of a token is stored, in Postgres and in the Redis key. A copy of the
   database or of Redis cannot be used to act as a user. A fast hash is right for a token with this much randomness; a

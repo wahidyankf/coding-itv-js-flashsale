@@ -13,7 +13,7 @@ the purchase of another shopper, and the operator routes would need something be
 
 - A user has a user name and a password (8 to 128 characters), hashed with scrypt. Sign-up makes a shopper. An operator is made on the server with `create-operator`.
 - A session is two cookies: `access_token` (15 minutes, path `/`) and `refresh_token` (7 days, path `/api/v1/auth`, used once).
-  Replaying an old refresh token ends the session. Only SHA-256 hashes of tokens are stored, in Postgres, with Redis as a cache.
+  The refresh token just before the current one is kept, and if it comes back, the session ends. Only SHA-256 hashes of tokens are stored, in Postgres, with Redis as a cache.
 - No route takes a user id. The shopper is the session (`/queue/me`, `/purchases/me`). Cookies are `SameSite=Lax`, and `Secure` when `COOKIE_SECURE` is true.
 - The identifier of the task is still there: it is the user name.
 

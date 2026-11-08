@@ -1,13 +1,13 @@
 # Failures as values
 
-`flash-be` and `flash-web` return failures instead of throwing, and they return `undefined` for a value that may be
+`flash-be`, `flash-web` and the libraries return failures instead of throwing, and they return `undefined` for a value that may be
 missing. The library is [`@flash/typekit`](../../libs/typekit/README.md).
 
 ## Why not exceptions
 
 A thrown error is invisible in a function's type. A caller can forget it, and nothing says which errors can come out.
 On the sale path that is costly: "sold out", "hold expired" and "payment declined" are normal answers, not accidents, and
-each has its own status code. A `Result<Purchase, ConfirmError>` lists them in the type, so the route must map every one,
+each has its own status code. A `Result<Confirmed, ConfirmError>` lists them in the type, so the route must map every one,
 and a new error fails the build until it is mapped.
 
 Exceptions still exist for what the code does not expect: a bug, or a store that is down. `attempt` catches only what a
@@ -46,7 +46,8 @@ not have one.
 ## Why exhaustive match
 
 TypeScript has no `match` statement. A `switch` over a union that ends without a case is silent unless the build checks it.
-Biome's `useExhaustiveSwitchCases` turns a forgotten case into an error at build time, which is when a new error code or a new sale status is added.
+Biome's `useExhaustiveSwitchCases` turns a forgotten case into an error at build time, which is when a new sale status
+or a new answer kind is added. A new error code is caught by the type of `ERROR_STATUS` in `errors.ts`.
 
 ## How the rules are kept
 

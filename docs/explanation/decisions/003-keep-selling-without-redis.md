@@ -20,8 +20,9 @@ The task wants the stock never oversold, and says nothing about what to do when 
 ## Alternatives considered
 
 - **Fail closed (answer `503` to sale routes).** A Redis outage becomes a full outage, for a store that is not the truth.
-- **Let the client queue commands until Redis returns.** The first chaos run showed it: a `MULTI` waited for the
-  connection, so a payment took about two seconds. Those paths are now single scripts.
+- **Let the client queue commands until Redis returns.** A queued command waits as long as the outage lasts. A `MULTI`
+  waits for the connection even with the offline queue off, and a chaos run measured a payment of about two seconds
+  with it. So every hold-gate call is a single script.
 - **A gate in the memory of each instance.** Three instances would each count alone, and the holds would not add up.
 - **Redis Sentinel or a managed failover only.** It shortens an outage but does not remove it. It is a next step, not a replacement.
 

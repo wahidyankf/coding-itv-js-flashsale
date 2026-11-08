@@ -66,7 +66,7 @@ domain knows nothing. The only packages the inner layers may import are [`@flash
 (see [failures as values](failures-as-values.md)) and [`@flash/flash-commons`](../../libs/flash-commons/README.md). Both are
 pure: no I/O, no timer and no randomness of their own. The one timer helper, `@flash/flash-commons/timers`, is refused
 in the domain and the application; [`composition.ts`](../../apps/flash-be/src/composition.ts) passes the real `sleep` in, and a test passes its own. The HTTP words (error codes, statuses, sentences, cookies) live in
-the inbound HTTP adapter, and the rules the domain needs, such as the user id rule, live in the domain.
+the inbound HTTP adapter, and the rules the domain needs, such as the user name rule, live in the domain.
 Inbound adapters never import outbound adapters, and outbound adapters import only ports and the
 domain. Only [`composition.ts`](../../apps/flash-be/src/composition.ts) and the entry points see both sides.
 
@@ -81,8 +81,9 @@ it must not know. It runs with the unit tests, so the pre-push hook enforces it.
   sit behind the same ports.
 - Most ports have one real implementation, and that is on purpose. They are not there so that a store can be swapped
   one day. They keep a service from naming Redis or Postgres, and they let a scenario run the same service against an
-  in-memory copy (`src/bdd/support/memory-*.ts`). The two ports with a real second life are the payment (a mock now) and
-  the clock (a fixed one in tests).
+  in-memory copy (`src/bdd/support/memory-*.ts`). `SessionRepository` has two in production: the Postgres store and the
+  Redis cache in front of it. The payment has only the mock, behind a port that a real provider could fill, and the
+  clock has a fixed copy in tests.
 - What it costs, and the options weighed against it, are in [decision 004](decisions/004-hexagon-in-the-api-only.md).
 
 ## Where the ports bend
@@ -113,7 +114,7 @@ functions (`hasRoom` and the reservation decision) that the memory copies and th
 the third copy, for speed, and Postgres can rebuild it ([decision 002](decisions/002-redis-gate-postgres-last-word.md)).
 
 One step crosses the boundary: a commit or a reservation looks up the shopper's user row by name inside the sale's
-transaction, and creates it for a name that has none (a rebuild or a test). It is one indexed read, and the user row is
+transaction, and creates it for a name that has none, which happens only in tests, because a logged-in shopper always has a row. It is one indexed read, and the user row is
 not locked, so it adds no wait between sales.
 
 ## Two names for a shopper

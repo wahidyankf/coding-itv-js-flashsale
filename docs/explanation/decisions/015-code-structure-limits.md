@@ -17,7 +17,7 @@ errors. None of them stops a function or a file from growing, and a long file of
   - `useMaxParams`: 5 parameters.
   - `noExcessiveNestedCallbacks`: 4 levels.
   - `noNestedTernary`.
-  - `noExcessiveLinesPerFile`: 400 lines.
+  - `noExcessiveLinesPerFile`: 400 lines, blank lines not counted.
 - Test files are exempt from both line limits, because a scenario binding is one long callback by nature. Migrations are exempt from the function line limit only, because a migration reads best as one script.
 - Every file starts with a header comment, and every export has a doc comment. Biome has no built-in rule that requires a doc comment: its only JSDoc rule, `useSingleJsDocAsterisk`, checks the style of a comment that exists. So AGENTS.md states the rule and `swe-reviewer` checks it.
 - A limit is never raised to pass a check. A function over a limit is split.

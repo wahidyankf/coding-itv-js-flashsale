@@ -22,15 +22,16 @@ bought twice, may never show in what k6 saw. The claim of the project is that th
 
 - **k6 thresholds only.** They judge what the client saw. They cannot see an extra row in `purchases`.
 - **Checks through the API after the run.** They can be wrong in the same way the API can, so they are not independent.
-- **Looser limits, or a pass for speed on a laptop.** That would hide a finding. The `burst` and `contention` speed limits
-  did not hold in most runs on the author's machine, and the README says so.
+- **Looser limits, or a pass for speed on a laptop.** That would hide a finding. One of five `burst` runs failed the purchase
+  speed limit (519.8 ms against 500 ms) on a shared machine. It is an open finding, and the limit stays
+  ([what the load runs found](../load-test-findings.md)).
 
 ## Consequences
 
 - It costs runner code, Docker, and times that are only relative: k6 and every server share one machine's CPUs, so the
   speed of `burst` and `contention` is not a result about production.
-- It buys proof that the invariants held in every run. The runs also found two real faults, a payment that waited two seconds
-  while Redis was down, and a wrong error for a buyer whose queue place was lost. Both are fixed with scenarios.
+- It buys proof that the invariants held in every run. Two scenarios come from what the runs measured: paying while Redis is
+  down answers at once, and a buyer whose queue place was lost is told `already_purchased`.
 
 ## Revisit when
 

@@ -5,7 +5,7 @@ and slow every other shopper down. The API therefore limits write requests befor
 
 ## What is limited
 
-The three write routes (join the queue, reserve and confirm) and, apart, the auth routes. Reads are cheap and are not limited.
+The three write routes (join the queue, reserve and confirm) and, apart, the auth routes. Shopper reads are cheap and are not limited.
 A rejected request gets status `429`, the body `{"errorCode":"rate_limited","errorMessage":"...","retryAfterSeconds":n}` and a
 `Retry-After` header, so a well-behaved client knows when to come back.
 
@@ -52,7 +52,7 @@ flowchart LR
 ## The window
 
 Each counter is a fixed window that starts at the first request. Redis does the work with `INCR`, then `PEXPIRE` on the
-first hit, then `PTTL` to tell the client how long to wait. This is one round trip of three small commands, and it is
+first hit, then `PTTL` to tell the client how long to wait, in one Lua script. This is one round trip, and it is
 the same for every API process, so three processes share one count.
 
 A fixed window lets a client send twice the limit around a boundary. That is accepted: the limit protects the system, it
@@ -60,7 +60,7 @@ is not a billing rule, and the gate and Postgres still hold the stock whatever t
 
 ## When Redis is down
 
-If the shared store throws, the limiter counts in the process memory instead. Each process then counts alone, so the
+If the shared store throws or its reply cannot be read, the limiter counts in the process memory instead. Each process then counts alone, so the
 effective limit grows with the number of processes. This is the trade-off: the API keeps limiting, and keeps serving, at
 the price of a looser limit. Failing closed would turn a Redis outage into a full outage, and failing open would leave
 the payment step open to floods.

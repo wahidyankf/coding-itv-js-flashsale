@@ -87,8 +87,10 @@ back.
 
 - **Two writes per reservation.** The hold goes to Redis and to Postgres. The Postgres insert has no contention, because
   each user has one row, so it stays cheap. The price is one more round trip.
-- **Clocks.** Expiry uses the clock of the instance that accepts the request. A skew of a second or two between
-  instances only moves a hold's end by that much. It cannot create extra items, because the count is made in Redis.
+- **Clocks.** Expiry uses the clock of the instance that takes the request, and the Redis count uses that instance's
+  `now` too. An instance whose clock runs fast can count a live hold as ended and give its item to a second shopper. It
+  cannot oversell: the purchase commit checks `sold < stock` in Postgres, and the shopper who loses is refunded and told
+  `sold_out`.
 - **Old entries stay in Redis.** An expired hold is not deleted. It stays until the user reserves again or Redis is
   rebuilt. The number of such entries is at most the number of users who ever reserved.
 

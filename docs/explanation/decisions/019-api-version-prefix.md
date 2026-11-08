@@ -23,17 +23,18 @@ outside this repository, so every caller can follow one deliberate change.
   one without the version, gets `404 not_found`.
 - **One path table, `libs/flash-commons/src/api-paths.ts`,** on the pure main entry of `@flash/flash-commons`. It exports
   `API_PREFIX`, `AUTH_BASE_PATH` (`/api/v1/auth`), `PROBE_PATHS` (`/health` and `/ready`) and `API_PATHS`, which names every
-  route path: the sale, its events, the queue, the queue place and its events, reservations, purchases, the shopper's
+  route path: the current sale, one sale, its events, the queue, the queue place and its events, reservations, purchases, the shopper's
   purchase, the five auth routes and the two operator paths. It holds paths only, with `:saleId` in a template, and no
   methods or handlers.
 - **`flash-be` uses it,** in every route file and in `cookies.ts`. The route files write no path of their own.
   `REFRESH_COOKIE_PATH` is `AUTH_BASE_PATH`. The access cookie is at `/`.
 - **`flash-web` uses it,** in the page clients (`sale/client.ts`, `auth/client.ts`, `web-api.ts`), in the server-side sale
-  loader and in the proxy. The proxy keeps its own ordered list of method and entry pairs, built from `API_PATHS`
-  without the operator paths. The order matters, because `/sales/current` must come before the sale-id pattern. A client and
+  loader and in the proxy. `BROWSER_ROUTES` in `api-paths.ts` is the ordered list of method and entry pairs, built from
+  `API_PATHS` without the operator paths, and the proxy turns it into its allow-list. The order matters, because `/sales/current` must come before the sale-id pattern. A client and
   the allow-list read the same entries, so they cannot name different paths. The proxy forwards the path unchanged: the
   browser path and the API path are the same, so neither the path nor a cookie is rewritten.
-- **No per-app path module and no path guard in `same_as_be_tests.ts`.** The compiler holds both apps to one source.
+- **No app writes its own path strings, and `same_as_be_tests.ts` has no path guard.** `flash-web`'s `api-paths.ts` only
+  picks table entries and their methods for the browser. The compiler holds both apps to one source.
 - **The oracles import it too:** `flash-be-e2e`, `flash-web-e2e`, the k6 script and its runner, and the prod smoke script.
   The k6 bundle takes only the pure main entry, which holds no Node built-ins. The `.http` files and the docs cannot import,
   so they stay literal and are covered by the docs rule in `AGENTS.md`. This is an exception to the oracle rule of
@@ -71,7 +72,7 @@ outside this repository, so every caller can follow one deliberate change.
 - **One path module per app, guarded by `same_as_be_tests.ts`.** This follows the repository's
   pattern for a rule only `flash-be` and `flash-web` share ([016](016-dry-rule-of-three.md)). Rejected: the path set is a
   contract that both sides must agree on, so one compiled source enforces it better than a guard test. A copy can drift
-  between two guard runs of a test that someone forgot to extend, and a shared source cannot.
+  when someone forgets to add it to the guard test. A shared source cannot drift.
 - **The oracles keep their own literal paths.** This is the rule of [016](016-dry-rule-of-three.md):
   a test that imports the server's paths cannot fail when the server changes them. Rejected: every path change would be
   retyped in dozens of places, and the single literal tripwire gives the same alarm. A URL change is a product decision
@@ -89,8 +90,8 @@ outside this repository, so every caller can follow one deliberate change.
 - The checks that hold it:
   - The tripwire, [`api-paths_tests.ts`](../../../libs/flash-commons/src/api-paths_tests.ts): `toEqual` against the whole
     table written as literal strings (`API_PREFIX`, `AUTH_BASE_PATH`, `PROBE_PATHS` and every `API_PATHS` entry). It also
-    checks that every auth entry starts with `AUTH_BASE_PATH`, the probes do not start with the prefix, and no entry is
-    repeated.
+    checks that every auth entry starts with `AUTH_BASE_PATH` (and that there are five), every `API_PATHS` entry starts
+    with `/api/v1/`, and the probes do not start with `/api/`.
   - The route-table test of `flash-be`,
     [`routes/index_tests.ts`](../../../apps/flash-be/src/adapters/inbound/http/routes/index_tests.ts) (an `onRoute` hook
     over `registerRoutes`): the registered paths equal a list of literal expected paths, not read from the table.
@@ -99,7 +100,8 @@ outside this repository, so every caller can follow one deliberate change.
     the clients, the loader and the proxy of `flash-web`.
   - Cookie tests: `Set-Cookie` for the refresh token has `Path=/api/v1/auth`, and the access cookie has `Path=/`. A scenario
     in `sessions.feature` states it, and a proxy test checks that the refresh cookie passes through unchanged.
-  - A proxy test that no operator entry is on the allow-list, with `/sales/current` listed before the sale-id pattern.
+  - Tests in `flash-web` (`api-paths_tests.ts`, `proxy_tests.ts`) check that no operator route is allowed and that
+    `/sales/current` comes before the sale-id pattern.
   - Scenarios: a path without the version answers `404 not_found` on `flash-be` and on `flash-web`;
     `/api/v1/admin/sales` through `flash-web` answers `404 not_found`; `/health`, `/ready` and `/api/health` keep their
     paths.

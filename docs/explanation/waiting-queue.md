@@ -50,7 +50,7 @@ permanent leader, so a crashed instance never stops the queue; the next tick ano
 
 The timer admits for the **current sale** only (`admitCurrentSale` in [`application/admission.ts`](../../apps/flash-be/src/application/admission.ts)): the sale that is running, or
 else the one that opens next. So when an operator schedules a later sale while one is running, the line of the running
-sale keeps moving, and the later sale starts to admit when it becomes current. A sale that is over has no line to move.
+sale keeps moving, and the later sale starts to admit when it is current and open. A sale that is over has no line to move.
 
 ## The ticket
 

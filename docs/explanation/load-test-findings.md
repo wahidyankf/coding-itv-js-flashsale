@@ -78,7 +78,8 @@ planned shopper. The pool is 800, five `burst` runs with it dropped no shopper, 
 [`profiles_tests.ts`](../../apps/flash-load/k6/profiles_tests.ts) keeps it above the herd.
 
 The pool has a ceiling that the machine sets, not the system: on the 7.7 GiB Docker VM, k6 stopped starting virtual users
-at 1,186 of 2,070 (about 6 MiB each), so the herd is 700, close to the 670 users that `full` starts. The runner reports a
+at 1,186 of 2,070 (about 6 MiB each). That was measured with a larger k6 bundle; the ceiling of the current bundle is
+not measured. The herd is 700, close to the 670 users that `full` starts. The runner reports a
 missing k6 summary as a load-generator failure and removes the stack.
 
 ## Latecomers take the items that abandoned holds give back

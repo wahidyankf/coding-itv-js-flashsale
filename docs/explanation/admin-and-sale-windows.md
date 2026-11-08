@@ -38,7 +38,8 @@ removal: they go with the sale. The next reservation of a shopper then finds no 
 
 Nothing is deleted from the database. A removal sets `deleted_at` and `deleted_by` on the sale and on its holds, in one
 transaction, and every read leaves out rows that have `deleted_at`. The row stays for the record, and the unique indexes
-(`UNIQUE(sale_id, user_id)`) only count rows that are not deleted, so a shopper's name is free again in a new sale.
+(`UNIQUE(sale_id, user_id)`) only count rows that are not deleted, so a deleted hold or purchase never blocks a new live row for that shopper in the
+same sale.
 
 ```mermaid
 sequenceDiagram

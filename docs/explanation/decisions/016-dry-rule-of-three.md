@@ -37,7 +37,7 @@ more places.
 - **A shared contract package for everything.** A test that imports the server's constants cannot fail when the server
   changes them. A renamed header or path would pass every test while real clients break. Oracles must be independent.
 - **No rule, review only.** Copies drift, and a reviewer sees one change at a time.
-- **One copy per app, always.** The time and status tables were already in four or more places.
+- **One copy per app, always.** The time and status tables are needed in four or more places.
 
 ## Consequences
 
