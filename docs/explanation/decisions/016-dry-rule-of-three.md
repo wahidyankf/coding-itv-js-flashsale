@@ -7,6 +7,9 @@ Accepted. Logic or a value used in three or more places becomes one named piece.
 Amended 2026-11-07: the count of `sleep` users is dropped, and the copies guarded by [`same_as_be_tests.ts`](../../../apps/flash-web/src/same_as_be_tests.ts) include the
 proxy's `not_found` reply.
 
+Amended 2026-11-08: the API path table is one exception to the copies. It lives in `libs/flash-commons` and `flash-be` and `flash-web` both import it
+([019](019-api-version-prefix.md)). The oracles still write their own paths.
+
 ## Context
 
 A copy that drifts is a bug that no test sees. But a shared piece used twice is often the wrong shape, and a shared
@@ -28,6 +31,11 @@ more places before this rule.
 - **Two places stay copied.** The password limits, the user name rule, the ticket header and the proxy's `not_found`
   reply are used by `flash-be` and `flash-web` only. [`apps/flash-web/src/same_as_be_tests.ts`](../../../apps/flash-web/src/same_as_be_tests.ts) fails if a copy drifts. The sale id rule (`isUuid`) has a
   third user, the uuid decoder, so it lives in `flash-commons`.
+- **One recorded exception: the API path table.** The set of API paths is a contract that `flash-be` and `flash-web` must
+  agree on exactly, and it is written in many places in both apps. It lives in `libs/flash-commons/src/api-paths.ts` and both
+  apps import it, because one compiled source enforces agreement better than a guard test. The e2e apps, the k6 script, the
+  prod smoke script and the `.http` files do not import it, so a renamed path still fails a test. See
+  [019](019-api-version-prefix.md).
 
 ## Alternatives considered
 
