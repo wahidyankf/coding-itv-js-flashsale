@@ -391,16 +391,17 @@ npx nx load:contention flash-load  # 700 shoppers reserve in the same moment, fo
 150 ms of the mock payment), and no server errors. A failed run is a finding about the system; a limit is not changed
 to make a run pass.
 
-**Expected outcome.** On a quiet machine `smoke`, `full` and `chaos` exit `0` and print a table where every check
-passes. On a busy one the speed checks of `smoke` and `full`, and the check that k6 started every shopper, can fail while
-every data check still holds (see [what the load runs found](docs/explanation/load-test-findings.md#how-the-runs-went)).
+**Expected outcome.** `smoke`, `full` and `chaos` should exit `0` and print a table where every check passes. Today
+`smoke` and `chaos` do, but `full` fails its purchase speed check while every data check holds; the cause is not known yet
+(see [what the load runs found](docs/explanation/load-test-findings.md#how-the-runs-went)).
 The checks are:
 k6 started every planned shopper, no oversell (`sold` is at most the stock), `sold` equals the purchase rows, no shopper
 bought twice, k6 and Postgres agree, the stock sells out, the shopper who floods the queue gets `429`, Redis and
 Postgres agree on the buyers, and there are no server errors.
 
-**What the runs showed.** On a laptop where k6 and the servers share the same CPUs, `smoke` and `full` sold every item
-with a reserve p95 of a few milliseconds and a purchase p95 of about 160 ms, most of it the mock payment. The two herd
+**What the runs showed.** On a laptop where k6 and the servers share the same CPUs, `smoke` and `full` sold every item.
+`smoke` and the earlier `full` runs had a reserve p95 of a few milliseconds and a purchase p95 of about 160 ms, most of
+it the mock payment; the latest `full` runs were slower, as said above. The two herd
 runs, `burst` and `contention`, put 700 shoppers into the system within one second, which the other runs never do. In
 all eight herd runs every check of the data held (100/100 and 50/50 sold, no server errors; in two runs k6 started a
 few shoppers late), but the speed limits failed in five of them as k6 measures them: reserve p95 reached 2,379 ms while the API logged about 5 ms per reserve. So these

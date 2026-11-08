@@ -99,11 +99,12 @@ times move with whatever else the machine runs. The slowest chaos run (547 ms an
 used the same CPUs; k6 then marked its speed thresholds as crossed and exited with code 99. Chaos judges only the data,
 so the run still passed, with every k6 check (1,402 of 1,402) and every data check green.
 
-`full` does judge speed. On 2026-11-08, with the machine's load average at 6 to 9 (a system scan used most of one CPU),
-two `full` runs in a row sold 100 of 100 with every data check green but failed: purchase p95 was 563 ms and 521 ms
-against the 500 ms limit, and the second run also had 237 shoppers that k6 started late. The code under test had not
-changed since the last `full` run that passed (reserve p95 3.7 ms, purchase p95 160 ms), so this is the machine, not the
-system. It is recorded as a failed run, and the limit stays.
+`full` does judge speed, and it is failing now. On 2026-11-08 three `full` runs in a row sold 100 of 100 with every
+data check green, but failed: purchase p95 was 563, 521 and 709 ms against the 500 ms limit, and k6 started 0, 237 and
+462 shoppers late. The last `full` run that passed (reserve p95 3.7 ms, purchase p95 160 ms) was on 2026-11-06. Since
+then the API was refactored, the load shoppers log in first, and the k6 retry backoff was doubled. The machine was also
+busy (load average 6 to 9, with system scans using most of one CPU). Which of these causes the failure is not known yet.
+`smoke` passed twice on the same day with a purchase p95 of 160 ms. This is an open finding, and the limit stays.
 
 ## Harness changes the first runs forced
 

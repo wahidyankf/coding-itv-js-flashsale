@@ -68,7 +68,8 @@ npx nx test:unit:watch flash-web    # only the unit tests
 npx nx test:integration flash-be    # needs the data stores above
 ```
 
-`git push` runs the full set of checks (see [test layers and coverage](../reference/test-layers-and-coverage.md)).
+The watch targets keep running and test again when you save a file. They need a terminal: without one (in CI or a
+script), Vitest runs the tests once and exits. `git push` runs the full set of checks (see [test layers and coverage](../reference/test-layers-and-coverage.md)).
 To try requests by hand, use `api-flash-be.http` and `api-flash-web.http` in Neovim with
 [kulala.nvim](https://github.com/wahidyankf/kulala.nvim), or `curl`; every route is in
 [HTTP endpoints](../reference/http-endpoints.md).
