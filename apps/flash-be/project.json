@@ -133,7 +133,7 @@
 		"db:reset": {
 			"executor": "nx:run-commands",
 			"options": {
-				"command": "docker compose -f compose.dev.yaml down -v && docker compose -f compose.dev.yaml up -d --wait && npm run migrate",
+				"command": "docker compose -f ../../compose.dev.yaml down -v && docker compose -f ../../compose.dev.yaml up -d --wait && npm run migrate",
 				"cwd": "apps/flash-be"
 			}
 		},
