@@ -2,9 +2,8 @@
 
 A decision record states one choice that was hard to reverse or that would surprise the next reader. It gives the
 context, the decision, the alternatives that were weighed and why they lost, what the choice costs and buys, and the
-signal that would make us look again. The decision of an accepted record is never changed: a later record replaces it and says so. A fact in it that is no
-longer true of the code (a path, a name, a count) is corrected in place, and a line in its Status says so:
-`Amended YYYY-MM-DD: what changed`.
+signal that would make us look again. Each record describes the code as it is now. When the code changes, the record
+changes with it, in the same change, so a record never tells the story of an older version.
 
 The pages in the [explanation](../README.md) folder say how each part works. These records say why it was chosen over
 the other options, and link to those pages.
@@ -26,7 +25,7 @@ the other options, and link to those pages.
 - [013-nx-as-a-command-runner.md](013-nx-as-a-command-runner.md) - Nx runs commands only, with no plugins.
 - [014-gherkin-scenarios-at-three-layers.md](014-gherkin-scenarios-at-three-layers.md) - scenarios are bound at unit, integration and end-to-end level, and a check finds the gaps.
 - [015-code-structure-limits.md](015-code-structure-limits.md) - size and nesting limits come from Biome's built-in rules; doc comments are kept by review.
-- [016-dry-rule-of-three.md](016-dry-rule-of-three.md) - logic used in three places becomes one piece; shared behaviour lives in `libs/flash-commons`; test oracles keep their own copies.
+- [016-dry-rule-of-three.md](016-dry-rule-of-three.md) - logic used in three places becomes one piece; shared behaviour lives in `libs/flash-commons`; test oracles keep their own copies of headers, codes and statuses; the API path table is the one recorded exception.
 - [017-retry-backoff-jitter.md](017-retry-backoff-jitter.md) - every retry uses exponential backoff, full jitter and a max attempt count, except the Redis reconnect.
 - [018-decode-payloads-at-the-edge.md](018-decode-payloads-at-the-edge.md) - every request body, reply and stream event is decoded at the edge with a small kit in flash-commons.
 - [019-api-version-prefix.md](019-api-version-prefix.md) - every API route is under `/api/v1`, and one path table in `flash-commons` names them all.

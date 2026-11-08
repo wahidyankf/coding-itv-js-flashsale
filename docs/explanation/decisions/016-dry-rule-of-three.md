@@ -4,17 +4,11 @@
 
 Accepted. Logic or a value used in three or more places becomes one named piece. Two copies are fine.
 
-Amended 2026-11-07: the count of `sleep` users is dropped, and the copies guarded by [`same_as_be_tests.ts`](../../../apps/flash-web/src/same_as_be_tests.ts) include the
-proxy's `not_found` reply.
-
-Amended 2026-11-08: the API path table is one exception to the copies. It lives in `libs/flash-commons` and `flash-be` and `flash-web` both import it
-([019](019-api-version-prefix.md)). The oracles still write their own paths.
-
 ## Context
 
 A copy that drifts is a bug that no test sees. But a shared piece used twice is often the wrong shape, and a shared
-package that holds everything couples every app to every change. Time units and HTTP status tables had grown in four or
-more places before this rule.
+package that holds everything couples every app to every change. Time units and HTTP status tables are needed in four or
+more places.
 
 ## Decision
 
@@ -25,17 +19,18 @@ more places before this rule.
   randomness or I/O of its own. `sleep`, used across four apps, is the one timer helper, on its own
   entry `@flash/flash-commons/timers`, so the pure entry stays pure. `libs/typekit` stays a kit of `Result` and the `attempt` wrappers. They are
   runtime code, but only the shape of a failure; typekit never gets a rule, a value or a helper of the apps.
-- **Test oracles are the exception.** The e2e steps, the k6 script and the prod smoke script write the API's paths, header
-  names, error codes and expected statuses themselves. Values that are not our contract (time units, the standard HTTP
+- **Test oracles are the exception.** The e2e steps, the k6 script and the prod smoke script write the API's header
+  names, error codes and expected statuses themselves. The paths are the one thing they import (see the exception below). Values that are not our contract (time units, the standard HTTP
   status numbers) are shared from `flash-commons`.
 - **Two places stay copied.** The password limits, the user name rule, the ticket header and the proxy's `not_found`
   reply are used by `flash-be` and `flash-web` only. [`apps/flash-web/src/same_as_be_tests.ts`](../../../apps/flash-web/src/same_as_be_tests.ts) fails if a copy drifts. The sale id rule (`isUuid`) has a
   third user, the uuid decoder, so it lives in `flash-commons`.
 - **One recorded exception: the API path table.** The set of API paths is a contract that `flash-be` and `flash-web` must
-  agree on exactly, and it is written in many places in both apps. It lives in `libs/flash-commons/src/api-paths.ts` and both
-  apps import it, because one compiled source enforces agreement better than a guard test. The e2e apps, the k6 script, the
-  prod smoke script and the `.http` files do not import it, so a renamed path still fails a test. See
-  [019](019-api-version-prefix.md).
+  agree on exactly, and it is written in many places in both apps. It lives in `libs/flash-commons/src/api-paths.ts`, and `flash-be`, `flash-web`, the
+  e2e apps, the k6 script and the prod smoke script all import it, because one compiled source enforces agreement better than
+  a guard test, and a URL change is a reviewed product decision. One literal test of the whole table
+  (`api-paths_tests.ts`) and the literal expectations of the `flash-be` route-table test are what keep a rename from passing
+  silently. The `.http` files and the docs stay literal. See [019](019-api-version-prefix.md).
 
 ## Alternatives considered
 

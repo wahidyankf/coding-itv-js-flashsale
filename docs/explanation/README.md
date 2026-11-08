@@ -20,7 +20,7 @@ When something fails:
 - [serving-without-redis.md](serving-without-redis.md) - what each step does when Redis is down, and how Redis catches up when it returns.
 - [liveness-and-readiness.md](liveness-and-readiness.md) - why `/health` checks nothing and `/ready` checks the stores.
 - [rate-limiting.md](rate-limiting.md) - why write requests are counted per user and per address, and what happens when Redis is down.
-- [load-test-findings.md](load-test-findings.md) - what the load runs showed, and what was fixed because of them.
+- [load-test-findings.md](load-test-findings.md) - the result of each load profile, and what the runs measured that shaped the code and the test.
 
 Accounts and operators:
 

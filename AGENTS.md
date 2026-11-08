@@ -5,7 +5,7 @@ Guidance for AI coding agents working in this repository. For setup and run comm
 ## Project
 
 Flash sale monorepo with five apps in [`apps/`](apps) and two libraries in [`libs/`](libs): `flash-be` (Fastify REST API), `flash-web` (TanStack Start client, styled with Tailwind CSS),
-`flash-be-e2e` and `flash-web-e2e` (Playwright), and `flash-load` (k6 load test). `libs/typekit` (`@flash/typekit`) holds `Result` and `attempt` and nothing else: the type of a failure and the wrappers that make one, with no rule of any app and no shared helper. `libs/flash-commons` (`@flash/flash-commons`) holds the behaviour and values that several apps share: retry with backoff and jitter, time units, HTTP status numbers, the payload decoders, the id rule (`isUuid`), the cookie jar and the time phrases of the scenarios on its pure main entry, and `sleep` on `@flash/flash-commons/timers`. Data lives in Postgres (Kysely, no ORM) and Redis. [docs/reference/code-map.md](docs/reference/code-map.md) says where each kind of thing lives, and each app's `README.md` says where to add one.
+`flash-be-e2e` and `flash-web-e2e` (Playwright), and `flash-load` (k6 load test). `libs/typekit` (`@flash/typekit`) holds `Result` and `attempt` and nothing else: the type of a failure and the wrappers that make one, with no rule of any app and no shared helper. `libs/flash-commons` (`@flash/flash-commons`) holds the behaviour and values that several apps share: retry with backoff and jitter, time units, HTTP status numbers, the payload decoders, the id rule (`isUuid`), the cookie jar, the time phrases of the scenarios and the table of API paths (`API_PATHS`) on its pure main entry, and `sleep` on `@flash/flash-commons/timers`. Data lives in Postgres (Kysely, no ORM) and Redis. [docs/reference/code-map.md](docs/reference/code-map.md) says where each kind of thing lives, and each app's `README.md` says where to add one.
 
 ## Docs and specs
 
@@ -48,18 +48,22 @@ Flash sale monorepo with five apps in [`apps/`](apps) and two libraries in [`lib
   workspaces with one [`package-lock.json`](package-lock.json).
 - Nx runs commands only. Do not add Nx plugins (`@nx/*`, `nx-*`) or run `nx init`. Define every target in the app's
   `project.json` with `"executor": "nx:run-commands"`.
-- `libs/typekit` and `libs/flash-commons` are built to `dist` (`npx nx build typekit`, `npx nx build flash-commons`). The Nx targets of the apps that use them build them first, and the
+- `libs/typekit` and `libs/flash-commons` are built to `dist`, which each build empties first (`npx nx build typekit`, `npx nx build flash-commons`). The Nx targets of the apps that use them build them first, and the
   Dockerfiles build them too. Each has `build`, `typecheck`, `lint`, `test:unit`, `test:coverage` and `test:quick`, each with a `:watch` variant where one exists, and needs no Docker.
 - Run targets with `npx nx <target> <app>`. Every app has `typecheck`, `lint`, `test:quick`, and `test:quick:watch`.
   - `flash-be` and `flash-web` also have `test:unit` and `test:integration`.
   - `flash-be-e2e` and `flash-web-e2e` have `test:e2e` instead.
-  - `flash-load` has `test:unit` (the runner's pure parts: verdict, report, sampler) and `load:smoke`, `load:full`, `load:chaos`, `load:burst` and `load:contention`. The load targets need Docker and run the stack. Its numbers are in
+  - `flash-load` has `test:unit` (the pure parts: verdict, report, sampler, accounts, paths and the VU pools of the profiles) and `load:smoke`, `load:full`, `load:chaos`, `load:burst` and `load:contention`. The load targets need Docker and run the stack. Its numbers are in
     [`apps/flash-load/k6/profiles.ts`](apps/flash-load/k6/profiles.ts), and its rules and limits are in [`specs/apps/flash/load/`](specs/apps/flash/load). A failed run is a finding; do not change a limit to make it pass.
   - `test:quick` runs `typecheck`, `lint`, and `test:unit` (flash-load included), or only `typecheck` and `lint` for the e2e apps. Change a
     check in its own target, not in `test:quick`. Keep `test:quick:watch` in sync with it.
 - The HTTP API is plain code. The routes are in [`apps/flash-be/src/adapters/inbound/http/routes/`](apps/flash-be/src/adapters/inbound/http/routes), one file per area, and the error codes with
-  their statuses and sentences are in [`errors.ts`](apps/flash-be/src/adapters/inbound/http/errors.ts) in `http/`. `flash-web` and the e2e and load apps write the paths they call
-  themselves. A change to a route or a reply updates the handler, every caller, [`docs/reference/http-endpoints.md`](docs/reference/http-endpoints.md) and the
+  their statuses and sentences are in [`errors.ts`](apps/flash-be/src/adapters/inbound/http/errors.ts) in `http/`. Every route is served under `/api/v1`
+  (the probes `/health` and `/ready` stay at the root), and every path comes from `API_PATHS` in
+  [`libs/flash-commons/src/api-paths.ts`](libs/flash-commons/src/api-paths.ts): `flash-be`, `flash-web`, the e2e apps and
+  `flash-load` import it, and only the `.http` files and the docs write a path out. A path change also edits the literal table in
+  [`api-paths_tests.ts`](libs/flash-commons/src/api-paths_tests.ts) on purpose
+  ([`docs/explanation/decisions/019-api-version-prefix.md`](docs/explanation/decisions/019-api-version-prefix.md)). A change to a route or a reply updates the handler, every caller, [`docs/reference/http-endpoints.md`](docs/reference/http-endpoints.md) and the
   scenario ([`docs/how-to/change-an-endpoint.md`](docs/how-to/change-an-endpoint.md)). An error reply is `{ errorCode, errorMessage }` (plus `retryAfterSeconds`
   for `429`); the status is not in the body.
 - Biome formats and lints (tabs, double quotes). Do not add Prettier or ESLint.
@@ -90,7 +94,8 @@ Flash sale monorepo with five apps in [`apps/`](apps) and two libraries in [`lib
   why it exists and what it promises, not what the code does. Biome has no rule for this, so `swe-reviewer` checks it.
 - DRY by the rule of three: two copies are fine, and the third use gets one named constant or function in the app, in the folder that owns it.
   When 3 or more places across the apps use it, it goes in `libs/flash-commons`. Its main entry stays pure; a helper that starts a timer or does I/O goes on its own entry, as `sleep` does on `/timers`. The exception is the test oracles: the
-  e2e apps and `flash-load` write the API's paths, headers, error codes and statuses themselves, so a renamed route fails a test. A rule that only
+  e2e apps and `flash-load` write the API's headers, error codes and statuses themselves, so a changed reply fails a test. The API's paths are
+  not part of that exception: everyone imports `API_PATHS`, and its literal tripwire test makes a rename visible ([019](docs/explanation/decisions/019-api-version-prefix.md)). A rule that only
   `flash-be` and `flash-web` share stays copied and is guarded by [`same_as_be_tests.ts`](apps/flash-web/src/same_as_be_tests.ts) in `flash-web`. See
   [`docs/explanation/decisions/016-dry-rule-of-three.md`](docs/explanation/decisions/016-dry-rule-of-three.md).
 - Every retry uses `retry` or `retryAsync` (or `backoffDelayMs`) from `@flash/flash-commons`: exponential backoff, a max attempt count and full
@@ -143,16 +148,16 @@ Flash sale monorepo with five apps in [`apps/`](apps) and two libraries in [`lib
   `src/adapters/inbound` (HTTP, CLI) and `src/adapters/outbound` (Postgres, Redis, memory, payment, clock). Only
   [`composition.ts`](apps/flash-be/src/composition.ts) and the entry points pick an adapter for a port. [`architecture_tests.ts`](apps/flash-be/src/architecture_tests.ts) fails on a wrong import.
   Put a new rule in the domain with a unit test first, not in a service or a route.
-- Routes are in `apps/flash-be/src/adapters/inbound/http/routes/<area>.ts`, with full paths; [`routes/index.ts`](apps/flash-be/src/adapters/inbound/http/routes/index.ts) registers every area. Migrations are hand-written in
+- Routes are in `apps/flash-be/src/adapters/inbound/http/routes/<area>.ts`, each with its full path from `API_PATHS`, never a literal ([`architecture_tests.ts`](apps/flash-be/src/architecture_tests.ts) fails on one); [`routes/index.ts`](apps/flash-be/src/adapters/inbound/http/routes/index.ts) registers every area. Migrations are hand-written in
   `apps/flash-be/src/adapters/outbound/postgres/migrations`. Use Kysely as a query builder. Do not add an ORM.
 - Config is built once from `process.env` in [`src/config.ts`](apps/flash-be/src/config.ts). `buildConfig` is exported for tests. Local defaults match
   [`compose.dev.yaml`](compose.dev.yaml). In production, a missing required URL must fail fast.
 - Accounts and sessions ([`docs/explanation/authentication.md`](docs/explanation/authentication.md)): shoppers and operators log in with a user name and a password.
-  Two cookies carry the session: `access_token` (15 minutes, path `/`) and `refresh_token` (7 days, path `/auth`, used once,
+  Two cookies carry the session: `access_token` (15 minutes, path `/`) and `refresh_token` (7 days, path `/api/v1/auth`, used once,
   replaying an old one ends the session). Both are `HttpOnly` and `SameSite=Lax`, and `Secure` when `COOKIE_SECURE` is true.
   Never put a token in a body, a URL or a log, and store only SHA-256 hashes of tokens and scrypt hashes of passwords. No
   route takes a user id: the shopper is `/queue/me`, `/purchases/me` and the session. The first operator is made with
-  `create-operator`; sign-up can only make a shopper. The `/auth` routes have their own rate limit (`AUTH_RATE_LIMIT_PER_IP`).
+  `create-operator`; sign-up can only make a shopper. The `/api/v1/auth` routes have their own rate limit (`AUTH_RATE_LIMIT_PER_IP`).
 - Nothing is hard-deleted. Every table has `created_at`, `created_by`, `updated_at`, `updated_by`, `deleted_at` and
   `deleted_by` (the `*_by` columns point at `users`). A removal sets `deleted_at` and `deleted_by`; every read adds
   `deleted_at IS NULL`, and the unique indexes on a live row are partial (`WHERE deleted_at IS NULL`); `purchases.reservation_id` stays plainly unique, because a hold is paid for once ever. Product code never calls
@@ -160,9 +165,9 @@ Flash sale monorepo with five apps in [`apps/`](apps) and two libraries in [`lib
   type, and [`schema_integration_tests.ts`](apps/flash-be/src/adapters/outbound/postgres/schema_integration_tests.ts) checks both.
 - Env vars are listed in [`.env.example`](.env.example). Never commit `.env`. Do not use the example passwords outside local
   development.
-- The operator routes are `POST`, `GET` (list), `PATCH` and `DELETE` under `/admin/sales`. They need the login of an operator (`401 not_authenticated`, `403 forbidden` for a shopper) and are never passed on by `flash-web`. Keep them
+- The operator routes are `POST`, `GET` (list), `PATCH` and `DELETE` under `/api/v1/admin/sales`. They need the login of an operator (`401 not_authenticated`, `403 forbidden` for a shopper) and are never passed on by `flash-web`. Keep them
   off the allow-list of the `flash-web` proxy; a test there fails if one is on it. Overlap is refused there only, not in the seed command. A started sale keeps its start and cannot lose stock, a sale that is over cannot change, and a sale with a purchase cannot be removed.
-- `GET /sales/current` and the admission timer use one rule (`pickCurrent`, `admitCurrentSale`): the running sale, else the next to open, else none. Do not use "the sale that opens last".
+- `GET /api/v1/sales/current` and the admission timer use one rule (`pickCurrent`, `admitCurrentSale`): the running sale, else the next to open, else none. Do not use "the sale that opens last".
 - [`api-flash-be.http`](api-flash-be.http) and [`api-flash-web.http`](api-flash-web.http) hold one request per route, one file per app. [`api-flash-demo.http`](api-flash-demo.http) is the demo story in order ([`docs/how-to/run-the-demo.md`](docs/how-to/run-the-demo.md)). All three use the kulala.nvim format (https://github.com/wahidyankf/kulala.nvim): a `Shared` block with `# @attach-cookie-jar`, and `# @name` (letters and `_` only) for a reply that later requests read. Update them when an endpoint changes. They do not replace tests.
 - The `demo:*` scripts in the root [`package.json`](package.json) set up and run the demo. `demo:reset` wipes the local data; never run it without being asked.
 

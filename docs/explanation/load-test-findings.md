@@ -1,153 +1,104 @@
 # What the load runs found
 
-The limits in [specification: limits](../../specs/apps/flash/load/limits.md) were fixed before the first run. This page records what
-the runs showed and what was changed because of them. A limit was never changed to make a run pass.
+The limits in [specification: limits](../../specs/apps/flash/load/limits.md) were fixed before the first run and are
+never changed to make a run pass. This page gives the results of each profile, then each thing the runs measured that
+shaped the code or the test, with what the code does about it now.
 
-## The invariants held every time
+## The results
 
-In every run of smoke, full and chaos, `sales.sold` equalled the number of `purchases` rows and never passed the stock.
-No user bought twice. k6 and Postgres agreed on the number of purchases. After Redis came back, the Redis buyers set was
-rebuilt to the same size as the rows in Postgres. This held even while Redis was stopped, because the Postgres path
-takes a row lock and the database constraints refuse a second sale.
+One run of each profile on one laptop, where k6 and every server share six CPUs on a Docker VM:
 
-## A herd of 700 in one second
+| Profile    | Result             | Stock sold     | Reserve p95 | Purchase p95 | Dropped |
+| ---------- | ------------------ | -------------- | ----------- | ------------ | ------- |
+| smoke      | every check passed | 20 of 20       | 2.6 ms      | 158.9 ms     | 0       |
+| full       | every check passed | 100 of 100     | 4.4 ms      | 167.4 ms     | 0       |
+| contention | every check passed | 50 of 50       | 3.0 ms      | 160.8 ms     | 0       |
+| chaos      | every check passed | 1,000 of 1,000 | 131.7 ms    | 365.0 ms     | 0       |
 
-`smoke`, `full` and `chaos` send shoppers over many seconds, so the queue smooths the load before it reaches the sale.
-Two profiles, `burst` and `contention`, were added to send everyone inside one second. Their size and the reason for it
-are in [`profiles.ts`](../../apps/flash-load/k6/profiles.ts) and were written before they ran. The limits are the same as for every other run.
+`burst` ran five times. Each run sold 100 of 100 with no dropped shopper and every data check green. Four runs passed
+every check, with a reserve p95 of 3.1 to 9.1 ms and a purchase p95 of 159.6 to 179.5 ms. One run failed the purchase
+speed limit: 519.8 ms against 500 ms. In that run the whole distribution was slower, not only the tail (median 243 ms,
+reserve p95 19.2 ms), and other projects' containers shared the VM, with a load average of about 16.7 when it was
+checked. The cause is not proven. It is an open finding, and the limit stays.
 
-**The first try never began.** With 2,000 shoppers k6 stopped starting virtual users at 1,186 of 2,070 on a Docker VM with
-7.7 GiB, about 6 MiB for each user with a schema library bundled into the script (the script has since been made plain code). That is a limit of the machine
-that runs the load generator, not a result about the system. The herd was cut to 700, close to the 670 users that `full`
-starts. The runner now reports a missing k6 summary as a load-generator failure and removes the stack.
+In every run `sales.sold` equalled the number of `purchases` rows and never passed the stock, no shopper bought twice,
+k6 and Postgres agreed on the purchases, and the flooding shopper got `429`. In `chaos`, Redis stops at +4 s and starts
+again, and the Redis buyers set is rebuilt to the same size as the rows in Postgres. The invariants hold while Redis is
+stopped, because the Postgres path takes a row lock and the database constraints refuse a second sale. Chaos is judged on
+the data only, so its speed is for information: while Redis is down, every reserve takes the slower Postgres path.
 
-**The invariants held.** In nine runs (four of `burst`, five of `contention`) `sales.sold` equalled the number of
-purchase rows and never passed the stock (100 of 100 in `burst`, 50 of 50 in `contention`), no shopper bought twice, k6, Postgres and Redis agreed,
-the flooding users got `429`, and there were no server errors. In the first six runs Postgres never had a session waiting
-for a lock; `burst 4` saw at most 5 waiting at once, and they did not slow it past the limits. The
-`contention` profile is the first one that sends hundreds of reserves for 50 items in the same moment, and the Lua gate
-and `UPDATE ... WHERE sold < stock` held.
+A purchase p95 of about 160 ms is the 150 ms of the mock payment plus the database.
 
-**The speed limits failed in five of the nine runs, as k6 measures them.**
+## What the times mean
 
-| Run          | Reserve p95 | Purchase p95 | Dropped | Note                                                                      |
-| ------------ | ----------- | ------------ | ------- | ------------------------------------------------------------------------- |
-| burst 1      | 2,379 ms    | 1,949 ms     | 3       |                                                                           |
-| burst 2      | 701 ms      | 724 ms       | 0       | API logs kept                                                             |
-| contention 1 | 349 ms      | 213 ms       | 0       | reserve over the limit, purchase under                                    |
-| contention 2 | 551 ms      | 194 ms       | 0       | API logs kept                                                             |
-| burst 3      | 70 ms       | 521 ms       | 1       | after the refactor; purchase over                                         |
-| contention 3 | 27 ms       | 297 ms       | 0       | after the refactor; both under                                            |
-| burst 4      | 83 ms       | 474 ms       | 0       | 2026-11-08; every check passed                                            |
-| contention 4 | 23 ms       | 247 ms       | 5       | 2026-11-08; both under, but k6 started 5 shoppers late, so the run failed |
-| contention 5 | 55 ms       | 405 ms       | 1       | 2026-11-08; both under, but k6 started 1 shopper late, so the run failed  |
+The client and the servers share one machine, so the times are relative and move with whatever else the machine runs.
+The correctness checks are exact. The API logs time a request from when Node hands it over; they do not include a wait
+in nginx, in the network or in a busy event loop. A faithful speed result needs the load generator on another machine.
 
-**Where the time is not.** In the runs with logs, the API logged a reserve at a median of 1.5 ms and a 95th percentile of
-5.3 to 5.5 ms (largest 46 ms). A purchase took 155 ms in the median, which is the 150 ms of the mock payment. A join took
-13 to 38 ms at the 95th percentile. So the handlers are not slow, and the database is not the wait. The gap between 5 ms
-and 350 to 2,400 ms is outside the handler: 700 to 770 virtual users running in k6's JavaScript runtime, nginx, and three
-Node processes all share six CPUs, and the run-to-run spread (701 against 2,379 ms for the same profile) says the machine is
-the noisy part.
+## Paying during a Redis outage answers at once
 
-**What this does not show.** The API logs time a request from when Node hands it to the server. They do not include the
-time a request waits before that, in nginx, in the network or in a busy event loop. So the logs lower the suspicion on the
-handlers, but they do not prove that a real client would see 5 ms. A faithful speed result needs the load generator on
-another machine. Until then the two profiles are judged on speed with the fixed limits. After the refactor `contention` passed
-and `burst` still failed on purchase (521 ms against 500 ms). On 2026-11-08 `burst` passed every check, and `contention`
-met both speed limits twice but failed both times because k6 started 5, then 1, shoppers late. Every shopper in the
-herd also signs up in that second, so the late starts likely have the same cause as the `full` failure below.
+The Redis client is created with `disableOfflineQueue`, so a command sent while Redis is down fails at once. A
+`MULTI`/`EXEC` does not: it waits for the connection, and the wait grows with the outage. A chaos run with `MULTI` in the
+hold gate measured a purchase p95 of about 1.8 seconds, because each payment waited for it.
 
-## Paying during a Redis outage was slow
+So `confirm` and `release` in
+[`redis-hold-gate.ts`](../../apps/flash-be/src/adapters/outbound/redis/redis-hold-gate.ts) are single Lua scripts, which
+fail at once like the other gate calls. The scenario "Paying while Redis is down is not slowed down" holds the outage
+for four seconds and requires every confirmation to answer in under 500 ms; with `MULTI` it measured 2,148 ms.
 
-The first chaos run kept every invariant and had no server errors, but the 95th percentile of a purchase was about
-1.8 seconds, against a limit of 500 ms (the limit does not apply to chaos, but the number is a finding).
+## A buyer who asks again while the queue is lost is told they bought
 
-Cause: the Redis client is created with `disableOfflineQueue`, so a command sent while Redis is down fails at once.
-A `MULTI`/`EXEC` is different. It waits for the connection first, and the wait grows with the length of the outage
-(about 0.9 s, then 1.8 to 2 s). The hold gate used `MULTI` to record a purchase and to release a hold, so each payment
-waited for it, even though the answer was thrown away.
+The reserve route checks the queue place before it asks the gate, and the queue lives only in Redis. The load stack runs
+Redis without persistence, so a stop and start empties the queue, and a shopper who had just bought would get
+`403 not_admitted` on a second reserve instead of `409 already_purchased`. No second hold could be made, but the error
+was wrong for 12 to 15 of about 200 buyers in a chaos run.
 
-Fix: `confirm` and `release` in [`redis-hold-gate.ts`](../../apps/flash-be/src/adapters/outbound/redis/redis-hold-gate.ts) are single Lua scripts. A script fails at once when Redis is down,
-like the other gate calls. The scenario "Paying while Redis is down is not slowed down" holds the outage for four
-seconds and requires every confirmation to answer in under 500 ms. It failed before the fix (2,148 ms) and passes after.
-
-The same chaos profile then gave a purchase p95 of 155 ms, which is the 150 ms of the mock payment plus the database.
-
-## A buyer asking again during the outage was refused with the wrong error
-
-In the first chaos runs, 12 to 15 of about 200 buyers who reserved a second time were refused with `403 not_admitted`
-and not `409 already_purchased`, so k6 reported the check "a second reserve is refused" as failed for them. No second
-hold was made and no invariant broke, so the refusal was safe, but the error was wrong.
-
-Cause: the reserve route checks the queue place before it asks the gate, and the queue lives only in Redis. The load
-stack runs Redis without persistence, so a stop and start empties the queue, and a shopper who bought a moment ago was
-no longer admitted.
-
-Fix: when the queue has no place for the shopper, the route asks Postgres whether they already bought, and answers
+So when the queue has no place for the shopper, the route asks Postgres whether they already bought, and answers
 `409 already_purchased` if so. The query runs only for shoppers the queue does not know, not on the hot path. The
-scenario "A buyer is told so when the queue was lost" binds it at unit, integration and end-to-end level. After the fix
-the chaos run passed all 1,384 k6 checks. The check was not loosened.
+scenario "A buyer is told so when the queue was lost" binds it at unit, integration and end-to-end level.
 
-## How the runs went
+## Shoppers sign up before the sale, not during it
 
-| Profile | Stock sold     | Reserve p95   | Purchase p95    | Server errors |
-| ------- | -------------- | ------------- | --------------- | ------------- |
-| smoke   | 20 of 20       | 2.1 to 3.1 ms | 156 to 160 ms   | 0             |
-| full    | 100 of 100     | 1.6 to 3.7 ms | 156 to 160 ms   | 0             |
-| chaos   | 1,000 of 1,000 | 3.0 to 547 ms | 155 to 1,046 ms | 0             |
+A sign-up hashes the password with scrypt at the cost Node uses by default, about 32 ms of CPU. `full` sends 250 shoppers
+a second, so sign-ups during the run would need about 8 CPU-seconds every second on six CPUs. Measured that way, `full`
+sold every item but had a purchase p95 of 641 to 673 ms, and k6 started up to 563 shoppers late; all requests together
+had a p95 of 3.7 s while reserve stayed at about 41 ms. That measures the hashing, not the sale, and a real shopper signs
+up before a sale opens.
 
-The client and the servers share one machine, so treat the times as relative. The correctness checks are exact. The
-times move with whatever else the machine runs. The slowest chaos run (547 ms and 1,046 ms) ran while other test suites
-used the same CPUs; k6 then marked its speed thresholds as crossed and exited with code 99. Chaos judges only the data,
-so the run still passed, with every k6 check (1,402 of 1,402) and every data check green.
+So the runner signs every account up before k6 starts
+([`scripts/accounts.ts`](../../apps/flash-load/scripts/accounts.ts)), and k6 reads the tokens from a file. A check fails
+the run if a shopper has no account.
 
-## `full` failed while the shoppers signed up during the run
+## The pool of virtual users is larger than the herd
 
-On 2026-11-08 five `full` runs sold 100 of 100 with every data check green, but failed: purchase p95 was 521 to 709 ms
-against the 500 ms limit, and k6 started up to 563 shoppers late. `smoke` passed on the same day with a purchase p95 of
-160 ms.
+`burst` and `contention` send 700 shoppers within one second, and a visit lasts more than a second, because the first
+poll of the place waits 1 to 2 seconds. With a pool equal to the herd, 700, k6 had no free user for the last arrivals and
+dropped 1 or 2 of them in three of five `burst` runs ("Insufficient VUs"), which fails the check that k6 started every
+planned shopper. The pool is 800, five `burst` runs with it dropped no shopper, and
+[`profiles_tests.ts`](../../apps/flash-load/k6/profiles_tests.ts) keeps it above the herd.
 
-**It was the code, not the machine.** The same day, the code of the last passing run (commit `64bfa17`, 2026-11-06) and
-the code of that day ran `full` in turn on the same machine:
+The pool has a ceiling that the machine sets, not the system: on the 7.7 GiB Docker VM, k6 stopped starting virtual users
+at 1,186 of 2,070 (about 6 MiB each), so the herd is 700, close to the 670 users that `full` starts. The runner reports a
+missing k6 summary as a load-generator failure and removes the stack.
 
-| Run   | Code    | Reserve p95 | Purchase p95 | Dropped | Result |
-| ----- | ------- | ----------- | ------------ | ------- | ------ |
-| old 1 | 64bfa17 | 2.0 ms      | 156.9 ms     | 0       | passed |
-| new 1 | current | 64.9 ms     | 641.1 ms     | 369     | failed |
-| old 2 | 64bfa17 | 2.0 ms      | 156.0 ms     | 0       | passed |
-| new 2 | current | 40.8 ms     | 673.2 ms     | 563     | failed |
+## Latecomers take the items that abandoned holds give back
 
-**Cause: the sign-ups.** Since `64bfa17`, every shopper has an account, and each load shopper signed up inside its
-visit (`POST /auth/register`). A sign-up hashes the password with scrypt at the cost Node uses by default, which takes
-about 32 ms of CPU. `full` sends 250 shoppers a second, so the sign-ups alone needed about 8 CPU-seconds every second,
-on a Docker VM with 6 CPUs. In `new 2`, all requests together had a p95 of 3.7 s while reserve stayed at 41 ms. A
-purchase waited behind the hashing, and k6 ran out of virtual users, so it started shoppers late.
+One shopper in twenty walks away with a hold on purpose, and the item comes back when the hold lapses. Latecomers arrive
+after that to buy it, so the stock sells out. Two details make that hold in every run:
 
-This was a fault of the test plan, not of the sale path: a real shopper signs up before a sale, not at the moment it
-opens. **Fix:** the runner now signs every account up before k6 starts
-([`scripts/accounts.ts`](../../apps/flash-load/scripts/accounts.ts)), and k6 reads the tokens from a file. A new check
-fails the run if a shopper has no account. The limits did not change. The runs after the fix, one of each profile:
+- A latecomer never walks away with a hold. Theirs are the last holds, and nobody comes after them, so an abandoned
+  latecomer hold would leave its item unsold (a run then sells 99 of 100).
+- Latecomers start 5 seconds after the last herd hold could have lapsed. In `burst` the herd is admitted up to about
+  1.3 seconds after its last arrival and polls up to 2 seconds later, so a latecomer who came earlier could meet a live
+  hold and leave with nothing.
 
-| Profile    | Result                               | Reserve p95 | Purchase p95 | Dropped |
-| ---------- | ------------------------------------ | ----------- | ------------ | ------- |
-| smoke      | every check passed                   | 2.8 ms      | 159.8 ms     | 0       |
-| full       | every check passed                   | 2.2 ms      | 157.4 ms     | 0       |
-| contention | every check passed                   | 2.6 ms      | 159.2 ms     | 0       |
-| chaos      | every check passed                   | 8.6 ms      | 162.5 ms     | 0       |
-| burst      | failed one check: sold 99 of the 100 | 2.5 ms      | 158.1 ms     | 0       |
+The report prints how many shoppers and latecomers walked away, for information.
 
-In that `burst` run every invariant held (no oversell, no double purchase, k6 and Postgres agreed), but one item was
-still unsold when the run ended: 105 holds, 99 purchases. Why is not known yet. It is an open finding, and the check
-stays.
+## How the harness keeps a run honest
 
-## Harness changes the first runs forced
-
-These were faults in the test, not in the system, and are listed so the numbers can be trusted.
-
-- k6 dropped iterations when shoppers kept retrying a sold-out sale and held all virtual users. A shopper now reserves
-  once and stops when the sale is sold out, and a dropped iteration fails the run.
-- Shoppers who waited in the queue after the sell-out never finished. A waiting shopper now reads the sale and gives up
-  when it is sold out or ended.
-- Items freed by abandoned holds stayed unsold because arrivals ended before the last hold lapsed. Late shoppers now
-  arrive after the holds have lapsed.
-- The first chaos stock of 50 sold out before Redis stopped. The stock is now 1,000 and the outage starts at +4 s.
+- A shopper reserves once and stops when the sale is sold out, so shoppers who keep retrying a sold-out sale do not hold
+  every virtual user. A dropped iteration fails the run.
+- A shopper who is still waiting in the queue reads the sale and gives up when it is sold out or ended.
+- The chaos stock is 1,000 and the outage starts at +4 s, so items are still for sale when Redis stops.
+- The verdict is read from Postgres and Redis after the run, not from what k6 saw
+  ([decision 012](decisions/012-load-verdict-from-the-data.md)).

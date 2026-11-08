@@ -12,9 +12,9 @@ never be charged for an item that is gone.
 
 ## Decision
 
-- `POST /sales/:saleId/queue` joins and returns a signed ticket. Each second one instance admits the next shoppers.
-- `POST /sales/:saleId/reservations` takes a hold on one item for a limited time. Only an admitted shopper may call it.
-- `POST /sales/:saleId/purchases` pays for the hold. **Buy Now** in the page makes the first two calls; **Confirm purchase** makes the third.
+- `POST /api/v1/sales/:saleId/queue` joins and returns a signed ticket. Each second one instance admits the next shoppers.
+- `POST /api/v1/sales/:saleId/reservations` takes a hold on one item for a limited time. Only an admitted shopper may call it.
+- `POST /api/v1/sales/:saleId/purchases` pays for the hold. **Buy Now** in the page makes the first two calls; **Confirm purchase** makes the third.
 
 ## Alternatives considered
 

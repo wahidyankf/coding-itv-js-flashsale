@@ -11,7 +11,7 @@ The task wants a page that shows the sale status. In a flash sale thousands of p
 
 ## Decision
 
-- Two streams: the sale (`/sales/:saleId/events`) and a shopper's queue place (`/sales/:saleId/queue/me/events`, which needs the login).
+- Two streams: the sale (`/api/v1/sales/:saleId/events`) and a shopper's queue place (`/api/v1/sales/:saleId/queue/me/events`, which needs the login).
 - Each stream reads its source every `EVENTS_INTERVAL_MS` (one second by default) and writes an event only when the result
   changed. A comment line every 15 seconds keeps proxies from closing an idle connection.
 - The sale stream reads through the one-second sale cache, so many watchers cost about one database read a second.

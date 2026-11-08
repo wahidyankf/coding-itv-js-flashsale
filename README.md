@@ -11,7 +11,7 @@ three levels and a load test that checks the data after each run. Everything run
 
 | You want to                   | Go to                                                                                                                                                                 |
 | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| see it work in ten minutes    | [run the demo](docs/how-to/run-the-demo.md)                                                                                                                           |
+| see it work in ten minutes    | [run the demo](docs/how-to/run-the-demo.md); to present it in an interview, [prepare the defense](docs/how-to/prepare-the-defense.md)                                 |
 | run it yourself, step by step | [the tutorial](docs/tutorials/run-flash-sale-locally.md) the first time, then [run in development](docs/how-to/run-in-development.md)                                 |
 | run it in containers          | [run in production](docs/how-to/run-in-production.md)                                                                                                                 |
 | understand the design         | [How a purchase works](#how-a-purchase-works), then [design choices](#design-choices-and-trade-offs) and the [decision records](docs/explanation/decisions/README.md) |
@@ -50,12 +50,12 @@ Each line of the interview task, and the code or scenario that answers it.
 
 | The task asks for                  | Where it is                                                                                                                                                                                                                                                                                                                                                                 |
 | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A configurable start and end time  | `sales.starts_at` and `ends_at`. Set them with `POST /admin/sales` (absolute times, needs an operator login) or with the seed command (minutes from now). `PATCH` and `DELETE /admin/sales/:saleId` change and remove a sale                                                                                                                                                |
+| A configurable start and end time  | `sales.starts_at` and `ends_at`. Set them with `POST /api/v1/admin/sales` (absolute times, needs an operator login) or with the seed command (minutes from now). `PATCH` and `DELETE /api/v1/admin/sales/:saleId` change and remove a sale                                                                                                                                  |
 | One product, limited stock         | `sales.stock`, with `UPDATE ... WHERE sold < stock` and `CHECK (sold <= stock)` in Postgres                                                                                                                                                                                                                                                                                 |
 | One item per user                  | `UNIQUE(sale_id, user_id)` on purchases and on reservations; a Redis set of buyers in front of it                                                                                                                                                                                                                                                                           |
-| An endpoint for the sale status    | `GET /sales/current` and `GET /sales/:saleId`, plus a live stream at `.../events`                                                                                                                                                                                                                                                                                           |
-| An endpoint to attempt a purchase  | Three calls, because a rush needs a queue: `POST /sales/:saleId/queue` (join, get a ticket), `POST .../reservations` (hold one item), `POST .../purchases` (pay). **Buy Now** makes the first two; **Confirm purchase** makes the third                                                                                                                                     |
-| An endpoint to check the outcome   | `GET /sales/:saleId/purchases/me`: a purchase, a live hold, or nothing (for the shopper who is logged in)                                                                                                                                                                                                                                                                   |
+| An endpoint for the sale status    | `GET /api/v1/sales/current` and `GET /api/v1/sales/:saleId`, plus a live stream at `.../events`                                                                                                                                                                                                                                                                             |
+| An endpoint to attempt a purchase  | Three calls, because a rush needs a queue: `POST /api/v1/sales/:saleId/queue` (join, get a ticket), `POST .../reservations` (hold one item), `POST .../purchases` (pay). **Buy Now** makes the first two; **Confirm purchase** makes the third                                                                                                                              |
+| An endpoint to check the outcome   | `GET /api/v1/sales/:saleId/purchases/me`: a purchase, a live hold, or nothing (for the shopper who is logged in)                                                                                                                                                                                                                                                            |
 | A simple React frontend            | `apps/flash-web`                                                                                                                                                                                                                                                                                                                                                            |
 | The frontend shows the sale status | the status badge, a sentence for what the shopper can do now, the window and the items left; it follows the sale live ([`specs/apps/flash/web/behaviours/sale/status.feature`](specs/apps/flash/web/behaviours/sale/status.feature))                                                                                                                                        |
 | A way to enter a user identifier   | log in or sign up with a user name. A password is added so one shopper cannot buy as another ([decision 007](docs/explanation/decisions/007-accounts-and-cookie-sessions.md), [`account/login.feature`](specs/apps/flash/web/behaviours/account/login.feature))                                                                                                             |
@@ -77,7 +77,7 @@ flowchart LR
   be["flash-be<br/>Fastify API"]
   pg[("Postgres 18<br/>source of truth")]
   redis[("Redis 8<br/>fast gate")]
-  browser -->|page, /api/sales| web
+  browser -->|page, /api/v1/sales| web
   web -->|sale routes| be
   be -->|SQL, final guard| pg
   be -->|queue, gate, counters| redis
@@ -146,9 +146,9 @@ flowchart LR
   be["flash-be x3<br/>identical, stateless"]
   pg[("Postgres 18<br/>UPDATE sold < stock<br/>UNIQUE per user")]
   redis[("Redis 8<br/>Lua gate, queue,<br/>admit lease, counters")]
-  browser -->|page, events, /api/sales| web
+  browser -->|page, /api/v1 routes| web
   web -->|sale routes| lb
-  operator -->|/admin/sales| lb
+  operator -->|/api/v1/admin/sales| lb
   lb -->|one instance per request| be
   be -->|SQL, last word| pg
   be -->|one script per hold| redis
@@ -187,14 +187,16 @@ linter enforces that; see [failures as values](docs/explanation/failures-as-valu
 
 [`libs/flash-commons`](libs/flash-commons/README.md) (`@flash/flash-commons`) holds the behaviour and values that 3 or
 more places across the apps share: retry with exponential backoff, a max attempt count and jitter, the time units, the
-HTTP status numbers, the payload decoders, the id rule, the cookie jar of the tests, the time phrases of the scenarios
-and a `sleep` (on its own entry, `/timers`, so the main entry stays pure). Every retry in the repository goes through it
+HTTP status numbers, the payload decoders, the id rule, the table of API paths, the cookie jar of the tests, the time
+phrases of the scenarios and a `sleep` (on its own entry, `/timers`, so the main entry stays pure). Every retry in the repository goes through it
 ([decision 017](docs/explanation/decisions/017-retry-backoff-jitter.md), [policies](docs/reference/retry-policies.md)).
 A value repeated a third time gets one name ([decision 016](docs/explanation/decisions/016-dry-rule-of-three.md)).
 
 The HTTP API is plain code: `flash-be` registers its routes in [`adapters/inbound/http/routes/`](apps/flash-be/src/adapters/inbound/http/routes), one file per area, and
-every route, request and reply is listed in [docs/reference/http-endpoints.md](docs/reference/http-endpoints.md). The
-callers (`flash-web`, the e2e tests and the k6 script) write the paths they use.
+every route, request and reply is listed in [docs/reference/http-endpoints.md](docs/reference/http-endpoints.md). Every
+route is served under `/api/v1`, and every path is named once in
+[`libs/flash-commons/src/api-paths.ts`](libs/flash-commons/src/api-paths.ts): `flash-be` serves it, and `flash-web`,
+the e2e tests and the k6 script call it ([decision 019](docs/explanation/decisions/019-api-version-prefix.md)).
 
 `flash-be` is a hexagon (hexagonal architecture, also called ports and adapters): the rules sit in `src/domain`, the use
 cases in `src/application`, and Postgres, Redis, the payment mock and HTTP are adapters behind ports. A unit test fails when a layer imports one it must not know. See
@@ -296,8 +298,8 @@ Open <http://localhost:3000>, sign up (**I am new**), press **Buy Now**, then **
 version is [the tutorial](docs/tutorials/run-flash-sale-locally.md).
 
 The seed command takes its window in minutes from now and does not check for overlaps. An operator can instead create
-a sale with an absolute window over HTTP (`POST /admin/sales`; a window that overlaps another sale gets `409`), and list
-(`GET /admin/sales`), change (`PATCH /admin/sales/:saleId`) and remove (`DELETE /admin/sales/:saleId`) sales. Nobody
+a sale with an absolute window over HTTP (`POST /api/v1/admin/sales`; a window that overlaps another sale gets `409`), and list
+(`GET /api/v1/admin/sales`), change (`PATCH /api/v1/admin/sales/:saleId`) and remove (`DELETE /api/v1/admin/sales/:saleId`) sales. Nobody
 can sign up as an operator, so the first one is made on the server with `npx nx db:create-operator`. The commands are in
 [seed a sale](docs/how-to/seed-a-sale.md#create-the-sale-through-the-api-instead), and the rules in
 [change, list or remove a sale](docs/how-to/seed-a-sale.md#change-list-or-remove-a-sale).
@@ -391,26 +393,21 @@ npx nx load:contention flash-load  # 700 shoppers reserve in the same moment, fo
 150 ms of the mock payment), and no server errors. A failed run is a finding about the system; a limit is not changed
 to make a run pass.
 
-**Expected outcome.** `smoke`, `full` and `chaos` should exit `0` and print a table where every check passes. They do
-since the load shoppers sign up before the sale starts; before that, `full` failed its purchase speed check (see
-[what the load runs found](docs/explanation/load-test-findings.md#full-failed-while-the-shoppers-signed-up-during-the-run)).
-The checks are:
-k6 started every planned shopper, no oversell (`sold` is at most the stock), `sold` equals the purchase rows, no shopper
-bought twice, k6 and Postgres agree, the stock sells out, the shopper who floods the queue gets `429`, Redis and
-Postgres agree on the buyers, and there are no server errors.
+**Expected outcome.** Every profile should exit `0` and print a table where every check passes. The checks are:
+k6 had an account for every shopper and started every planned shopper, no oversell (`sold` is at most the stock),
+`sold` equals the purchase rows, no shopper bought twice, k6 and Postgres agree, the stock sells out, the shopper who
+floods the queue gets `429`, Redis and Postgres agree on the buyers, and there are no server errors.
 
-**What the runs showed.** On a laptop where k6 and the servers share the same CPUs, `smoke` and `full` sold every item.
-`smoke` and the earlier `full` runs had a reserve p95 of a few milliseconds and a purchase p95 of about 160 ms, most of
-it the mock payment; the latest `full` runs were slower, as said above. The two herd
-runs, `burst` and `contention`, put 700 shoppers into the system within one second, which the other runs never do. In
-all nine herd runs every check of the data held (100/100 and 50/50 sold, no server errors; in four runs k6 started 1
-to 5 shoppers late), but the speed limits failed in five of them as k6 measures them: reserve p95 reached 2,379 ms
-while the API logged about 5 ms per reserve. So these
-runs show that the sale stays correct under a herd, not how fast production would answer.
+**What the runs show.** On a laptop where k6 and the servers share the same CPUs, every profile sells its whole stock
+and keeps every data check, with a reserve p95 of a few milliseconds and a purchase p95 of about 160 ms, most of it the
+mock payment. `burst` and `contention` put 700 shoppers into the system within one second; `chaos` stops Redis in the
+middle of the sale. One of five `burst` runs failed the purchase speed limit (519.8 ms against 500 ms) on a machine that other
+projects shared; that is an open finding, and the limit stays. The times are relative, because the
+load generator shares the machine; the data checks are exact.
 
-The chaos run found that paying while Redis was down took about two seconds, because of how the Redis client queues a
-transaction. That is fixed, with a scenario that holds the outage and requires an answer in under 500 ms. Every run,
-with its numbers, is in [what the load runs found](docs/explanation/load-test-findings.md). The profiles are in
+The runs also shaped the code: paying while Redis is down uses single Lua scripts so it answers at once, a buyer whose
+queue place was lost is told they already bought, the shoppers sign up before the sale, and the pool of virtual users
+is larger than the herd. Each of these, with its numbers, is in [what the load runs found](docs/explanation/load-test-findings.md). The profiles are in
 [docs/reference/load-test.md](docs/reference/load-test.md), the limits and checks in
 [specs/apps/flash/load](specs/apps/flash/load/README.md), and the steps in
 [how to run the load test](docs/how-to/run-the-load-test.md).

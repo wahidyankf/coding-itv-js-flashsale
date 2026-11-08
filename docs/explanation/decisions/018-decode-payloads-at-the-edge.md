@@ -7,11 +7,10 @@ every reply and every stream event in `flash-web`. The decoders are a small kit 
 
 ## Context
 
-`flash-be` checked body fields one at a time (`fieldOf`, `missingFieldError`), and some reached the use cases as
-`unknown`. `flash-web` checked only that a reply was JSON, then cast it to the type the caller named, so a reply with a
-missing field or a field of the wrong type went straight into the page state. The page and the API ship together, but a
-proxy, a half-finished deploy or a bug can still send a shape the other side does not expect. The repository had Zod in
-a contract library until it was removed as too much structure for this size (commit `e3c25da`).
+A request body and an API reply arrive as `unknown`. Checking fields one at a time spreads the checks over many
+functions, and casting a reply to the type the caller names lets a missing field or a field of the wrong type go
+straight into the page state. The page and the API ship together, but a proxy, a half-finished deploy or a bug can still
+send a shape the other side does not expect.
 
 ## Decision
 

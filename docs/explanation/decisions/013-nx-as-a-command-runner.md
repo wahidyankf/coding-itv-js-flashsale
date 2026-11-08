@@ -4,8 +4,6 @@
 
 Accepted. Nx runs commands. It has no plugins, and every target is written by hand in a `project.json`.
 
-Amended 2026-11-07: the apps build both libraries first, `flash-commons` as well as `typekit`.
-
 ## Context
 
 The repository has five apps and two libraries in one npm workspace. People and tools need one way to say "typecheck this

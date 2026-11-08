@@ -6,13 +6,13 @@ Accepted. A shopper signs up with a user name and a password, and a login is two
 
 ## Context
 
-The task only asks for "a user identifier". The first design used a name that anyone could type. Then anyone could read
-the place, the hold or the purchase of another shopper, and the operator routes were guarded by one shared token.
+The task only asks for "a user identifier". A name that anyone can type would let anyone read the place, the hold or
+the purchase of another shopper, and the operator routes would need something better than one shared token.
 
 ## Decision
 
 - A user has a user name and a password (8 to 128 characters), hashed with scrypt. Sign-up makes a shopper. An operator is made on the server with `create-operator`.
-- A session is two cookies: `access_token` (15 minutes, path `/`) and `refresh_token` (7 days, path `/auth`, used once).
+- A session is two cookies: `access_token` (15 minutes, path `/`) and `refresh_token` (7 days, path `/api/v1/auth`, used once).
   Replaying an old refresh token ends the session. Only SHA-256 hashes of tokens are stored, in Postgres, with Redis as a cache.
 - No route takes a user id. The shopper is the session (`/queue/me`, `/purchases/me`). Cookies are `SameSite=Lax`, and `Secure` when `COOKIE_SECURE` is true.
 - The identifier of the task is still there: it is the user name.
@@ -33,7 +33,7 @@ the place, the hold or the purchase of another shopper, and the operator routes 
 
 ## Consequences
 
-- It costs more surface: the `/auth` routes and their own rate limit (`AUTH_RATE_LIMIT_PER_IP`). It has no password
+- It costs more surface: the `/api/v1/auth` routes and their own rate limit (`AUTH_RATE_LIMIT_PER_IP`). It has no password
   reset, e-mail check, two-factor step or account lock. It needs a Postgres read for the session when Redis is down.
 - It buys a request that says who it is from, operator routes that need the role `operator`, and a stolen database or Redis copy that cannot be used to act as a user.
 

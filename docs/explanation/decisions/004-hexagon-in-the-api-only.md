@@ -4,8 +4,6 @@
 
 Accepted. The API is split into domain, application and adapters. The web app is a plain React app.
 
-Amended 2026-11-07: the copies guarded by [`same_as_be_tests.ts`](../../../apps/flash-web/src/same_as_be_tests.ts) include the proxy's `not_found` reply.
-
 ## Context
 
 The sale rules must hold whatever sits behind them: Redis can be empty or down, and the payment is a mock. `flash-be` has two

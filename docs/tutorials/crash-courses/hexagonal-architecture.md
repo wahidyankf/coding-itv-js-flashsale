@@ -20,7 +20,7 @@ only one real adapter is fine here: its job is to keep Redis and Postgres out of
 
 ## How it looks here
 
-We follow one request: a shopper asks to hold an item, `POST /sales/:saleId/reservations`. The explanation page
+We follow one request: a shopper asks to hold an item, `POST /api/v1/sales/:saleId/reservations`. The explanation page
 [draws it through the layers](../../explanation/hexagonal-architecture.md#one-request-through-the-layers); here are the
 same steps in the code.
 
@@ -151,8 +151,9 @@ Trimmed output:
  ✓ |unit| src/architecture_tests.ts > hexagonal architecture > keeps the application free of adapters and packages
  ✓ |unit| src/architecture_tests.ts > hexagonal architecture > keeps inbound adapters away from outbound adapters and the wiring
  ✓ |unit| src/architecture_tests.ts > hexagonal architecture > lets outbound adapters implement ports, not use services or inbound adapters
+ ✓ |unit| src/architecture_tests.ts > the route files > writes no path of its own: each one takes its path from the table
  Test Files  1 passed (1)
-      Tests  14 passed (14)
+      Tests  17 passed (17)
 ```
 
 Now break a rule in your head. Say [`domain/sale.ts`](../../../apps/flash-be/src/domain/sale.ts) imports `../application/sale-service.js` to read a sale. The test

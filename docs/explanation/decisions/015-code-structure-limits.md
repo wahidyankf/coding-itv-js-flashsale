@@ -4,13 +4,10 @@
 
 Accepted. Size and nesting limits are set in [`biome.json`](../../../biome.json) with built-in rules. File headers and doc comments are kept by a rule in AGENTS.md and by review.
 
-Amended 2026-11-07: migrations are exempt from the function line limit only; the routes file has been split.
-
 ## Context
 
 The code is read by people who did not write it. The checks already stop wrong types, wrong imports and swallowed
-errors. Nothing stopped a function or a file from growing. The file of HTTP routes reached about 690 lines before it was
-split into a folder.
+errors. None of them stops a function or a file from growing, and a long file of HTTP routes is hard to review.
 
 ## Decision
 
