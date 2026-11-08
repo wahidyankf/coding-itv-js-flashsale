@@ -42,6 +42,7 @@ Optional:
 | --------------------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------- |
 | `COOKIE_SECURE`                   | `true`         | the login cookies are `Secure`, so they need HTTPS. Set `false` only to try the stack over plain HTTP on one machine |
 | `FLASH_BE_PORT`, `FLASH_WEB_PORT` | `8080`, `3000` | the host ports of nginx and of the web server                                                                        |
+| `LOG_LEVEL`                       | `info`         | how much the API logs: `fatal`, `error`, `warn`, `info`, `debug`, `trace` or `silent`                                |
 
 Never use the values of [`.env.example`](../../.env.example) outside your machine. The other settings (rate limits, payment mock, cache) keep
 the defaults written in [`apps/flash-be/src/config.ts`](../../apps/flash-be/src/config.ts).

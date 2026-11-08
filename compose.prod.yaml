@@ -21,6 +21,8 @@ x-api: &api
     COOKIE_SECURE: ${COOKIE_SECURE:-true}
     FLASH_BE_PORT: 8080
     TRUST_PROXY: "true"
+    # The API's log level: fatal|error|warn|info|debug|trace|silent. Passwords, tokens and cookies are never logged.
+    LOG_LEVEL: ${LOG_LEVEL:-info}
   depends_on:
     flash-be-migrate:
       condition: service_completed_successfully
