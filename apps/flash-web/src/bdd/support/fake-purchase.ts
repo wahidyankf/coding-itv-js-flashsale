@@ -26,6 +26,8 @@ function reserveRefusal(
 	if (status === "ended") return refuse("sale_ended");
 	if (status === "sold_out") return refuse("sold_out");
 	if (ticket !== ticketOf(user)) return refuse("invalid_ticket");
+	// The admission can run out between the join and the hold, as its time does; the fake ends it here.
+	if (state.settings.admissionEnds) state.admitted.delete(user);
 	if (!state.admitted.has(user)) return refuse("not_admitted");
 	if (state.bought.has(user)) return refuse("already_purchased");
 	return undefined;

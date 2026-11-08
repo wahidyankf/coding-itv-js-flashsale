@@ -35,3 +35,26 @@ Feature: Checking my status
     When she presses Check my status
     Then the page says "You got it! Your purchase is confirmed."
     And the page shows the Purchase ID of "ana"'s purchase
+
+  Scenario Outline: A shopper who cannot reach the sale is told so when checking
+    Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
+    And "ana" is logged in
+    And a visitor has the page open
+    And <failure>
+    When she presses Check my status
+    Then the page says "The sale could not be reached. Please try again."
+
+    Examples:
+      | failure                                |
+      | the sale cannot be reached             |
+      | the connection to the web server fails |
+
+  Scenario: A shopper whose login has ended is asked to log in again when checking
+    Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
+    And "ana" is logged in
+    And a visitor has the page open
+    And every login has ended
+    When she presses Check my status
+    Then the page says "Your login has ended. Please log in again."
+    And the page says "Log in to buy"
+    And the page has no "Buy Now" button

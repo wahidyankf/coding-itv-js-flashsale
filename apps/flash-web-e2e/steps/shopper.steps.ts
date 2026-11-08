@@ -26,6 +26,9 @@ import {
 
 const { Given, When, Then } = createBdd();
 
+// The longest a hold lasts here: flash-be's default, which the sales of these scenarios use. A countdown never shows more.
+const HOLD_SECONDS_MAX = 120;
+
 // Shoppers that the scenario set up before the page opened talk to flash-be directly, as other clients would. Each holds
 // the cookie of their own login.
 async function joinAndWait(
@@ -185,3 +188,16 @@ Then(
 		else await expect(button).toBeDisabled();
 	},
 );
+
+// The countdown of a hold, as the page shows it. The check takes any second in the hold's range, so it does not depend on
+// when the page is read: the number is never zero while held, and never more than the hold lasts.
+Then("the page counts down the seconds left to confirm", async ({ page }) => {
+	const body = page.locator("body");
+	await expect(body).toContainText(/Confirm within \d+ seconds\./);
+	const match = /Confirm within (\d+) seconds\./.exec(
+		(await body.textContent()) ?? "",
+	);
+	const seconds = Number(match?.[1]);
+	expect(seconds).toBeGreaterThan(0);
+	expect(seconds).toBeLessThanOrEqual(HOLD_SECONDS_MAX);
+});

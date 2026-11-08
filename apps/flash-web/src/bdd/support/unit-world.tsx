@@ -23,6 +23,7 @@ import { ACCESS_COOKIE, REFRESH_COOKIE } from "./fake-account";
 import { createFakeBackend, type FakeBackend } from "./fake-backend";
 import { errorPayload, matchRoute } from "./fake-http";
 import { SALE_ID, type SaleSpec } from "./fake-state";
+import { secondsToConfirmIn } from "./web-steps";
 import type { WebWorld } from "./web-world";
 
 const BACKEND = "http://flash-be.test";
@@ -48,6 +49,8 @@ type Harness = {
 	jar: ReturnType<typeof createCookieJar>;
 	// The ways to end the live streams that are open now, as a dropped connection ends them.
 	streams: Set<() => void>;
+	// True when the browser cannot reach the web server, so each of its calls fails before it is sent.
+	browserDown: boolean;
 };
 
 // One event stream of the fake flash-be, as the bytes flash-be would send. It sends a frame only when the value differs
@@ -149,6 +152,7 @@ function backendFetchOf(h: Harness): typeof fetch {
 // sends the cookies that match the path, says which site a POST comes from, and keeps the cookies that come back.
 function webFetchOf(h: Harness, backendFetch: typeof fetch): typeof fetch {
 	return async (input, init) => {
+		if (h.browserDown) throw new TypeError("fetch failed");
 		const url = new URL(String(input), SITE);
 		const headers = new Headers(init?.headers);
 		const cookie = h.jar.header(url.pathname);
@@ -215,6 +219,7 @@ function lifecycleOf(h: Harness) {
 			h.load = { state: "none" };
 			h.jar.clear();
 			h.streams.clear();
+			h.browserDown = false;
 		},
 		clear() {
 			cleanup();
@@ -259,6 +264,12 @@ function setupOf(h: Harness, webFetch: typeof fetch) {
 		},
 		holdSeconds: (seconds: number) => {
 			h.backend.settings.holdSeconds = seconds;
+		},
+		admissionEndsBeforeHold: () => {
+			h.backend.settings.admissionEnds = true;
+		},
+		serverFails: (error: "internal" | "unavailable") => {
+			h.backend.settings.failWith = error;
 		},
 	};
 }
@@ -305,6 +316,9 @@ function pageOf(
 			}),
 		// The connection of every open stream ends, as when a network blips. The watcher opens each one again.
 		liveConnectionDrops: () => inPage(() => dropStreams(h)),
+		connectionFails: () => {
+			h.browserDown = true;
+		},
 		advance: (seconds: number) =>
 			act(async () => {
 				await vi.advanceTimersByTimeAsync(seconds * MS_PER_SECOND);
@@ -320,6 +334,9 @@ function expectationsOf(h: Harness) {
 		},
 		async expectPageNotSays(text: string) {
 			expect(document.body.textContent).not.toContain(text);
+		},
+		async secondsToConfirm() {
+			return secondsToConfirmIn(document.body.textContent ?? "");
 		},
 		async expectButton(name: string, state: "enabled" | "disabled") {
 			const button = screen.getByRole("button", { name }) as HTMLButtonElement;
@@ -379,6 +396,7 @@ export function unitWorld(): WebWorld {
 		load: { state: "none" },
 		jar: createCookieJar(),
 		streams: new Set(),
+		browserDown: false,
 	};
 	const backendFetch = backendFetchOf(h);
 	const webFetch = webFetchOf(h, backendFetch);

@@ -14,7 +14,7 @@ const steps = bindSaleBuying(world);
 
 describeFeature(
 	await loadFeature(specFile("flash/web/behaviours/sale/buying.feature")),
-	({ Scenario, BeforeEachScenario, AfterEachScenario }) => {
+	({ Scenario, ScenarioOutline, BeforeEachScenario, AfterEachScenario }) => {
 		BeforeEachScenario(() => world.reset());
 		AfterEachScenario(() => world.clear());
 
@@ -53,6 +53,21 @@ describeFeature(
 		Scenario(
 			"A waiting shopper whose access cookie runs out keeps seeing their place",
 			steps.waitingCookieRunsOut,
+		);
+
+		Scenario(
+			"A shopper whose turn ends before the item is held is told to wait",
+			steps.turnEnds,
+		);
+
+		ScenarioOutline(
+			"A shopper who cannot reach the sale is told so",
+			steps.cannotReach,
+		);
+
+		ScenarioOutline(
+			"A shopper is told something went wrong when the server fails",
+			steps.serverFails,
 		);
 	},
 );

@@ -80,3 +80,18 @@ export function confirmsPurchase(world: WebWorld) {
 export function admitsSlowly(world: WebWorld) {
 	return () => world.slowAdmission();
 }
+
+// The seconds in the sentence "Confirm within N seconds.", or NaN when the text does not say it.
+export function secondsToConfirmIn(text: string): number {
+	const match = /Confirm within (\d+) seconds\./.exec(text);
+	return match ? Number(match[1]) : Number.NaN;
+}
+
+// The body of the "<failure>" step of the outlines where the shopper cannot reach the sale: the API is cut off, or the
+// browser's connection to the web server fails. Any other row is the connection case.
+export function cannotReachSale(world: WebWorld, failure: string) {
+	return async () => {
+		if (failure === "the sale cannot be reached") world.cutOff();
+		else world.connectionFails();
+	};
+}

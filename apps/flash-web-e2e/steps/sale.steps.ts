@@ -2,7 +2,7 @@
 // (the queue, the hold, the rate limit, the payment, the start and the end, the loss of the line), and the time that passes. Binds the sale scenarios of
 // flash-web: sale/status.feature, sale/buying.feature and sale/checking.feature. The shoppers are in shopper.steps.ts.
 
-import { MS_PER_SECOND } from "@flash/flash-commons";
+import { HTTP_STATUS, MS_PER_SECOND } from "@flash/flash-commons";
 import { createBdd } from "playwright-bdd";
 import {
 	ensureDatabase,
@@ -18,6 +18,7 @@ import {
 	setApiEnv,
 } from "../../flash-be-e2e/steps/support/world.js";
 import {
+	answerWith,
 	cutWebServerOff,
 	dropApiConnections,
 	planSale,
@@ -46,6 +47,36 @@ Given("no sale exists", async ({ request: _request }) => {
 
 Given("the sale cannot be reached", async ({ request: _request }) => {
 	await cutWebServerOff();
+});
+
+// The web server answers every call with a fault, as flash-be does when it fails: a 503 is "unavailable", any other is "internal".
+Given(
+	/^the server answers (\d+) from now on$/,
+	async ({ request: _request }, status: string) => {
+		const fault =
+			Number(status) === HTTP_STATUS.serviceUnavailable
+				? {
+						errorCode: "unavailable",
+						errorMessage:
+							"The service cannot take this request now. Try again later.",
+					}
+				: {
+						errorCode: "internal",
+						errorMessage: "Something went wrong on the server.",
+					};
+		await answerWith(Number(status), JSON.stringify(fault));
+	},
+);
+
+// The browser's calls to the sale fail before they reach the web server, as when the connection drops. The event streams
+// are left alone, so the page keeps the streams it already has.
+Given("the connection to the web server fails", async ({ page }) => {
+	await page.route(
+		(url) =>
+			url.pathname.startsWith("/api/v1/sales/") &&
+			!url.pathname.endsWith("/events"),
+		(route) => route.abort(),
+	);
 });
 
 // A slow line: the queue admits one shopper a second, and its timer runs every five seconds, so five shoppers go in at a time.

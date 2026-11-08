@@ -42,6 +42,10 @@ export type WebWorld = {
 	writeLimit: (count: number) => void;
 	paymentDeclines: () => void;
 	holdSeconds: (seconds: number) => void;
+	// The admission of the shopper runs out between the join and the hold, as its time does.
+	admissionEndsBeforeHold: () => void;
+	// Every call of the web server gets this fault, as flash-be's 500 or 503 does.
+	serverFails: (error: "internal" | "unavailable") => void;
 	// The visitor.
 	openPage: () => Promise<void>;
 	signUp: (user: string, password: string) => Promise<void>;
@@ -60,11 +64,15 @@ export type WebWorld = {
 	liveUpdatesFail: () => Promise<void>;
 	// The connection of each live stream ends, as when a network blips. The page opens each stream again.
 	liveConnectionDrops: () => Promise<void>;
+	// The browser cannot reach the web server: each of its calls fails before it is sent.
+	connectionFails: () => void;
 	advance: (seconds: number) => Promise<void>;
 	// What the visitor sees. Each waits for the page to catch up, so a slow layer does not fail a correct page.
 	expectPageSays: (text: string) => Promise<void>;
 	// The page does not show this text now. A check that a sentence has gone, such as a hint once the live updates stop.
 	expectPageNotSays: (text: string) => Promise<void>;
+	// The seconds the page says are left to confirm a hold. NaN when the page says no such thing.
+	secondsToConfirm: () => Promise<number>;
 	expectButton: (name: string, state: "enabled" | "disabled") => Promise<void>;
 	expectNoButton: (name: string) => Promise<void>;
 	// The browser keeps neither cookie of a login.

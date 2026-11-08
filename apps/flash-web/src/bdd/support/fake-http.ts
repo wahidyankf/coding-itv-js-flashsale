@@ -11,6 +11,8 @@ export const ERROR_STATUS = {
 	username_taken: 409,
 	invalid_ticket: 401,
 	payment_failed: 402,
+	internal: 500,
+	unavailable: 503,
 	not_admitted: 403,
 	sale_not_found: 404,
 	reservation_not_found: 404,

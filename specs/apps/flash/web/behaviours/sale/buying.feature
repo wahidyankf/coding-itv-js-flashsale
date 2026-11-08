@@ -10,6 +10,7 @@ Feature: Buying the item
     And a visitor has the page open
     When she presses Buy Now
     Then the page says "An item is held for you."
+    And the page counts down the seconds left to confirm
     And the "Confirm purchase" button is enabled
     When she confirms the purchase
     Then the page says "You got it! Your purchase is confirmed."
@@ -113,3 +114,39 @@ Feature: Buying the item
     And the queue is lost
     Then the page says "Your place was lost. Press Buy Now to join again."
     And the page says "Signed in as ana"
+
+  # Exemption(e2e): the page reserves within milliseconds of the join that admitted the shopper, so no running stack can end the admission between the two calls on purpose; alternative-proof: flash-web:integration / A shopper whose turn ends before the item is held is told to wait
+  @e2e-exempt
+  Scenario: A shopper whose turn ends before the item is held is told to wait
+    Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
+    And "ana" is logged in
+    And a visitor has the page open
+    And the admission ends before the item is held
+    When she presses Buy Now
+    Then the page says "Please wait for your turn."
+
+  Scenario Outline: A shopper who cannot reach the sale is told so
+    Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
+    And "ana" is logged in
+    And a visitor has the page open
+    And <failure>
+    When she presses Buy Now
+    Then the page says "The sale could not be reached. Please try again."
+
+    Examples:
+      | failure                                |
+      | the sale cannot be reached             |
+      | the connection to the web server fails |
+
+  Scenario Outline: A shopper is told something went wrong when the server fails
+    Given a sale with stock 10 and 0 sold that opens 1 hour ago and closes in 1 hour
+    And "ana" is logged in
+    And a visitor has the page open
+    And the server answers <status> from now on
+    When she presses Buy Now
+    Then the page says "Something went wrong. Please try again."
+
+    Examples:
+      | status |
+      | 500    |
+      | 503    |

@@ -36,13 +36,18 @@ export type Session = {
 	previous: string | undefined;
 };
 
-// The knobs a scenario turns: slow admission, declined payments, the hold's length, and a write limit.
+// The knobs a scenario turns: slow admission, declined payments, the hold's length, a write limit, a lapsed admission, and
+// a server fault that answers every call.
 export type Settings = {
 	slowAdmission: boolean;
 	paymentDeclines: boolean;
 	holdSeconds: number;
 	// Zero means no limit.
 	writesPerUser: number;
+	// True when the admission of a shopper ends before the shopper takes the hold.
+	admissionEnds: boolean;
+	// The fault every call gets, as flash-be's 500 or 503. Undefined means the calls work.
+	failWith: "internal" | "unavailable" | undefined;
 };
 
 // Everything the fake remembers. The handlers read it and change it.
@@ -80,6 +85,8 @@ export function createFakeState(now: () => number): FakeState {
 			paymentDeclines: false,
 			holdSeconds: 120,
 			writesPerUser: 0,
+			admissionEnds: false,
+			failWith: undefined,
 		},
 		accounts: new Map(),
 		sessions: [],

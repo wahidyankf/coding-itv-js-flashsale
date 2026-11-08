@@ -1,12 +1,16 @@
 // Binds specs/apps/flash/web/behaviours/sale/buying.feature at both the unit and the integration layer: the steps of each
 // scenario, over the layer's world. The layer names the scenarios in its own test file, where the behaviour checker reads
 // the titles. The shared bodies are in support/web-steps.ts.
+import { HTTP_STATUS } from "@flash/flash-commons";
+import { expect } from "vitest";
 import { openSale } from "./open-sale";
 import {
 	admitsSlowly,
 	buttonIs,
+	cannotReachSale,
 	confirmsPurchase,
 	isLoggedIn,
+	type OutlineBinder,
 	openTenSale,
 	pageSays,
 	pressBuyNow,
@@ -20,6 +24,9 @@ import type { WebWorld } from "./web-world";
 // A sale with a single item, which the scenario that runs out of items opens.
 const SALE_1 =
 	"a sale with stock 1 and 0 sold that opens 1 hour ago and closes in 1 hour";
+// How long a hold lasts in the sale the buying scenarios open: the fake's default, which flash-be's default matches. The
+// countdown on the page is never more than this.
+const HOLD_SECONDS = 120;
 
 // "{int} shoppers are ahead in the queue": the fake queue puts that many shoppers in front of the visitor.
 function shoppersAhead(world: WebWorld) {
@@ -34,6 +41,11 @@ function buysItem(world: WebWorld): ScenarioBinder {
 		And("a visitor has the page open", visitorOpensPage(world));
 		When("she presses Buy Now", pressBuyNow(world));
 		Then("the page says {string}", pageSays(world));
+		And("the page counts down the seconds left to confirm", async () => {
+			const seconds = await world.secondsToConfirm();
+			expect(seconds).toBeGreaterThan(0);
+			expect(seconds).toBeLessThanOrEqual(HOLD_SECONDS);
+		});
 		And("the {string} button is enabled", buttonIs(world, "enabled"));
 		When("she confirms the purchase", confirmsPurchase(world));
 		Then('the page says "You got it! Your purchase is confirmed."', async () =>
@@ -213,6 +225,50 @@ function waitingCookieRunsOut(world: WebWorld): ScenarioBinder {
 	};
 }
 
+// A shopper whose turn ends before the item is held is told to wait: the admission has run out when the hold is taken.
+function turnEnds(world: WebWorld): ScenarioBinder {
+	return ({ Given, And, When, Then }) => {
+		Given(SALE_10, openTenSale(world));
+		And("{string} is logged in", isLoggedIn(world));
+		And("a visitor has the page open", visitorOpensPage(world));
+		And("the admission ends before the item is held", async () =>
+			world.admissionEndsBeforeHold(),
+		);
+		When("she presses Buy Now", pressBuyNow(world));
+		Then("the page says {string}", pageSays(world));
+	};
+}
+
+// A shopper who cannot reach the sale is told so, whether the API is cut off or the browser cannot reach the web server.
+function cannotReach(world: WebWorld): OutlineBinder {
+	return ({ Given, And, When, Then }, examples) => {
+		Given(SALE_10, openTenSale(world));
+		And("{string} is logged in", isLoggedIn(world));
+		And("a visitor has the page open", visitorOpensPage(world));
+		And("<failure>", cannotReachSale(world, String(examples.failure)));
+		When("she presses Buy Now", pressBuyNow(world));
+		Then("the page says {string}", pageSays(world));
+	};
+}
+
+// A shopper is told something went wrong when the server fails a call. flash-be's 503 is "unavailable"; its 500 is "internal".
+function serverFails(world: WebWorld): OutlineBinder {
+	return ({ Given, And, When, Then }, examples) => {
+		Given(SALE_10, openTenSale(world));
+		And("{string} is logged in", isLoggedIn(world));
+		And("a visitor has the page open", visitorOpensPage(world));
+		And("the server answers <status> from now on", async () =>
+			world.serverFails(
+				Number(examples.status) === HTTP_STATUS.serviceUnavailable
+					? "unavailable"
+					: "internal",
+			),
+		);
+		When("she presses Buy Now", pressBuyNow(world));
+		Then("the page says {string}", pageSays(world));
+	};
+}
+
 // The steps of each scenario in the buying feature, by the scenario's name in the layer's test file.
 export function bindSaleBuying(world: WebWorld) {
 	return {
@@ -227,5 +283,8 @@ export function bindSaleBuying(world: WebWorld) {
 		holdEnds: holdEnds(world),
 		placeLost: placeLost(world),
 		waitingCookieRunsOut: waitingCookieRunsOut(world),
+		turnEnds: turnEnds(world),
+		cannotReach: cannotReach(world),
+		serverFails: serverFails(world),
 	};
 }

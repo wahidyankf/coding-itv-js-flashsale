@@ -156,6 +156,7 @@ export function createFakeBackend(now: () => number) {
 			state.requests += 1;
 			told = headers;
 			if (state.unreachable) throw new TypeError("fetch failed");
+			if (state.settings.failWith) return refuse(state.settings.failWith);
 			const match = matchRoute(method, path);
 			return match ? answer(state, match, headers, body) : refuse("not_found");
 		},

@@ -2,8 +2,10 @@
 // scenario, over the layer's world. The layer names the scenarios in its own test file, where the behaviour checker reads
 // the titles. The shared bodies are in support/web-steps.ts.
 import {
+	cannotReachSale,
 	confirmsPurchase,
 	isLoggedIn,
+	noButton,
 	type OutlineBinder,
 	openTenSale,
 	pageSays,
@@ -60,11 +62,41 @@ function seesPurchaseId(world: WebWorld): ScenarioBinder {
 	};
 }
 
+// A shopper who cannot reach the sale is told so when checking, whether the API is cut off or the connection fails.
+function cannotReachWhenChecking(world: WebWorld): OutlineBinder {
+	return ({ Given, And, When, Then }, examples) => {
+		Given(SALE_10, openTenSale(world));
+		And("{string} is logged in", isLoggedIn(world));
+		And("a visitor has the page open", visitorOpensPage(world));
+		And("<failure>", cannotReachSale(world, String(examples.failure)));
+		When("she presses Check my status", async () => world.pressCheck());
+		Then("the page says {string}", pageSays(world));
+	};
+}
+
+// A shopper whose login has ended is replaced by the form, with the reason, when checking.
+function loginEndsWhenChecking(world: WebWorld): ScenarioBinder {
+	return ({ Given, And, When, Then }) => {
+		Given(SALE_10, openTenSale(world));
+		And("{string} is logged in", isLoggedIn(world));
+		And("a visitor has the page open", visitorOpensPage(world));
+		And("every login has ended", () => world.loginEnds());
+		When("she presses Check my status", async () => world.pressCheck());
+		Then("the page says {string}", pageSays(world));
+		And('the page says "Log in to buy"', async () =>
+			world.expectPageSays("Log in to buy"),
+		);
+		And("the page has no {string} button", noButton(world));
+	};
+}
+
 // The steps of each scenario in the checking feature, by the scenario's name in the layer's test file.
 export function bindSaleChecking(world: WebWorld) {
 	return {
 		checksOutcome: checksOutcome(world),
 		confirmsAfterChecking: confirmsAfterChecking(world),
 		seesPurchaseId: seesPurchaseId(world),
+		cannotReachWhenChecking: cannotReachWhenChecking(world),
+		loginEndsWhenChecking: loginEndsWhenChecking(world),
 	};
 }

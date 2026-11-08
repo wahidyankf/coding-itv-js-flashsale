@@ -29,5 +29,15 @@ describeFeature(
 			"A shopper who bought sees the Purchase ID after checking",
 			steps.seesPurchaseId,
 		);
+
+		ScenarioOutline(
+			"A shopper who cannot reach the sale is told so when checking",
+			steps.cannotReachWhenChecking,
+		);
+
+		Scenario(
+			"A shopper whose login has ended is asked to log in again when checking",
+			steps.loginEndsWhenChecking,
+		);
 	},
 );
