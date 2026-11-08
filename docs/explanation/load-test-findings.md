@@ -99,12 +99,32 @@ times move with whatever else the machine runs. The slowest chaos run (547 ms an
 used the same CPUs; k6 then marked its speed thresholds as crossed and exited with code 99. Chaos judges only the data,
 so the run still passed, with every k6 check (1,402 of 1,402) and every data check green.
 
-`full` does judge speed, and it is failing now. On 2026-11-08 three `full` runs in a row sold 100 of 100 with every
-data check green, but failed: purchase p95 was 563, 521 and 709 ms against the 500 ms limit, and k6 started 0, 237 and
-462 shoppers late. The last `full` run that passed (reserve p95 3.7 ms, purchase p95 160 ms) was on 2026-11-06. Since
-then the API was refactored, the load shoppers log in first, and the k6 retry backoff was doubled. The machine was also
-busy (load average 6 to 9, with system scans using most of one CPU). Which of these causes the failure is not known yet.
-`smoke` passed twice on the same day with a purchase p95 of 160 ms. This is an open finding, and the limit stays.
+## `full` fails now: the sign-ups use the CPU
+
+`full` does judge speed, and it is failing now. On 2026-11-08 five `full` runs of the current code sold 100 of 100
+with every data check green, but failed: purchase p95 was 521 to 709 ms against the 500 ms limit, and k6 started up to
+563 shoppers late. `smoke` passed twice on the same day with a purchase p95 of 160 ms.
+
+**It is the code, not the machine.** The same day, the code of the last passing run (commit `64bfa17`, 2026-11-06) and
+the current code ran `full` in turn on the same machine:
+
+| Run   | Code    | Reserve p95 | Purchase p95 | Dropped | Result |
+| ----- | ------- | ----------- | ------------ | ------- | ------ |
+| old 1 | 64bfa17 | 2.0 ms      | 156.9 ms     | 0       | passed |
+| new 1 | current | 64.9 ms     | 641.1 ms     | 369     | failed |
+| old 2 | 64bfa17 | 2.0 ms      | 156.0 ms     | 0       | passed |
+| new 2 | current | 40.8 ms     | 673.2 ms     | 563     | failed |
+
+**The likely cause is the sign-up.** Since `64bfa17`, every shopper has an account, and each load shopper signs up
+during the run (`POST /auth/register` in `shop.ts`). A sign-up hashes the password with scrypt at the cost Node uses by
+default, which takes about 32 ms of CPU. `full` sends 250 shoppers a second, so the sign-ups alone need about 8
+CPU-seconds every second, on a Docker VM with 6 CPUs. In `new 2`, all requests together had a p95 of 3.7 s and the
+slowest took 24.6 s, while reserve stayed at 41 ms. A purchase waits behind the hashing, and k6 runs out of virtual
+users, so it starts shoppers late. `smoke` sends far fewer shoppers a second, so it passes.
+
+This is a fault of the test plan more than of the sale path: a real shopper signs up before the sale, not at the moment
+it opens. The next step is to make the load shoppers sign up before the sale starts, and then run `full` again. Until
+then this is an open finding, and the limit stays.
 
 ## Harness changes the first runs forced
 
