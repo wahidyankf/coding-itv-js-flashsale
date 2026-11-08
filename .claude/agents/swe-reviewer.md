@@ -44,7 +44,8 @@ Six checks.
 2. **Clarity and cost.** Names, brief comments in simple English that say why the code is needed (a comment that only
    restates what the code does is a finding), no near-duplicate of something the repository already holds, no
    dead code, no magic number, no new dependency without a reason, and no ORM, Nx plugin, Prettier, or ESLint. Every
-   source file has a header comment and every export a doc comment that says why; Biome cannot check this, so this
+   source file has a header comment (a test file's header only says what it tests) and every export a doc comment that
+   says why; Biome cannot check this, so this
    review does. The rule of three from `AGENTS.md`: a third copy is a finding, and a value 3 or more places across the
    apps share belongs in `libs/flash-commons`, except what the e2e and load oracles write themselves. A retry that does
    not go through `@flash/flash-commons` with backoff, a max attempt count and jitter is a finding. A new kind of file

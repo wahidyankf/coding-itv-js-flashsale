@@ -85,7 +85,8 @@ Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `fla
   4 nested callbacks, no nested ternary, and 400 lines per file (blank lines do not count). Test files are exempt from the two line limits, and
   migrations from the function line limit. Split a function only into steps a reader would name ("parse the body", "take the hold"); do not
   make one-line wrappers or split code that is under the limits and reads top to bottom. Do not raise a limit to pass.
-- Every source file starts with a header comment that says what the module is for and where it sits. Every export has a doc comment that says
+- Every source file starts with a header comment that says what the module is for and where it sits. A test file sits next to
+  the code it tests, so its header only says what it tests. Every export has a doc comment that says
   why it exists and what it promises, not what the code does. Biome has no rule for this, so `swe-reviewer` checks it.
 - DRY by the rule of three: two copies are fine, and the third use gets one named constant or function in the app, in the folder that owns it.
   When 3 or more places across the apps use it, it goes in `libs/flash-commons`. Its main entry stays pure; a helper that starts a timer or does I/O goes on its own entry, as `sleep` does on `/timers`. The exception is the test oracles: the
