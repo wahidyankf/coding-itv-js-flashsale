@@ -167,6 +167,6 @@ Flash sale monorepo with five apps in `apps/` and two libraries in `libs/`: `fla
 
 ## Code style
 
-- Keep comments, commit messages, and notes brief. Explain why, not what.
+- Keep comments, commit messages, and notes brief. Explain why the code is needed, not what it does. Use clear, simple,
+  and natural English that is easy for non-native speakers to understand.
 - Use neutral domain names in docs and commits: say "shopper", "sale", "hold" and "purchase".
-- Use clear, simple, and natural English that is easy for non-native speakers to understand.

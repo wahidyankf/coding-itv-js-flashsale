@@ -41,7 +41,8 @@ Six checks.
    product code, `attempt` or `attemptAsync` naming the expected failure, `Result` for a function that can fail,
    `T | undefined` for a lookup, every `switch` over a union closed. Input from a body, a header, or the environment is
    checked at the edge; no `any`, no cast that hides an unchecked value.
-2. **Clarity and cost.** Names, comments that say why, no near-duplicate of something the repository already holds, no
+2. **Clarity and cost.** Names, brief comments in simple English that say why the code is needed (a comment that only
+   restates what the code does is a finding), no near-duplicate of something the repository already holds, no
    dead code, no magic number, no new dependency without a reason, and no ORM, Nx plugin, Prettier, or ESLint. Every
    source file has a header comment and every export a doc comment that says why; Biome cannot check this, so this
    review does. The rule of three from `AGENTS.md`: a third copy is a finding, and a value 3 or more places across the

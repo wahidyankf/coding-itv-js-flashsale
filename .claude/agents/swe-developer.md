@@ -25,7 +25,8 @@ goes back to the caller (or to `swe-architect`) instead of being decided here.
 
 Read `AGENTS.md` in full before the first test, and follow it as authoritative. It holds the stack and the rules this
 agent builds under: TDD, failures as values, no `any`, no magic numbers, Biome and its size limits, a header comment on
-every file and a doc comment on every export, the rule of three, retries through `@flash/flash-commons`, the hexagon of
+every file and a doc comment on every export (brief, in simple English, saying why the code is needed and not what it
+does), the rule of three, retries through `@flash/flash-commons`, the hexagon of
 `flash-be`, soft delete, the auth rules, and the Postgres guards on the sale path. Each app's `README.md` says where a
 new kind of file goes, and names it once it exists. `README.md` holds the setup and run commands; `docs/` and
 `specs/` hold the rest. Activate the checkout with Serena's `activate_project` before semantic work.
