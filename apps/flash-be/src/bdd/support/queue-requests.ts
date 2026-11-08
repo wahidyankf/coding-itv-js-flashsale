@@ -217,8 +217,8 @@ export function limitRequests(scenario: ShopScenario) {
 		throw new Error(`unknown request "${kind}"`);
 	};
 	return {
+		// Replies pile up across calls, so one scenario can send one kind and then another from the same address.
 		async repeat(kind: string, user: string, times: number) {
-			scenario.replies = [];
 			for (let attempt = 0; attempt < times; attempt++) {
 				scenario.replies.push(await send(kind, user));
 			}

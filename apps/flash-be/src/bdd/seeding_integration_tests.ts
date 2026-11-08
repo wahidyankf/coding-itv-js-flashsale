@@ -147,7 +147,7 @@ describeFeature(
 		Scenario("Seeding refuses a window that lasts no minutes", refusesSeed);
 
 		Scenario(
-			"Seeding refuses a window that starts past the range of a date",
+			"Seeding refuses a window that starts too far in the future",
 			refusesSeed,
 		);
 	},

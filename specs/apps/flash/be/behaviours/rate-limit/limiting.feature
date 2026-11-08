@@ -51,7 +51,8 @@ Feature: Rate limiting
 
   Scenario: Sign-ups from one address share the login limit
     Given the limit is 3 logins per address in each 60 seconds
-    When "ana" tries to sign up 4 times
+    When "ana" tries to log in 2 times
+    And "ana" tries to sign up 2 times
     Then the first 3 requests are not limited
     And the response status is 429
     And the error is "rate_limited"

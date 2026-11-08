@@ -22,7 +22,7 @@ Feature: Seeding a sale
     Then seeding fails with "duration-minutes must be a positive integer"
     And the sales table holds 0 sales
 
-  Scenario: Seeding refuses a window that starts past the range of a date
+  Scenario: Seeding refuses a window that starts too far in the future
     Given a database migrated to the latest version
     When the sale is seeded with stock 100, opening in 9000000000000000 minutes for 60 minutes
     Then seeding fails with "the sale is not usable: its name, window or holds are out of range"

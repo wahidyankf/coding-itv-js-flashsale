@@ -83,7 +83,7 @@ describe("parseSeedArgs", () => {
 		expect(refused.isErr() && refused.error).toBe(UNUSABLE_SALE);
 	});
 
-	it("refuses a window past the range of a date", () => {
+	it("refuses a window that starts too far in the future", () => {
 		const refused = parseSeedArgs(
 			["--stock", "10", "--starts-in-minutes", "1e20"],
 			NOW,

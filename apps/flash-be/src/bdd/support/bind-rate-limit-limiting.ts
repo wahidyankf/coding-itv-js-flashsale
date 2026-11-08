@@ -155,11 +155,8 @@ function countStartsAgain(layer: ShopLayer): ScenarioBinder {
 	};
 }
 
-// The auth routes count the sign-ups and the logins of one address together, so a burst of either past the limit is refused.
-function authBurstLimited(
-	layer: ShopLayer,
-	verb: "log in" | "sign up",
-): ScenarioBinder {
+// A burst of logins from one address past the login limit is refused.
+function authBurstLimited(layer: ShopLayer): ScenarioBinder {
 	return ({ Given, And, When, Then }) => {
 		const world = layer.newWorld();
 
@@ -171,9 +168,40 @@ function authBurstLimited(
 		);
 
 		When(
-			`{string} tries to ${verb} {int} times`,
+			"{string} tries to log in {int} times",
 			async (_ctx, user: string, times: number) => {
-				await world.repeat(verb, user, times);
+				await world.repeat("log in", user, times);
+			},
+		);
+
+		burstChecks({ Then, And }, world);
+	};
+}
+
+// A mix of logins and sign-ups from one address. Both kinds draw on one count, so the fourth request, whichever kind it
+// is, is refused; a count kept apart for each kind would let all four through.
+function authMixLimited(layer: ShopLayer): ScenarioBinder {
+	return ({ Given, And, When, Then }) => {
+		const world = layer.newWorld();
+
+		Given(
+			"the limit is {int} logins per address in each {int} seconds",
+			async (_ctx, requests: number, seconds: number) => {
+				await world.setLoginLimit(requests, seconds);
+			},
+		);
+
+		When(
+			"{string} tries to log in {int} times",
+			async (_ctx, user: string, times: number) => {
+				await world.repeat("log in", user, times);
+			},
+		);
+
+		And(
+			"{string} tries to sign up {int} times",
+			async (_ctx, user: string, times: number) => {
+				await world.repeat("sign up", user, times);
 			},
 		);
 
@@ -212,8 +240,8 @@ export function bindRateLimitLimiting(layer: ShopLayer) {
 		otherUserUnaffected: otherUserUnaffected(layer),
 		addressLimited: addressLimited(layer),
 		countStartsAgain: countStartsAgain(layer),
-		loginsLimited: authBurstLimited(layer, "log in"),
-		signUpsShareLimit: authBurstLimited(layer, "sign up"),
+		loginsLimited: authBurstLimited(layer),
+		signUpsShareLimit: authMixLimited(layer),
 		operatorRoutesLimited: operatorRoutesLimited(layer),
 	};
 }
