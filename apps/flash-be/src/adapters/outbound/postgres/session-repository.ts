@@ -29,7 +29,8 @@ async function principalOf(
 	return user === undefined ? undefined : toPrincipal(user);
 }
 
-// Records a login, and stamps the user's last login, in one transaction.
+// Records a login, and stamps the user's last login, in one transaction. A sign-up and a login are the user's own act,
+// so the user is the one who changed their row.
 async function createSession(
 	db: Kysely<Database>,
 	session: NewSession,
@@ -50,7 +51,11 @@ async function createSession(
 			.execute();
 		await trx
 			.updateTable("users")
-			.set({ last_login_at: dbNow })
+			.set({
+				last_login_at: dbNow,
+				updated_at: dbNow,
+				updated_by: session.userId,
+			})
 			.where("id", "=", session.userId)
 			.execute();
 	});

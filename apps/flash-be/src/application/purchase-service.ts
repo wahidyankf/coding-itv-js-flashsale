@@ -153,6 +153,20 @@ export function createPurchaseService(
 		return new Ok({ created: result.created, purchase: result.purchase });
 	}
 
+	// The checks that stop a charge, in order: the shopper has not bought, the sale is still open, and the hold is theirs
+	// and live. Returns nothing when the hold may be paid for.
+	async function refusalOf(
+		sale: Sale,
+		user: Username,
+		reservationId: string,
+	): Promise<ConfirmError | undefined> {
+		if (await repository.findByUser(sale.id, user)) return "already_purchased";
+		const ended = confirmBlock(sale, clock());
+		if (ended !== undefined) return ended;
+		const hold = await repository.findReservation(sale.id, user);
+		return holdRefusalOf(hold, reservationId, clock());
+	}
+
 	return {
 		async confirm(saleId, user, reservationId) {
 			const request = wellFormed(await sales.details(saleId), reservationId);
@@ -161,14 +175,12 @@ export function createPurchaseService(
 
 			const earlier = await paidEarlier(saleId, user, held);
 			if (earlier !== undefined) return earlier;
-			if (await repository.findByUser(saleId, user)) {
-				return new Err("already_purchased");
+			const refused = await refusalOf(request.value.sale, user, held);
+			// Another confirmation of the same hold may have committed since the first look, and then spent the hold. This
+			// one is a repeat, so it answers that purchase as a repeat would.
+			if (refused !== undefined) {
+				return (await paidEarlier(saleId, user, held)) ?? new Err(refused);
 			}
-			const ended = confirmBlock(request.value.sale, clock());
-			if (ended !== undefined) return new Err(ended);
-			const hold = await repository.findReservation(saleId, user);
-			const refused = holdRefusalOf(hold, held, clock());
-			if (refused !== undefined) return new Err(refused);
 
 			return chargeAndCommit(saleId, user, held);
 		},

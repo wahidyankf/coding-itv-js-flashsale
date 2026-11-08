@@ -84,6 +84,66 @@ describe("confirming a purchase", () => {
 	});
 });
 
+// Two confirmations of one hold at once: the other one commits after this one first looked for a purchase of the
+// reservation, so a later check finds the purchase, or finds the hold already spent. This one is then a repeat.
+describe("a confirmation that the other confirmation of the same hold overtakes", () => {
+	// Answers like `real`, except that its first call finds nothing, as if the other commit had not landed yet.
+	function missOnce<A extends unknown[], T>(
+		real: (...args: A) => Promise<T | undefined>,
+	): (...args: A) => Promise<T | undefined> {
+		let missed = false;
+		return async (...args) => {
+			if (missed) return real(...args);
+			missed = true;
+			return undefined;
+		};
+	}
+
+	// Ana has bought, and her purchase is missed once by the lookup of the reservation, and also by the lookup of her
+	// purchase in the sale when `alsoByUser` is set.
+	async function overtaken(alsoByUser: boolean) {
+		const world = await boughtByAna();
+		const repository = world.purchaseRepository;
+		repository.findByReservation = missOnce(repository.findByReservation);
+		if (alsoByUser) repository.findByUser = missOnce(repository.findByUser);
+		return world;
+	}
+
+	it("answers the same purchase when the purchase check already sees it", async () => {
+		const world = await overtaken(false);
+		const reply = await world.confirm("ana");
+		expect(reply.statusCode).toBe(200);
+		expect(reply.json().purchaseId).toBe(
+			world.purchases.get("ana")?.purchaseId,
+		);
+	});
+
+	it("answers the same purchase, not reservation_not_found, when the hold is already spent", async () => {
+		const world = await overtaken(true);
+		const reply = await world.confirm("ana");
+		expect(reply.statusCode).toBe(200);
+		expect(reply.json().purchaseId).toBe(
+			world.purchases.get("ana")?.purchaseId,
+		);
+		expect(
+			(await world.payment.statusOf(reply.json().reservationId))?.attempts,
+		).toBe(1);
+	});
+
+	it("still answers reservation_not_found for a hold that is gone with no purchase of it", async () => {
+		const world = queueWorld(NOW);
+		await world.addSale({
+			startsAt: relativeTime("1 hour ago", NOW),
+			endsAt: relativeTime("in 1 hour", NOW),
+		});
+		const reply = await world.confirm("ana", {
+			reservationId: "00000000-0000-4000-8000-000000000001",
+		});
+		expect(reply.statusCode).toBe(404);
+		expect(reply.json().errorCode).toBe("reservation_not_found");
+	});
+});
+
 // A charge that went through is given back when the commit fails, so a shopper is never charged for nothing. The reply
 // stays what it was for an unexpected failure: the shopper gets the generic 500, not a purchase.
 describe("a commit that fails after the charge", () => {
@@ -104,7 +164,9 @@ describe("a commit that fails after the charge", () => {
 		const reply = await world.confirm("ana");
 		expect(reply.statusCode).toBe(500);
 		expect(reply.json().errorCode).toBe("internal");
-		expect(world.payment.refunded).toEqual([`mock-${reservationId}`]);
+		expect((await world.payment.statusOf(reservationId ?? ""))?.status).toBe(
+			"refunded",
+		);
 	});
 
 	// A commit that threw may still have written the purchase: the reply was lost, not the write. The purchase is then
@@ -128,7 +190,9 @@ describe("a commit that fails after the charge", () => {
 		const reply = await world.confirm("ana");
 		expect(reply.statusCode).toBe(201);
 		expect(reply.json().reservationId).toBe(reservationId);
-		expect(world.payment.refunded).toEqual([]);
+		expect((await world.payment.statusOf(reservationId ?? ""))?.status).toBe(
+			"charged",
+		);
 	});
 
 	// A purchase found under the reservation that is not this shopper's, or not this sale's, is not the answer: the
@@ -163,7 +227,9 @@ describe("a commit that fails after the charge", () => {
 		const reply = await world.confirm("ana");
 		expect(reply.statusCode).toBe(500);
 		expect(reply.json().errorCode).toBe("internal");
-		expect(world.payment.refunded).toEqual([`mock-${reservationId}`]);
+		expect((await world.payment.statusOf(reservationId ?? ""))?.status).toBe(
+			"refunded",
+		);
 	});
 
 	// The lookup of the purchase fails too, most likely because Postgres is down, so the commit most likely never landed:
@@ -192,6 +258,8 @@ describe("a commit that fails after the charge", () => {
 		const reply = await world.confirm("ana");
 		expect(reply.statusCode).toBe(500);
 		expect(reply.json().errorCode).toBe("internal");
-		expect(world.payment.refunded).toEqual([`mock-${reservationId}`]);
+		expect((await world.payment.statusOf(reservationId ?? ""))?.status).toBe(
+			"refunded",
+		);
 	});
 });

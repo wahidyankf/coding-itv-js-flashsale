@@ -37,7 +37,7 @@ The output ends with the two containers, `flash-dev-postgres-1` and `flash-dev-r
 npx nx db:migrate flash-be
 ```
 
-The command prints one line for each migration it applies, such as `0001_users: Success`, and nothing when
+The command prints one line for each migration it applies, `0001_schema: Success` on a new database, and nothing when
 the schema is already current. Nx ends with `Successfully ran target db:migrate for project flash-be`.
 
 ## 5. Start the API

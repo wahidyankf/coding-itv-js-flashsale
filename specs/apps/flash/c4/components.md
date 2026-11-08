@@ -50,7 +50,7 @@ flowchart LR
 - **Driven adapters** ([`adapters/outbound/`](../../../../apps/flash-be/src/adapters/outbound)) implement the ports. `postgres/` reads and writes the sales, holds,
   purchases, users and sessions and runs the migrations. `redis/` holds the gate script, the queue, the rate counters and
   the cache of live sessions. `crypto/` hashes passwords with scrypt and makes random tokens. `memory/` counts
-  rate limits when Redis fails. `payment/` is the mock provider. `system/` reads the clock.
+  rate limits when Redis fails. `payment/` is the mock provider, which keeps its charges in a ledger: `postgres/payment-ledger.ts` in the app, a memory one in the unit scenarios. `system/` reads the clock.
 - **Composition root** ([`main.ts`](../../../../apps/flash-be/src/main.ts), [`composition.ts`](../../../../apps/flash-be/src/composition.ts)) picks an adapter for each port of the API. The command entry
   points [`seed-sale.ts`](../../../../apps/flash-be/src/seed-sale.ts) and [`create-operator.ts`](../../../../apps/flash-be/src/create-operator.ts) pick their own. No other file does.
 

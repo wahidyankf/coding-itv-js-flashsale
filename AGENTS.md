@@ -151,7 +151,7 @@ Flash sale monorepo with five apps in [`apps/`](apps) and two libraries in [`lib
   [`composition.ts`](apps/flash-be/src/composition.ts) and the entry points pick an adapter for a port. [`architecture_tests.ts`](apps/flash-be/src/architecture_tests.ts) fails on a wrong import.
   Put a new rule in the domain with a unit test first, not in a service or a route.
 - Routes are in `apps/flash-be/src/adapters/inbound/http/routes/<area>.ts`, each with its full path from `API_PATHS`, never a literal ([`architecture_tests.ts`](apps/flash-be/src/architecture_tests.ts) fails on one); [`routes/index.ts`](apps/flash-be/src/adapters/inbound/http/routes/index.ts) registers every area. Migrations are hand-written in
-  `apps/flash-be/src/adapters/outbound/postgres/migrations`. Use Kysely as a query builder. Do not add an ORM.
+  `apps/flash-be/src/adapters/outbound/postgres/migrations`, which holds one file, `0001_schema.ts`: a schema change edits it, with the indexes its queries need, and a local database built before the change is rebuilt with `npm run demo:reset`. Use Kysely as a query builder. Do not add an ORM.
 - Config is built once from `process.env` in [`src/config.ts`](apps/flash-be/src/config.ts). `buildConfig` is exported for tests. Local defaults match
   [`compose.dev.yaml`](compose.dev.yaml). In production, a missing required URL must fail fast.
 - Accounts and sessions ([`docs/explanation/authentication.md`](docs/explanation/authentication.md)): shoppers and operators log in with a user name and a password.

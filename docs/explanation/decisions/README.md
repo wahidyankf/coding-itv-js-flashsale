@@ -18,7 +18,7 @@ the other options, and link to those pages.
 - [006-browser-talks-to-web-server-only.md](006-browser-talks-to-web-server-only.md) - the browser calls only its own web server, which passes on an allow-list.
 - [007-accounts-and-cookie-sessions.md](007-accounts-and-cookie-sessions.md) - accounts with passwords and two-cookie sessions, though the task asks only for a user identifier.
 - [008-server-sent-events.md](008-server-sent-events.md) - the page follows the sale over Server-Sent Events, not polling or WebSockets.
-- [009-in-process-mock-payment.md](009-in-process-mock-payment.md) - the payment is a mock in the process, with real idempotency, refund and retry rules.
+- [009-in-process-mock-payment.md](009-in-process-mock-payment.md) - the payment is a mock in the process, with real idempotency, refund and retry rules, and a ledger in Postgres that keeps a charge idempotent across instances.
 - [010-one-sale-at-a-time.md](010-one-sale-at-a-time.md) - the current sale is the running one, else the next to open, and windows may not overlap.
 - [011-soft-delete-everywhere.md](011-soft-delete-everywhere.md) - nothing is hard-deleted; every table has six audit columns and partial unique indexes.
 - [012-load-verdict-from-the-data.md](012-load-verdict-from-the-data.md) - the load verdict is read from Postgres and Redis, and k6 is compared with it.

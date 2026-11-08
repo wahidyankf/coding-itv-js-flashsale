@@ -98,6 +98,19 @@ const COLUMNS: {
 		deleted_at: true,
 		deleted_by: true,
 	},
+	payments: {
+		id: true,
+		reservation_id: true,
+		status: true,
+		ref: true,
+		attempts: true,
+		created_at: true,
+		created_by: true,
+		updated_at: true,
+		updated_by: true,
+		deleted_at: true,
+		deleted_by: true,
+	},
 };
 
 const AUDIT = [

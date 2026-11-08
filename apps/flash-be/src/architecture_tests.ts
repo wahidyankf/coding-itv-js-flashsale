@@ -181,6 +181,24 @@ describe("hexagonal architecture", () => {
 		expect(wrappers).toEqual([]);
 	});
 
+	// The mock pays through its ledger contract (decision 009); which store keeps the ledger is the wiring's choice.
+	it("keeps the mock payment free of the database: adapters/outbound/payment imports no kysely, pg or Postgres adapter", () => {
+		const payment = product.filter((file) =>
+			path.relative(SRC, file).startsWith("adapters/outbound/payment/"),
+		);
+		expect(payment.length).toBeGreaterThan(0);
+		const reaching = payment
+			.flatMap(importsOf)
+			.filter(
+				(imp) =>
+					imp.target === "kysely" ||
+					imp.target === "pg" ||
+					imp.target.startsWith("adapters/outbound/postgres/"),
+			)
+			.map((imp) => `${path.relative(SRC, imp.from)} -> ${imp.target}`);
+		expect(reaching).toEqual([]);
+	});
+
 	it("never erases a row: the product code has no `deleteFrom(`", () => {
 		const erasing = product
 			.filter((file) => /\bdeleteFrom\(/.test(readFileSync(file, "utf8")))

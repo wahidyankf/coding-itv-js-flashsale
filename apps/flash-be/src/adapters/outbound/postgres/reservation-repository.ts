@@ -8,6 +8,7 @@ import {
 	earlyReservationAnswer,
 	type FallbackAnswer,
 	type HoldSnapshot,
+	holdWriteOf,
 	type Reservation,
 	type ReserveRequest,
 	roomReservationAnswer,
@@ -25,18 +26,79 @@ import {
 } from "./queries.js";
 import { ensureUser } from "./users.js";
 
-// Saves or renews the hold of one user. A shopper has at most one live hold in a sale; a renewal keeps the row and
-// records who renewed it. Only live rows count, which matches the partial unique index the conflict uses.
-async function upsertHold(
-	db: Kysely<Database>,
-	hold: {
-		id: string;
-		saleId: string;
-		userId: string;
-		expiresAt: Date;
-	},
+// The hold of one shopper in one sale, as the writes below take it.
+type HoldInput = {
+	id: string;
+	saleId: string;
+	userId: string;
+	expiresAt: Date;
+};
+
+// Locks what a write of the shopper's hold depends on, always in the same order: the sale row (shared, so shoppers do not
+// wait for each other), then the shopper's row (exclusive, so two writes of one shopper's hold run one at a time). The
+// Postgres fallback takes the sale row first too, so the two paths can never wait on each other in a circle. Returns the
+// id of the shopper's live row in the sale, if there is one.
+async function lockShopperHold(
+	trx: Kysely<Database>,
+	hold: HoldInput,
+): Promise<string | undefined> {
+	await trx
+		.selectFrom("sales")
+		.select("id")
+		.where("id", "=", hold.saleId)
+		.forKeyShare()
+		.execute();
+	const row = await trx
+		.selectFrom("users")
+		.leftJoin("reservations", (join) =>
+			join
+				.onRef("reservations.user_id", "=", "users.id")
+				.on("reservations.sale_id", "=", hold.saleId)
+				.on(live("reservations")),
+		)
+		.select("reservations.id")
+		.where("users.id", "=", hold.userId)
+		.forNoKeyUpdate("users")
+		.executeTakeFirst();
+	return row?.id ?? undefined;
+}
+
+// The same hold again: its row stays, with its new end, and records who renewed it.
+async function renewHold(
+	trx: Kysely<Database>,
+	hold: HoldInput,
 ): Promise<void> {
-	await db
+	await trx
+		.updateTable("reservations")
+		.set({
+			expires_at: hold.expiresAt,
+			updated_at: dbNow,
+			updated_by: hold.userId,
+		})
+		.where("id", "=", hold.id)
+		.execute();
+}
+
+// Another hold takes the place of the shopper's live row, which stays as a row marked deleted by the shopper.
+async function retireLiveHold(
+	trx: Kysely<Database>,
+	hold: HoldInput,
+): Promise<void> {
+	await trx
+		.updateTable("reservations")
+		.set({ deleted_at: dbNow, deleted_by: hold.userId })
+		.where("sale_id", "=", hold.saleId)
+		.where("user_id", "=", hold.userId)
+		.where(live("reservations"))
+		.execute();
+}
+
+// A new row for a new hold. The shopper is its author.
+async function insertHold(
+	trx: Kysely<Database>,
+	hold: HoldInput,
+): Promise<void> {
+	await trx
 		.insertInto("reservations")
 		.values({
 			id: hold.id,
@@ -45,31 +107,44 @@ async function upsertHold(
 			expires_at: hold.expiresAt,
 			created_by: hold.userId,
 		})
-		.onConflict((conflict) =>
-			conflict
-				.columns(["sale_id", "user_id"])
-				.where("deleted_at", "is", null)
-				.doUpdateSet({
-					id: hold.id,
-					expires_at: hold.expiresAt,
-					updated_at: dbNow,
-					updated_by: hold.userId,
-				}),
-		)
 		.execute();
 }
 
-// Writes the hold a reservation asks for, as the shopper's one live hold in the sale.
+// Writes the hold as the shopper's one live row in the sale, by the domain's rule (`holdWriteOf`). A row is never
+// overwritten by another hold, so an expired hold the shopper takes again is kept, marked deleted. The caller runs it in
+// a transaction, so the old row and the new one change together.
+async function writeHold(
+	trx: Kysely<Database>,
+	hold: HoldInput,
+): Promise<void> {
+	const liveId = await lockShopperHold(trx, hold);
+	switch (holdWriteOf(liveId, hold.id)) {
+		case "renew":
+			await renewHold(trx, hold);
+			return;
+		case "replace":
+			await retireLiveHold(trx, hold);
+			await insertHold(trx, hold);
+			return;
+		case "insert":
+			await insertHold(trx, hold);
+			return;
+	}
+}
+
+// Writes the hold a reservation asks for, as the shopper's one live hold in the sale, in one transaction.
 async function saveHold(
 	db: Kysely<Database>,
 	reservation: Reservation,
 ): Promise<void> {
-	const userId = await ensureUser(db, reservation.user);
-	await upsertHold(db, {
-		id: reservation.reservationId,
-		saleId: reservation.saleId,
-		userId,
-		expiresAt: reservation.expiresAt,
+	await db.transaction().execute(async (trx) => {
+		const userId = await ensureUser(trx, reservation.user);
+		await writeHold(trx, {
+			id: reservation.reservationId,
+			saleId: reservation.saleId,
+			userId,
+			expiresAt: reservation.expiresAt,
+		});
 	});
 }
 
@@ -162,7 +237,7 @@ async function reserveUnderLock(
 		request,
 	);
 	if (decision.kind === "reserved") {
-		await upsertHold(trx, {
+		await writeHold(trx, {
 			id: request.reservationId,
 			saleId: request.saleId,
 			userId,

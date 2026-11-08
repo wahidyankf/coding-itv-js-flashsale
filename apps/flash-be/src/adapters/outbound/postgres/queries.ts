@@ -10,7 +10,8 @@ export type SoftDeletedTable =
 	| "products"
 	| "sales"
 	| "purchases"
-	| "reservations";
+	| "reservations"
+	| "payments";
 
 // The condition that a row of `table` is live: its `deleted_at` is empty. Every read adds it, so a removed row never
 // shows. The column is named with its table, so the same condition holds inside a join.

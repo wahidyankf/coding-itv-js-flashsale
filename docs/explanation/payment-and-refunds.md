@@ -38,14 +38,19 @@ flowchart TD
 ```
 
 The provider is a mock that lives in the process. It waits `PAYMENT_LATENCY_MS` (150 by default) and declines
-`PAYMENT_FAILURE_RATE` of the charges (2 percent by default). A real provider would replace it behind the same port.
+`PAYMENT_FAILURE_RATE` of the charges (2 percent by default). It keeps its charges in a `payments` table in Postgres,
+its own ledger, which every API instance shares. A real provider would replace it behind the same port.
 
 ## Idempotency
 
 The reservation id is the key. A second request for the same reservation does not charge again, in two places:
 
-- The mock remembers a charge while it runs and after it succeeds, so two requests at the same moment share one charge.
-  A declined charge is forgotten, so a retry is a new attempt.
+- The mock keeps one ledger row per reservation id (`payments.reservation_id` is unique). A charge first reads the row:
+  a `charged` row answers at once with the same ref. Otherwise the mock waits, draws its decline, and writes the row
+  with one upsert that never overwrites a `charged` row. So two confirms of one hold on two instances, at the same moment
+  or one after the other, charge once, get the same ref, and both answer with the same purchase. A decline is stored as `declined`, so a retry is a new
+  attempt.
+- A refund sets the row to `refunded` only if it is still `charged` with that ref, so a repeated refund does nothing.
 - The commit looks for a purchase with the same reservation id and returns it. The `purchases` table repeats this with a
   unique constraint on `reservation_id`.
 
@@ -81,7 +86,8 @@ itself: if the item is still free, the commit sells it. If another shopper took 
 
 ## Trade-offs
 
-The mock keeps its charges in the process, cannot fail a refund, and has no price. What that costs, and what a real
+The mock cannot fail a refund and has no price. A charge whose commit never comes (a crash between the two) leaves a
+`charged` ledger row with no purchase; nothing refunds it yet. What that costs, and what a real
 provider would change, are in [decision 009](decisions/009-in-process-mock-payment.md).
 
 ## Where to read more

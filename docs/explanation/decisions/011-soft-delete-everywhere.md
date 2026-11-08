@@ -12,7 +12,7 @@ accounts (see [007](007-accounts-and-cookie-sessions.md)) there is someone to na
 ## Decision
 
 - Every table has `created_at`, `created_by`, `updated_at`, `updated_by`, `deleted_at` and `deleted_by`. The `*_by` columns point at `users`.
-- A removal sets `deleted_at` and `deleted_by`. Every read adds `deleted_at IS NULL`. A removed sale takes its holds with it in one transaction, and a spent hold is marked deleted by the buyer.
+- A removal sets `deleted_at` and `deleted_by`. Every read adds `deleted_at IS NULL`. A removed sale takes its holds with it in one transaction, a spent hold is marked deleted by the buyer, and an expired hold that the shopper takes again is marked deleted by the shopper while a new row records the new hold.
 - Unique indexes are partial (`WHERE deleted_at IS NULL`), so a removed row frees its key.
 - [`architecture_tests.ts`](../../../apps/flash-be/src/architecture_tests.ts) fails if product code calls `deleteFrom(`. [`schema_integration_tests.ts`](../../../apps/flash-be/src/adapters/outbound/postgres/schema_integration_tests.ts) checks that each table has the six columns and a `Database` type entry.
 - No row is ever hard-deleted. The only hard deletes are in `down` migrations, which are not part of the shipped process.

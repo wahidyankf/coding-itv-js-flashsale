@@ -8,6 +8,7 @@ import {
 	earlyReservationAnswer,
 	type GateAnswer,
 	holdRequest,
+	holdWriteOf,
 	type ReservationState,
 	type ReserveRequest,
 	roomReservationAnswer,
@@ -165,5 +166,19 @@ describe("the room answer of a reservation", () => {
 		expect(
 			roomReservationAnswer({ sold: 3, othersHolding: 0 }, request),
 		).toEqual({ kind: "sold_out" });
+	});
+});
+
+describe("how a hold is written over the shopper's live row", () => {
+	it("inserts the hold when the shopper has no live row", () => {
+		expect(holdWriteOf(undefined, "r-2")).toBe("insert");
+	});
+
+	it("renews the row in place when it is the same hold", () => {
+		expect(holdWriteOf("r-2", "r-2")).toBe("renew");
+	});
+
+	it("replaces the row when it is another hold, so the old one is kept marked deleted", () => {
+		expect(holdWriteOf("r-1", "r-2")).toBe("replace");
 	});
 });

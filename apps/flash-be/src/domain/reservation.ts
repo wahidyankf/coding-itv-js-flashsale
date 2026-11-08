@@ -114,6 +114,21 @@ export function decideReservation(
 	);
 }
 
+// How a store writes a hold over the shopper's live row in the sale. A row is never overwritten by another hold: the old
+// row stays, marked deleted, and the new hold gets a row of its own.
+export type HoldWrite = "insert" | "renew" | "replace";
+
+// The write for the hold `nextId`, given the id of the shopper's live row, if there is one. The same id renews that row
+// in place. Another id is a new hold, so the old row is replaced, never lost: an expired hold counts as free by its time
+// and is never marked deleted on its own, so its row is still the live one when the shopper holds again.
+export function holdWriteOf(
+	liveId: string | undefined,
+	nextId: string,
+): HoldWrite {
+	if (liveId === undefined) return "insert";
+	return liveId === nextId ? "renew" : "replace";
+}
+
 // The reserve request for one item. The hold length comes from the sale, so a shopper cannot choose it.
 export function holdRequest(
 	sale: Sale,

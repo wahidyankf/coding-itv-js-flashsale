@@ -11,6 +11,7 @@ import { createMockPayment } from "./adapters/outbound/payment/mock-payment.js";
 import { createAccountRepository } from "./adapters/outbound/postgres/account-repository.js";
 import type { Database } from "./adapters/outbound/postgres/database.js";
 import { checkDatabase } from "./adapters/outbound/postgres/health.js";
+import { createPostgresPaymentLedger } from "./adapters/outbound/postgres/payment-ledger.js";
 import { createPurchaseRepository } from "./adapters/outbound/postgres/purchase-repository.js";
 import { createReservationRepository } from "./adapters/outbound/postgres/reservation-repository.js";
 import { createPostgresSaleAdmin } from "./adapters/outbound/postgres/sale-admin.js";
@@ -122,6 +123,7 @@ export function dependenciesFrom(
 		purchases: createPurchaseService(
 			createPurchaseRepository(db),
 			createMockPayment({
+				ledger: createPostgresPaymentLedger(db),
 				latencyMs: settings.paymentLatencyMs,
 				failureRate: settings.paymentFailureRate,
 				log: console.log,

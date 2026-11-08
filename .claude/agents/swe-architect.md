@@ -41,8 +41,8 @@ settles.
    or does: domain rule, use case, port, adapter, or wiring.
 2. Name the assets, trust boundaries, and entry points the design creates or changes (sessions, cookies, the proxy, the
    operator routes, the sale path), and the threats each choice opens or closes.
-3. Where the design changes a table or a migration, state the expand, migrate, verify, and contract steps. Migrations
-   are hand-written Kysely files, and a new table gets the six audit columns and a `Database` type entry.
+3. Where the design changes a table, say what changes in the one migration, `0001_schema.ts` (hand-written Kysely),
+   and which index each new query needs. A new table gets the six audit columns and a `Database` type entry.
 4. Return the decisions, the boundaries, and the deterministic tests the work must add: each a failing test, a lint or
    type rule (for example in [`architecture_tests.ts`](../../apps/flash-be/src/architecture_tests.ts)), an e2e assertion, or a threshold a command checks. A design whose
    success no command can check is not finished. Work on the sale path also names its concurrency scenario and the

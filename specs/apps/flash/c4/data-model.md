@@ -1,22 +1,22 @@
 # Data model
 
-The tables of the Postgres database, as the migrations build them. It sits beside the C4 views because Postgres
-is the data store that has the last word on stock and on who bought (see [containers.md](containers.md)). The
-sources are [`apps/flash-be/src/adapters/outbound/postgres/migrations/`](../../../../apps/flash-be/src/adapters/outbound/postgres/migrations): [`0001_users.ts`](../../../../apps/flash-be/src/adapters/outbound/postgres/migrations/0001_users.ts) makes the users and the
-`$system` user, [`0002_products_and_sales.ts`](../../../../apps/flash-be/src/adapters/outbound/postgres/migrations/0002_products_and_sales.ts) the products and the sales,
-[`0003_reservations_and_purchases.ts`](../../../../apps/flash-be/src/adapters/outbound/postgres/migrations/0003_reservations_and_purchases.ts) the holds and the purchases, and
-[`0004_sessions.ts`](../../../../apps/flash-be/src/adapters/outbound/postgres/migrations/0004_sessions.ts) the sessions.
+The tables of the Postgres database, as the migration builds them. It sits beside the C4 views because Postgres
+is the data store that has the last word on stock and on who bought (see [containers.md](containers.md)). The source is
+one migration, [`0001_schema.ts`](../../../../apps/flash-be/src/adapters/outbound/postgres/migrations/0001_schema.ts): it
+makes the users and the `$system` user, then the products and the sales, the purchases and the holds, the sessions, and
+the payment ledger, with their constraints and indexes.
 
 ```mermaid
 erDiagram
   accTitle: Flash sale tables
-  accDescr: A product has many sales. A sale has many purchases and many reservations. A purchase is one confirmed item bought by one user. A reservation is one hold with an expiry, held by one user. A user has many sessions, one for each login. Every table also points to users from its created_by, updated_by and deleted_by columns, which the diagram leaves out. Within one sale, a user has at most one live purchase and at most one live reservation.
+  accDescr: A product has many sales. A sale has many purchases and many reservations. A purchase is one confirmed item bought by one user. A reservation is one hold with an expiry, held by one user. A user has many sessions, one for each login. The payments table is the mock payment provider's ledger, one row per reservation id. Every table also points to users from its created_by, updated_by and deleted_by columns, which the diagram leaves out. Within one sale, a user has at most one live purchase and at most one live reservation.
   products ||--o{ sales : "is sold in"
   sales ||--o{ purchases : "has"
   sales ||--o{ reservations : "has"
   users ||--o{ purchases : "buys"
   users ||--o{ reservations : "holds"
   users ||--o{ sessions : "logs in with"
+  reservations ||--o| payments : "is charged as"
   products {
     uuid id PK
     text name
@@ -52,6 +52,13 @@ erDiagram
     text role
     timestamptz last_login_at
   }
+  payments {
+    uuid id PK
+    uuid reservation_id UK
+    text status
+    text ref UK
+    int attempts
+  }
   sessions {
     uuid id PK
     uuid user_id FK
@@ -67,7 +74,7 @@ erDiagram
   classDef child fill:#029E73,stroke:#000000,color:#000000
   classDef default fill:#808080,stroke:#000000,color:#000000
   class sales,users parent
-  class purchases,reservations,sessions child
+  class purchases,reservations,sessions,payments child
 ```
 
 Every table also has the six audit columns, which the diagram leaves out because they would hide the relations (see
@@ -144,6 +151,20 @@ One row is one login. It holds two tokens, and only their SHA-256 hashes.
 | `ip`                    | `text`        | The address of the login, so a session that is not yours can be recognised.                  |
 | `user_agent`            | `text`        | The browser of the login, cut to 200 characters.                                             |
 
+### payments
+
+The mock payment provider's own ledger (see [decision 009](../../../../docs/explanation/decisions/009-in-process-mock-payment.md)).
+Every API instance shares it, so a reservation is charged once however many instances confirm it. `reservation_id` is
+not a foreign key: the ledger belongs to the provider, which knows only the key it was given.
+
+| column_name      | data_type | note                                                                                            |
+| ---------------- | --------- | ----------------------------------------------------------------------------------------------- |
+| `id`             | `uuid`    | Primary key. Default `gen_random_uuid()`.                                                       |
+| `reservation_id` | `uuid`    | Not null. Unique, deleted or not: the idempotency key of the charge.                            |
+| `status`         | `text`    | Not null. One of `charged`, `declined` and `refunded` (`payments_status_known`).                |
+| `ref`            | `text`    | Unique. A new `mock-<uuid>` for each charged write; a `charged` row always has one.             |
+| `attempts`       | `integer` | Not null. Default 1. How many settles wrote the row: a decline and the charge after it are two. |
+
 ### Audit columns
 
 Every table has these six columns, and nothing is ever hard-deleted: a row that is removed gets `deleted_at` and
@@ -158,8 +179,10 @@ Every table has these six columns, and nothing is ever hard-deleted: a row that 
 | `deleted_at` | `timestamptz` | Empty while the row is live.                                                |
 | `deleted_by` | `uuid`        | Foreign key to `users.id`. Empty while the row is live.                     |
 
-`$system` is the author when no person acts: the migration, the seed command and `create-operator`. It is its own
-author, and it cannot log in.
+`$system` is the author when no person acts: the migration, the seed command, `create-operator` and the mock payment
+provider. It is its own author, and it cannot log in. A change made by a person names that person: a login stamps the
+user's `updated_at` and `updated_by`, a refresh the session's, and a hold taken again marks the old row deleted by the
+shopper.
 
 ## Tables in Prose
 
@@ -172,9 +195,11 @@ author, and it cannot log in.
   admission rate. A sale is running while `starts_at <= now < ends_at`.
 - `purchases` has one row per confirmed item, tied to the user and to the hold it paid for.
 - `reservations` has one row per hold. A row past `expires_at` counts as free, so no sweep job runs. A hold that is
-  paid for or removed is marked deleted.
+  paid for or removed is marked deleted. When a shopper whose hold expired holds again, the old row is marked deleted
+  and a new row is written, so each hold keeps its own record.
 - `sessions` has one row per login. A logout or a replayed refresh token marks it deleted. A refresh that comes too late
   is refused, and the row stays as it is.
+- `payments` has one row per reservation that was ever charged or declined. A refund changes its status, never removes it.
 - `kysely_migration` and `kysely_migration_lock` belong to the migrator. They are not part of the model.
 
 ## Constraints
@@ -189,11 +214,26 @@ author, and it cannot log in.
 - `users_username_live`: `UNIQUE(username) WHERE deleted_at IS NULL`. A name is free again once its user is deleted.
 - `users_role_known`: `role IN ('shopper', 'operator')`.
 - `sessions_access_live` and `sessions_refresh_live`: the token hashes are unique among live sessions.
+- `payments.reservation_id` and `payments.ref` are `UNIQUE`. `payments_status_known`: `status IN ('charged', 'declined',
+  'refunded')`. `payments_charged_has_ref`: a `charged` row has a ref.
 - `sales.product_id`, `purchases.sale_id`, `reservations.sale_id` and `sessions.user_id` are foreign keys with
   `ON DELETE RESTRICT`. Since nothing is hard-deleted, a row is never removed from under the rows that point at it.
   The operator route marks a sale and its holds deleted, and refuses when the sale has a purchase (`sale_has_purchases`).
 - Product code never calls `deleteFrom`: [`architecture_tests.ts`](../../../../apps/flash-be/src/architecture_tests.ts) fails if it does, and [`schema_integration_tests.ts`](../../../../apps/flash-be/src/adapters/outbound/postgres/schema_integration_tests.ts) checks
   that every table has the six audit columns and that the `Database` type matches the migrations.
+
+## Indexes
+
+Besides the primary keys and the unique constraints above, each index serves a query that runs on a hot path:
+
+| index                            | on                                                            | serves                                                                                                               |
+| -------------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `reservations_live_by_expiry`    | `reservations (sale_id, expires_at) WHERE deleted_at IS NULL` | the Postgres path counts the live holds of a sale on every reservation while Redis is down, and a rebuild reads them |
+| `sessions_user`                  | `sessions (user_id)`                                          | the sessions of one user                                                                                             |
+| `sessions_previous_refresh_live` | `sessions (previous_refresh_hash) WHERE deleted_at IS NULL`   | the replay check of a refresh and a logout look a session up by its previous refresh token                           |
+
+The partial unique indexes (`users_username_live`, `purchases_one_per_user`, `reservations_one_per_user`,
+`sessions_access_live`, `sessions_refresh_live`) also serve the lookups by name, by shopper and sale, and by token hash.
 
 ## Not in the database
 

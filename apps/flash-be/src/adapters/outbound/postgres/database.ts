@@ -3,6 +3,7 @@
 import { type Generated, Kysely, PostgresDialect } from "kysely";
 import pg from "pg";
 import type { Role } from "../../../domain/auth.js";
+import type { PaymentStatus } from "../payment/payment-ledger.js";
 
 // Who made a row, who changed it and who deleted it. A row is never erased: a deletion fills `deleted_at` and
 // `deleted_by`. A change or a deletion is empty until it happens.
@@ -63,6 +64,14 @@ export type Database = {
 		sale_id: string;
 		user_id: string;
 		expires_at: Date;
+	};
+	// The mock payment provider's ledger (decision 009): one row per reservation id.
+	payments: Audit & {
+		id: Generated<string>;
+		reservation_id: string;
+		status: PaymentStatus;
+		ref: string | null;
+		attempts: Generated<number>;
 	};
 };
 

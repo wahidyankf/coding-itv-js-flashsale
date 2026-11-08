@@ -69,7 +69,7 @@ export function purchasesWithBuyer(from: Kysely<Database>) {
 
 Nothing is erased. A removal sets `deleted_at`, and every read adds `live(table)`, which is `<table>.deleted_at is null`.
 The unique indexes are partial, so a removed row frees its key.
-[Migration 0003](../../../apps/flash-be/src/adapters/outbound/postgres/migrations/0003_reservations_and_purchases.ts) writes
+The one migration, [`0001_schema.ts`](../../../apps/flash-be/src/adapters/outbound/postgres/migrations/0001_schema.ts), writes
 them in plain SQL:
 
 ```ts
@@ -111,7 +111,7 @@ and then runs its steps in a fixed order. The order is the rule:
 
 `takeItem` raises `sold` only while items remain. Postgres checks the `WHERE` and writes in one step, so two
 transactions cannot both take the last item. The `CHECK (sold <= stock)` from
-[migration 0002](../../../apps/flash-be/src/adapters/outbound/postgres/migrations/0002_products_and_sales.ts) repeats the rule:
+[the migration](../../../apps/flash-be/src/adapters/outbound/postgres/migrations/0001_schema.ts) repeats the rule:
 
 ```ts
 const updated = await trx
@@ -130,9 +130,11 @@ return updated.numUpdatedRows !== 0n;
 
 ### Hand-written migrations
 
-Each file in [`migrations/`](../../../apps/flash-be/src/adapters/outbound/postgres/migrations/) exports `up` and `down`.
-[`migrator.ts`](../../../apps/flash-be/src/adapters/outbound/postgres/migrator.ts) gives the folder to Kysely's
-`Migrator` with a `FileMigrationProvider`, which runs them in name order and records each one in `kysely_migration`.
+[`migrations/`](../../../apps/flash-be/src/adapters/outbound/postgres/migrations/) holds one file, `0001_schema.ts`, which
+exports `up` and `down`. [`migrator.ts`](../../../apps/flash-be/src/adapters/outbound/postgres/migrator.ts) gives the
+folder to Kysely's `Migrator` with a `FileMigrationProvider`, which runs the files in name order and records each one in
+`kysely_migration`. A schema change edits that one file, so a local database built before it is rebuilt with
+`npm run demo:reset`; Kysely refuses to migrate a database that records a migration file that no longer exists.
 `npx nx db:migrate flash-be` applies them.
 
 ### The pool
@@ -176,9 +178,9 @@ npx vitest run --config vitest.integration.config.ts src/adapters/outbound/postg
 ## Traps to avoid
 
 - **`ON CONFLICT` must name the partial index.** A partial unique index is matched only when the conflict target repeats
-  its `WHERE`. `upsertHold` in
-  [`reservation-repository.ts`](../../../apps/flash-be/src/adapters/outbound/postgres/reservation-repository.ts) writes
-  `.columns(["sale_id", "user_id"]).where("deleted_at", "is", null)` for this reason.
+  its `WHERE`. The hold save avoids the upsert: in
+  [`reservation-repository.ts`](../../../apps/flash-be/src/adapters/outbound/postgres/reservation-repository.ts) it locks
+  the shopper's row, then renews the live hold, or marks it deleted and inserts a new one, so no row is overwritten.
 - **Counts and row counts are not plain numbers.** `numUpdatedRows` is a `bigint`, so the code compares with `0n`. A
   `count(*)` comes back as text, so `countHoldsOfOthers` reads it with `countAll<string>()` and `Number(...)`.
 - **A missed `live()` shows deleted data.** Decision 011 names it as the cost. The shared queries in [`queries.ts`](../../../apps/flash-be/src/adapters/outbound/postgres/queries.ts) add the
@@ -186,7 +188,7 @@ npx vitest run --config vitest.integration.config.ts src/adapters/outbound/postg
 - **A rebuild snapshot must hold the lock.** The Redis rebuild reads holds inside a transaction that locks the sale, so
   no hold is written between the read and the restore (see
   [reservations and recovery](../../explanation/reservations-and-recovery.md#when-redis-loses-its-state)).
-- **A migration never reads live code.** Migration 0002 writes its defaults (`HOLD_SECONDS_DEFAULT = 120`) in the file,
+- **A migration never reads live code.** The migration writes its defaults (`HOLD_SECONDS_DEFAULT = 120`) in the file,
   so a change to the app's code never changes what the migration builds.
 
 ## Read next

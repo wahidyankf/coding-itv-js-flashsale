@@ -55,8 +55,9 @@ counter that can drift away from the truth.
 
 Redis answers fast, but it can be lost. So every new hold is also written to the `reservations` table, and a purchase is
 written to `purchases`. The database has the last word: a sale cannot sell more than its stock (a `CHECK`), and a user
-can buy once per sale (a unique index on `(sale_id, user_id)` over the rows that are not deleted). If the write to Postgres fails, the hold is removed from Redis again, so a
-hold never exists only in Redis.
+can buy once per sale (a unique index on `(sale_id, user_id)` over the rows that are not deleted). A shopper whose hold expired and who holds again gets a new row, and the old row is
+marked deleted by that shopper, so each hold keeps its own record. If the write to Postgres fails, the hold is removed
+from Redis again, so a hold never exists only in Redis.
 
 ## When an operator changes the sale
 
@@ -85,8 +86,8 @@ back.
 
 ## Trade-offs
 
-- **Two writes per reservation.** The hold goes to Redis and to Postgres. The Postgres insert has no contention, because
-  each user has one row, so it stays cheap. The price is one more round trip.
+- **Two writes per reservation.** The hold goes to Redis and to Postgres. The Postgres write has no contention, because
+  each user has at most one live row in a sale, so it stays cheap. The price is one more round trip.
 - **Clocks.** Expiry uses the clock of the instance that takes the request, and the Redis count uses that instance's
   `now` too. An instance whose clock runs fast can count a live hold as ended and give its item to a second shopper. It
   cannot oversell: the purchase commit checks `sold < stock` in Postgres, and the shopper who loses is refunded and told

@@ -13,7 +13,8 @@ import type { Username } from "../../domain/user.js";
 export type ReservationRepository = {
 	// True when the shopper already bought in this sale. Asked only when the queue has no place for them.
 	hasPurchase(saleId: string, user: Username): Promise<boolean>;
-	// Writes the hold. One row per shopper and sale: a new hold replaces an expired one.
+	// Writes the hold. A shopper has one live row per sale: the same hold renews it, and a new hold (after an expired one)
+	// gets a row of its own while the old row stays, marked deleted by the shopper, so no hold is ever lost.
 	save(reservation: Reservation): Promise<void>;
 	// Decides a reservation when the gate is down, under the sale's row lock. `gateReady` is asked under that same lock, so
 	// a rebuild cannot slip in between; if the gate is ready, nothing is written. The rule is `decideReservation` in the

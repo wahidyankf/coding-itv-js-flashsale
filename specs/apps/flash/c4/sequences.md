@@ -49,7 +49,7 @@ WHERE "username" = $1 AND "deleted_at" IS NULL;
 INSERT INTO "sessions" ("user_id", "access_hash", "access_expires_at", "refresh_hash", "refresh_expires_at",
   "ip", "user_agent", "created_by")
 VALUES ($1, $2, $3, $4, $5, $6, $7, $1);
-UPDATE "users" SET "last_login_at" = now() WHERE "id" = $1;
+UPDATE "users" SET "last_login_at" = now(), "updated_at" = now(), "updated_by" = $1 WHERE "id" = $1;
 
 -- read the session by token hash (on a miss in Redis)
 SELECT "users"."id", "users"."username", "users"."role", "sessions"."access_expires_at"
@@ -107,7 +107,8 @@ sequenceDiagram
 - The gate script runs as one step in Redis. It refuses when buyers plus live holds reach the stock. An expired hold
   stops counting by its time, so nothing sweeps it.
 - The hold is written to Postgres too. Without that row, a Redis that lost its data could not give the hold back.
-- Confirming is safe to repeat. The reservation id is the key for the charge and for the purchase.
+- Confirming is safe to repeat. The reservation id is the key for the charge and for the purchase. The mock payment
+  keeps its charges in the `payments` table, so two instances that confirm one hold charge it once.
 
 ### The calls in full
 
@@ -161,11 +162,19 @@ return 1
 Postgres. The purchase is one transaction, in this order.
 
 ```sql
--- save the hold (the same statement runs when the hold is repeated). $3 is the id of the user row.
-INSERT INTO "reservations" ("id", "sale_id", "user_id", "expires_at", "created_by")
-VALUES ($1, $2, $3, $4, $3)
-ON CONFLICT ("sale_id", "user_id") WHERE "deleted_at" IS NULL
-DO UPDATE SET "id" = $5, "expires_at" = $6, "updated_at" = now(), "updated_by" = $3;
+-- save the hold: one transaction. $3 is the id of the user row. Lock the sale (shared), then the shopper's row with
+-- their live hold, if any.
+SELECT "id" FROM "sales" WHERE "id" = $2 FOR KEY SHARE;
+SELECT "reservations"."id" FROM "users"
+LEFT JOIN "reservations" ON "reservations"."user_id" = "users"."id"
+  AND "reservations"."sale_id" = $2 AND "reservations"."deleted_at" IS NULL
+WHERE "users"."id" = $3 FOR NO KEY UPDATE OF "users";
+-- the same hold again (renew): its row keeps its id and gets the new end
+UPDATE "reservations" SET "expires_at" = $4, "updated_at" = now(), "updated_by" = $3 WHERE "id" = $1;
+-- another hold (an expired one taken again): the old row is marked deleted by the shopper, then a new row
+UPDATE "reservations" SET "deleted_at" = now(), "deleted_by" = $3
+WHERE "sale_id" = $2 AND "user_id" = $3 AND "deleted_at" IS NULL;
+INSERT INTO "reservations" ("id", "sale_id", "user_id", "expires_at", "created_by") VALUES ($1, $2, $3, $4, $3);
 
 -- lock, count, insert: one transaction
 SELECT * FROM "sales" WHERE "id" = $1 AND "deleted_at" IS NULL FOR UPDATE;
@@ -279,11 +288,7 @@ SELECT "id", "expires_at" FROM "reservations"
 WHERE "sale_id" = $1 AND "user_id" = $2 AND "deleted_at" IS NULL;
 SELECT COUNT(*) AS "count" FROM "reservations"
 WHERE "sale_id" = $1 AND "deleted_at" IS NULL AND "expires_at" > $2 AND "user_id" != $3;
--- save the hold
-INSERT INTO "reservations" ("id", "sale_id", "user_id", "expires_at", "created_by")
-VALUES ($1, $2, $3, $4, $3)
-ON CONFLICT ("sale_id", "user_id") WHERE "deleted_at" IS NULL
-DO UPDATE SET "id" = $5, "expires_at" = $6, "updated_at" = now(), "updated_by" = $3;
+-- save the hold: the same lock of the shopper's row, then renew, or retire and insert, as in the first flow
 
 -- rebuild buyers and holds: one transaction, under the same lock
 SELECT * FROM "sales" WHERE "id" = $1 AND "deleted_at" IS NULL FOR UPDATE;

@@ -1,5 +1,5 @@
-// Integration test for the migrations over a scratch database on the dev Postgres: they roll back one at a time, and they
-// build the constraints and indexes that the code refers to by name.
+// Integration test for the migration over a scratch database on the dev Postgres: it rolls back in one step, and it builds
+// the constraints and indexes that the code refers to by name.
 import { sql } from "kysely";
 import { afterAll, expect, it } from "vitest";
 import { createScratchDatabase } from "../../../bdd/support/scratch-db.js";
@@ -32,18 +32,6 @@ async function exists(
 	return result.rows[0]?.name === table;
 }
 
-async function columns(
-	db: ReturnType<typeof createDb>,
-	table: string,
-): Promise<string[]> {
-	const result = await sql<{
-		name: string;
-	}>`select column_name as name from information_schema.columns where table_name = ${table}`.execute(
-		db,
-	);
-	return result.rows.map((row) => row.name);
-}
-
 async function liveUsers(db: ReturnType<typeof createDb>): Promise<string[]> {
 	const result = await sql<{
 		username: string;
@@ -69,7 +57,7 @@ async function definitions(
 	return new Map(result.rows.map((row) => [row.name, row.definition]));
 }
 
-it("rolls the migrations back one at a time", async () => {
+it("rolls the schema back in one step, and leaves no table behind", async () => {
 	const db = await scratchDb();
 	const migrator = createMigrator(db);
 
@@ -77,29 +65,18 @@ it("rolls the migrations back one at a time", async () => {
 	expect(up.error).toBeUndefined();
 	expect(await liveUsers(db)).toEqual(["$system"]);
 
-	// Logins go: the sessions table. The accounts stay, with their login columns.
 	expect((await migrator.migrateDown()).error).toBeUndefined();
-	expect(await exists(db, "sessions")).toBe(false);
-	expect(await columns(db, "users")).toContain("role");
-	expect(await columns(db, "users")).toContain("password_hash");
-
-	// The purchases and the holds go; the sales stay.
-	expect((await migrator.migrateDown()).error).toBeUndefined();
-	for (const table of ["purchases", "reservations"]) {
-		expect(await exists(db, table)).toBe(false);
+	for (const table of [
+		"payments",
+		"sessions",
+		"reservations",
+		"purchases",
+		"sales",
+		"products",
+		"users",
+	]) {
+		expect(await exists(db, table), table).toBe(false);
 	}
-	expect(await exists(db, "sales")).toBe(true);
-
-	// The sales and their products go; the users stay.
-	expect((await migrator.migrateDown()).error).toBeUndefined();
-	for (const table of ["sales", "products"]) {
-		expect(await exists(db, table)).toBe(false);
-	}
-	expect(await liveUsers(db)).toEqual(["$system"]);
-
-	// The users go last.
-	expect((await migrator.migrateDown()).error).toBeUndefined();
-	expect(await exists(db, "users")).toBe(false);
 });
 
 it("builds the constraints and indexes that the code names", async () => {
@@ -136,6 +113,27 @@ it("builds the constraints and indexes that the code names", async () => {
 		expect(named.get(index), index).toContain("WHERE (deleted_at IS NULL)");
 	}
 	expect(named.get("sessions_user")).not.toContain("WHERE");
+	// The lookups that grow with the rows: the replay check and the logout by the previous refresh token, and the holds of a
+	// sale that still count, read by the Postgres fallback and the rebuild.
+	expect(named.get("sessions_previous_refresh_live")).toContain(
+		"INDEX sessions_previous_refresh_live ON public.sessions USING btree (previous_refresh_hash) WHERE (deleted_at IS NULL)",
+	);
+	expect(named.get("reservations_live_by_expiry")).toContain(
+		"INDEX reservations_live_by_expiry ON public.reservations USING btree (sale_id, expires_at) WHERE (deleted_at IS NULL)",
+	);
+	// The payment ledger: one row per reservation for good, a ref of its own for each charge, and a charge always has one.
+	expect(named.get("payments_reservation_id_key")).toContain(
+		"UNIQUE INDEX payments_reservation_id_key ON public.payments USING btree (reservation_id)",
+	);
+	expect(named.get("payments_ref_key")).toContain(
+		"UNIQUE INDEX payments_ref_key ON public.payments USING btree (ref)",
+	);
+	expect(named.get("payments_status_known")).toContain(
+		"CHECK ((status = ANY (ARRAY['charged'::text, 'declined'::text, 'refunded'::text])))",
+	);
+	expect(named.get("payments_charged_has_ref")).toContain(
+		"CHECK (((status <> 'charged'::text) OR (ref IS NOT NULL)))",
+	);
 	// A product, a sale and a user that is still in use are never removed under a row.
 	for (const constraint of [
 		"sales_product_id_fkey",
