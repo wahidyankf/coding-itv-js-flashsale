@@ -1,8 +1,8 @@
-// Runs one load profile end to end: start the stack and seed a sale, start the chaos timers and the Postgres sampler, run k6, then judge and report.
+// Runs one load profile end to end: start the stack and seed a sale, sign up the accounts, start the chaos timers and the Postgres sampler, run k6, then judge and report.
 // Usage: node scripts/run.ts <smoke|full|chaos|burst|contention> [--keep] [--calm]. --keep leaves the stack running; --calm drops the Redis timers as a control.
 // The verdict comes from Postgres and Redis, not from what k6 says it did.
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { sleep } from "@flash/flash-commons/timers";
 import {
 	PROFILE_NAMES,
@@ -10,6 +10,7 @@ import {
 	type Profile,
 	type ProfileName,
 } from "../k6/profiles.ts";
+import { signUpAccounts } from "./accounts.ts";
 import { bundleShop } from "./bundle.ts";
 import { type Chaos, startChaos } from "./chaos.ts";
 import {
@@ -61,6 +62,7 @@ async function main(): Promise<number> {
 	console.log(`load: profile ${name}`, JSON.stringify(profile));
 
 	const saleId = await startStackAndSeed();
+	await signUpAccounts(name, profile);
 	const chaos = startChaos(profile, calm);
 	const sampler = startSampler();
 	const k6Exit = await runK6(saleId);
@@ -116,6 +118,9 @@ async function startStackAndSeed(): Promise<string> {
 // Runs k6 against the sale and keeps its output in `<profile>-k6.log`. Resolves with k6's exit code, or null when k6
 // was killed. k6 runs one file, so the script is bundled first.
 async function runK6(saleId: string): Promise<number | null> {
+	// A summary left by an earlier run would pass for this one, so it goes first. Without this, a k6 that never started
+	// would look like a finished run.
+	rmSync(reportPath(k6SummaryFile(name)), { force: true });
 	await bundleShop();
 	console.log("load: running k6");
 	const log: string[] = [];

@@ -42,6 +42,13 @@ function invariantRows(postgres: PostgresFacts, k6: K6Facts): Row[] {
 			String(k6.dropped),
 			k6.dropped === 0,
 		),
+		// A shopper with no account could not take part, so the run did not apply the planned load.
+		row(
+			"k6 had an account for every shopper",
+			"0 missing",
+			String(k6.missingAccounts),
+			k6.missingAccounts === 0,
+		),
 		row(
 			"no oversell: sold is at most the stock",
 			`<= ${stock}`,

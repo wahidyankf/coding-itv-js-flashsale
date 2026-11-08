@@ -10,6 +10,7 @@ const K6: K6Facts = {
 	rateLimited: 3,
 	serverErrors: 0,
 	dropped: 0,
+	missingAccounts: 0,
 	reserveP95: 120.25,
 	purchaseP95: undefined,
 };

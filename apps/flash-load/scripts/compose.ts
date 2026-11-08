@@ -12,6 +12,8 @@ export const REPORTS_DIR = path.resolve(
 	APP_ROOT,
 	"../../generated-reports/load",
 );
+// The API as the host sees it: nginx on the loopback port compose.yaml publishes. The accounts sign up through it.
+export const NGINX_URL = "http://127.0.0.1:8088";
 
 // 256 MiB. A long k6 log and the container logs come back through one call, so the buffer is large.
 const MAX_COMPOSE_OUTPUT_BYTES = 268_435_456;

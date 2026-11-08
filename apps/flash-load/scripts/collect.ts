@@ -33,6 +33,8 @@ export type K6Facts = {
 	rateLimited: number;
 	serverErrors: number;
 	dropped: number;
+	// Shoppers k6 had no signed-up account for. Each one is a harness fault, not a result.
+	missingAccounts: number;
 	// The 95th percentile of the two timed requests, in milliseconds. Undefined when k6 timed none.
 	reserveP95: number | undefined;
 	purchaseP95: number | undefined;
@@ -76,6 +78,7 @@ export function readK6(name: ProfileName): K6Facts {
 		rateLimited: counter(summary, "rate_limited"),
 		serverErrors: counter(summary, "server_errors"),
 		dropped: counter(summary, "dropped_iterations"),
+		missingAccounts: counter(summary, "missing_accounts"),
 		reserveP95: metric(summary, "http_req_duration{name:reserve}", "p(95)"),
 		purchaseP95: metric(summary, "http_req_duration{name:purchase}", "p(95)"),
 	};

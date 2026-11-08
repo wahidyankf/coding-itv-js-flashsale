@@ -13,6 +13,7 @@ const CLEAN_K6: K6Facts = {
 	rateLimited: 3,
 	serverErrors: 0,
 	dropped: 0,
+	missingAccounts: 0,
 	reserveP95: LIMITS.reserveP95Ms - 1,
 	purchaseP95: LIMITS.purchaseP95Ms - 1,
 };
@@ -37,6 +38,7 @@ describe("judgeRun", () => {
 		const rows = judgeRun(JUDGED, CLEAN);
 		expect(rows.map((row) => row.check)).toEqual([
 			"k6 started every planned shopper",
+			"k6 had an account for every shopper",
 			"no oversell: sold is at most the stock",
 			"the sold count equals the purchases",
 			"no shopper bought twice",
@@ -58,7 +60,7 @@ describe("judgeRun", () => {
 			redisBuyers: 999,
 			k6: { ...CLEAN_K6, reserveP95: 9999, purchaseP95: undefined },
 		});
-		expect(rows).toHaveLength(7);
+		expect(rows).toHaveLength(8);
 		expect(rows.every((row) => row.pass)).toBe(true);
 	});
 
@@ -71,6 +73,10 @@ describe("judgeRun", () => {
 
 	it.each<[string, Partial<RunFacts>]>([
 		["k6 started every planned shopper", { k6: { ...CLEAN_K6, dropped: 1 } }],
+		[
+			"k6 had an account for every shopper",
+			{ k6: { ...CLEAN_K6, missingAccounts: 1 } },
+		],
 		[
 			"no oversell: sold is at most the stock",
 			{ postgres: { stock: 100, sold: 101, purchases: 101, twice: 0 } },

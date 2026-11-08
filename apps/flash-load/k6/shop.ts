@@ -1,6 +1,7 @@
-// The k6 script of the load test. Each iteration is one shopper's visit to the sale: sign up, join the queue, wait to be
-// admitted, reserve an item, confirm the purchase, then ask whether they got it. scripts/bundle.ts bundles this file and
-// its imports into one file, which k6 runs, so it may use only the k6 modules and the files of this app, never Node.
+// The k6 script of the load test. Each iteration is one shopper's visit to the sale: use the account the runner signed up
+// before the run, join the queue, wait to be admitted, reserve an item, confirm the purchase, then ask whether they got it.
+// scripts/bundle.ts bundles this file and its imports into one file, which k6 runs, so it may use only the k6 modules and
+// the files of this app, never Node.
 
 import {
 	FIRST_ERROR_STATUS,
@@ -11,10 +12,22 @@ import {
 } from "@flash/flash-commons";
 import { Err, Ok, type Result } from "@flash/typekit";
 import { check, sleep } from "k6";
+import { SharedArray } from "k6/data";
 import exec from "k6/execution";
 import http from "k6/http";
 import { Counter } from "k6/metrics";
 import type { Options } from "k6/options";
+import {
+	ACCESS_COOKIE,
+	type Account,
+	accountsFileName,
+	hammerAccount,
+	issuedTokens,
+	latecomerAccount,
+	shopperAccount,
+	signedUpCounts,
+	tokensByUser,
+} from "./accounts.ts";
 import { LIMITS, PROFILES, type ProfileName } from "./profiles.ts";
 
 // The runner passes the profile and the sale through the environment (k6 `-e`).
@@ -25,14 +38,10 @@ const SALE_ID = __ENV.SALE_ID ?? "";
 // The path of the sale. Every request for the sale starts with it.
 const SALE_PATH = `/sales/${SALE_ID}`;
 
-// The names the API uses for the queue ticket and the login. They are written here, not imported, so a renamed header fails this test.
+// The name the API uses for the queue ticket. It is written here, not imported, so a renamed header fails this test.
 const TICKET_HEADER = "x-queue-ticket";
-const ACCESS_COOKIE = "access_token";
 // The state the queue gives a shopper once they may buy.
 const ADMITTED = "admitted";
-// An IPv4 address is four bytes; a shopper's index is spread over the last three of them.
-const BYTE = 255;
-const BYTE_BITS = 8;
 
 // How a shopper behaves. Each number is a choice about the load, not a limit of the system.
 // A join answered 429 is tried again this many times, then the shopper gives up.
@@ -53,8 +62,6 @@ const JOIN_BACKOFF = { baseMs: JOIN_BASE_MS, capMs: JOIN_CAP_MS };
 const PAYMENT_BACKOFF = { baseMs: PAYMENT_BASE_MS, capMs: PAYMENT_CAP_MS };
 // The share of buyers who press confirm a second time.
 const REPEAT_CONFIRM_SHARE = 0.2;
-// Latecomers get addresses far from the shoppers' range, so the two never share one.
-const LATECOMER_ID_OFFSET = 1_000_000;
 // Latecomers arrive at a steady rate, with their own pool of virtual users, once every hold has lapsed plus a margin.
 const LATECOMERS_PER_SECOND = 10;
 const LATECOMER_PRE_ALLOCATED_VUS = 50;
@@ -73,6 +80,33 @@ const reserved = new Counter("reserved");
 const soldOutReplies = new Counter("sold_out_replies");
 const rateLimited = new Counter("rate_limited");
 const serverErrors = new Counter("server_errors");
+// A shopper the runner did not sign up cannot take part. The verdict fails the run on any of them.
+const missingAccounts = new Counter("missing_accounts");
+
+// The tokens the runner signed the accounts up with, one array for each kind of account, in the order the accounts are
+// numbered. A SharedArray is read once for all virtual users, so each one holds only the entries it uses.
+const ACCOUNTS_PATH = `/reports/${accountsFileName(profileName)}`;
+const shoppers = new SharedArray<string>("shoppers", () =>
+	issuedTokens(
+		tokensByUser(open(ACCOUNTS_PATH)),
+		shopperAccount,
+		signedUpCounts(profile).users,
+	),
+);
+const latecomers = new SharedArray<string>("latecomers", () =>
+	issuedTokens(
+		tokensByUser(open(ACCOUNTS_PATH)),
+		latecomerAccount,
+		signedUpCounts(profile).latecomers,
+	),
+);
+const hammers = new SharedArray<string>("hammers", () =>
+	issuedTokens(
+		tokensByUser(open(ACCOUNTS_PATH)),
+		hammerAccount,
+		signedUpCounts(profile).hammerUsers,
+	),
+);
 
 // A refusal such as 409 or 429 is an answer. Only a 5xx or no answer counts as a failed request.
 http.setResponseCallback(
@@ -137,8 +171,6 @@ type Body = {
 type Answer = {
 	status: number;
 	body: Body;
-	// The value of the access cookie the reply set, if it set one.
-	accessToken?: string;
 };
 type Send = { headers?: Record<string, string>; body?: object };
 
@@ -156,9 +188,6 @@ function errorOf(answer: Answer): string | undefined {
 		? answer.body.errorCode
 		: undefined;
 }
-
-// All shoppers share one password. The accounts exist only in this test stack, so the password guards nothing.
-const PASSWORD = "load-test-password";
 
 // One request. The shopper's address goes in X-Forwarded-For, which the API trusts behind the proxy, so each shopper is
 // limited on their own and not as one address.
@@ -190,17 +219,11 @@ function call(
 	if (response.status === HTTP_STATUS.tooManyRequests) rateLimited.add(1);
 	// A gateway error page is not JSON; the status says enough.
 	const isJson = String(response.headers["Content-Type"]).includes("json");
-	const accessToken = response.cookies[ACCESS_COOKIE]?.[0]?.value;
 	return {
 		status: response.status,
 		body: isJson ? (response.json() as Body) : {},
-		...(accessToken && { accessToken }),
 	};
 }
-
-// The address of shopper `index`. Every shopper has their own, so the API limits each of them on their own.
-const address = (index: number) =>
-	`10.${(index >> (BYTE_BITS * 2)) & BYTE}.${(index >> BYTE_BITS) & BYTE}.${index & BYTE}`;
 
 const pause = ({ min, spread }: Pause) => sleep(min + Math.random() * spread);
 
@@ -217,13 +240,12 @@ function ticketHeaders(me: Visit): Record<string, string> {
 	return { ...cookieHeaders(me.cookie), [TICKET_HEADER]: me.ticket };
 }
 
-// A shopper signs up, which also logs them in, and gets the cookie header every later request carries. Nothing but a
-// refusal of the account itself stops them: without a login the shopper cannot take part.
-function signUp(user: string, ip: string): string | undefined {
-	const account = call("POST", "/auth/register", "register", ip, {
-		body: { username: user, password: PASSWORD },
-	});
-	return account.accessToken && `${ACCESS_COOKIE}=${account.accessToken}`;
+// The cookie header of a shopper, from the access token the runner signed them up with. A shopper with no token has no
+// account. That is a fault of the harness, so it is counted and the run fails; the shopper takes no part.
+function cookieFor(token: string | undefined): string | undefined {
+	if (token) return `${ACCESS_COOKIE}=${token}`;
+	missingAccounts.add(1);
+	return undefined;
 }
 
 // Joins the queue. A shopper refused for going too fast tries again, with backoff, then gives up. Returns the reply that
@@ -352,11 +374,11 @@ function checkOutcome(me: Visit, gotItem: boolean): void {
 	});
 }
 
-// One shopper, from the first click to the answer to "did I get it".
-function visit(user: string, index: number): void {
-	const ip = address(index);
-	const cookie = signUp(user, ip);
+// One shopper, from the first click to the answer to "did I get it". The account is the one the runner signed up.
+function visit(account: Account, token: string | undefined): void {
+	const cookie = cookieFor(token);
 	if (!cookie) return;
+	const ip = account.ip;
 	const place = joinQueue(ip, cookie);
 	if (!place) return;
 	const me: Visit = { ip, cookie, ticket: place.ticket ?? "" };
@@ -380,22 +402,22 @@ function visit(user: string, index: number): void {
 // One shopper at the steady rate of the main sale. Each iteration is one new shopper.
 export function shopper(): void {
 	const index = exec.scenario.iterationInTest + 1;
-	visit(`shopper-${index}`, index);
+	visit(shopperAccount(index), shoppers[index - 1]);
 }
 
 // Shoppers who arrive after every hold has lapsed. They take the items that abandoned holds gave back.
 export function latecomer(): void {
 	const index = exec.scenario.iterationInTest + 1;
-	visit(`late-${index}`, LATECOMER_ID_OFFSET + index);
+	visit(latecomerAccount(index), latecomers[index - 1]);
 }
 
-// A shopper who sends request after request. Past the limit the API must answer 429, never an error. The hammer uses
-// addresses of the documentation range (192.0.2.0/24), apart from the shoppers' range.
+// A shopper who sends request after request. Past the limit the API must answer 429, never an error. The hammer's address
+// is in the documentation range (192.0.2.0/24), apart from the shoppers' range.
 export function hammer(): void {
-	const id = exec.vu.idInTest;
-	const user = `hammer-${id}`;
-	const ip = `192.0.2.${id}`;
-	const cookie = signUp(user, ip);
+	// The id counts the hammers of this scenario. exec.vu.idInTest counts every virtual user of the test, so it is not 1 to N.
+	const id = exec.scenario.iterationInTest + 1;
+	const { ip } = hammerAccount(id);
+	const cookie = cookieFor(hammers[id - 1]);
 	if (!cookie) return;
 	for (let sent = 0; sent < HAMMER_REQUESTS; sent++) {
 		call("POST", `${SALE_PATH}/queue`, "hammer", ip, {
