@@ -35,6 +35,9 @@ export type K6Facts = {
 	dropped: number;
 	// Shoppers k6 had no signed-up account for. Each one is a harness fault, not a result.
 	missingAccounts: number;
+	// Holds a shopper walked away from, split by kind of shopper. Shown for information; no verdict row judges them.
+	abandonedShoppers: number;
+	abandonedLatecomers: number;
 	// The 95th percentile of the two timed requests, in milliseconds. Undefined when k6 timed none.
 	reserveP95: number | undefined;
 	purchaseP95: number | undefined;
@@ -73,12 +76,20 @@ export function readK6(name: ProfileName): K6Facts {
 	const summary: unknown = JSON.parse(
 		readFileSync(reportPath(k6SummaryFile(name)), "utf8"),
 	);
+	return k6FactsOf(summary);
+}
+
+// The counts and timings of one k6 summary object. Kept apart from the file read, so the summary can be checked on its own.
+// A counter or timing k6 did not report reads as zero or as undefined.
+export function k6FactsOf(summary: unknown): K6Facts {
 	return {
 		purchased: counter(summary, "purchased"),
 		rateLimited: counter(summary, "rate_limited"),
 		serverErrors: counter(summary, "server_errors"),
 		dropped: counter(summary, "dropped_iterations"),
 		missingAccounts: counter(summary, "missing_accounts"),
+		abandonedShoppers: counter(summary, "abandoned_shoppers"),
+		abandonedLatecomers: counter(summary, "abandoned_latecomers"),
 		reserveP95: metric(summary, "http_req_duration{name:reserve}", "p(95)"),
 		purchaseP95: metric(summary, "http_req_duration{name:purchase}", "p(95)"),
 	};

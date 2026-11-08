@@ -14,6 +14,8 @@ const CLEAN_K6: K6Facts = {
 	serverErrors: 0,
 	dropped: 0,
 	missingAccounts: 0,
+	abandonedShoppers: 0,
+	abandonedLatecomers: 0,
 	reserveP95: LIMITS.reserveP95Ms - 1,
 	purchaseP95: LIMITS.purchaseP95Ms - 1,
 };

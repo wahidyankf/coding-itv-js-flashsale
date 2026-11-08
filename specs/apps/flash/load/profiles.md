@@ -46,9 +46,12 @@ One shopper in twenty walks away with a hold and does not confirm. One in five o
 the repeat must return the same purchase, and a second reserve must not give a second item. Flooders join the queue many
 times to prove that they are limited, not failed.
 
-Latecomers arrive once every hold has lapsed. They take the items that abandoned holds gave back.
+Latecomers arrive once every hold has lapsed, plus a margin of 5 seconds for the last herd shopper to take a hold. They
+take the items that abandoned holds gave back, and they never walk away with a hold themselves.
 
-A visit lasts at least two seconds. So the virtual users needed are the same as the shoppers.
+A visit lasts more than a second, because the first poll of the place waits 1 to 2 seconds. So the shoppers of one second
+are all still in the system when the last of them arrives, and the pool of virtual users must be larger than the herd.
+`burst` and `contention` send 700 shoppers in one second with a pool of 800.
 
 ## The profiles
 

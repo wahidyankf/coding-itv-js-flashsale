@@ -74,13 +74,15 @@ export const PROFILES = {
 	// Everyone arrives inside one second. The runs above spread their shoppers over many seconds, which lets the queue
 	// smooth the load. These two do not: the herd arrives first and the system has to take it.
 	//
-	// Sizing. A visit lasts at least two seconds, so every shopper who arrives in the same second is in the system at
-	// once: the virtual users needed equal the shoppers, and k6 starts all of them before the clock begins. The
-	// machine sets the ceiling, not the system under test. A first try with 2,000 never began: k6 stopped starting
-	// virtual users at 1,186 of 2,070 on a Docker VM with 7.7 GiB, which is about 6 MiB for each user with the
-	// schema library bundled in (it has since been removed). `full` starts 670 users and runs, so 700 shoppers are used here, about the largest herd
-	// this machine is known to start. The speed limits below are the same as for every other run and are not loosened
-	// for a herd.
+	// Sizing. A visit lasts over a second (the first place poll waits 1 to 2 s), so a shopper who arrives in the herd is
+	// still in the system when the herd's last shopper arrives. The machine sets the ceiling, not the system under
+	// test. A first try with 2,000 never began: k6 stopped starting virtual users at 1,186 of 2,070 on a Docker VM with
+	// 7.7 GiB, about 6 MiB for each user with the schema library bundled in (it has since been removed). `full` starts
+	// 670 users and runs. The speed limits below are the same as for every other run and are not loosened for a herd.
+	//
+	// The pool of a herd profile holds more virtual users than it has shoppers. The herd arrives inside one second, so a
+	// pool equal to the herd has no spare user for its last arrival, and k6 drops that arrival ("Insufficient VUs").
+	// 800 leaves 100 spare users, and stays under the 1,186 the machine reached.
 	//
 	// burst: the herd hits the queue. 700 shoppers join within a second for 100 items; admission still lets in 300 a
 	// second, so the reserve and confirm steps are spread over about two seconds.
@@ -92,8 +94,8 @@ export const PROFILES = {
 		arrivalsPerSecond: 700,
 		latecomers: 100,
 		hammerUsers: 20,
-		preAllocatedVUs: 700,
-		maxVUs: 700,
+		preAllocatedVUs: 800,
+		maxVUs: 800,
 		abandonShare: 0.05,
 		judgeSpeed: true,
 	},
@@ -108,8 +110,8 @@ export const PROFILES = {
 		arrivalsPerSecond: 700,
 		latecomers: 100,
 		hammerUsers: 20,
-		preAllocatedVUs: 700,
-		maxVUs: 700,
+		preAllocatedVUs: 800,
+		maxVUs: 800,
 		abandonShare: 0.05,
 		judgeSpeed: true,
 	},

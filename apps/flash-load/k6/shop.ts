@@ -4,6 +4,7 @@
 // the files of this app, never Node.
 
 import {
+	API_PATHS,
 	FIRST_ERROR_STATUS,
 	FIRST_SERVER_ERROR_STATUS,
 	HTTP_STATUS,
@@ -28,6 +29,7 @@ import {
 	signedUpCounts,
 	tokensByUser,
 } from "./accounts.ts";
+import { saleRoute } from "./paths.ts";
 import { LIMITS, PROFILES, type ProfileName } from "./profiles.ts";
 
 // The runner passes the profile and the sale through the environment (k6 `-e`).
@@ -35,8 +37,15 @@ const profileName = (__ENV.PROFILE ?? "smoke") as ProfileName;
 const profile = PROFILES[profileName];
 const BASE = __ENV.BASE_URL ?? "http://nginx";
 const SALE_ID = __ENV.SALE_ID ?? "";
-// The path of the sale. Every request for the sale starts with it.
-const SALE_PATH = `/sales/${SALE_ID}`;
+// The API paths of this run's sale, with the sale id filled in. Every request for the sale is sent to one of them.
+const SALE_ROUTES = {
+	sale: saleRoute(API_PATHS.sale, SALE_ID),
+	queue: saleRoute(API_PATHS.queue, SALE_ID),
+	queueMe: saleRoute(API_PATHS.queueMe, SALE_ID),
+	reservations: saleRoute(API_PATHS.reservations, SALE_ID),
+	purchases: saleRoute(API_PATHS.purchases, SALE_ID),
+	purchaseMe: saleRoute(API_PATHS.purchaseMe, SALE_ID),
+};
 
 // The name the API uses for the queue ticket. It is written here, not imported, so a renamed header fails this test.
 const TICKET_HEADER = "x-queue-ticket";
@@ -66,7 +75,14 @@ const REPEAT_CONFIRM_SHARE = 0.2;
 const LATECOMERS_PER_SECOND = 10;
 const LATECOMER_PRE_ALLOCATED_VUS = 50;
 const LATECOMER_MAX_VUS = 200;
-const LAPSE_MARGIN_SECONDS = 2;
+// The gap, after the last herd shopper's hold would have lapsed, before the first latecomer arrives. In burst the herd is
+// admitted 1.3 s after its last arrival (700 at 300 a second), and a shopper polls at most 2 s after admission, so the
+// last herd hold can be taken 3.3 s after the last arrival and lapse 10 s later. A latecomer who came earlier would meet
+// that hold and leave with nothing. Five seconds covers the tail with about 1.7 s to spare. Smoke's herd is admitted as it
+// arrives, so its tail is shorter.
+const LAPSE_MARGIN_SECONDS = 5;
+// A latecomer never walks away with a hold: the holds they leave are the last ones, and nobody is left to take them.
+const NEVER_ABANDONS = 0;
 // How many joins one hammering shopper sends.
 const HAMMER_REQUESTS = 60;
 // A pause is a fixed time plus a random part, in seconds, so shoppers do not move together.
@@ -82,6 +98,9 @@ const rateLimited = new Counter("rate_limited");
 const serverErrors = new Counter("server_errors");
 // A shopper the runner did not sign up cannot take part. The verdict fails the run on any of them.
 const missingAccounts = new Counter("missing_accounts");
+// Holds a shopper walked away from, by kind of shopper. The report shows them for information; no verdict row judges them.
+const abandonedShoppers = new Counter("abandoned_shoppers");
+const abandonedLatecomers = new Counter("abandoned_latecomers");
 
 // The tokens the runner signed the accounts up with, one array for each kind of account, in the order the accounts are
 // numbered. A SharedArray is read once for all virtual users, so each one holds only the entries it uses.
@@ -252,7 +271,7 @@ function cookieFor(token: string | undefined): string | undefined {
 // holds the shopper's place, or undefined when there is none. Only a join refused as rate limited is sent again.
 function joinQueue(ip: string, cookie: string): Body | undefined {
 	const join = (): Result<Answer, Answer> => {
-		const answer = call("POST", `${SALE_PATH}/queue`, "join", ip, {
+		const answer = call("POST", SALE_ROUTES.queue, "join", ip, {
 			headers: cookieHeaders(cookie),
 		});
 		return errorOf(answer) === "rate_limited"
@@ -271,7 +290,7 @@ function joinQueue(ip: string, cookie: string): Body | undefined {
 
 // Whether the sale has stopped letting shoppers in: it is sold out or it has ended.
 function saleIsOver(ip: string): boolean {
-	const sale = bodyOf(call("GET", SALE_PATH, "sale", ip));
+	const sale = bodyOf(call("GET", SALE_ROUTES.sale, "sale", ip));
 	return sale?.status === "sold_out" || sale?.status === "ended";
 }
 
@@ -282,7 +301,7 @@ function waitForAdmission(me: Visit, joinedState: string): boolean {
 	for (let polls = 0; state !== ADMITTED && polls < MAX_POLLS; polls++) {
 		pause(POLL_PAUSE);
 		const place = bodyOf(
-			call("GET", `${SALE_PATH}/queue/me`, "place", me.ip, {
+			call("GET", SALE_ROUTES.queueMe, "place", me.ip, {
 				headers: ticketHeaders(me),
 			}),
 		);
@@ -295,7 +314,7 @@ function waitForAdmission(me: Visit, joinedState: string): boolean {
 
 // The reserve request. A shopper who asks again is refused: one item per shopper.
 function askForItem(me: Visit): Answer {
-	return call("POST", `${SALE_PATH}/reservations`, "reserve", me.ip, {
+	return call("POST", SALE_ROUTES.reservations, "reserve", me.ip, {
 		headers: ticketHeaders(me),
 	});
 }
@@ -319,7 +338,7 @@ function buy(
 	reservationId: string | undefined,
 	name: string,
 ): Answer {
-	return call("POST", `${SALE_PATH}/purchases`, name, me.ip, {
+	return call("POST", SALE_ROUTES.purchases, name, me.ip, {
 		headers: cookieHeaders(me.cookie),
 		body: { reservationId },
 	});
@@ -364,7 +383,7 @@ function checkRepeatPurchase(
 
 // "Did I get it" must agree with what happened.
 function checkOutcome(me: Visit, gotItem: boolean): void {
-	const outcome = call("GET", `${SALE_PATH}/purchases/me`, "outcome", me.ip, {
+	const outcome = call("GET", SALE_ROUTES.purchaseMe, "outcome", me.ip, {
 		headers: cookieHeaders(me.cookie),
 	});
 	check(null, {
@@ -374,8 +393,14 @@ function checkOutcome(me: Visit, gotItem: boolean): void {
 	});
 }
 
-// One shopper, from the first click to the answer to "did I get it". The account is the one the runner signed up.
-function visit(account: Account, token: string | undefined): void {
+// One shopper, from the first click to the answer to "did I get it". The account is the one the runner signed up. The
+// abandon share is the chance of walking away with the hold, and the counter records each walk-away.
+function visit(
+	account: Account,
+	token: string | undefined,
+	abandonShare: number,
+	abandoned: Counter,
+): void {
 	const cookie = cookieFor(token);
 	if (!cookie) return;
 	const ip = account.ip;
@@ -386,7 +411,10 @@ function visit(account: Account, token: string | undefined): void {
 	const held = reserveItem(me);
 	if (!held) return;
 	// A share of shoppers (abandonShare in the profile) walks away with the hold and does not confirm.
-	if (Math.random() < profile.abandonShare) return;
+	if (Math.random() < abandonShare) {
+		abandoned.add(1);
+		return;
+	}
 	pause(THINK_BEFORE_PAYING);
 	const bought = payForItem(me, held.reservationId);
 	const gotItem = bought.status === HTTP_STATUS.created;
@@ -402,13 +430,23 @@ function visit(account: Account, token: string | undefined): void {
 // One shopper at the steady rate of the main sale. Each iteration is one new shopper.
 export function shopper(): void {
 	const index = exec.scenario.iterationInTest + 1;
-	visit(shopperAccount(index), shoppers[index - 1]);
+	visit(
+		shopperAccount(index),
+		shoppers[index - 1],
+		profile.abandonShare,
+		abandonedShoppers,
+	);
 }
 
 // Shoppers who arrive after every hold has lapsed. They take the items that abandoned holds gave back.
 export function latecomer(): void {
 	const index = exec.scenario.iterationInTest + 1;
-	visit(latecomerAccount(index), latecomers[index - 1]);
+	visit(
+		latecomerAccount(index),
+		latecomers[index - 1],
+		NEVER_ABANDONS,
+		abandonedLatecomers,
+	);
 }
 
 // A shopper who sends request after request. Past the limit the API must answer 429, never an error. The hammer's address
@@ -420,7 +458,7 @@ export function hammer(): void {
 	const cookie = cookieFor(hammers[id - 1]);
 	if (!cookie) return;
 	for (let sent = 0; sent < HAMMER_REQUESTS; sent++) {
-		call("POST", `${SALE_PATH}/queue`, "hammer", ip, {
+		call("POST", SALE_ROUTES.queue, "hammer", ip, {
 			headers: cookieHeaders(cookie),
 		});
 	}

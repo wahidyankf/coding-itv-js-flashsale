@@ -3,7 +3,7 @@
 // address is never reached. The tokens go to a file k6 reads. A failed sign-up fails the run, because the load generator
 // then says nothing about the system. Part of the load runner in scripts/.
 import { writeFileSync } from "node:fs";
-import { HTTP_STATUS, parseSetCookie } from "@flash/flash-commons";
+import { API_PATHS, HTTP_STATUS, parseSetCookie } from "@flash/flash-commons";
 import { attemptAsync, Err, Ok, type Result } from "@flash/typekit";
 import {
 	ACCESS_COOKIE,
@@ -21,7 +21,6 @@ import { NGINX_URL, reportPath } from "./compose.ts";
 const SIGN_UPS_AT_ONCE = 16;
 // How many failures the error names. The rest are left out of the message.
 const FAILURES_SHOWN = 3;
-const REGISTER_PATH = "/auth/register";
 
 // A signed-up account: its user name and the access token its sign-up set.
 type Issued = { user: string; token: string };
@@ -46,7 +45,7 @@ export function groupsOf<T>(items: readonly T[], size: number): T[][] {
 // Signs one account up from its own address. Resolves with its token, or with the reason it failed.
 async function signUp(account: Account): Promise<Result<Issued, string>> {
 	const sent = await attemptAsync(async () => {
-		const response = await fetch(`${NGINX_URL}${REGISTER_PATH}`, {
+		const response = await fetch(`${NGINX_URL}${API_PATHS.authRegister}`, {
 			method: "POST",
 			headers: {
 				"content-type": "application/json",

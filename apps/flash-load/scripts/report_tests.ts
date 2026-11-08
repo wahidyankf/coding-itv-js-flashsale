@@ -11,6 +11,8 @@ const K6: K6Facts = {
 	serverErrors: 0,
 	dropped: 0,
 	missingAccounts: 0,
+	abandonedShoppers: 5,
+	abandonedLatecomers: 0,
 	reserveP95: 120.25,
 	purchaseP95: undefined,
 };
@@ -64,6 +66,14 @@ describe("renderReport", () => {
 		expect(text).toContain(
 			"Informational: reserve p95 120.3 ms, purchase p95 not measured, server errors 0, requests per instance 10 / 20 / 30, k6 exit code 0.",
 		);
+	});
+
+	it("shows the abandoned holds of shoppers and of latecomers for information, not as a verdict row", () => {
+		const text = renderReport(input());
+		expect(text).toContain(
+			"Abandoned holds, for information: shoppers 5, latecomers 0.\n",
+		);
+		expect(text).not.toContain("| abandoned");
 	});
 
 	it("keeps the worst value of each Postgres session count", () => {

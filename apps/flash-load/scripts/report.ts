@@ -49,6 +49,7 @@ export function renderReport(input: ReportInput): string {
 		"",
 		`Informational: reserve p95 ${formatMs(k6.reserveP95)}, purchase p95 ${formatMs(k6.purchaseP95)}, ` +
 			`server errors ${k6.serverErrors}, requests per instance ${input.requestsPerInstance.join(" / ")}, k6 exit code ${k6Exit}.`,
+		`Abandoned holds, for information: shoppers ${k6.abandonedShoppers}, latecomers ${k6.abandonedLatecomers}.`,
 		sessionsLine(input.samples),
 		"",
 	];
